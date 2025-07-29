@@ -1,0 +1,69 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::Optimize_table_order not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::Optimize_table_order not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::Optimize_table_order not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::Optimize_table_order not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::Optimize_table_order not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::greedy_search
+        greedy_search().
+      */
+      const double buffer_count =
+          1.0 + ((double)cache_record_length(join, idx) * prefix_rowcount /
+                 (double)thd->variables.join_buff_size);
+
+      scan_and_filter_cost =
+          buffer_count *
+          (single_scan_read_cost + cost_model->row_evaluate_cost(
+                                       tab->records() - *rows_after_filtering));
+
+      trace_access_scan->add("using_join_cache", true);
+      trace_access_scan->add(
+          "buffers_needed",
+          static_cast<ulonglong>(std::min(buffer_count, ULLONG_MAX_DOUBLE)));
+    }
+  }
+
+  return scan_and_filter_cost;
+}
+
+/**
+  If table is a lateral derived table, calculates the "cost of
+  materialization", which is the cost of a single materialization (available
+  in the DT's underlying JOIN final plan) multiplied by the number of rows
+  output by the last-in-plan table which DT references (available in a
+  POSITION structure). For example if plan is
+  t1 (outputs 2 rows) - t2 (outputs 20 rows) - dt
+  and dt's definition references only t1, we multiply by 2, not by 20.
+  This cost is divided by the number of times the DT will be read (20, here),
+  to provide a number which best_access_path() can add to best_read_cost.
+*/
+double Optimize_table_order::lateral_derived_cost(
+    const JOIN_TAB *tab, const uint idx, const double prefix_rowcount,
+    const Cost_model_server *cost_model) {
+  assert(tab->table_ref->is_derived() &&
+         tab->table_ref->derived_query_expression()->m_lateral_deps);
+  if (prefix_rowcount == 0)  // no input rows: no materialization needed
+    return 0;
+  table_map deps = tab->table_ref->derived_query_expression()->m_lateral_deps;
+  POSITION *positions = got_final_plan ? join->best_positions : join->positions;
+  double derived_mat_cost = 0;
+  for (int j = idx; j >= (int)join->const_tables; j--) {
+    if (deps & join->best_ref[j]->table_ref->map()) {
+
+

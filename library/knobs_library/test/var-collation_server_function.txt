@@ -1,0 +1,1442 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: set_db_default_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: set_db_default_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: set_db_default_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: mysql_alter_db
+bool mysql_alter_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
+  DBUG_TRACE;
+
+  // Reject altering the system schema except for system threads.
+  if (!thd->is_dd_system_thread() &&
+      dd::get_dictionary()->is_dd_schema_name(db)) {
+    my_error(ER_NO_SYSTEM_SCHEMA_ACCESS, MYF(0), db);
+    return true;
+  }
+
+  /*
+    Check if user has permission to alter database, if encryption type
+    provided differ from global 'default_table_encryption' setting.
+  */
+  if (create_info->encrypt_type.str && opt_table_encryption_privilege_check &&
+      dd::is_encrypted(create_info->encrypt_type) !=
+          thd->variables.default_table_encryption &&
+      check_table_encryption_admin_access(thd)) {
+    my_error(ER_CANNOT_SET_DATABASE_ENCRYPTION, MYF(0));
+    return true;
+  }
+
+  if (lock_schema_name(thd, db)) return true;
+
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  dd::Schema *schema = nullptr;
+  if (thd->dd_client()->acquire_for_modification(db, &schema)) return true;
+
+  if (schema == nullptr) {
+    my_error(ER_NO_SUCH_DB, MYF(0), db);
+    return true;
+  }
+
+  /*
+    If the schema is in read_only state, then the only change allowed is to:
+
+    - Turn off read_only, possibly along with other option changes.
+    - Keep read_only turned on, i.e., a no-op. In this case, other options may
+      not be changed in the same statement.
+
+     This means we fail if:
+
+     - HA_CREATE_USED_READ_ONLY is not set.
+     - Or if we set other fields as well and set READ ONLY to true.
+
+     We check this before locking tables to avoid unnecessary lock acquisition.
+  */
+  bool schema_read_only = false;
+  schema_read_only = schema->read_only();
+  if (!thread_can_ignore_schema_read_only(thd) && schema_read_only) {
+    if (!(create_info->used_fields & HA_CREATE_USED_READ_ONLY) ||
+        ((create_info->used_fields & ~HA_CREATE_USED_READ_ONLY) &&
+         create_info->schema_read_only)) {
+      my_error(ER_SCHEMA_READ_ONLY, MYF(0), db);
+      return true;
+    }
+  }
+
+  /*
+    Lock all tables while under schema lock so that we block all transactions
+    from touching these tables until the ALTER is done. Because the schema read
+    only check and the COMMIT are not done atomically, we use the table MDL
+    to serialize ALTER SCHEMA and any write statements.
+  */
+  Table_ref *tables = nullptr;
+  if (find_db_tables(thd, *schema, db, &tables) ||
+      lock_table_names(thd, tables, nullptr, thd->variables.lock_wait_timeout,
+                       0))
+    return true;
+
+  // Set new collation ID if submitted in the statement.
+  if (create_info->used_fields & HA_CREATE_USED_DEFAULT_CHARSET) {
+    set_db_default_charset(thd, create_info);
+    schema->set_default_collation_id(
+        create_info->default_table_charset->number);
+  }
+
+  // Set encryption type.
+  if (create_info->used_fields & HA_CREATE_USED_DEFAULT_ENCRYPTION) {
+    assert(create_info->encrypt_type.length > 0);
+    schema->set_default_encryption(dd::is_encrypted(create_info->encrypt_type));
+  }
+
+  // Set read_only option.
+  if (create_info->used_fields & HA_CREATE_USED_READ_ONLY) {
+    schema->set_read_only(create_info->schema_read_only);
+  }
+
+  // Update schema.
+  if (thd->dd_client()->update(schema)) return true;
+
+  /*
+    The original query is submitted to the engine's log handler
+    because e.g. NDB needs to propagate the read only option to
+    other mysqld servers in the cluster.
+  */
+  ha_binlog_log_query(thd, nullptr, LOGCOM_ALTER_DB, thd->query().str,
+                      thd->query().length, db, "");
+
+  /*
+    The original query is written to the binlog and hence replicated.
+    Binlogging must be switched off while executing ALTER SCHEMA if
+    this is not desired.
+  */
+  if (write_db_cmd_to_binlog(thd, db, true)) return true;
+
+  /*
+    Commit the statement locally instead of relying on caller,
+    in order to be sure that it is successful, before changing
+    options of current database.
+  */
+  if (trans_commit_stmt(thd) || trans_commit(thd)) return true;
+
+  /*
+    Change collation options if the current database is being
+    altered and the clause is explicitly submitted in the ALTER
+    statement.
+  */
+  if (create_info->used_fields & HA_CREATE_USED_DEFAULT_CHARSET &&
+      thd->db().str && !my_strcasecmp(table_alias_charset, thd->db().str, db)) {
+    thd->db_charset = create_info->default_table_charset
+                          ? create_info->default_table_charset
+                          : thd->variables.collation_server;
+    thd->variables.collation_database = thd->db_charset;
+  }
+
+  /*
+    If the schema read only option was changed, then we must also evict the
+    tables belonging to the schema from the TDC since the option is cached
+    in the table shares. This is safe since we have already acquired
+    exclusive MDL for each table.
+  */
+  if (create_info->used_fields & HA_CREATE_USED_READ_ONLY) {
+    mysql_ha_flush_tables(thd, tables);
+    for (Table_ref *table = tables; table != nullptr;
+         table = table->next_global) {
+      tdc_remove_table(thd, TDC_RT_REMOVE_ALL, table->db, table->table_name,
+                       false);
+    }
+  }
+
+  my_ok(thd, 1);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: mysql_rm_db
+bool mysql_rm_db(THD *thd, const LEX_CSTRING &db, bool if_exists) {
+  ulong deleted_tables = 0;
+  bool error = false;
+  char path[2 * FN_REFLEN + 16];
+  Table_ref *tables = nullptr;
+  Table_ref *table;
+  Drop_table_error_handler err_handler;
+  bool dropped_non_atomic = false;
+  std::set<handlerton *> post_ddl_htons;
+  Foreign_key_parents_invalidator fk_invalidator;
+
+  DBUG_TRACE;
+
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  // Reject dropping the system schema except for system threads.
+  if (!thd->is_dd_system_thread() &&
+      dd::get_dictionary()->is_dd_schema_name(dd::String_type(db.str))) {
+    my_error(ER_NO_SYSTEM_SCHEMA_ACCESS, MYF(0), db.str);
+    return true;
+  }
+
+  if (lock_schema_name(thd, db.str)) return true;
+
+  build_table_filename(path, sizeof(path) - 1, db.str, "", "", 0);
+
+  DEBUG_SYNC(thd, "before_acquire_in_drop_schema");
+  const dd::Schema *schema = nullptr;
+  if (thd->dd_client()->acquire(db.str, &schema)) return true;
+
+  DBUG_EXECUTE_IF("pretend_no_schema_in_drop_schema", { schema = nullptr; });
+
+  /* See if the directory exists */
+  MY_DIR *schema_dirp = my_dir(path, MYF(MY_DONT_SORT));
+
+  auto dirender = [](MY_DIR *dirp) { my_dirend(dirp); };
+  std::unique_ptr<MY_DIR, decltype(dirender)> grd{schema_dirp, dirender};
+
+  if (schema == nullptr)  // Schema not found in DD
+  {
+    if (schema_dirp != nullptr)  // Schema directory exists
+    {
+      // This is always an error, even when if_exists is true
+      my_error(ER_SCHEMA_DIR_UNKNOWN, MYF(0), db.str, path);
+      return true;
+    }
+
+    if (!if_exists)  // IF EXISTS not given
+    {
+      my_error(ER_DB_DROP_EXISTS, MYF(0), db.str);
+      return true;
+    }
+    push_warning_printf(thd, Sql_condition::SL_NOTE, ER_DB_DROP_EXISTS,
+                        ER_THD(thd, ER_DB_DROP_EXISTS), db.str);
+
+    /*
+      We don't have active transaction at this point so we can't use
+      binlog's trx cache, which requires transaction with valid XID.
+    */
+    if (write_db_cmd_to_binlog(thd, db.str, false)) return true;
+
+    if (trans_commit_stmt(thd) || trans_commit_implicit(thd)) return true;
+
+    /* Fall-through to resetting current database in connection. */
+  } else  // Schema found in DD
+  {
+    /* Database directory does not exist. */
+    if (schema_dirp == nullptr) {
+      if (!if_exists) {
+        my_error(ER_SCHEMA_DIR_MISSING, MYF(0), path);
+        return true;
+      }
+      push_warning_printf(thd, Sql_condition::SL_NOTE, ER_SCHEMA_DIR_MISSING,
+                          ER_THD(thd, ER_SCHEMA_DIR_MISSING), path);
+    } else {
+      if (find_unknown_and_remove_deletable_files(thd, schema_dirp, path)) {
+        return true;
+      }
+    }
+
+    if (find_db_tables(thd, *schema, db.str, &tables)) {
+      return true;
+    }
+
+    /* Lock all tables and stored routines about to be dropped. */
+    if (lock_table_names(thd, tables, nullptr, thd->variables.lock_wait_timeout,
+                         0) ||
+        rm_table_do_discovery_and_lock_fk_tables(thd, tables) ||
+        lock_check_constraint_names(thd, tables) ||
+        Events::lock_schema_events(thd, *schema) ||
+        lock_db_routines(thd, *schema) || lock_trigger_names(thd, tables))
+      return true;
+
+    /* mysql_ha_rm_tables() requires a non-null Table_ref. */
+    if (tables) mysql_ha_rm_tables(thd, tables);
+
+    for (table = tables; table; table = table->next_local) {
+      deleted_tables++;
+    }
+
+    if (thd->killed) return true;
+
+    thd->push_internal_handler(&err_handler);
+    if (tables)
+      error = mysql_rm_table_no_locks(thd, tables, true, false, true,
+                                      &dropped_non_atomic, &post_ddl_htons,
+                                      &fk_invalidator, nullptr);
+
+    DBUG_EXECUTE_IF("rm_db_fail_after_dropping_tables", {
+      my_error(ER_UNKNOWN_ERROR, MYF(0));
+      error = true;
+    });
+
+    if (!error) {
+      /*
+        We temporarily disable the binary log while dropping SPs
+        in the database. Since the DROP DATABASE statement is always
+        replicated as a statement, execution of it will drop all objects
+        in the database on the slave as well, so there is no need to
+        replicate the removal of the individual objects in the database
+        as well.
+
+        This is more of a safety precaution, since normally no objects
+        should be dropped while the database is being cleaned, but in
+        the event that a change in the code to remove other objects is
+        made, these drops should still not be logged.
+
+        Notice that the binary log have to be enabled over the call to
+        ha_drop_database(), since NDB otherwise detects the binary log
+        as disabled and will not log the drop database statement on any
+        other connected server.
+      */
+
+      ha_drop_database(path);
+      thd->clear_error(); /* @todo Do not ignore errors */
+      Disable_binlog_guard binlog_guard(thd);
+      error = Events::drop_schema_events(thd, *schema);
+      error = (error || sp_drop_db_routines(thd, *schema));
+    }
+    thd->pop_internal_handler();
+
+    if (!error) error = thd->dd_client()->drop(schema);
+
+    /*
+      If database exists and there was no error we should
+      write statement to binary log and remove DD entry.
+    */
+    if (!error) error = write_db_cmd_to_binlog(thd, db.str, true);
+
+    if (!error) error = trans_commit_stmt(thd) || trans_commit(thd);
+
+    /*
+      In case of error rollback the transaction in order to revert
+      changes which are possible to rollback (e.g. removal of tables
+      in SEs supporting atomic DDL, events and routines).
+    */
+    if (error) {
+      trans_rollback_stmt(thd);
+      /*
+        Play safe to be sure that THD::transaction_rollback_request is
+        cleared before work-around code below is run. This also necessary
+        to synchronize state of data-dicitionary on disk and in cache (to
+        clear cache of uncommitted objects).
+      */
+      trans_rollback_implicit(thd);
+    }
+
+    /*
+      Call post-DDL handlerton hook. For engines supporting atomic DDL
+      tables' files are removed from disk on this step.
+    */
+    for (handlerton *hton : post_ddl_htons) hton->post_ddl(thd);
+
+    fk_invalidator.invalidate(thd);
+
+    /*
+      Now we can try removing database directory.
+
+      If the directory is a symbolic link, remove the link first, then
+      remove the directory the symbolic link pointed at.
+
+      This can happen only after post-DDL handlerton hook removes files
+      from the directory.
+
+      Since the statement is committed already, we do not report unlikely
+      failure to remove the directory as an error. Instead we report it
+      as a warning, which is sent to user and written to server error log.
+    */
+    if (!error && schema_dirp != nullptr) {
+      Rmdir_error_handler rmdir_handler;
+      thd->push_internal_handler(&rmdir_handler);
+      (void)rm_dir_w_symlink(path, true);
+      thd->pop_internal_handler();
+    }
+
+    if (error) {
+      if (mysql_bin_log.is_open()) {
+        /*
+          If GTID_NEXT=='UUID:NUMBER', we must not log an incomplete
+          statement.  However, the incomplete DROP has already 'committed'
+          (some tables were removed).  So we generate an error and let
+          user fix the situation.
+        */
+        if (thd->variables.gtid_next.type == ASSIGNED_GTID &&
+            dropped_non_atomic) {
+          char gtid_buf[Gtid::MAX_TEXT_LENGTH + 1];
+          thd->variables.gtid_next.gtid.to_string(global_sid_map, gtid_buf,
+                                                  true);
+          my_error(ER_CANNOT_LOG_PARTIAL_DROP_DATABASE_WITH_GTID, MYF(0), path,
+                   gtid_buf, db.str);
+          return true;
+        }
+      }
+      return true;
+    }
+  }
+
+  /*
+    If this database was the client's selected database, we silently
+    change the client's selected database to nothing (to have an empty
+    SELECT DATABASE() in the future). For this we free() thd->db and set
+    it to 0.
+  */
+  if (thd->db().str && !strcmp(thd->db().str, db.str)) {
+    mysql_change_db_impl(thd, NULL_CSTR, 0, thd->variables.collation_server);
+    /*
+      Check if current database tracker is enabled. If so, set the 'changed'
+      flag.
+    */
+    if (thd->session_tracker.get_tracker(CURRENT_SCHEMA_TRACKER)
+            ->is_enabled()) {
+      thd->session_tracker.get_tracker(CURRENT_SCHEMA_TRACKER)
+          ->mark_as_changed(thd, {});
+    }
+  }
+
+  thd->server_status |= SERVER_STATUS_DB_DROPPED;
+  my_ok(thd, deleted_tables);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: mysql_change_db
+bool mysql_change_db(THD *thd, const LEX_CSTRING &new_db_name,
+                     bool force_switch) {
+  LEX_STRING new_db_file_name;
+  LEX_CSTRING new_db_file_name_cstr;
+
+  Security_context *sctx = thd->security_context();
+  ulong db_access = sctx->current_db_access();
+  const CHARSET_INFO *db_default_cl = nullptr;
+
+  // We must make sure the schema is released and unlocked in the right order.
+  dd::Schema_MDL_locker mdl_handler(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  const dd::Schema *schema = nullptr;
+
+  DBUG_TRACE;
+  DBUG_PRINT("enter", ("name: '%s'", new_db_name.str));
+
+  if (new_db_name.str == nullptr || new_db_name.length == 0) {
+    if (force_switch) {
+      /*
+        This can happen only if we're switching the current database back
+        after loading stored program. The thing is that loading of stored
+        program can happen when there is no current database.
+
+        TODO: actually, new_db_name and new_db_name->str seem to be always
+        non-NULL. In case of stored program, new_db_name->str == "" and
+        new_db_name->length == 0.
+      */
+
+      mysql_change_db_impl(thd, NULL_CSTR, 0, thd->variables.collation_server);
+
+      goto done;
+    } else {
+      my_error(ER_NO_DB_ERROR, MYF(0));
+
+      return true;
+    }
+  }
+
+  if (is_infoschema_db(new_db_name.str, new_db_name.length)) {
+    /* Switch the current database to INFORMATION_SCHEMA. */
+
+    mysql_change_db_impl(thd, INFORMATION_SCHEMA_NAME, SELECT_ACL,
+                         system_charset_info);
+    goto done;
+  }
+
+  /*
+    Now we need to make a copy because check_db_name requires a
+    non-constant argument. Actually, it takes database file name.
+
+    TODO: fix check_db_name().
+  */
+
+  new_db_file_name.str = my_strndup(key_memory_THD_db, new_db_name.str,
+                                    new_db_name.length, MYF(MY_WME));
+  new_db_file_name.length = new_db_name.length;
+
+  if (new_db_file_name.str == nullptr) return true; /* the error is set */
+
+  /*
+    NOTE: if check_db_name() fails, we should throw an error in any case,
+    even if we are called from sp_head::execute().
+
+    It's next to impossible however to get this error when we are called
+    from sp_head::execute(). But let's switch the current database to NULL
+    in this case to be sure.
+  */
+
+  if (check_and_convert_db_name(&new_db_file_name, false) !=
+      Ident_name_check::OK) {
+    my_free(new_db_file_name.str);
+
+    if (force_switch)
+      mysql_change_db_impl(thd, NULL_CSTR, 0, thd->variables.collation_server);
+    return true;
+  }
+  new_db_file_name_cstr.str = new_db_file_name.str;
+  new_db_file_name_cstr.length = new_db_file_name.length;
+  DBUG_PRINT("info", ("Use database: %s", new_db_file_name.str));
+
+  if (sctx->get_active_roles()->size() == 0) {
+    db_access =
+        sctx->check_access(DB_OP_ACLS, new_db_file_name.str)
+            ? DB_OP_ACLS
+            : acl_get(thd, sctx->host().str, sctx->ip().str,
+                      sctx->priv_user().str, new_db_file_name.str, false) |
+                  sctx->master_access(new_db_file_name.str);
+  } else {
+    db_access = sctx->db_acl(new_db_file_name_cstr) |
+                sctx->master_access(new_db_file_name.str);
+  }
+
+  if (!force_switch && !(db_access & DB_OP_ACLS) &&
+      check_grant_db(thd, new_db_file_name.str, true)) {
+    my_error(ER_DBACCESS_DENIED_ERROR, MYF(0), sctx->priv_user().str,
+             sctx->priv_host().str, new_db_file_name.str);
+    query_logger.general_log_print(
+        thd, COM_INIT_DB, ER_DEFAULT(ER_DBACCESS_DENIED_ERROR),
+        sctx->priv_user().str, sctx->priv_host().str, new_db_file_name.str);
+    my_free(new_db_file_name.str);
+    return true;
+  }
+
+  if (mdl_handler.ensure_locked(new_db_file_name.str) ||
+      thd->dd_client()->acquire(new_db_file_name.str, &schema)) {
+    my_free(new_db_file_name.str);
+    return true;
+  }
+
+  DEBUG_SYNC(thd, "acquired_schema_while_getting_collation");
+
+  if (schema == nullptr) {
+    if (force_switch) {
+      /* Throw a warning and free new_db_file_name. */
+
+      push_warning_printf(thd, Sql_condition::SL_NOTE, ER_BAD_DB_ERROR,
+                          ER_THD(thd, ER_BAD_DB_ERROR), new_db_file_name.str);
+
+      my_free(new_db_file_name.str);
+
+      /* Change db to NULL. */
+      mysql_change_db_impl(thd, NULL_CSTR, 0, thd->variables.collation_server);
+
+      /* The operation succeed. */
+      goto done;
+    } else {
+      /* Report an error and free new_db_file_name. */
+
+      my_error(ER_BAD_DB_ERROR, MYF(0), new_db_file_name.str);
+      my_free(new_db_file_name.str);
+
+      /* The operation failed. */
+
+      return true;
+    }
+  }
+
+  if (get_default_db_collation(*schema, &db_default_cl)) {
+    my_free(new_db_file_name.str);
+    assert(thd->is_error() || thd->killed);
+    return true;
+  }
+
+  db_default_cl = db_default_cl ? db_default_cl : thd->collation();
+  /*
+    NOTE: in mysql_change_db_impl() new_db_file_name is assigned to THD
+    attributes and will be freed in THD::~THD().
+  */
+  mysql_change_db_impl(thd, new_db_file_name_cstr, db_access, db_default_cl);
+
+done:
+  /*
+    Check if current database tracker is enabled. If so, set the 'changed' flag.
+  */
+  if (thd->session_tracker.get_tracker(CURRENT_SCHEMA_TRACKER)->is_enabled()) {
+    thd->session_tracker.get_tracker(CURRENT_SCHEMA_TRACKER)
+        ->mark_as_changed(thd, {});
+  }
+  if (thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+          ->is_enabled())
+    thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+        ->mark_as_changed(thd, {});
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc
+Function: Sql_cmd_create_or_drop_index_base::execute
+bool Sql_cmd_create_table::execute(THD *thd) {
+  LEX *const lex = thd->lex;
+  Query_block *const query_block = lex->query_block;
+  Query_expression *const query_expression = lex->unit;
+  Table_ref *const create_table = lex->query_tables;
+  partition_info *part_info = lex->part_info;
+
+  /*
+    Code below (especially in mysql_create_table() and Query_result_create
+    methods) may modify HA_CREATE_INFO structure in LEX, so we have to
+    use a copy of this structure to make execution prepared statement-
+    safe. A shallow copy is enough as this code won't modify any memory
+    referenced from this structure.
+  */
+  HA_CREATE_INFO create_info(*lex->create_info);
+  /*
+    We need to copy alter_info for the same reasons of re-execution
+    safety, only in case of Alter_info we have to do (almost) a deep
+    copy.
+  */
+  Alter_info alter_info(*m_alter_info, thd->mem_root);
+
+  if (thd->is_error()) {
+    /* If out of memory when creating a copy of alter_info. */
+    return true;
+  }
+
+  if (((lex->create_info->used_fields & HA_CREATE_USED_DATADIR) != 0 ||
+       (lex->create_info->used_fields & HA_CREATE_USED_INDEXDIR) != 0) &&
+      check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "FILE");
+    return true;
+  }
+
+  if (!thd->is_plugin_fake_ddl()) {
+    if (create_table_precheck(thd, query_expression_tables, create_table))
+      return true;
+  }
+
+  /* Might have been updated in create_table_precheck */
+  create_info.alias = create_table->alias;
+
+  /*
+    If no engine type was given, work out the default now
+    rather than at parse-time.
+  */
+  if (!(create_info.used_fields & HA_CREATE_USED_ENGINE))
+    create_info.db_type = create_info.options & HA_LEX_CREATE_TMP_TABLE
+                              ? ha_default_temp_handlerton(thd)
+                              : ha_default_handlerton(thd);
+
+  assert(create_info.db_type != nullptr);
+  if ((m_alter_info->flags & Alter_info::ANY_ENGINE_ATTRIBUTE) != 0 &&
+      ((create_info.db_type->flags & HTON_SUPPORTS_ENGINE_ATTRIBUTE) == 0 &&
+       DBUG_EVALUATE_IF("simulate_engine_attribute_support", false, true))) {
+    my_error(ER_ENGINE_ATTRIBUTE_NOT_SUPPORTED, MYF(0),
+             ha_resolve_storage_engine_name(create_info.db_type));
+    return true;
+  }
+
+  /*
+    Assign target tablespace name to enable locking in lock_table_names().
+    Reject invalid names.
+  */
+  if (create_info.tablespace) {
+    if (validate_tablespace_name_length(create_info.tablespace) ||
+        validate_tablespace_name(TS_CMD_NOT_DEFINED, create_info.tablespace,
+                                 create_info.db_type))
+      return true;
+
+    if (lex_string_strmake(thd->mem_root, &create_table->target_tablespace_name,
+                           create_info.tablespace,
+                           strlen(create_info.tablespace)))
+      return true;
+  }
+
+  // Reject invalid tablespace names specified for partitions.
+  if (validate_partition_tablespace_name_lengths(part_info) ||
+      validate_partition_tablespace_names(part_info, create_info.db_type))
+    return true;
+
+  /* Fix names if symlinked or relocated tables */
+  if (prepare_index_and_data_dir_path(thd, &create_info.data_file_name,
+                                      &create_info.index_file_name,
+                                      create_table->table_name))
+    return true;
+
+  {
+    partition_info *part = thd->lex->part_info;
+    if (part != nullptr && has_external_data_or_index_dir(*part) &&
+        check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+      return true;
+    }
+    if (part && !(part = thd->lex->part_info->get_clone(thd, true)))
+      return true;
+    thd->work_part_info = part;
+  }
+
+  if (part_info != nullptr && part_info->part_expr &&
+      part_info->part_expr->fixed) {  // @todo Code may be redundant
+    part_info->fixed = true;
+  }
+  bool res = false;
+
+  if (!query_block->field_list_is_empty())  // With select
+  {
+    /*
+      CREATE TABLE...IGNORE/REPLACE SELECT... can be unsafe, unless
+      ORDER BY PRIMARY KEY clause is used in SELECT statement. We therefore
+      use row based logging if mixed or row based logging is available.
+      TODO: Check if the order of the output of the select statement is
+      deterministic. Waiting for BUG#42415
+    */
+    if (lex->is_ignore())
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_IGNORE_SELECT);
+
+    if (lex->duplicates == DUP_REPLACE)
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_REPLACE_SELECT);
+
+    /**
+      Disallow creation of foreign keys if,
+
+      - SE supports atomic DDL's.
+      - The binlogging is enabled.
+      - The binlog format is ROW.
+
+      This is done to avoid complications involved in locking,
+      updating and invalidation (in case of rollback) of DD cache
+      for parent table.
+    */
+    if ((alter_info.flags & Alter_info::ADD_FOREIGN_KEY) &&
+        (create_info.db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+        mysql_bin_log.is_open() &&
+        (thd->variables.option_bits & OPTION_BIN_LOG) &&
+        thd->variables.binlog_format == BINLOG_FORMAT_ROW) {
+      my_error(ER_FOREIGN_KEY_WITH_ATOMIC_CREATE_SELECT, MYF(0));
+      return true;
+    }
+
+    // Reject request to CREATE TABLE AS SELECT with START TRANSACTION.
+    if (create_info.m_transactional_ddl) {
+      my_error(ER_NOT_ALLOWED_WITH_START_TRANSACTION, MYF(0),
+               "with CREATE TABLE ... AS SELECT statement.");
+      return true;
+    }
+
+    /*
+      If:
+      a) we inside an SP and there was NAME_CONST substitution,
+      b) binlogging is on (STMT mode),
+      c) we log the SP as separate statements
+      raise a warning, as it may cause problems
+      (see 'NAME_CONST issues' in 'Binary Logging of Stored Programs')
+     */
+    if (thd->query_name_consts && mysql_bin_log.is_open() &&
+        thd->variables.binlog_format == BINLOG_FORMAT_STMT &&
+        !mysql_bin_log.is_query_in_union(thd, thd->query_id)) {
+      uint splocal_refs = 0;
+      /* Count SP local vars in the top-level SELECT list */
+      for (Item *item : query_block->visible_fields()) {
+        if (item->is_splocal()) splocal_refs++;
+      }
+      /*
+        If it differs from number of NAME_CONST substitution applied,
+        we may have a SOME_FUNC(NAME_CONST()) in the SELECT list,
+        that may cause a problem with binary log (see BUG#35383),
+        raise a warning.
+      */
+      if (splocal_refs != thd->query_name_consts)
+        push_warning(
+            thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+            "Invoked routine ran a statement that may cause problems with "
+            "binary log, see 'NAME_CONST issues' in 'Binary Logging of Stored "
+            "Programs' "
+            "section of the manual.");
+    }
+
+    /*
+      Disable non-empty MERGE tables with CREATE...SELECT. Too
+      complicated. See Bug #26379. Empty MERGE tables are read-only
+      and don't allow CREATE...SELECT anyway.
+    */
+    if (create_info.used_fields & HA_CREATE_USED_UNION) {
+      my_error(ER_WRONG_OBJECT, MYF(0), create_table->db,
+               create_table->table_name, "BASE TABLE");
+      return true;
+    }
+
+    if (query_expression->is_prepared()) {
+      cleanup(thd);
+    }
+    auto cleanup_se_guard = create_scope_guard(
+        [lex] { lex->set_secondary_engine_execution_context(nullptr); });
+    if (open_tables_for_query(thd, lex->query_tables, false)) return true;
+
+    /* The table already exists */
+    if (create_table->table || create_table->is_view()) {
+      if (create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+        push_warning_printf(thd, Sql_condition::SL_NOTE, ER_TABLE_EXISTS_ERROR,
+                            ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                            create_info.alias);
+        my_ok(thd);
+        return false;
+      } else {
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_info.alias);
+        return false;
+      }
+    }
+
+    /*
+      Remove target table from main select and name resolution
+      context. This can't be done earlier as it will break view merging in
+      statements like "CREATE TABLE IF NOT EXISTS existing_view SELECT".
+    */
+    bool link_to_local;
+    lex->unlink_first_table(&link_to_local);
+
+    /* Updating any other table is prohibited in CTS statement */
+    for (Table_ref *table = lex->query_tables; table;
+         table = table->next_global) {
+      if (table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+        lex->link_first_table_back(create_table, link_to_local);
+
+        my_error(ER_CANT_UPDATE_TABLE_IN_CREATE_TABLE_SELECT, MYF(0),
+                 table->table_name, create_info.alias);
+        return true;
+      }
+    }
+
+    Query_result_create *result;
+    if (!query_expression->is_prepared()) {
+      const Prepare_error_tracker tracker(thd);
+      Prepared_stmt_arena_holder ps_arena_holder(thd);
+      result = new (thd->mem_root)
+          Query_result_create(create_table, &query_block->fields,
+                              lex->duplicates, query_expression_tables);
+      if (result == nullptr) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+
+      // Use the hypergraph optimizer for the SELECT statement, if enabled.
+      lex->set_using_hypergraph_optimizer(
+          thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
+
+      if (query_expression->prepare(thd, result, nullptr, SELECT_NO_UNLOCK,
+                                    0)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+      if (!thd->stmt_arena->is_regular() && lex->save_cmd_properties(thd)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+    } else {
+      result = down_cast<Query_result_create *>(
+          query_expression->query_result() != nullptr
+              ? query_expression->query_result()
+              : query_block->query_result());
+      // Restore prepared statement properties, bind table and field information
+      lex->restore_cmd_properties();
+      bind_fields(thd->stmt_arena->item_list());
+    }
+    if (validate_use_secondary_engine(lex)) return true;
+
+    result->set_two_fields(&create_info, &alter_info);
+
+    // For objects acquired during table creation.
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    Ignore_error_handler ignore_handler;
+    Strict_error_handler strict_handler;
+    if (lex->is_ignore())
+      thd->push_internal_handler(&ignore_handler);
+    else if (thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+
+    res = populate_table(thd, lex);
+
+    // Count the number of statements offloaded to a secondary storage engine.
+    if (using_secondary_storage_engine() && lex->unit->is_executed())
+      ++thd->status_var.secondary_engine_execution_count;
+
+    if (lex->is_ignore() || thd->is_strict_mode()) thd->pop_internal_handler();
+    lex->cleanup(false);
+    thd->clear_current_query_costs();
+    lex->clear_values_map();
+
+    // Abort the result set if execution ended in error
+    if (res) result->abort_result_set(thd);
+
+    result->cleanup();
+
+    lex->link_first_table_back(create_table, link_to_local);
+    THD_STAGE_INFO(thd, stage_end);
+  } else {
+    Strict_error_handler strict_handler;
+    /* Push Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+    /* regular create */
+    if (create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
+      /* CREATE TABLE ... LIKE ... */
+      res = mysql_create_like_table(thd, create_table, query_expression_tables,
+                                    &create_info);
+    } else {
+      /* Regular CREATE TABLE */
+      res = mysql_create_table(thd, create_table, &create_info, &alter_info);
+    }
+    /* Pop Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode()) thd->pop_internal_handler();
+    if (!res) {
+      /* in case of create temp tables if @@session_track_state_change is
+         ON then send session state notification in OK packet */
+      if (create_info.options & HA_LEX_CREATE_TMP_TABLE &&
+          thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, {});
+      my_ok(thd);
+    }
+  }
+  // The following code is required to make CREATE TABLE re-execution safe.
+  // @todo Consider refactoring this code.
+  if (part_info != nullptr) {
+    if (part_info->part_expr != nullptr &&
+        part_info->part_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->part_expr)->reset_field();
+
+    if (part_info->subpart_expr != nullptr &&
+        part_info->subpart_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->subpart_expr)->reset_field();
+  }
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: HA_CREATE_INFO::init_create_options_from_share
+void HA_CREATE_INFO::init_create_options_from_share(const TABLE_SHARE *share,
+                                                    uint64_t used_fields) {
+  if (!(used_fields & HA_CREATE_USED_MIN_ROWS)) min_rows = share->min_rows;
+
+  if (!(used_fields & HA_CREATE_USED_MAX_ROWS)) max_rows = share->max_rows;
+
+  if (!(used_fields & HA_CREATE_USED_AVG_ROW_LENGTH))
+    avg_row_length = share->avg_row_length;
+
+  if (!(used_fields & HA_CREATE_USED_DEFAULT_CHARSET))
+    default_table_charset = share->table_charset;
+
+  if (!(used_fields & HA_CREATE_USED_KEY_BLOCK_SIZE))
+    key_block_size = share->key_block_size;
+
+  if (!(used_fields & HA_CREATE_USED_STATS_SAMPLE_PAGES))
+    stats_sample_pages = share->stats_sample_pages;
+
+  if (!(used_fields & HA_CREATE_USED_STATS_AUTO_RECALC))
+    stats_auto_recalc = share->stats_auto_recalc;
+
+  if (!(used_fields & HA_CREATE_USED_TABLESPACE))
+    tablespace = share->tablespace;
+
+  if (storage_media == HA_SM_DEFAULT)
+    storage_media = share->default_storage_media;
+
+  /* Creation of federated table with LIKE clause needs connection string */
+  if (!(used_fields & HA_CREATE_USED_CONNECTION))
+    connect_string = share->connect_string;
+
+  if (!(used_fields & HA_CREATE_USED_COMMENT)) {
+    // Assert to check that used_fields flag and comment are in sync.
+    assert(!comment.str);
+    comment = share->comment;
+  }
+
+  if (!(used_fields & HA_CREATE_USED_COMPRESS)) {
+    // Assert to check that used_fields flag and compress are in sync
+    assert(!compress.str);
+    compress = share->compress;
+  }
+
+  if (!(used_fields & (HA_CREATE_USED_ENCRYPT))) {
+    // Assert to check that used_fields flag and encrypt_type are in sync
+    assert(!encrypt_type.str);
+    encrypt_type = share->encrypt_type;
+  }
+
+  if (!(used_fields & HA_CREATE_USED_SECONDARY_ENGINE)) {
+    assert(secondary_engine.str == nullptr);
+    secondary_engine = share->secondary_engine;
+  }
+  secondary_load = share->secondary_load;
+
+  if (!(used_fields & HA_CREATE_USED_AUTOEXTEND_SIZE)) {
+    /* m_implicit_tablespace_autoextend_size = 0 is a valid value. Hence,
+    we need a mechanism to indicate the value change. */
+    m_implicit_tablespace_autoextend_size = share->autoextend_size;
+    m_implicit_tablespace_autoextend_size_change = false;
+  }
+
+  if (engine_attribute.str == nullptr)
+    engine_attribute = share->engine_attribute;
+
+  if (secondary_engine_attribute.str == nullptr)
+    secondary_engine_attribute = share->secondary_engine_attribute;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_show.cc
+Function: mysqld_show_create_db
+bool mysqld_show_create_db(THD *thd, char *dbname,
+                           HA_CREATE_INFO *create_info) {
+  char buff[2048], orig_dbname[NAME_LEN];
+  String buffer(buff, sizeof(buff), system_charset_info);
+  Security_context *sctx = thd->security_context();
+  uint db_access;
+  HA_CREATE_INFO create;
+  bool schema_read_only{false};
+  uint create_options = create_info ? create_info->options : 0;
+  Protocol *protocol = thd->get_protocol();
+  DBUG_TRACE;
+
+  strcpy(orig_dbname, dbname);
+  if (lower_case_table_names && dbname != any_db)
+    my_casedn_str(files_charset_info, dbname);
+
+  if (sctx->check_access(DB_OP_ACLS, orig_dbname))
+    db_access = DB_OP_ACLS;
+  else {
+    if (sctx->get_active_roles()->size() > 0 && dbname != nullptr) {
+      db_access = (sctx->db_acl({dbname, strlen(dbname)}) |
+                   sctx->master_access(dbname ? dbname : ""));
+    } else {
+      db_access = (acl_get(thd, sctx->host().str, sctx->ip().str,
+                           sctx->priv_user().str, dbname, false) |
+                   sctx->master_access(dbname ? dbname : ""));
+    }
+  }
+  if (!(db_access & DB_OP_ACLS) && check_grant_db(thd, dbname, true)) {
+    my_error(ER_DBACCESS_DENIED_ERROR, MYF(0), sctx->priv_user().str,
+             sctx->host_or_ip().str, dbname);
+    query_logger.general_log_print(
+        thd, COM_INIT_DB, ER_DEFAULT(ER_DBACCESS_DENIED_ERROR),
+        sctx->priv_user().str, sctx->host_or_ip().str, dbname);
+    return true;
+  }
+
+  bool is_encrypted_schema = false;
+  if (is_infoschema_db(dbname)) {
+    create.default_table_charset = system_charset_info;
+  } else {
+    dd::Schema_MDL_locker mdl_handler(thd);
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+    const dd::Schema *schema = nullptr;
+    if (mdl_handler.ensure_locked(dbname) ||
+        thd->dd_client()->acquire(dbname, &schema))
+      return true;
+
+    if (schema == nullptr) {
+      my_error(ER_BAD_DB_ERROR, MYF(0), dbname);
+      return true;
+    }
+
+    if (get_default_db_collation(*schema, &create.default_table_charset)) {
+      assert(thd->is_error() || thd->killed);
+      return true;
+    }
+
+    schema_read_only = schema->read_only();
+
+    if (create.default_table_charset == nullptr)
+      create.default_table_charset = thd->collation();
+
+    is_encrypted_schema = schema->default_encryption();
+  }
+  mem_root_deque<Item *> field_list(thd->mem_root);
+  field_list.push_back(new Item_empty_string("Database", NAME_CHAR_LEN));
+  field_list.push_back(new Item_empty_string("Create Database", 1024));
+
+  if (thd->send_result_metadata(field_list,
+                                Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF))
+    return true;
+
+  protocol->start_row();
+  protocol->store_string(orig_dbname, strlen(orig_dbname), system_charset_info);
+  buffer.length(0);
+  buffer.append(STRING_WITH_LEN("CREATE DATABASE "));
+  if (create_options & HA_LEX_CREATE_IF_NOT_EXISTS)
+    buffer.append(STRING_WITH_LEN("/*!32312 IF NOT EXISTS*/ "));
+  append_identifier(thd, &buffer, orig_dbname, strlen(orig_dbname));
+
+  if (create.default_table_charset) {
+    buffer.append(STRING_WITH_LEN(" /*!40100"));
+    buffer.append(STRING_WITH_LEN(" DEFAULT CHARACTER SET "));
+    buffer.append(create.default_table_charset->csname);
+    if (!(create.default_table_charset->state & MY_CS_PRIMARY) ||
+        create.default_table_charset == &my_charset_utf8mb4_0900_ai_ci) {
+      buffer.append(STRING_WITH_LEN(" COLLATE "));
+      buffer.append(create.default_table_charset->m_coll_name);
+    }
+    buffer.append(STRING_WITH_LEN(" */"));
+  }
+  buffer.append(STRING_WITH_LEN(" /*!80016"));
+  buffer.append(STRING_WITH_LEN(" DEFAULT ENCRYPTION="));
+  if (is_encrypted_schema)
+    buffer.append(STRING_WITH_LEN("'Y'"));
+  else
+    buffer.append(STRING_WITH_LEN("'N'"));
+  buffer.append(STRING_WITH_LEN(" */"));
+
+  /*
+    The read only option is not supported by the CREATE SCHEMA syntax,
+    so we enclose the output in a separate comment without version tag.
+  */
+  if (schema_read_only) buffer.append(STRING_WITH_LEN(" /* READ ONLY = 1 */"));
+
+  protocol->store_string(buffer.ptr(), buffer.length(), buffer.charset());
+
+  if (protocol->end_row()) return true;
+  my_eof(thd);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc
+Function: dd::fill_dd_routine_info
+  Method is called from the fill_dd_routine_info().
+
+  @param[in]  thd        Thread handle.
+  @param[in]  sp         Stored routine object.
+  @param[out] routine    dd::Routine object prepared from sp_head.
+
+  @retval false  ON SUCCESS
+  @retval true   ON FAILURE
+*/
+
+static bool fill_routine_parameters_info(THD *thd, sp_head *sp,
+                                         Routine *routine) {
+  DBUG_TRACE;
+
+  /*
+    The return type of the stored function is listed as first parameter from
+    the Information_schema.parameters. Storing return type as first parameter
+    for the stored functions.
+  */
+  if (sp->m_type == enum_sp_type::FUNCTION) {
+    // Add parameter.
+    dd::Parameter *param = routine->add_parameter();
+
+    // Fill return type information.
+    fill_parameter_info_from_field(thd, &sp->m_return_field_def, param);
+  }
+
+  // Fill parameter information of the stored routine.
+  sp_pcontext *sp_root_parsing_ctx = sp->get_root_parsing_context();
+  assert(sp_root_parsing_ctx != nullptr);
+  for (uint i = 0; i < sp_root_parsing_ctx->context_var_count(); i++) {
+    sp_variable *sp_var = sp_root_parsing_ctx->find_variable(i);
+    Create_field *field_def = &sp_var->field_def;
+
+    // Add parameter.
+    dd::Parameter *param = routine->add_parameter();
+
+    // Set parameter name.
+    param->set_name(sp_var->name.str);
+
+    // Set parameter mode.
+    Parameter::enum_parameter_mode mode;
+    switch (sp_var->mode) {
+      case sp_variable::MODE_IN:
+        mode = Parameter::PM_IN;
+        break;
+      case sp_variable::MODE_OUT:
+        mode = Parameter::PM_OUT;
+        break;
+      case sp_variable::MODE_INOUT:
+        mode = Parameter::PM_INOUT;
+        break;
+      default:
+        assert(false); /* purecov: deadcode */
+        return true;   /* purecov: deadcode */
+    }
+    param->set_mode(mode);
+
+    // Fill return type information.
+    fill_parameter_info_from_field(thd, field_def, param);
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::run_bootstrap_thread
+bool run_bootstrap_thread(const char *file_name, MYSQL_FILE *file,
+                          bootstrap_functor boot_handler,
+                          enum_thread_type thread_type) {
+  DBUG_TRACE;
+
+  THD *thd = new THD;
+  thd->system_thread = thread_type;
+  thd->get_protocol_classic()->init_net(nullptr);
+  // Skip grants and set the system_user flag in THD.
+  thd->security_context()->skip_grants();
+
+  thd->set_new_thread_id();
+
+  handle_bootstrap_args args;
+
+  args.m_thd = thd;
+  args.m_bootstrap_handler = boot_handler;
+  args.m_file_name = file_name;
+  args.m_file = file;
+
+  // Set server default sql_mode irrespective of mysqld server command line
+  // argument.
+  thd->variables.sql_mode =
+      find_static_system_variable("sql_mode")->get_default();
+
+  // Set session server and connection collation irrespective of
+  // mysqld server command line argument.
+  thd->variables.collation_server =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+  thd->variables.collation_connection =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+
+  // Set session transaction completion type to server default to
+  // avoid problems due to transactions being active when they are
+  // not supposed to.
+  thd->variables.completion_type =
+      find_static_system_variable("completion_type")->get_default();
+
+  /*
+    Set default value for explicit_defaults_for_timestamp variable. Bootstrap
+    thread creates dictionary tables. The creation of dictionary tables should
+    be independent of the value of explicit_defaults_for_timestamp specified by
+    the user.
+  */
+  thd->variables.explicit_defaults_for_timestamp =
+      find_static_system_variable("explicit_defaults_for_timestamp")
+          ->get_default();
+
+  /*
+    The global table encryption default setting applies to user threads.
+    Setting it false for system threads.
+  */
+  thd->variables.default_table_encryption = false;
+
+  my_thread_attr_t thr_attr;
+  my_thread_attr_init(&thr_attr);
+#ifndef _WIN32
+  pthread_attr_setscope(&thr_attr, PTHREAD_SCOPE_SYSTEM);
+#endif
+  my_thread_attr_setdetachstate(&thr_attr, MY_THREAD_CREATE_JOINABLE);
+
+  // Default stack size may be too small.
+  size_t stacksize = 0;
+  my_thread_attr_getstacksize(&thr_attr, &stacksize);
+  if (stacksize < my_thread_stack_size) {
+    if (0 != my_thread_attr_setstacksize(&thr_attr, my_thread_stack_size)) {
+      assert(false);
+    }
+  }
+
+  my_thread_handle thread_handle;
+  // What about setting THD::real_id?
+  int error = mysql_thread_create(key_thread_bootstrap, &thread_handle,
+                                  &thr_attr, handle_bootstrap, &args);
+  if (error) {
+    /* purecov: begin inspected */
+    LogErr(WARNING_LEVEL, ER_BOOTSTRAP_CANT_THREAD, errno).os_errno(errno);
+    thd->release_resources();
+    delete thd;
+    return true;
+    /* purecov: end */
+  }
+  /* Wait for thread to die */
+  my_thread_join(&thread_handle, nullptr);
+  // Free Items that were created during this execution.
+  thd->free_items();
+  delete thd;
+  return args.m_bootstrap_error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/schema.cc
+Function: dd::upgrade_57::load_db_schema_collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/schema.cc
+Function: dd::upgrade_57::load_db_schema_collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/schema.cc
+Function: dd::upgrade_57::load_db_schema_collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/schema.cc
+Function: dd::upgrade_57::migrate_schema_to_dd
+bool migrate_schema_to_dd(THD *thd, const char *dbname) {
+  char dbopt_path_buff[FN_REFLEN + 1];
+  char schema_name[NAME_LEN + 1];
+  LEX_STRING dbopt_file_name;
+  const CHARSET_INFO *schema_charset = thd->variables.collation_server;
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  // Construct the schema name from its canonical format.
+  bool has_invalid_name = false;
+  filename_to_tablename(dbname, schema_name, sizeof(schema_name), false,
+                        &has_invalid_name);
+
+  // If the filename of the database is invalid, stop the upgrade.
+  if (has_invalid_name) return true;
+
+  dbopt_file_name.str = dbopt_path_buff;
+  dbopt_file_name.length = build_table_filename(dbopt_path_buff, FN_REFLEN - 1,
+                                                schema_name, "db", ".opt", 0);
+
+  if (!my_access(dbopt_file_name.str, F_OK)) {
+    // Get the collation id for the database.
+    if (load_db_schema_collation(thd, &dbopt_file_name, &schema_charset))
+      return true;
+  } else {
+    LogErr(WARNING_LEVEL, ER_DB_OPT_NOT_FOUND_USING_DEFAULT_CHARSET, dbname);
+  }
+
+  // See comments regarding l_c_t_n in migrate_all_frm_to_dd().
+  if (lower_case_table_names == 0)
+    // Supported only for case sensitive file systems.
+    assert(!lower_case_file_system);
+  else if (lower_case_table_names == 1) {
+    // Supported for any file system. All names must be in lower case.
+    if (!is_string_in_lowercase(schema_name, system_charset_info)) {
+      LogErr(ERROR_LEVEL, ER_SCHEMA_NAME_IN_UPPER_CASE_NOT_ALLOWED,
+             schema_name);
+      return true;
+    }
+  } else if (lower_case_table_names == 2)
+    // Supported only for case insensitive file systems.
+    assert(lower_case_file_system);
+  else
+    assert(false);
+
+  // Disable autocommit option
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  if (dd::create_schema(thd, schema_name, schema_charset, false)) {
+    trans_rollback_stmt(thd);
+    // Full rollback in case we have THD::transaction_rollback_request.
+    trans_rollback(thd);
+    return true;
+  }
+
+  if (trans_commit_stmt(thd) || trans_commit(thd)) return true;
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/schema.cc
+Function: dd::upgrade_57::load_db_schema_collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/schema.cc
+Function: dd::upgrade_57::load_db_schema_collation not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: set_slave_thread_default_charset
+void set_slave_thread_default_charset(THD *thd, Relay_log_info const *rli) {
+  DBUG_TRACE;
+
+  thd->variables.character_set_client =
+      global_system_variables.character_set_client;
+  thd->variables.collation_connection =
+      global_system_variables.collation_connection;
+  thd->variables.collation_server = global_system_variables.collation_server;
+  thd->update_charset();
+
+  /*
+    We use a const cast here since the conceptual (and externally
+    visible) behavior of the function is to set the default charset of
+    the thread.  That the cache has to be invalidated is a secondary
+    effect.
+   */
+  const_cast<Relay_log_info *>(rli)->cached_charset_invalidate();
+}
+
+

@@ -1,0 +1,31 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_profile.cc
+Function: PROFILING::finish_current_query
+void PROFILING::finish_current_query() {
+  DBUG_TRACE;
+  if (current != nullptr) {
+    /* The last fence-post, so we can support the span before this. */
+    status_change("ending", nullptr, nullptr, 0);
+
+    if ((enabled) && /* ON at start? */
+        ((thd->variables.option_bits & OPTION_PROFILING) !=
+         0) && /* and ON at end? */
+        (current->m_query_source.str != nullptr) &&
+        (!current->entries.is_empty())) {
+      current->profiling_query_id = next_profile_id(); /* assign an id */
+
+      history.push_back(current);
+      last = current; /* never contains something that is not in the history. */
+      current = nullptr;
+    } else {
+      delete current;
+      current = nullptr;
+    }
+  }
+
+  /* Maintain the history size. */
+  while (history.elements > thd->variables.profiling_history_size)
+    delete history.pop();
+}
+
+

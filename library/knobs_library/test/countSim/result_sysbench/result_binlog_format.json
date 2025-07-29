@@ -1,0 +1,37 @@
+[
+    {
+        "knob_name": "binlog_format",
+        "data_matched_functions": [
+            "read_lock_type_for_table",
+            "THD::decide_logging_format",
+            "THD::is_ddl_gtid_compatible"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "MDL_request::init_with_source",
+            "String::append",
+            "MDL_context::acquire_locks",
+            "THD::pop_internal_handler",
+            "find_temporary_table",
+            "dd::get_dictionary",
+            "MDL_context::acquire_lock",
+            "THD::push_internal_handler",
+            "MYSQL_BIN_LOG::ordered_commit",
+            "trans_has_updated_trans_table",
+            "Session_tracker::get_tracker",
+            "is_xa_rollback",
+            "open_tables_for_query",
+            "THD::enter_stage",
+            "Diagnostics_area::reset_diagnostics_area",
+            "my_ok",
+            "Transaction_dependency_tracker::get_max_committed_timestamp",
+            "Delegate::is_empty",
+            "ER_THD",
+            "THD::is_dml_gtid_compatible",
+            "is_generated_invisible_primary_key_column_name",
+            "Rpl_transaction_ctx::is_transaction_rollback"
+        ],
+        "control_matched_count": 22,
+        "matched_count": 25
+    }
+]

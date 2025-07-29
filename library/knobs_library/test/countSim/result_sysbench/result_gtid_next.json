@@ -1,0 +1,28 @@
+[
+    {
+        "knob_name": "gtid_next",
+        "data_matched_functions": [
+            "Gtid_state::generate_automatic_gtid",
+            "Gtid_state::update_gtids_impl_own_anonymous",
+            "Gtid_state::end_gtid_violating_transaction",
+            "Clone_persist_gtid::set_persist_gtid",
+            "mysql_execute_command",
+            "Gtid_log_event::Gtid_log_event",
+            "gtid_reacquire_ownership_if_anonymous",
+            "MYSQL_BIN_LOG::gtid_end_transaction",
+            "MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group"
+        ],
+        "data_matched_count": 9,
+        "control_matched_functions": [
+            "Gtid_specification::to_string",
+            "gtid_pre_statement_checks",
+            "is_already_logged_transaction",
+            "Gtid_mode::get",
+            "Binlog_group_commit_ctx::get_session_ticket",
+            "binlog::BgcTicket::is_set",
+            "Rpl_thd_context::binlog_group_commit_ctx"
+        ],
+        "control_matched_count": 7,
+        "matched_count": 16
+    }
+]

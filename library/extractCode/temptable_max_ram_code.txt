@@ -1,0 +1,43 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc
+Function: temptable::Handler::get_memory_buffer_size
+longlong Handler::get_memory_buffer_size() const {
+  DBUG_TRACE;
+
+  DBUG_PRINT("temptable_api",
+             ("this=%p; return=%lld", this, temptable_max_ram));
+
+  return temptable_max_ram;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h
+Function: temptable::MemoryMonitor::RAM::threshold
+static size_t threshold() { return temptable_max_ram; }
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h
+Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+struct Prefer_RAM_over_MMAP_policy {
+  static Source block_source(uint32_t block_size,
+                             TableResourceMonitor * = nullptr) {
+    if (MemoryMonitor::RAM::consumption() < MemoryMonitor::RAM::threshold()) {
+      if (MemoryMonitor::RAM::increase(block_size) <=
+          MemoryMonitor::RAM::threshold()) {
+        return Source::RAM;
+      } else {
+        MemoryMonitor::RAM::decrease(block_size);
+      }
+    }
+    if (MemoryMonitor::MMAP::consumption() < MemoryMonitor::MMAP::threshold()) {
+      if (MemoryMonitor::MMAP::increase(block_size) <=
+          MemoryMonitor::MMAP::threshold()) {
+        return Source::MMAP_FILE;
+      } else {
+        MemoryMonitor::MMAP::decrease(block_size);
+      }
+    }
+    throw Result::RECORD_FILE_FULL;
+  }
+};
+

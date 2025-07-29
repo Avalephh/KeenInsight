@@ -1,0 +1,390 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_table.cc
+Function: mysql_prepare_create_table
+        mysql_prepare_create_table() we can compare field numbers directly.
+      */
+      if ((key_part->length != k_part->length) ||
+          (key_part->fieldnr != k_part->fieldnr) ||
+          (key_part->key_part_flag != k_part->key_part_flag)) {
+        all_columns_are_identical = false;
+        break;
+      }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::write
+   To be invoked in Log_event::write() stack.
+   The decision is positive
+
+    S,M) if it's been marked for checksumming with @c checksum_alg
+
+    M) otherwise, if @@global.binlog_checksum is not NONE and the event is
+       directly written to the binlog file.
+       The to-be-cached event decides at @c write_cache() time.
+
+   Otherwise the decision is negative.
+
+   @note   A side effect of the method is altering Log_event::checksum_alg
+           it the latter was undefined at calling.
+
+   @return true (positive) or false (negative)
+*/
+bool Log_event::need_checksum() {
+  DBUG_TRACE;
+  bool ret = false;
+  /*
+     few callers of Log_event::write
+     (incl FD::write, FD constructing code on the slave side, Rotate relay log
+     and Stop event)
+     provides their checksum alg preference through Log_event::checksum_alg.
+  */
+  if (common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+    ret = (common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF);
+  else if (binlog_checksum_options != binary_log::BINLOG_CHECKSUM_ALG_OFF &&
+           event_cache_type == Log_event::EVENT_NO_CACHE)
+    ret = (binlog_checksum_options != 0);
+  else
+    ret = false;
+
+  /*
+    FD calls the methods before data_written has been calculated.
+    The following invariant claims if the current is not the first
+    call (and therefore data_written is not zero) then `ret' must be
+    true. It may not be null because FD is always checksummed.
+  */
+
+  assert(get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT || ret ||
+         common_header->data_written == 0);
+
+  if (common_footer->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+    common_footer->checksum_alg =
+        ret ?  // calculated value stored
+            static_cast<enum_binlog_checksum_alg>(binlog_checksum_options)
+            : binary_log::BINLOG_CHECKSUM_ALG_OFF;
+
+  assert(!ret ||
+         ((common_footer->checksum_alg ==
+               static_cast<enum_binlog_checksum_alg>(binlog_checksum_options) ||
+           /*
+              Stop event closes the relay-log and its checksum alg
+              preference is set by the caller can be different
+              from the server's binlog_checksum_options.
+           */
+           get_type_code() == binary_log::STOP_EVENT ||
+           /*
+              Rotate:s can be checksummed regardless of the server's
+              binlog_checksum_options. That applies to both
+              the local RL's Rotate and the master's Rotate
+              which IO thread instantiates via queue_binlog_ver_3_event.
+           */
+           get_type_code() == binary_log::ROTATE_EVENT ||
+           /*
+              The previous event has its checksum option defined
+              according to the format description event.
+           */
+           get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT ||
+           /* FD is always checksummed */
+           get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
+           /*
+              View_change_log_event is queued into relay log by the
+              local member, which may have a different checksum algorithm
+              than the one of the event source.
+           */
+           get_type_code() == binary_log::VIEW_CHANGE_EVENT) &&
+          common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF));
+
+  assert(common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+  assert(((get_type_code() != binary_log::ROTATE_EVENT &&
+           get_type_code() != binary_log::STOP_EVENT) ||
+          get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT) ||
+         event_cache_type == Log_event::EVENT_NO_CACHE);
+
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/sdi_api.cc
+Function: dd::sdi::Import_target::load
+bool Import_target::load(THD *thd, String_type *shared_buffer) {
+  if (dd::sdi_file::load(thd, m_path, shared_buffer)) {
+    return true;
+  }
+
+  if (dd::deserialize(thd, *shared_buffer, m_table_object.get(),
+                      &m_schema_name_in_sdi)) {
+    return true;
+  }
+
+  if (!dd::has_primary_key(*m_table_object) &&
+      thd->variables.sql_require_primary_key) {
+    my_error(ER_TABLE_WITHOUT_PK, MYF(0));
+    return true;
+  }
+
+  const CHARSET_INFO *dd_charset_info =
+      Object_table_definition_impl::fs_name_collation();
+  if (lower_case_table_names == 1) {
+    m_table_object->set_name(casedn(dd_charset_info, m_table_object->name()));
+    m_schema_name_in_sdi =
+        casedn(dd_charset_info, std::move(m_schema_name_in_sdi));
+  }
+
+  if (lower_case_table_names == 2) {
+    m_lc_tname.reset(
+        new dd::String_type(casedn(dd_charset_info, m_table_object->name())));
+    m_lc_sname.reset(
+        new dd::String_type(casedn(dd_charset_info, m_schema_name_in_sdi)));
+  }
+
+  if (!m_in_datadir) {
+    return false;
+  }
+
+  dd::String_type tmpname{m_path};
+  tmpname.insert(tmpname.length() - 4, "_import");
+  if (mysql_file_rename(key_file_sdi, m_path.c_str(), tmpname.c_str(),
+                        MYF(MY_FAE))) {
+    return true;
+  }
+  m_tmp_sdi_filename = std::move(tmpname);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: handle_slave_sql not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: handle_slave_sql not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: handle_slave_worker
+static void *handle_slave_worker(void *arg) {
+  THD *thd; /* needs to be first for thread_stack */
+  bool thd_added = false;
+  int error = 0;
+  Slave_worker *w = (Slave_worker *)arg;
+  Relay_log_info *rli = w->c_rli;
+  ulong purge_cnt = 0;
+  ulonglong purge_size = 0;
+  struct slave_job_item _item, *job_item = &_item;
+  Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  struct PSI_thread *psi;
+#endif
+
+  my_thread_init();
+  DBUG_TRACE;
+
+  thd = new THD;
+  if (!thd) {
+    LogErr(ERROR_LEVEL, ER_RPL_REPLICA_CANT_INITIALIZE_REPLICA_WORKER,
+           rli->get_for_channel_str());
+    goto err;
+  }
+  mysql_mutex_lock(&w->info_thd_lock);
+  w->info_thd = thd;
+  mysql_mutex_unlock(&w->info_thd_lock);
+  thd->thread_stack = (char *)&thd;
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  // save the instrumentation for worker thread in w->info_thd
+  psi = PSI_THREAD_CALL(get_thread)();
+  thd_set_psi(w->info_thd, psi);
+#endif
+  mysql_thread_set_psi_THD(thd);
+
+  if (init_replica_thread(thd, SLAVE_THD_WORKER)) {
+    // todo make SQL thread killed
+    LogErr(ERROR_LEVEL, ER_RPL_REPLICA_CANT_INITIALIZE_REPLICA_WORKER,
+           rli->get_for_channel_str());
+    goto err;
+  }
+  thd->rli_slave = w;
+  thd->init_query_mem_roots();
+
+  if (channel_map.is_group_replication_channel_name(rli->get_channel())) {
+    if (channel_map.is_group_replication_channel_name(rli->get_channel(),
+                                                      true)) {
+      thd->rpl_thd_ctx.set_rpl_channel_type(GR_APPLIER_CHANNEL);
+    } else {
+      thd->rpl_thd_ctx.set_rpl_channel_type(GR_RECOVERY_CHANNEL);
+    }
+  } else {
+    thd->rpl_thd_ctx.set_rpl_channel_type(RPL_STANDARD_CHANNEL);
+  }
+
+  w->set_filter(rli->rpl_filter);
+
+  if ((w->deferred_events_collecting = w->rpl_filter->is_on()))
+    w->deferred_events = new Deferred_log_events();
+  assert(thd->rli_slave->info_thd == thd);
+
+  /* Set applier thread InnoDB priority */
+  set_thd_tx_priority(thd, rli->get_thd_tx_priority());
+  /* Set write set related options */
+  set_thd_write_set_options(thd, rli->get_ignore_write_set_memory_limit(),
+                            rli->get_allow_drop_write_set());
+
+  thd->variables.require_row_format = rli->is_row_format_required();
+
+  if (Relay_log_info::PK_CHECK_STREAM !=
+      rli->get_require_table_primary_key_check())
+    thd->variables.sql_require_primary_key =
+        (rli->get_require_table_primary_key_check() ==
+         Relay_log_info::PK_CHECK_ON);
+  w->set_require_table_primary_key_check(
+      rli->get_require_table_primary_key_check());
+
+  thd->variables.sql_generate_invisible_primary_key = false;
+  if (thd->rpl_thd_ctx.get_rpl_channel_type() != GR_APPLIER_CHANNEL &&
+      thd->rpl_thd_ctx.get_rpl_channel_type() != GR_RECOVERY_CHANNEL &&
+      Relay_log_info::PK_CHECK_GENERATE ==
+          rli->get_require_table_primary_key_check()) {
+    thd->variables.sql_generate_invisible_primary_key = true;
+  }
+
+  thd_manager->add_thd(thd);
+  thd_added = true;
+
+  if (w->update_is_transactional()) {
+    rli->report(ERROR_LEVEL, ER_REPLICA_FATAL_ERROR,
+                ER_THD(thd, ER_REPLICA_FATAL_ERROR),
+                "Error checking if the worker repository is transactional.");
+    goto err;
+  }
+
+  if (rli->get_commit_order_manager() != nullptr)
+    rli->get_commit_order_manager()->init_worker_context(
+        *w);  // Initialize worker context within Commit_order_manager
+
+  mysql_mutex_lock(&w->jobs_lock);
+  w->running_status = Slave_worker::RUNNING;
+  mysql_cond_signal(&w->jobs_cond);
+
+  mysql_mutex_unlock(&w->jobs_lock);
+
+  assert(thd->is_slave_error == 0);
+
+  w->stats_exec_time = w->stats_read_time = 0;
+  set_timespec_nsec(&w->ts_exec[0], 0);
+  set_timespec_nsec(&w->ts_exec[1], 0);
+  set_timespec_nsec(&w->stats_begin, 0);
+
+  // No need to report anything, all error handling will be performed in the
+  // slave SQL thread.
+  if (!rli->check_privilege_checks_user())
+    rli->initialize_security_context(w->info_thd);  // Worker security context
+                                                    // initialization with
+                                                    // `PRIVILEGE_CHECKS_USER`
+
+  while (!error) {
+    error = slave_worker_exec_job_group(w, rli);
+  }
+
+  /*
+     Cleanup after an error requires clear_error() go first.
+     Otherwise assert(!all) in binlog_rollback()
+  */
+  thd->clear_error();
+  w->cleanup_context(thd, error);
+
+  mysql_mutex_lock(&w->jobs_lock);
+
+  while (w->jobs.de_queue(job_item)) {
+    purge_cnt++;
+    purge_size += job_item->data->common_header->data_written;
+    assert(job_item->data);
+    delete job_item->data;
+  }
+
+  assert(w->jobs.get_length() == 0);
+
+  mysql_mutex_unlock(&w->jobs_lock);
+
+  mysql_mutex_lock(&rli->pending_jobs_lock);
+  rli->pending_jobs -= purge_cnt;
+  rli->mts_pending_jobs_size -= purge_size;
+  assert(rli->mts_pending_jobs_size < rli->mts_pending_jobs_size_max);
+
+  mysql_mutex_unlock(&rli->pending_jobs_lock);
+
+  /*
+     In MTS case cleanup_after_session() has be called explicitly.
+     TODO: to make worker thd be deleted before Slave_worker instance.
+  */
+  if (thd->rli_slave) {
+    w->cleanup_after_session();
+    thd->rli_slave = nullptr;
+  }
+  mysql_mutex_lock(&w->jobs_lock);
+
+  struct timespec stats_end;
+  set_timespec_nsec(&stats_end, 0);
+  DBUG_PRINT("info",
+             ("Worker %lu statistics: "
+              "events processed = %lu "
+              "online time = %llu "
+              "events exec time = %llu "
+              "events read time = %llu "
+              "hungry waits = %lu "
+              "priv queue overfills = %llu ",
+              w->id, w->events_done, diff_timespec(&stats_end, &w->stats_begin),
+              w->stats_exec_time, w->stats_read_time, w->wq_empty_waits,
+              w->jobs.waited_overfill));
+
+  w->running_status = Slave_worker::NOT_RUNNING;
+  mysql_cond_signal(&w->jobs_cond);  // famous last goodbye
+
+  mysql_mutex_unlock(&w->jobs_lock);
+
+err:
+
+  if (thd) {
+    /*
+       The slave code is very bad. Notice that it is missing
+       several clean up calls here. I've just added what was
+       necessary to avoid valgrind errors.
+
+       /Alfranio
+    */
+    thd->get_protocol_classic()->end_net();
+
+    /*
+      to avoid close_temporary_tables() closing temp tables as those
+      are Coordinator's burden.
+    */
+    thd->system_thread = NON_SYSTEM_THREAD;
+    thd->release_resources();
+
+    THD_CHECK_SENTRY(thd);
+    if (thd_added) thd_manager->remove_thd(thd);
+    mysql_thread_set_psi_THD(nullptr);
+    delete thd;
+  }
+
+  my_thread_end();
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  ERR_remove_thread_state(0);
+#endif /* OPENSSL_VERSION_NUMBER < 0x10100000L */
+  my_thread_exit(nullptr);
+  return nullptr;
+}
+
+

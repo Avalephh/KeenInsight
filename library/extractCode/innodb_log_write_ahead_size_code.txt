@@ -1,0 +1,594 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: Log_files_write_impl::compute_how_much_to_write 
+static inline size_t compute_how_much_to_write(const log_t &log,
+                                               os_offset_t real_offset,
+                                               size_t buffer_size,
+                                               bool &write_from_log_buffer) {
+  size_t write_size;
+
+  /* First we ensure, that we will write within single log file.
+  If we had more to write and cannot fit the current log file,
+  we first write what fits, then stops and returns to the main
+  loop of the log writer thread. Then, the log writer will update
+  maximum lsn up to which, it has data ready in the log buffer,
+  and request next write operation according to its strategy. */
+  if (!current_file_has_space(log, real_offset, buffer_size)) {
+    /* The end of write would not fit the current log file. */
+
+    /* But the beginning is guaranteed to fit or to be placed
+    at the first byte of the next file. */
+    ut_a(current_file_has_space(log, real_offset, 0));
+
+    if (!current_file_has_space(log, real_offset, 1)) {
+      /* The beginning of write is at the first byte
+      of the next log file. Flush header of the next
+      log file, advance current log file to the next,
+      stop and return to the main loop of log writer. */
+      write_from_log_buffer = false;
+      return 0;
+
+    } else {
+      /* We write across at least two consecutive log files.
+      Limit current write to the first one and then retry for
+      next_file. */
+
+      /* If the condition for real_offset + buffer_size holds,
+      then the expression below is < buffer_size, which is
+      size_t, so the typecast is ok. */
+      write_size =
+          static_cast<size_t>(log.m_current_file.m_size_in_bytes - real_offset);
+
+      ut_a(write_size <= buffer_size);
+      ut_a(write_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+    }
+
+  } else {
+    write_size = buffer_size;
+
+    ut_a(write_size % OS_FILE_LOG_BLOCK_SIZE >= LOG_BLOCK_HDR_SIZE ||
+         write_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+
+    ut_a(write_size % OS_FILE_LOG_BLOCK_SIZE <
+         OS_FILE_LOG_BLOCK_SIZE - LOG_BLOCK_TRL_SIZE);
+  }
+
+  /* Now, we know we can write write_size bytes from the buffer,
+  and we will do the write within single log file - current one. */
+
+  ut_a(write_size > 0);
+  ut_a(real_offset + write_size <= log.m_current_file.m_size_in_bytes);
+
+  /* We are interested in writing from log buffer only,
+  if we had at least one completed block for write.
+  Still we might decide not to write from the log buffer,
+  because write-ahead is needed. In such case we could write
+  together with the last incomplete block after copying. */
+  write_from_log_buffer = write_size >= OS_FILE_LOG_BLOCK_SIZE;
+
+  if (write_from_log_buffer) {
+    MONITOR_INC(MONITOR_LOG_FULL_BLOCK_WRITES);
+  } else {
+    MONITOR_INC(MONITOR_LOG_PARTIAL_BLOCK_WRITES);
+  }
+
+  /* Check how much we have written ahead to avoid read-on-write. */
+
+  if (!current_write_ahead_enough(log, real_offset, write_size)) {
+    if (!current_write_ahead_enough(log, real_offset, 1)) {
+      /* Current write-ahead region has no space at all. */
+
+      const auto next_wa = compute_next_write_ahead_end(real_offset);
+
+      if (!write_ahead_enough(next_wa, real_offset, write_size)) {
+        /* ... and also the next write-ahead is too small.
+        Therefore we have more data to write than size of
+        the write-ahead. We write from the log buffer,
+        skipping last fragment for which the write ahead
+        is required. */
+
+        ut_a(write_from_log_buffer);
+
+        write_size = next_wa - real_offset;
+
+        ut_a((real_offset + write_size) % srv_log_write_ahead_size == 0);
+
+        ut_a(write_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+
+      } else {
+        /* We copy data to write_ahead buffer,
+        and write from there doing write-ahead
+        of the bigger region in the same time. */
+        write_from_log_buffer = false;
+      }
+
+    } else {
+      /* We limit write up to the end of region
+      we have written ahead already. */
+      write_size =
+          static_cast<size_t>(log.write_ahead_end_offset - real_offset);
+
+      ut_a(write_size >= OS_FILE_LOG_BLOCK_SIZE);
+      ut_a(write_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+    }
+
+  } else {
+    if (write_from_log_buffer) {
+      write_size = ut_uint64_align_down(write_size, OS_FILE_LOG_BLOCK_SIZE);
+    }
+  }
+
+  return write_size;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: Log_files_write_impl::copy_to_write_ahead_buffer 
+static inline void copy_to_write_ahead_buffer(log_t &log, const byte *buffer,
+                                              size_t &size, lsn_t start_lsn) {
+  ut_a(size <= srv_log_write_ahead_size);
+
+  ut_a(buffer >= log.buf);
+  ut_a(buffer + size <= log.buf + log.buf_size);
+
+  byte *write_buf = log.write_ahead_buf;
+
+  log_sync_point("log_writer_before_copy_to_write_ahead_buffer");
+
+  std::memcpy(write_buf, buffer, size);
+
+  size_t completed_blocks_size;
+  byte *incomplete_block;
+  size_t incomplete_size;
+
+  completed_blocks_size = ut_uint64_align_down(size, OS_FILE_LOG_BLOCK_SIZE);
+
+  incomplete_block = write_buf + completed_blocks_size;
+
+  incomplete_size = size % OS_FILE_LOG_BLOCK_SIZE;
+
+  ut_a(incomplete_block + incomplete_size <=
+       write_buf + srv_log_write_ahead_size);
+
+  if (incomplete_size != 0) {
+    /* Prepare the incomplete (last) block. */
+    ut_a(incomplete_size >= LOG_BLOCK_HDR_SIZE);
+
+    const lsn_t block_lsn = start_lsn + completed_blocks_size;
+
+    Log_data_block_header block_header;
+    block_header.set_lsn(block_lsn);
+    block_header.m_data_len = incomplete_size;
+    block_header.m_first_rec_group =
+        log_block_get_first_rec_group(incomplete_block);
+    if (block_header.m_first_rec_group > incomplete_size) {
+      block_header.m_first_rec_group = 0;
+    }
+    log_data_block_header_serialize(block_header, incomplete_block);
+
+    std::memset(incomplete_block + incomplete_size, 0x00,
+                OS_FILE_LOG_BLOCK_SIZE - incomplete_size);
+
+    log_block_store_checksum(incomplete_block);
+
+    size = completed_blocks_size + OS_FILE_LOG_BLOCK_SIZE;
+  }
+
+  /* Since now, size is about completed blocks always. */
+  ut_a(size % OS_FILE_LOG_BLOCK_SIZE == 0);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: Log_files_write_impl::compute_next_write_ahead_end 
+static inline os_offset_t compute_next_write_ahead_end(
+    os_offset_t real_offset) {
+  const auto last_wa =
+      ut_uint64_align_down(real_offset, srv_log_write_ahead_size);
+
+  const auto next_wa = last_wa + srv_log_write_ahead_size;
+
+  ut_a(next_wa > real_offset);
+  ut_a(next_wa % srv_log_write_ahead_size == 0);
+
+  return next_wa;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: Log_files_write_impl::write_blocks
+static inline dberr_t write_blocks(log_t &log, byte *write_buf,
+                                   size_t write_size, os_offset_t real_offset) {
+  ut_a(write_size >= OS_FILE_LOG_BLOCK_SIZE);
+  ut_a(write_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(real_offset / UNIV_PAGE_SIZE <= PAGE_NO_MAX);
+
+  ut_a(log.write_ahead_end_offset % srv_log_write_ahead_size == 0);
+
+  ut_a(real_offset + write_size <= log.write_ahead_end_offset ||
+       (real_offset + write_size) % srv_log_write_ahead_size == 0);
+
+  const dberr_t err = log_data_blocks_write(log.m_current_file_handle,
+                                            real_offset, write_size, write_buf);
+
+  if (err != DB_SUCCESS) {
+    return err;
+  }
+
+  meb::redo_log_archive_produce(write_buf, write_size);
+
+  return DB_SUCCESS;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: Log_files_write_impl::update_current_write_ahead 
+static inline void update_current_write_ahead(log_t &log,
+                                              os_offset_t real_offset,
+                                              size_t write_size) {
+  const auto end = real_offset + write_size;
+
+  if (end > log.write_ahead_end_offset) {
+    log.write_ahead_end_offset =
+        ut_uint64_align_down(end, srv_log_write_ahead_size);
+  }
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_allocate_write_ahead_buffer
+static void log_allocate_write_ahead_buffer(log_t &log) {
+  ut_a(srv_log_write_ahead_size >= INNODB_LOG_WRITE_AHEAD_SIZE_MIN);
+  ut_a(srv_log_write_ahead_size <= INNODB_LOG_WRITE_AHEAD_SIZE_MAX);
+
+  log.write_ahead_buf_size = srv_log_write_ahead_size;
+  log.write_ahead_buf.alloc_withkey(UT_NEW_THIS_FILE_PSI_KEY,
+                                    ut::Count{log.write_ahead_buf_size});
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_init_params
+static int innodb_init_params() {
+  DBUG_TRACE;
+
+  static char current_dir[3];
+  char *default_path;
+
+  /* First calculate the default path for innodb_data_home_dir etc.,
+  in case the user has not given any value. */
+
+  /* It's better to use current lib, to keep paths short */
+  current_dir[0] = FN_CURLIB;
+  current_dir[1] = FN_LIBCHAR;
+  current_dir[2] = 0;
+  default_path = current_dir;
+
+  std::string mysqld_datadir{default_path};
+
+  MySQL_datadir_path = Fil_path{mysqld_datadir};
+
+  /* Validate, normalize and interpret the InnoDB start-up parameters. */
+
+  /* The default dir for data files is the datadir of MySQL */
+
+  srv_data_home =
+      (innobase_data_home_dir == nullptr || *innobase_data_home_dir == '\0')
+          ? default_path
+          : innobase_data_home_dir;
+  Fil_path::normalize(srv_data_home);
+
+  /* Validate the undo directory. */
+  if (srv_undo_dir == nullptr || srv_undo_dir[0] == 0) {
+    srv_undo_dir = default_path;
+  } else {
+    Fil_path::normalize(srv_undo_dir);
+  }
+
+  MySQL_undo_path = Fil_path{srv_undo_dir};
+
+  if (MySQL_undo_path.is_ancestor(default_path)) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_INNODB_UNDO_DIRECTORY_LOCATION);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  /* Validate the temp directory */
+  if (ibt::srv_temp_dir == nullptr) {
+    ibt::srv_temp_dir = default_path;
+  } else {
+    os_file_type_t type;
+    bool exists;
+    os_file_status(ibt::srv_temp_dir, &exists, &type);
+    if (!exists || type != OS_FILE_TYPE_DIR) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_DOESNT_EXIST)
+          << "Invalid innodb_temp_tablespaces_dir: " << ibt::srv_temp_dir
+          << ". Directory doesn't exist or not valid";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    Fil_path temp_dir(ibt::srv_temp_dir);
+    if (temp_dir.path().empty()) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_EMPTY)
+          << "Invalid innodb_temp_tablespaces dir: " << ibt::srv_temp_dir
+          << ". Path cannot be empty";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    if (strchr(ibt::srv_temp_dir, ';')) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_CONTAINS_SEMICOLON)
+          << "Invalid innodb_temp_tablespaces dir: " << ibt::srv_temp_dir
+          << ". Path cannot contain ;";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    if (MySQL_datadir_path.is_ancestor(
+            Fil_path::get_real_path(temp_dir.path()))) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_SUBDIR_OF_DATADIR)
+          << "Invalid innodb_temp_tablespaces_dir=" << ibt::srv_temp_dir
+          << ". This path should not be a subdirectory of the datadir.";
+      return HA_ERR_INITIALIZATION;
+    }
+  }
+
+  Fil_path::normalize(ibt::srv_temp_dir);
+
+  /* The default dir for log files is the datadir of MySQL */
+
+  if (srv_log_group_home_dir == nullptr) {
+    srv_log_group_home_dir = default_path;
+  }
+  Fil_path::normalize(srv_log_group_home_dir);
+
+  if (strchr(srv_log_group_home_dir, ';')) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_LOG_GROUP_HOME_DIR);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  if (strchr(srv_undo_dir, ';')) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_INNODB_UNDO_DIRECTORY);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  if (!is_filename_allowed(srv_buf_dump_filename, strlen(srv_buf_dump_filename),
+                           false)) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_ILLEGAL_COLON_IN_POOL);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  /* Check that the value of system variable innodb_page_size was
+  set correctly.  Its value was put into srv_page_size. If valid,
+  return the associated srv_page_size_shift. */
+  srv_page_size_shift = page_size_validate(srv_page_size);
+  if (!srv_page_size_shift) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_PAGE_SIZE, srv_page_size);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  ut_a(srv_log_buffer_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(srv_log_buffer_size > 0);
+
+  ut_a(srv_log_write_ahead_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(srv_log_write_ahead_size > 0);
+
+  assert(innodb_change_buffering <= IBUF_USE_ALL);
+
+  /* Check that interdependent parameters have sane values. */
+  if (srv_max_buf_pool_modified_pct < srv_max_dirty_pages_pct_lwm) {
+    log_errlog(WARNING_LEVEL, ER_INNODB_DIRTY_WATER_MARK_NOT_LOW,
+               srv_max_buf_pool_modified_pct);
+    srv_max_dirty_pages_pct_lwm = srv_max_buf_pool_modified_pct;
+  }
+
+  if (srv_max_io_capacity == SRV_MAX_IO_CAPACITY_DUMMY_DEFAULT) {
+    if (srv_io_capacity >= SRV_MAX_IO_CAPACITY_LIMIT / 2) {
+      /* Avoid overflow. */
+      srv_max_io_capacity = SRV_MAX_IO_CAPACITY_LIMIT;
+    } else {
+      /* The user has not set the value. We should
+      set it based on innodb_io_capacity. */
+      srv_max_io_capacity = std::max(2 * srv_io_capacity, 2000UL);
+    }
+
+  } else if (srv_max_io_capacity < srv_io_capacity) {
+    log_errlog(WARNING_LEVEL, ER_INNODB_IO_CAPACITY_EXCEEDS_MAX,
+               srv_max_io_capacity);
+    srv_io_capacity = srv_max_io_capacity;
+  }
+
+  if (UNIV_PAGE_SIZE_DEF != srv_page_size) {
+    ib::warn(ER_IB_MSG_538)
+        << "innodb-page-size has been changed from the"
+           " default value "
+        << UNIV_PAGE_SIZE_DEF << " to " << srv_page_size << ".";
+  }
+
+  if (srv_log_write_ahead_size > srv_page_size) {
+    srv_log_write_ahead_size = srv_page_size;
+  } else {
+    ulong srv_log_write_ahead_size_tmp = OS_FILE_LOG_BLOCK_SIZE;
+
+    while (srv_log_write_ahead_size_tmp < srv_log_write_ahead_size) {
+      srv_log_write_ahead_size_tmp = srv_log_write_ahead_size_tmp * 2;
+    }
+    if (srv_log_write_ahead_size_tmp != srv_log_write_ahead_size) {
+      srv_log_write_ahead_size = srv_log_write_ahead_size_tmp / 2;
+    }
+  }
+
+  srv_buf_pool_size = srv_buf_pool_curr_size;
+
+  innodb_log_checksums_func_update(srv_log_checksums);
+
+#ifdef HAVE_LINUX_LARGE_PAGES
+  if ((os_use_large_pages = opt_large_pages)) {
+    os_large_page_size = opt_large_page_size;
+  }
+#endif /* HAVE_LINUX_LARGE_PAGES */
+
+  row_rollback_on_timeout = innobase_rollback_on_timeout;
+
+  if (innobase_open_files < 10) {
+    innobase_open_files = 300;
+    if (srv_file_per_table && table_cache_size > 300) {
+      innobase_open_files = table_cache_size;
+    }
+  }
+
+  if (innobase_open_files > (long)open_files_limit) {
+    ib::warn(ER_IB_MSG_539) << "innodb_open_files should not be greater"
+                               " than the open_files_limit.\n";
+    if (innobase_open_files > (long)table_cache_size) {
+      innobase_open_files = table_cache_size;
+    }
+  }
+
+  srv_innodb_status = innobase_create_status_file;
+
+  /* Round up ddl:fts_parser_threads to nearest power of 2 number */
+  {
+    ulong n_parser_threads = 1;
+
+    while (n_parser_threads < ddl::fts_parser_threads) {
+      n_parser_threads <<= 1;
+    }
+
+    ddl::fts_parser_threads = n_parser_threads;
+  }
+
+  /* Store the default charset-collation number of this MySQL
+  installation */
+
+  data_mysql_default_charset_coll = (ulint)default_charset_info->number;
+
+  innobase_commit_concurrency_init_default();
+
+  if (srv_force_recovery == SRV_FORCE_NO_LOG_REDO) {
+    srv_read_only_mode = true;
+  }
+
+  high_level_read_only =
+      srv_read_only_mode || srv_force_recovery > SRV_FORCE_NO_TRX_UNDO;
+
+  if (srv_read_only_mode) {
+    ib::info(ER_IB_MSG_540) << "Started in read only mode";
+
+    /* There is no write except to intrinsic table and so turn-off
+    doublewrite mechanism completely. */
+    dblwr::g_mode = dblwr::Mode::OFF;
+  }
+
+#ifdef LINUX_NATIVE_AIO
+  if (srv_use_native_aio) {
+    ib::info(ER_IB_MSG_541) << "Using Linux native AIO";
+  }
+#elif !defined _WIN32
+  /* Currently native AIO is supported only on Windows and Linux
+  and that also when the support is compiled in. In all other
+  cases, we ignore the setting of innodb_use_native_aio. */
+  srv_use_native_aio = false;
+#endif
+
+#ifndef _WIN32
+  /* Check if innodb_dedicated_server == ON and O_DIRECT is supported */
+  if (srv_dedicated_server && sysvar_source_svc != nullptr &&
+      os_is_o_direct_supported()) {
+    static const char *variable_name = "innodb_flush_method";
+    enum enum_variable_source source;
+
+    if (!sysvar_source_svc->get(variable_name, strlen(variable_name),
+                                &source)) {
+      /* If innodb_flush_method is not specified explicitly */
+      if (source == COMPILED) {
+        innodb_flush_method = static_cast<ulong>(SRV_UNIX_O_DIRECT_NO_FSYNC);
+      } else {
+        ib::warn(ER_IB_MSG_542)
+            << "Option innodb_dedicated_server"
+               " is ignored for innodb_flush_method"
+               "because innodb_flush_method="
+            << innodb_flush_method_names[innodb_flush_method]
+            << " is specified explicitly.";
+      }
+    }
+  }
+
+  srv_unix_file_flush_method =
+      static_cast<srv_unix_flush_t>(innodb_flush_method);
+  ut_ad(innodb_flush_method <= SRV_UNIX_O_DIRECT_NO_FSYNC);
+#else
+  srv_win_file_flush_method = static_cast<srv_win_flush_t>(innodb_flush_method);
+  ut_ad(innodb_flush_method <= SRV_WIN_IO_NORMAL);
+  if (srv_use_native_aio) {
+    ib::info(ER_IB_MSG_541) << "Using Windows native AIO";
+  }
+#endif /* !_WIN32 */
+
+  /* Set the maximum number of threads which can wait for a semaphore
+  inside InnoDB: this is the 'sync wait array' size, as well as the
+  maximum number of threads that can wait in the 'srv_conc array' for
+  their time to enter InnoDB. */
+
+  srv_max_n_threads = 100 * 1024;
+
+  /* This is the first time univ_page_size is used.
+  It was initialized to 16k pages before srv_page_size was set */
+  univ_page_size.copy_from(page_size_t(srv_page_size, srv_page_size, false));
+
+  srv_sys_space.set_space_id(TRX_SYS_SPACE);
+
+  /* Create the filespace flags. */
+  predefined_flags = fsp_flags_init(univ_page_size, false, false, true, false);
+  fsp_flags_set_sdi(predefined_flags);
+
+  srv_sys_space.set_flags(predefined_flags);
+
+  srv_sys_space.set_name(dict_sys_t::s_sys_space_name);
+  srv_sys_space.set_path(srv_data_home);
+
+  /* We set the temporary tablspace id later, after recovery.
+  The temp tablespace doesn't support raw devices.
+  Set the name and path. */
+  srv_tmp_space.set_name(dict_sys_t::s_temp_space_name);
+  srv_tmp_space.set_path(srv_data_home);
+
+  /* Create the filespace flags with the temp flag set. */
+  uint32_t fsp_flags =
+      fsp_flags_init(univ_page_size, false, false, false, true);
+  srv_tmp_space.set_flags(fsp_flags);
+
+  /* Set buffer pool size to default for fast startup when mysqld is
+  run with --help --verbose options. */
+  ulint srv_buf_pool_size_org = 0;
+  if (opt_help && opt_verbose && opt_validate_config &&
+      srv_buf_pool_size > srv_buf_pool_def_size) {
+    ib::warn(ER_IB_MSG_543) << "Setting innodb_buf_pool_size to "
+                            << srv_buf_pool_def_size << " for fast startup, "
+                            << "when running with --help --verbose options.";
+    srv_buf_pool_size_org = srv_buf_pool_size;
+    srv_buf_pool_size = srv_buf_pool_def_size;
+  }
+
+  innodb_buffer_pool_size_init();
+
+  innodb_undo_tablespaces_deprecate();
+
+  innodb_redo_log_capacity_init();
+
+  /* Set the original value back to show in help. */
+  if (srv_buf_pool_size_org != 0) {
+    srv_buf_pool_size_org = buf_pool_size_align(srv_buf_pool_size_org);
+    srv_buf_pool_curr_size = srv_buf_pool_size_org;
+  }
+
+  if (srv_n_page_cleaners > srv_buf_pool_instances) {
+    /* limit of page_cleaner parallelizability
+    is number of buffer pool instances. */
+    srv_n_page_cleaners = srv_buf_pool_instances;
+  }
+
+  srv_lock_table_size = 5 * (srv_buf_pool_size / UNIV_PAGE_SIZE);
+
+  return 0;
+}
+
+

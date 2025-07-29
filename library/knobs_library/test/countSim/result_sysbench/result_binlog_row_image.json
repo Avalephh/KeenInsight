@@ -1,0 +1,18 @@
+[
+    {
+        "knob_name": "binlog_row_image",
+        "data_matched_functions": [
+            "TABLE::mark_columns_per_binlog_row_image",
+            "binlog_log_row"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "bitmap_is_clear_all",
+            "add_pke",
+            "TABLE::mark_columns_used_by_index_no_reset",
+            "bitmap_union"
+        ],
+        "control_matched_count": 4,
+        "matched_count": 6
+    }
+]

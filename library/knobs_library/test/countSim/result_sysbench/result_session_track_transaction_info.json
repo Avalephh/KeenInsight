@@ -1,0 +1,30 @@
+[
+    {
+        "knob_name": "session_track_transaction_info",
+        "data_matched_functions": [
+            "Transaction_state_tracker::store",
+            "mysql_lock_tables",
+            "mysql_execute_command",
+            "trans_reset_one_shot_chistics",
+            "Locked_tables_list::unlock_locked_tables",
+            "my_eof"
+        ],
+        "data_matched_count": 6,
+        "control_matched_functions": [
+            "Transaction_state_tracker::reset",
+            "Session_tracker::get_tracker",
+            "MDL_context::release_statement_locks",
+            "net_store_length",
+            "close_thread_tables",
+            "net_length_size",
+            "THD::inc_lock_usec",
+            "String::append",
+            "Transaction_state_tracker::add_trx_state",
+            "THD::rollback_item_tree_changes",
+            "THD::issue_unsafe_warnings",
+            "MDL_context::release_transactional_locks"
+        ],
+        "control_matched_count": 12,
+        "matched_count": 18
+    }
+]

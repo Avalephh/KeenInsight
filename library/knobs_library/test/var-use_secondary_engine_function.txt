@@ -1,0 +1,444 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_secondary_engine_tables
+static bool open_secondary_engine_tables(THD *thd, uint flags) {
+  LEX *const lex = thd->lex;
+  Sql_cmd *const sql_cmd = lex->m_sql_cmd;
+
+  // The previous execution context should have been destroyed.
+  assert(lex->secondary_engine_execution_context() == nullptr);
+
+  // If use of secondary engines has been disabled for the statement,
+  // there is nothing to do.
+  if (sql_cmd == nullptr || sql_cmd->secondary_storage_engine_disabled())
+    return false;
+
+  // If the user has requested the use of a secondary storage engine
+  // for this statement, skip past the initial optimization for the
+  // primary storage engine and go straight to the secondary engine.
+  if (thd->secondary_engine_optimization() ==
+          Secondary_engine_optimization::PRIMARY_TENTATIVELY &&
+      thd->variables.use_secondary_engine == SECONDARY_ENGINE_FORCED) {
+    thd->set_secondary_engine_optimization(
+        Secondary_engine_optimization::SECONDARY);
+    mysql_thread_set_secondary_engine(true);
+    mysql_statement_set_secondary_engine(thd->m_statement_psi, true);
+  }
+
+  // Only open secondary engine tables if use of a secondary engine
+  // has been requested.
+  if (thd->secondary_engine_optimization() !=
+      Secondary_engine_optimization::SECONDARY)
+    return false;
+
+  // If the statement cannot be executed in a secondary engine because
+  // of a property of the statement, do not attempt to open the
+  // secondary tables. Also disable use of secondary engines for
+  // future executions of the statement, since these properties will
+  // not change between executions.
+  const LEX_CSTRING *secondary_engine =
+      sql_cmd->eligible_secondary_storage_engine();
+  const plugin_ref secondary_engine_plugin =
+      secondary_engine == nullptr
+          ? nullptr
+          : ha_resolve_by_name(thd, secondary_engine, false);
+
+  if ((secondary_engine_plugin == nullptr) ||
+      !plugin_is_ready(*secondary_engine, MYSQL_STORAGE_ENGINE_PLUGIN)) {
+    // Didn't find a secondary storage engine to use for the query.
+    sql_cmd->disable_secondary_storage_engine();
+    return false;
+  }
+
+  // If the statement cannot be executed in a secondary engine because
+  // of a property of the environment, do not attempt to open the
+  // secondary tables. However, do not disable use of secondary
+  // storage engines for future executions of the statement, since the
+  // environment may change before the next execution.
+  if (!thd->is_secondary_storage_engine_eligible()) return false;
+
+  auto hton = plugin_data<const handlerton *>(secondary_engine_plugin);
+  sql_cmd->use_secondary_storage_engine(hton);
+
+  // Replace the TABLE objects in the Table_ref with secondary tables.
+  Open_table_context ot_ctx(thd, flags | MYSQL_OPEN_SECONDARY_ENGINE);
+  Table_ref *tl = lex->query_tables;
+  // For INSERT INTO SELECT and CTAS statements, the table to insert into does
+  // not have to have a secondary engine. This table is always first in the list
+  if ((lex->sql_command == SQLCOM_INSERT_SELECT ||
+       lex->sql_command == SQLCOM_CREATE_TABLE) &&
+      tl != nullptr)
+    tl = tl->next_global;
+  for (; tl != nullptr; tl = tl->next_global) {
+    if (tl->is_placeholder()) continue;
+    TABLE *primary_table = tl->table;
+    tl->table = nullptr;
+    if (open_table(thd, tl, &ot_ctx)) {
+      if (!thd->is_error()) {
+        /*
+          open_table() has not registered any error, implying that we can
+          retry the failed open; but it is complicated to do so reliably, so we
+          prefer to simply fail and re-prepare the statement in the primary
+          engine, as an exceptional case. So we register an error.
+        */
+        my_error(ER_SECONDARY_ENGINE_PLUGIN, MYF(0),
+                 "Transient error when opening tables in RAPID");
+      }
+      return true;
+    }
+    assert(tl->table->s->is_secondary_engine());
+    tl->table->file->ha_set_primary_handler(primary_table->file);
+  }
+
+  // Prepare the secondary engine for executing the statement.
+  return hton->prepare_secondary_engine != nullptr &&
+         hton->prepare_secondary_engine(thd, lex);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::is_secondary_storage_engine_eligible
+bool THD::is_secondary_storage_engine_eligible() const {
+  // STATEMENT based replication is enabled and the statement is CTAS or
+  // INSERT INTO SELECT
+  if (variables.binlog_format == BINLOG_FORMAT_STMT &&
+      (lex->sql_command == SQLCOM_CREATE_TABLE ||
+       lex->sql_command == SQLCOM_INSERT_SELECT))
+    return false;
+  // Secondary engines had been disabled in the session
+  if (secondary_engine_optimization() ==
+      Secondary_engine_optimization::PRIMARY_ONLY)
+    return false;
+  // The user has explicitly disabled secondary engines
+  if (variables.use_secondary_engine == SECONDARY_ENGINE_OFF) return false;
+  // LOCK TABLES mode is active
+  if (locked_tables_mode != LTM_NONE) return false;
+  // Multi-statement transaction mode is active and the statement is not a
+  // CREATE TABLE AS SELECT (these are safe due to COMMIT being run before
+  // and after the statement is executed)
+  if ((in_multi_stmt_transaction_mode() &&
+       lex->sql_command != SQLCOM_CREATE_TABLE))
+    return false;
+  //  It is a sub-statement of a stored procedure
+  if (sp_runtime_ctx != nullptr) return false;
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: Sql_cmd_dml::execute
+bool Sql_cmd_dml::execute(THD *thd) {
+  DBUG_TRACE;
+
+  lex = thd->lex;
+
+  Query_expression *const unit = lex->unit;
+
+  bool statement_timer_armed = false;
+  bool error_handler_active = false;
+
+  // flag to determine if execution was not offloaded to the secondary engine
+  // and ended up in the external engine in which case we throw an error.
+  bool external_table_not_offloaded = false;
+
+  Ignore_error_handler ignore_handler;
+  Strict_error_handler strict_handler;
+
+  // If statement is preparable, it must be prepared
+  assert(owner() == nullptr || is_prepared());
+  // If statement is regular, it must be unprepared
+  assert(!is_regular() || !is_prepared());
+  // If statement is part of SP, it can be both prepared and unprepared.
+
+  // If a timer is applicable to statement, then set it.
+  if (is_timer_applicable_to_statement(thd))
+    statement_timer_armed = set_statement_timer(thd);
+
+  if (is_data_change_stmt()) {
+    // Push ignore / strict error handler
+    if (lex->is_ignore()) {
+      thd->push_internal_handler(&ignore_handler);
+      error_handler_active = true;
+      /*
+        UPDATE IGNORE can be unsafe. We therefore use row based
+        logging if mixed or row based logging is available.
+        TODO: Check if the order of the output of the select statement is
+        deterministic. Waiting for BUG#42415
+      */
+      if (lex->sql_command == SQLCOM_UPDATE)
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_UPDATE_IGNORE);
+    } else if (thd->is_strict_mode()) {
+      thd->push_internal_handler(&strict_handler);
+      error_handler_active = true;
+    }
+  }
+
+  if (!is_prepared()) {
+    if (prepare(thd)) goto err;
+  } else {
+    /*
+      Prepared statement, open tables referenced in statement and check
+      privileges for it.
+    */
+    cleanup(thd);
+    if (open_tables_for_query(thd, lex->query_tables, 0)) goto err;
+#ifndef NDEBUG
+    if (sql_command_code() == SQLCOM_SELECT)
+      DEBUG_SYNC(thd, "after_table_open");
+#endif
+    // Bind table and field information
+    if (restore_cmd_properties(thd)) return true;
+    if (check_privileges(thd)) goto err;
+
+    if (m_lazy_result) {
+      Prepared_stmt_arena_holder ps_arena_holder(thd);
+
+      if (result->prepare(thd, *unit->get_unit_column_types(), unit)) goto err;
+      m_lazy_result = false;
+    }
+  }
+
+  if (lex->thd->variables.use_secondary_engine == SECONDARY_ENGINE_OFF) {
+    if (has_external_table(lex->query_tables)) {
+      my_error(ER_SECONDARY_ENGINE_PLUGIN, MYF(0),
+               "Query could not be offloaded to the secondary engine");
+      external_table_not_offloaded = true;
+      goto err;  // NOLINT
+    }
+  } else if ((thd->secondary_engine_optimization() ==
+                  Secondary_engine_optimization::PRIMARY_ONLY &&
+              lex->thd->variables.use_secondary_engine !=
+                  SECONDARY_ENGINE_FORCED) &&
+             has_external_table(lex->query_tables)) {
+    // throw the propagated error from the external engine in case there is an
+    // external table
+    external_engine_fail_reason(lex);
+
+    // reset error message
+    set_external_engine_fail_reason(lex, nullptr);
+    external_table_not_offloaded = true;
+    goto err;  // NOLINT
+  }
+
+  if (validate_use_secondary_engine(lex)) goto err;
+
+  lex->set_exec_started();
+
+  DBUG_EXECUTE_IF("use_attachable_trx",
+                  thd->begin_attachable_ro_transaction(););
+
+  THD_STAGE_INFO(thd, stage_init);
+
+  thd->clear_current_query_costs();
+
+  // Replication may require extra check of data change statements
+  if (is_data_change_stmt() && run_before_dml_hook(thd)) goto err;
+
+  // Revertable changes are not supported during preparation
+  assert(thd->change_list.is_empty());
+
+  assert(!lex->is_query_tables_locked());
+  /*
+    Locking of tables is done after preparation but before optimization.
+    This allows to do better partition pruning and avoid locking unused
+    partitions. As a consequence, in such a case, prepare stage can rely only
+    on metadata about tables used and not data from them.
+  */
+  if (!is_empty_query()) {
+    if (lock_tables(thd, lex->query_tables, lex->table_count, 0)) goto err;
+  }
+
+  // Perform statement-specific execution
+  if (execute_inner(thd)) goto err;
+
+  // Count the number of statements offloaded to a secondary storage engine.
+  if (using_secondary_storage_engine() && lex->unit->is_executed())
+    ++thd->status_var.secondary_engine_execution_count;
+
+  assert(!thd->is_error());
+
+  // Pop ignore / strict error handler
+  if (error_handler_active) thd->pop_internal_handler();
+
+  THD_STAGE_INFO(thd, stage_end);
+
+  // Do partial cleanup (preserve plans for EXPLAIN).
+  lex->cleanup(false);
+  lex->clear_values_map();
+  lex->set_secondary_engine_execution_context(nullptr);
+
+  // Perform statement-specific cleanup for Query_result
+  if (result != nullptr) result->cleanup();
+
+  thd->save_current_query_costs();
+
+  thd->update_previous_found_rows();
+
+  DBUG_EXECUTE_IF("use_attachable_trx", thd->end_attachable_transaction(););
+
+  if (statement_timer_armed && thd->timer) reset_statement_timer(thd);
+
+  /*
+    This sync point is normally right before thd->query_plan is reset, so
+    EXPLAIN FOR CONNECTION can catch the plan. It is copied here as
+    after unprepare() EXPLAIN considers the query as "not ready".
+    @todo remove in WL#6570 when unprepare() is gone.
+  */
+  DEBUG_SYNC(thd, "before_reset_query_plan");
+
+  return false;
+
+err:
+  assert(thd->is_error() || thd->killed);
+  DBUG_PRINT("info", ("report_error: %d", thd->is_error()));
+  THD_STAGE_INFO(thd, stage_end);
+
+  lex->cleanup(false);
+  lex->clear_values_map();
+  lex->set_secondary_engine_execution_context(nullptr);
+
+  // check if we already have a secondary-engine-specific error message
+  // populate otherwise
+  if (!external_table_not_offloaded) {
+    const char *offloadfail_reason = get_secondary_engine_fail_reason(lex);
+    if (offloadfail_reason == nullptr || strlen(offloadfail_reason) == 0) {
+      if (thd->is_error()) {
+        assert(thd->get_stmt_da() != nullptr);
+        // here we check if there is any table in an external engine to set the
+        // error there as well.
+        if (has_external_table(lex->query_tables)) {
+          set_external_engine_fail_reason(lex,
+                                          thd->get_stmt_da()->message_text());
+        }
+        set_secondary_engine_fail_reason(lex,
+                                         thd->get_stmt_da()->message_text());
+      }
+    }
+  }
+
+  // Abort and cleanup the result set (if it has been prepared).
+  if (result != nullptr) {
+    result->abort_result_set(thd);
+    result->cleanup();
+  }
+  if (error_handler_active) thd->pop_internal_handler();
+
+  if (statement_timer_armed && thd->timer) reset_statement_timer(thd);
+
+  /*
+    There are situations where we want to know the cost of a query that
+    has failed during execution, e.g because of a timeout.
+  */
+  thd->save_current_query_costs();
+
+  DBUG_EXECUTE_IF("use_attachable_trx", thd->end_attachable_transaction(););
+
+  return thd->is_error();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: set_external_engine_fail_reason
+void set_external_engine_fail_reason(const LEX *lex, const char *reason) {
+  if (lex->thd->variables.use_secondary_engine != SECONDARY_ENGINE_FORCED &&
+      reason != nullptr) {
+    for (Table_ref *ref = lex->query_tables; ref != nullptr;
+         ref = ref->next_global) {
+      if (ref->is_external()) {
+        ref->table->get_primary_handler()->set_external_table_offload_error(
+            reason);
+        break;
+      }
+    }
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: validate_use_secondary_engine
+bool validate_use_secondary_engine(const LEX *lex) {
+  if (lex->m_sql_cmd == nullptr) {
+    return false;
+  }
+  THD *thd = lex->thd;
+  const Sql_cmd *sql_cmd = lex->m_sql_cmd;
+  // Ensure that all read columns are in the secondary engine.
+  if (sql_cmd->using_secondary_storage_engine()) {
+    if (reads_not_secondary_columns(lex)) {
+      const char *err_msg =
+          "One or more read columns are marked as NOT SECONDARY";
+      set_fail_reason_and_raise_error(lex, err_msg);
+      return true;
+    }
+    return false;
+  }
+  // A query must be executed in secondary engine if these conditions are met:
+  //
+  // (1) use_secondary_engine is FORCED.
+  // (and either)
+  // (2) Is a SELECT statement that accesses one or more base tables.
+  // (or)
+  // (3) Is an INSERT SELECT or CREATE TABLE AS SELECT statement that accesses
+  // two or more base tables.
+  if (thd->variables.use_secondary_engine == SECONDARY_ENGINE_FORCED &&  // 1
+      ((sql_cmd->sql_command_code() == SQLCOM_SELECT &&
+        lex->table_count >= 1) ||  // 2
+       ((sql_cmd->sql_command_code() == SQLCOM_INSERT_SELECT ||
+         sql_cmd->sql_command_code() == SQLCOM_CREATE_TABLE) &&
+        lex->table_count >= 2))) {  // 3
+    // Gather secondary-engine-specific error message.
+    const char *offloadfail_reason = get_secondary_engine_fail_reason(lex);
+    if (offloadfail_reason != nullptr && strlen(offloadfail_reason) > 0) {
+      if (thd->is_error()) {
+        thd->clear_error();
+      }
+      my_error(ER_SECONDARY_ENGINE, MYF(0), offloadfail_reason);
+      return true;
+    }
+    // If we haven't generated a specific error so far,
+    // we try to generate one here.
+    if (!thd->is_error() && find_and_set_offload_fail_reason(lex)) {
+      return true;
+    }
+    // If no specifc error could be generated so far,
+    // we give out a generic one.
+    if (!thd->is_error()) {
+      const char *err_msg =
+          "use_secondary_engine is FORCED but query could not be executed in "
+          "secondary engine";
+      set_fail_reason_and_raise_error(lex, err_msg);
+      return true;
+    }
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: get_secondary_engine_fail_reason not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: get_secondary_engine_fail_reason not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: get_secondary_engine_fail_reason not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: set_secondary_engine_fail_reason not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: set_secondary_engine_fail_reason not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: set_secondary_engine_fail_reason not found.
+

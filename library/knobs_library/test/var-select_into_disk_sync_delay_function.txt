@@ -1,0 +1,153 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/query_result.cc
+Function: create_file
+    create_file()
+    thd			Thread handle
+    path		File name
+    exchange		Exchange class
+    cache		IO cache
+
+  RETURN
+    >= 0 	File handle
+   -1		Error
+*/
+
+static File create_file(THD *thd, char *path, sql_exchange *exchange,
+                        IO_CACHE *cache) {
+  File file;
+  uint option = MY_UNPACK_FILENAME | MY_RELATIVE_PATH;
+
+  if (!dirname_length(exchange->file_name)) {
+    strxnmov(path, FN_REFLEN - 1, mysql_real_data_home,
+             thd->db().str ? thd->db().str : "", NullS);
+    (void)fn_format(path, exchange->file_name, path, "", option);
+  } else
+    (void)fn_format(path, exchange->file_name, mysql_real_data_home, "",
+                    option);
+
+  if (!is_secure_file_path(path)) {
+    /* Write only allowed to dir or subdir specified by secure_file_priv */
+    my_error(ER_OPTION_PREVENTS_STATEMENT, MYF(0), "--secure-file-priv");
+    return -1;
+  }
+
+  if (!access(path, F_OK)) {
+    my_error(ER_FILE_EXISTS_ERROR, MYF(0), exchange->file_name);
+    return -1;
+  }
+  /* Create the file world readable */
+  if ((file = mysql_file_create(key_select_to_file, path,
+                                S_IRUSR | S_IWUSR | S_IRGRP, O_WRONLY | O_EXCL,
+                                MYF(MY_WME))) < 0)
+    return file;
+#ifdef HAVE_FCHMOD
+  (void)fchmod(file, S_IRUSR | S_IWUSR | S_IRGRP);  // Because of umask()
+#else
+  (void)chmod(path, S_IRUSR | S_IWUSR | S_IRGRP);
+#endif
+  if (init_io_cache(cache, file, thd->variables.select_into_buffer_size,
+                    WRITE_CACHE, 0L, true, MYF(MY_WME))) {
+    mysql_file_close(file, MYF(0));
+    /* Delete file on error, it was just created */
+    mysql_file_delete(key_select_to_file, path, MYF(0));
+    return -1;
+  }
+  if (thd->variables.select_into_disk_sync) {
+    cache->disk_sync = true;
+    if (thd->variables.select_into_disk_sync_delay)
+      cache->disk_sync_delay = thd->variables.select_into_disk_sync_delay;
+  }
+  return file;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/mysys/mf_iocache.cc
+Function: my_b_flush_io_cache
+  exceeds the file buffer or if one calls my_b_flush_io_cache().
+
+  If one uses SEQ_READ_APPEND, then two buffers are allocated, one for
+  reading and another for writing.  Reads are first done from disk and
+  then done from the write buffer.  This is an efficient way to read
+  from a log file when one is writing to it at the same time.
+  For this to work, the file has to be opened in append mode!
+  Note that when one uses SEQ_READ_APPEND, one MUST write using
+  my_b_append !  This is needed because we need to lock the mutex
+  every time we access the write buffer.
+
+TODO:
+  When one SEQ_READ_APPEND and we are reading and writing at the same time,
+  each time the write buffer gets full and it's written to disk, we will
+  always do a disk read to read a part of the buffer from disk to the
+  read buffer.
+  This should be fixed so that when we do a my_b_flush_io_cache() and
+  we have been reading the write buffer, we should transfer the rest of the
+  write buffer to the read buffer before we start to reuse it.
+*/
+
+#include <errno.h>
+#include <fcntl.h>
+#include <math.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <algorithm>
+
+#include "m_string.h"
+#include "my_byteorder.h"
+#include "my_compiler.h"
+#include "my_dbug.h"
+#include "my_inttypes.h"
+#include "my_io.h"
+#include "my_macros.h"
+#include "my_sys.h"
+#include "my_systime.h"
+#include "my_thread_local.h"
+#include "mysql/components/services/bits/psi_bits.h"
+#include "mysql/psi/mysql_cond.h"
+#include "mysql/psi/mysql_file.h"
+#include "mysql/psi/mysql_mutex.h"
+#include "mysql/service_mysql_alloc.h"
+#include "mysys/mysys_priv.h"
+#include "thr_mutex.h"
+
+PSI_file_key key_file_io_cache;
+#ifndef NDEBUG
+bool binlog_cache_temporary_file_is_encrypted = false;
+#endif
+
+#define lock_append_buffer(info) mysql_mutex_lock(&(info)->append_buffer_lock)
+#define unlock_append_buffer(info) \
+  mysql_mutex_unlock(&(info)->append_buffer_lock)
+
+#define IO_ROUND_UP(X) (((X) + IO_SIZE - 1) & ~(IO_SIZE - 1))
+#define IO_ROUND_DN(X) ((X) & ~(IO_SIZE - 1))
+
+/*
+  Setup internal pointers inside IO_CACHE
+
+  SYNOPSIS
+    setup_io_cache()
+    info		IO_CACHE handler
+
+  NOTES
+    This is called on automatically on init or reinit of IO_CACHE
+    It must be called externally if one moves or copies an IO_CACHE
+    object.
+*/
+
+void setup_io_cache(IO_CACHE *info) {
+  /* Ensure that my_b_tell() and my_b_bytes_in_cache works */
+  if (info->type == WRITE_CACHE) {
+    info->current_pos = &info->write_pos;
+    info->current_end = &info->write_end;
+  } else {
+    info->current_pos = &info->read_pos;
+    info->current_end = &info->read_end;
+  }
+}
+
+

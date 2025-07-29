@@ -1,0 +1,481 @@
+Global Variable: System_variables.123
+Explicit Data Flow (60):
+  Instruction: %24 = load i8, i8* %default_table_encryption, align 4, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:356:37 | Function: mysql_create_db
+  Instruction: %tobool26 = trunc i8 %24 to i1, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:356:37 | Function: mysql_create_db
+  Instruction: %frombool27 = zext i1 %tobool26 to i8, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:356:20 | Function: mysql_create_db
+  Instruction: store i8 %frombool27, i8* %encrypt_schema, align 1, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:356:20 | Function: mysql_create_db
+  Instruction: %26 = load i8, i8* %encrypt_schema, align 1, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:7 | Function: mysql_create_db
+  Instruction: %tobool31 = trunc i8 %26 to i1, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:7 | Function: mysql_create_db
+  Instruction: %conv = zext i1 %tobool31 to i32, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:7 | Function: mysql_create_db
+  Instruction: %cmp = icmp ne i32 %conv, %conv35, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:22 | Function: mysql_create_db
+  Instruction: br i1 %cmp, label %land.lhs.true36, label %if.end41, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:65 | Function: mysql_create_db
+  Instruction: %28 = load i8, i8* %default_table_encryption33, align 4, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:40 | Function: mysql_create_db
+  Instruction: %tobool34 = trunc i8 %28 to i1, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:40 | Function: mysql_create_db
+  Instruction: %conv35 = zext i1 %tobool34 to i32, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:359:25 | Function: mysql_create_db
+  Instruction: %17 = load i8, i8* %default_table_encryption, align 4, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:525:26 | Function: mysql_alter_db
+  Instruction: %tobool17 = trunc i8 %17 to i1, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:525:26 | Function: mysql_alter_db
+  Instruction: %conv18 = zext i1 %tobool17 to i32, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:525:11 | Function: mysql_alter_db
+  Instruction: %cmp = icmp ne i32 %conv, %conv18, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:524:51 | Function: mysql_alter_db
+  Instruction: br i1 %cmp, label %land.lhs.true19, label %if.end24, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:525:51 | Function: mysql_alter_db
+  Instruction: %34 = load i8, i8* %default_table_encryption, align 4, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:484:41 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %tobool27 = trunc i8 %34 to i1, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:484:41 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %frombool28 = zext i1 %tobool27 to i8, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:484:24 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: store i8 %frombool28, i8* %encrypt_tablespace, align 1, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:484:24 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %35 = load i8, i8* %encrypt_tablespace, align 1, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:485:20 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %tobool29 = trunc i8 %35 to i1, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:485:20 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: br i1 %tobool29, label %cond.true, label %cond.false, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:485:20 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %37 = load i8, i8* %encrypt_tablespace, align 1, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:7 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %tobool34 = trunc i8 %37 to i1, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:7 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %conv = zext i1 %tobool34 to i32, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:7 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %cmp = icmp ne i32 %conv, %conv38, !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:26 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: br i1 %cmp, label %land.lhs.true39, label %if.end44, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:69 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %39 = load i8, i8* %default_table_encryption36, align 4, !dbg !1255399 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:44 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %tobool37 = trunc i8 %39 to i1, !dbg !1255399 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:44 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %conv38 = zext i1 %tobool37 to i32, !dbg !1255397 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:489:29 | Function: Sql_cmd_create_tablespace::execute
+  Instruction: %12 = load i8, i8* %default_table_encryption, align 4, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:918:26 | Function: Sql_cmd_alter_tablespace::execute
+  Instruction: %tobool8 = trunc i8 %12 to i1, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:918:26 | Function: Sql_cmd_alter_tablespace::execute
+  Instruction: %conv9 = zext i1 %tobool8 to i32, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:918:11 | Function: Sql_cmd_alter_tablespace::execute
+  Instruction: %cmp = icmp ne i32 %conv, %conv9, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:917:47 | Function: Sql_cmd_alter_tablespace::execute
+  Instruction: br i1 %cmp, label %land.lhs.true10, label %if.end15, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:918:51 | Function: Sql_cmd_alter_tablespace::execute
+  Instruction: %5 = load i8, i8* %default_table_encryption, align 4, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7446:42 | Function: check_set_default_table_encryption_access
+  Instruction: %tobool6 = trunc i8 %5 to i1, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7446:42 | Function: check_set_default_table_encryption_access
+  Instruction: %conv = zext i1 %tobool6 to i64, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7446:27 | Function: check_set_default_table_encryption_access
+  Instruction: store i64 %conv, i64* %previous_val, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7446:12 | Function: check_set_default_table_encryption_access
+  Instruction: store i8 0, i8* %default_table_encryption, align 4, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:406:43 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %default_table_encryption = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables53, i32 0, i32 123, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:406:18 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %default_table_encryption27 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables26, i32 0, i32 123, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4753:28 | Function: Query_log_event::do_apply_event
+  Instruction: store i8 %frombool, i8* %default_table_encryption27, align 4, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4753:53 | Function: Query_log_event::do_apply_event
+  Instruction: %default_table_encryption = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 123, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4741:32 | Function: Query_log_event::do_apply_event
+  Instruction: %326 = load i8, i8* %default_table_encryption, align 4, !dbg !1255698 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3603:31 | Function: Query_log_event::write
+  Instruction: %tobool367 = trunc i8 %326 to i1, !dbg !1255698 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3603:31 | Function: Query_log_event::write
+  Instruction: %conv368 = zext i1 %tobool367 to i8, !dbg !1255696 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3603:16 | Function: Query_log_event::write
+  Instruction: store i8 %conv368, i8* %327, align 1, !dbg !1255700 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3603:14 | Function: Query_log_event::write
+  Instruction: %441 = load i8, i8* %default_table_encryption602, align 4, !dbg !1255785 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4737:28 | Function: Query_log_event::do_apply_event
+  Instruction: %tobool603 = trunc i8 %441 to i1, !dbg !1255785 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4737:28 | Function: Query_log_event::do_apply_event
+  Instruction: %conv604 = zext i1 %tobool603 to i32, !dbg !1255782 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4737:13 | Function: Query_log_event::do_apply_event
+  Instruction: %cmp612 = icmp ne i32 %conv604, %conv611, !dbg !1255788 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4737:53 | Function: Query_log_event::do_apply_event
+  Instruction: br i1 %cmp612, label %if.then613, label %if.end624, !dbg !1255789 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4737:13 | Function: Query_log_event::do_apply_event
+  Instruction: %9 = load i8, i8* %default_table_encryption, align 4, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4741:32 | Function: Query_log_event::do_apply_event
+  Instruction: %tobool = trunc i8 %9 to i1, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4741:32 | Function: Query_log_event::do_apply_event
+  Instruction: %conv = zext i1 %tobool to i32, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4741:17 | Function: Query_log_event::do_apply_event
+  Instruction: %cmp = icmp ne i32 %conv, %conv5, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4741:57 | Function: Query_log_event::do_apply_event
+  Instruction: br i1 %cmp, label %land.lhs.true, label %land.end, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4742:65 | Function: Query_log_event::do_apply_event
+
+Implicit Data Flow (2):
+  Instruction: %cond-lvalue = phi [2 x i8]* [ @.str.5.17585, %cond.true ], [ @.str.6.17586, %cond.false ], !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:485:20Sql_cmd_create_tablespace::execute
+  Instruction: %26 = phi i1 [ false, %invoke.cont7 ], [ false, %invoke.cont ], [ false, %entry ], [ %lnot, %invoke.cont15 ], !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:0:0Query_log_event::do_apply_event
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_stpcpy
+  Controlled Function: lock_schema_name
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::dd_client
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: bool dd::cache::Dictionary_client::acquire
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: build_table_filename
+  Controlled Function: my_error
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: my_error
+  Controlled Function: inline_mysql_file_stat
+  Controlled Function: THD::is_dd_system_thread
+  Controlled Function: dd::upgrade_57::in_progress
+  Controlled Function: dd::get_dictionary
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_printf_error
+  Controlled Function: my_error
+  Controlled Function: my_errno
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: set_db_default_charset
+  Controlled Function: THD::query
+  Controlled Function: dd::create_schema
+  Controlled Function: THD::query
+  Controlled Function: my_errno
+  Controlled Function: my_mkdir
+  Controlled Function: ha_binlog_log_query
+  Controlled Function: my_errno
+  Controlled Function: write_db_cmd_to_binlog
+  Controlled Function: my_strerror
+  Controlled Function: my_errno
+  Controlled Function: rm_dir_w_symlink
+  Controlled Function: my_error
+  Controlled Function: my_errno
+  Controlled Function: my_strerror
+  Controlled Function: rm_dir_w_symlink
+  Controlled Function: my_error
+  Controlled Function: rm_dir_w_symlink
+  Controlled Function: my_ok
+  Controlled Function: lock_schema_name
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::dd_client
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::dd_client
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: bool dd::cache::Dictionary_client::acquire_for_modification
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: thread_can_ignore_schema_read_only
+  Controlled Function: find_db_tables
+  Controlled Function: lock_table_names
+  Controlled Function: my_error
+  Controlled Function: set_db_default_charset
+  Controlled Function: __assert_fail
+  Controlled Function: THD::dd_client
+  Controlled Function: dd::is_encrypted
+  Controlled Function: bool dd::cache::Dictionary_client::update
+  Controlled Function: THD::query
+  Controlled Function: THD::query
+  Controlled Function: ha_binlog_log_query
+  Controlled Function: write_db_cmd_to_binlog
+  Controlled Function: THD::db
+  Controlled Function: mysql_ha_flush_tables
+  Controlled Function: my_ok
+  Controlled Function: THD::db
+  Controlled Function: tdc_remove_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: THD::dd_client
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: bool dd::cache::Dictionary_client::acquire
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: dd::Tablespace* dd::create_object
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: ha_resolve_storage_engine_name
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: is_invalid_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: String::String
+  Controlled Function: mysql_generate_uuid
+  Controlled Function: my_error
+  Controlled Function: std::unique_ptr
+  Controlled Function: String::~String
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::c_ptr_quick
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Query_arena::strmake
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::length
+  Controlled Function: std::optional
+  Controlled Function: String::~String
+  Controlled Function: std::optional
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: bool dd::Properties::set
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: bool dd::cache::Dictionary_client::store
+  Controlled Function: ddl_is_atomic
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::pair
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: 
+  Controlled Function: bool dd::cache::Dictionary_client::drop
+  Controlled Function: bool dd::cache::Dictionary_client::update
+  Controlled Function: bool 
+  Controlled Function: THD::dd_client
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: 
+  Controlled Function: bool dd::cache::Dictionary_client::acquire
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: dd::Tablespace* dd::create_object
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: ha_resolve_storage_engine_name
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: is_invalid_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: String::String
+  Controlled Function: mysql_generate_uuid
+  Controlled Function: my_error
+  Controlled Function: std::unique_ptr
+  Controlled Function: String::~String
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::c_ptr_quick
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Query_arena::strmake
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::length
+  Controlled Function: std::optional
+  Controlled Function: String::~String
+  Controlled Function: std::optional
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: bool dd::Properties::set
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: bool dd::cache::Dictionary_client::store
+  Controlled Function: ddl_is_atomic
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::pair
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: 
+  Controlled Function: bool dd::cache::Dictionary_client::drop
+  Controlled Function: bool dd::cache::Dictionary_client::update
+  Controlled Function: bool 
+  Controlled Function: bool 
+  Controlled Function: my_error
+  Controlled Function: 
+  Controlled Function: THD::dd_client
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::pair
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: 
+  Controlled Function: ha_is_storage_engine_disabled
+  Controlled Function: ha_resolve_storage_engine_name
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: I_P_List
+  Controlled Function: my_error
+  Controlled Function: dd::is_encrypted
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::optional
+  Controlled Function: validate_tablespace_name
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::optional
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: bool dd::Properties::set
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: 
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: set_table_encryption_type
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: upgrade_lock_for_tables_in_tablespace
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: tdc_remove_table
+  Controlled Function: bool dd::cache::Dictionary_client::update
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: std::vector
+  Controlled Function: 
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: bool 
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: bool dd::cache::Dictionary_client::update
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: Rpl_thd_context::post_filters_actions
+  Controlled Function: std::function
+  Controlled Function: std::vector
+  Controlled Function: Scope_guard
+  Controlled Function: strlen
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: THD::set_invoker
+  Controlled Function: ignored_error_code
+  Controlled Function: mysql_thread_set_secondary_engine
+  Controlled Function: Parser_state::Parser_state
+  Controlled Function: concurrency_error_code
+  Controlled Function: THD::query
+  Controlled Function: THD::query
+  Controlled Function: Parser_state::init
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: __assert_fail
+  Controlled Function: Scope_guard
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::is_error
+  Controlled Function: Query_log_event::detach_temp_tables_worker
+  Controlled Function: THD::set_catalog
+  Controlled Function: __assert_fail
+  Controlled Function: THD::set_db
+  Controlled Function: THD::db
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::db
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::query
+  Controlled Function: THD::rewritten_query
+  Controlled Function: THD::charset
+  Controlled Function: THD::query
+  Controlled Function: String::length
+  Controlled Function: _db_pargs_
+  Controlled Function: inline_mysql_start_statement
+  Controlled Function: Query_logger::general_log_write
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::enter_stage
+  Controlled Function: THD::is_error
+  Controlled Function: THD::rewritten_query
+  Controlled Function: String::ptr
+  Controlled Function: _db_doprnt_
+  Controlled Function: sql_digest_state::reset
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::rewritten_query
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::is_error
+  Controlled Function: String::length
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::is_error
+  Controlled Function: Query_logger::general_log_write
+  Controlled Function: inline_mysql_end_statement
+  Controlled Function: gtid_pre_statement_checks
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::reset_rewritten_query
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: _db_pargs_
+  Controlled Function: MEM_ROOT::ClearForReuse
+  Controlled Function: THD::update_slow_query_status
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: _db_enabled_
+  Controlled Function: String::String
+  Controlled Function: log_slow_statement
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: _db_doprnt_
+  Controlled Function: THD::query
+  Controlled Function: String::~String
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: Rpl_filter::get_rewrite_db_statistics
+  Controlled Function: ER_THD
+  Controlled Function: Rpl_filter_statistics::increase_counter
+  Controlled Function: THD::db
+  Controlled Function: String::c_ptr
+  Controlled Function: Rpl_filter::db_ok
+  Controlled Function: concurrency_error_code
+  Controlled Function: ignored_error_code
+  Controlled Function: String::~String
+  Controlled Function: is_atomic_ddl
+  Controlled Function: concurrency_error_code
+  Controlled Function: _db_pargs_
+  Controlled Function: is_silent_error
+  Controlled Function: THD::is_fatal_error
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: _db_enabled_
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: ignored_error_code
+  Controlled Function: my_error
+  Controlled Function: _db_doprnt_
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: ignored_error_code
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: THD::db
+  Controlled Function: print_slave_db_safe
+  Controlled Function: _db_keyword_
+  Controlled Function: ignored_error_code
+  Controlled Function: ignored_error_code
+  Controlled Function: clear_all_errors
+  Controlled Function: std::atomic
+  Controlled Function: strcmp
+  Controlled Function: ER_THD_NONCONST
+  Controlled Function: ER_THD
+  Controlled Function: strcmp
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: ER_THD_NONCONST
+  Controlled Function: Error_log_throttle::log
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: THD::get_transaction
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: clear_all_errors
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: print_slave_db_safe
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: std::atomic
+  Controlled Function: my_error
+
+Implicit Control Flow:
+
+----------------------------------------

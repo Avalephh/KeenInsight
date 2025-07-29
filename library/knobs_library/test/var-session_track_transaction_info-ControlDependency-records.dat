@@ -1,0 +1,193 @@
+Global Variable: System_variables.108
+Explicit Data Flow (42):
+  Instruction: %1 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:927:22 | Function: Transaction_state_tracker::update
+  Instruction: %cmp = icmp ne i64 %1, 0, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:927:53 | Function: Transaction_state_tracker::update
+  Instruction: br i1 %cmp, label %if.then, label %if.else, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:927:7 | Function: Transaction_state_tracker::update
+  Instruction: %7 = load i64, i64* %session_track_transaction_info5, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:937:24 | Function: Transaction_state_tracker::update
+  Instruction: %cmp6 = icmp eq i64 %7, 2, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:937:55 | Function: Transaction_state_tracker::update
+  Instruction: br i1 %cmp6, label %if.then7, label %if.end10, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:937:9 | Function: Transaction_state_tracker::update
+  Instruction: %33 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:988:23 | Function: Transaction_state_tracker::store
+  Instruction: %cmp = icmp eq i64 %33, 2, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:988:54 | Function: Transaction_state_tracker::store
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end216, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:988:76 | Function: Transaction_state_tracker::store
+  Instruction: %71 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255479 | Location: /root/LLVM/mysql-8.0.36/sql/sp_head.cc:2803:26 | Function: sp_head::execute_procedure
+  Instruction: %cmp92 = icmp ugt i64 %71, 0, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/sql/sp_head.cc:2803:57 | Function: sp_head::execute_procedure
+  Instruction: br i1 %cmp92, label %if.then93, label %if.end97, !dbg !1255481 | Location: /root/LLVM/mysql-8.0.36/sql/sp_head.cc:2803:11 | Function: sp_head::execute_procedure
+  Instruction: %84 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255460 | Location: /root/LLVM/mysql-8.0.36/sql/sp_instr.cc:542:22 | Function: sp_lex_instr::reset_lex_and_exec_core
+  Instruction: %cmp122 = icmp ugt i64 %84, 0, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/sql/sp_instr.cc:542:53 | Function: sp_lex_instr::reset_lex_and_exec_core
+  Instruction: br i1 %cmp122, label %if.then123, label %if.end128, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/sp_instr.cc:542:7 | Function: sp_lex_instr::reset_lex_and_exec_core
+  Instruction: %41 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6377:22 | Function: check_lock_and_start_stmt
+  Instruction: %cmp38 = icmp ugt i64 %41, 0, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6377:53 | Function: check_lock_and_start_stmt
+  Instruction: br i1 %cmp38, label %if.then39, label %if.end49, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6377:7 | Function: check_lock_and_start_stmt
+  Instruction: %4 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3298:22 | Function: my_eof
+  Instruction: %cmp = icmp ugt i64 %4, 0, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3298:53 | Function: my_eof
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3298:7 | Function: my_eof
+  Instruction: %1823 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1258943 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4994:24 | Function: mysql_execute_command
+  Instruction: %cmp2964 = icmp ugt i64 %1823, 0, !dbg !1258944 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4994:55 | Function: mysql_execute_command
+  Instruction: br i1 %cmp2964, label %if.then2965, label %if.end2967, !dbg !1258945 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4994:9 | Function: mysql_execute_command
+  Instruction: %14 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5264:24 | Function: Sys_var_transaction_read_only::session_update
+  Instruction: %cmp8 = icmp ugt i64 %14, 0, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5264:55 | Function: Sys_var_transaction_read_only::session_update
+  Instruction: br i1 %cmp8, label %if.then9, label %if.end17, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5264:9 | Function: Sys_var_transaction_read_only::session_update
+  Instruction: %1 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:72:22 | Function: trans_reset_one_shot_chistics
+  Instruction: %cmp = icmp ugt i64 %1, 0, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:72:53 | Function: trans_reset_one_shot_chistics
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:72:7 | Function: trans_reset_one_shot_chistics
+  Instruction: %3 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:8712:22 | Function: set_tx_isolation
+  Instruction: %cmp = icmp ule i64 %3, 0, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:8712:53 | Function: set_tx_isolation
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:8712:7 | Function: set_tx_isolation
+  Instruction: %63 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255443 | Location: /root/LLVM/mysql-8.0.36/sql/lock.cc:370:22 | Function: mysql_lock_tables
+  Instruction: %cmp = icmp ugt i64 %63, 0, !dbg !1255444 | Location: /root/LLVM/mysql-8.0.36/sql/lock.cc:370:53 | Function: mysql_lock_tables
+  Instruction: br i1 %cmp, label %if.then82, label %if.end84, !dbg !1255445 | Location: /root/LLVM/mysql-8.0.36/sql/lock.cc:370:7 | Function: mysql_lock_tables
+  Instruction: %68 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc:106:22 | Function: Locked_tables_list::init_locked_tables
+  Instruction: %cmp44 = icmp ugt i64 %68, 0, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc:106:53 | Function: Locked_tables_list::init_locked_tables
+  Instruction: br i1 %cmp44, label %if.then45, label %if.end47, !dbg !1255421 | Location: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc:106:7 | Function: Locked_tables_list::init_locked_tables
+  Instruction: %21 = load i64, i64* %session_track_transaction_info, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc:148:24 | Function: Locked_tables_list::unlock_locked_tables
+  Instruction: %cmp7 = icmp ugt i64 %21, 0, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc:148:55 | Function: Locked_tables_list::unlock_locked_tables
+  Instruction: br i1 %cmp7, label %if.then8, label %if.end9, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc:148:9 | Function: Locked_tables_list::unlock_locked_tables
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Transaction_state_tracker::reset
+  Controlled Function: THD::get_transaction
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::has_state
+  Controlled Function: String::String
+  Controlled Function: String::length
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: THD::get_transaction
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: net_length_size
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: net_length_size
+  Controlled Function: String::prep_append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: net_store_length
+  Controlled Function: xid_t::get_gtrid_length
+  Controlled Function: net_store_length
+  Controlled Function: String::ptr
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: xid_t::get_data
+  Controlled Function: store_lenenc_string
+  Controlled Function: String::append
+  Controlled Function: String::~String
+  Controlled Function: xid_t::get_bqual_length
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: xid_t::get_data
+  Controlled Function: xid_t::get_format_id
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: xid_t::get_format_id
+  Controlled Function: String::append_ulonglong
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Transaction_state_tracker::add_trx_state_from_thd
+  Controlled Function: mem_root_deque
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: mem_root_deque
+  Controlled Function: LEX::cleanup
+  Controlled Function: sp_pcontext::find_variable
+  Controlled Function: set_thd_proc_info
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: close_thread_tables
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: set_thd_proc_info
+  Controlled Function: THD::is_error
+  Controlled Function: Item::operator new
+  Controlled Function: mem_root_deque
+  Controlled Function: THD::rollback_item_tree_changes
+  Controlled Function: my_error
+  Controlled Function: Item_null::Item_null
+  Controlled Function: sp_rcontext::set_variable
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: sp_rcontext::set_variable
+  Controlled Function: _db_pargs_
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Item::operator delete
+  Controlled Function: _db_enabled_
+  Controlled Function: MDL_context::release_statement_locks
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: _db_doprnt_
+  Controlled Function: sp_head::set_security_ctx
+  Controlled Function: _db_pargs_
+  Controlled Function: inline_mysql_start_sp
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: inline_mysql_end_sp
+  Controlled Function: sp_head::execute
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: mem_root_deque
+  Controlled Function: void destroy
+  Controlled Function: void destroy
+  Controlled Function: THD::pop_lock_usec
+  Controlled Function: MYSQL_BIN_LOG::is_open
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: THD::is_current_stmt_binlog_format_row
+  Controlled Function: sp_pcontext::find_variable
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::issue_unsafe_warnings
+  Controlled Function: __assert_fail
+  Controlled Function: sp_rcontext::get_item_addr
+  Controlled Function: operator new
+  Controlled Function: sp_rcontext::get_item
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Transaction_state_tracker::add_trx_state_from_thd
+  Controlled Function: SP_instr_error_handler::~SP_instr_error_handler
+  Controlled Function: SP_instr_error_handler::~SP_instr_error_handler
+  Controlled Function: THD::is_error
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: handler::has_transactions
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Transaction_state_tracker::calc_trx_state
+  Controlled Function: Transaction_state_tracker::add_trx_state
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Transaction_state_tracker::add_trx_state
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: binlog_gtid_end_transaction
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Transaction_state_tracker::set_read_flags
+  Controlled Function: Transaction_state_tracker::set_read_flags
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: track_table_access
+  Controlled Function: my_micro_time
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::inc_lock_usec
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+
+Implicit Control Flow:
+
+----------------------------------------

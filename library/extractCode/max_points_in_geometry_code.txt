@@ -1,0 +1,86 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc
+Function: Item_func_buffer_strategy::val_str
+String *Item_func_buffer_strategy::val_str(String * /* str_arg */) {
+  String str;
+  String *strat_name = args[0]->val_str_ascii(&str);
+  if ((null_value = args[0]->null_value)) {
+    assert(is_nullable());
+    return nullptr;
+  }
+
+  // Get the NULL-terminated ascii string.
+  const char *pstrat_name = strat_name->c_ptr_safe();
+
+  bool found = false;
+
+  tmp_value.set_charset(&my_charset_bin);
+  // The tmp_value is supposed to always stores a {uint32,double} pair,
+  // and it uses a char tmp_buffer[16] array data member.
+  uchar *result_buf = pointer_cast<uchar *>(tmp_value.ptr());
+
+  // Although the result of this item node is never persisted, we still have to
+  // use portable endianness access otherwise unaligned access will crash
+  // on sparc CPUs.
+  for (uint32 i = 0; i <= max_strategy; i++) {
+    // The above var_str_ascii() call makes the strat_name an ascii string so
+    // we can do below comparison.
+    if (str_icmp(pstrat_name, buffer_strategy_names[i]) != 0) continue;
+
+    int4store(result_buf, i);
+    result_buf += 4;
+    enum_buffer_strategies istrat = static_cast<enum_buffer_strategies>(i);
+
+    /*
+      The end_flat and point_square strategies must have no more arguments;
+      The rest strategies must have 2nd parameter which must be a positive
+      numeric value, and we will store it as a double.
+      We use float8store to ensure that the value is independent of endianness.
+    */
+    if (istrat != end_flat && istrat != point_square) {
+      if (arg_count != 2) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+        return error_str();
+      }
+
+      double val = args[1]->val_real();
+      if ((null_value = args[1]->null_value)) {
+        assert(is_nullable());
+        return nullptr;
+      }
+      if (val <= 0) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+        return error_str();
+      }
+
+      if (istrat != join_miter &&
+          val > current_thd->variables.max_points_in_geometry) {
+        my_error(ER_GIS_MAX_POINTS_IN_GEOMETRY_OVERFLOWED, MYF(0),
+                 "points_per_circle",
+                 current_thd->variables.max_points_in_geometry, func_name());
+        return error_str();
+      }
+
+      float8store(result_buf, val);
+    } else if (arg_count != 1) {
+      my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+      return error_str();
+    } else
+      float8store(result_buf, 0.0);
+
+    found = true;
+
+    break;
+  }
+
+  // Unrecognized strategy names, report error.
+  if (!found) {
+    my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+    return error_str();
+  }
+  tmp_value.length(12);
+
+  return &tmp_value;
+}
+
+

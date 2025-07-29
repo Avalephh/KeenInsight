@@ -1,0 +1,1875 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: close_temporary_tables
+bool close_temporary_tables(THD *thd) {
+  DBUG_TRACE;
+  TABLE *table;
+  TABLE *next = nullptr;
+  TABLE *prev_table;
+  /* Assume thd->variables.option_bits has OPTION_QUOTE_SHOW_CREATE */
+  bool was_quote_show = true;
+  bool error = false;
+  int slave_closed_temp_tables = 0;
+
+  if (!thd->temporary_tables) return false;
+
+  assert(!thd->slave_thread ||
+         thd->system_thread != SYSTEM_THREAD_SLAVE_WORKER);
+
+  /*
+    Ensure we don't have open HANDLERs for tables we are about to close.
+    This is necessary when close_temporary_tables() is called as part
+    of execution of BINLOG statement (e.g. for format description event).
+  */
+  mysql_ha_rm_temporary_tables(thd);
+  if (!mysql_bin_log.is_open()) {
+    TABLE *tmp_next;
+    for (TABLE *t = thd->temporary_tables; t; t = tmp_next) {
+      tmp_next = t->next;
+      mysql_lock_remove(thd, thd->lock, t);
+      /*
+        We should not meet temporary tables created by ALTER TABLE here.
+        It is responsibility of ALTER statement to close them. Otherwise
+        it might be necessary to remove them from DD as well.
+      */
+      assert(t->s->tmp_table_def);
+      close_temporary(thd, t, true, true);
+      slave_closed_temp_tables++;
+    }
+
+    thd->temporary_tables = nullptr;
+    if (thd->slave_thread) {
+      atomic_replica_open_temp_tables -= slave_closed_temp_tables;
+      thd->rli_slave->get_c_rli()->atomic_channel_open_temp_tables -=
+          slave_closed_temp_tables;
+    }
+
+    return false;
+  }
+
+  /*
+    We are about to generate DROP TEMPORARY TABLE statements for all
+    the left out temporary tables. If GTID_NEXT is set (e.g. if user
+    did SET GTID_NEXT just before disconnecting the client), we must
+    ensure that it will be able to generate GTIDs for the statements
+    with this server's UUID. Therefore we set gtid_next to
+    AUTOMATIC_GTID.
+  */
+  gtid_state->update_on_rollback(thd);
+  thd->variables.gtid_next.set_automatic();
+
+  /*
+    We must separate transactional temp tables and
+    non-transactional temp tables in two distinct DROP statements
+    to avoid the splitting if a slave server reads from this binlog.
+  */
+
+  /* Better add "if exists", in case a RESET MASTER has been done */
+  const char stub[] = "DROP /*!40005 TEMPORARY */ TABLE IF EXISTS ";
+  uint stub_len = sizeof(stub) - 1;
+  char buf_trans[256], buf_non_trans[256];
+  String s_query_trans =
+      String(buf_trans, sizeof(buf_trans), system_charset_info);
+  String s_query_non_trans =
+      String(buf_non_trans, sizeof(buf_non_trans), system_charset_info);
+  bool found_user_tables = false;
+  bool found_trans_table = false;
+  bool found_non_trans_table = false;
+
+  memcpy(buf_trans, stub, stub_len);
+  memcpy(buf_non_trans, stub, stub_len);
+
+  /*
+    Insertion sort of temp tables by pseudo_thread_id to build ordered list
+    of sublists of equal pseudo_thread_id
+  */
+
+  for (prev_table = thd->temporary_tables, table = prev_table->next; table;
+       prev_table = table, table = table->next) {
+    TABLE *prev_sorted /* same as for prev_table */, *sorted;
+    /*
+      We should not meet temporary tables created by ALTER TABLE here.
+      It is responsibility of ALTER statement to close them. Otherwise
+      it might be necessary to remove them from DD as well.
+    */
+    assert(table->s->tmp_table_def);
+    if (is_user_table(table)) {
+      if (!found_user_tables) found_user_tables = true;
+      for (prev_sorted = nullptr, sorted = thd->temporary_tables;
+           sorted != table; prev_sorted = sorted, sorted = sorted->next) {
+        if (!is_user_table(sorted) || tmpkeyval(sorted) > tmpkeyval(table)) {
+          /* move into the sorted part of the list from the unsorted */
+          prev_table->next = table->next;
+          table->next = sorted;
+          if (prev_sorted) {
+            prev_sorted->next = table;
+          } else {
+            thd->temporary_tables = table;
+          }
+          table = prev_table;
+          break;
+        }
+      }
+    }
+  }
+
+  /* We always quote db,table names though it is slight overkill */
+  if (found_user_tables && !(was_quote_show = (thd->variables.option_bits &
+                                               OPTION_QUOTE_SHOW_CREATE))) {
+    thd->variables.option_bits |= OPTION_QUOTE_SHOW_CREATE;
+  }
+
+  /*
+    Make LEX consistent with DROP TEMPORARY TABLES statement which we
+    are going to log. This is important for the binary logging code.
+  */
+  LEX *lex = thd->lex;
+  enum_sql_command sav_sql_command = lex->sql_command;
+  bool sav_drop_temp = lex->drop_temporary;
+  lex->sql_command = SQLCOM_DROP_TABLE;
+  lex->drop_temporary = true;
+
+  /* scan sorted tmps to generate sequence of DROP */
+  for (table = thd->temporary_tables; table; table = next) {
+    if (is_user_table(table) && table->should_binlog_drop_if_temp()) {
+      bool save_thread_specific_used = thd->thread_specific_used;
+      my_thread_id save_pseudo_thread_id = thd->variables.pseudo_thread_id;
+      /* Set pseudo_thread_id to be that of the processed table */
+      thd->variables.pseudo_thread_id = tmpkeyval(table);
+      String db;
+      db.append(table->s->db.str);
+      /* Loop forward through all tables that belong to a common database
+         within the sublist of common pseudo_thread_id to create single
+         DROP query
+      */
+      for (s_query_trans.length(stub_len), s_query_non_trans.length(stub_len),
+           found_trans_table = false, found_non_trans_table = false;
+           table && is_user_table(table) &&
+           tmpkeyval(table) == thd->variables.pseudo_thread_id &&
+           table->s->db.length == db.length() &&
+           strcmp(table->s->db.str, db.ptr()) == 0;
+           table = next) {
+        /* Separate transactional from non-transactional temp tables */
+        if (table->should_binlog_drop_if_temp()) {
+          /* Separate transactional from non-transactional temp tables */
+          if (table->s->tmp_table == TRANSACTIONAL_TMP_TABLE) {
+            found_trans_table = true;
+            /*
+              We are going to add ` around the table names and possible more
+              due to special characters
+            */
+            append_identifier(thd, &s_query_trans, table->s->table_name.str,
+                              strlen(table->s->table_name.str));
+            s_query_trans.append(',');
+          } else if (table->s->tmp_table == NON_TRANSACTIONAL_TMP_TABLE) {
+            found_non_trans_table = true;
+            /*
+              We are going to add ` around the table names and possible more
+              due to special characters
+            */
+            append_identifier(thd, &s_query_non_trans, table->s->table_name.str,
+                              strlen(table->s->table_name.str));
+            s_query_non_trans.append(',');
+          }
+        }
+
+        next = table->next;
+        mysql_lock_remove(thd, thd->lock, table);
+        close_temporary(thd, table, true, true);
+        slave_closed_temp_tables++;
+      }
+      thd->clear_error();
+      const CHARSET_INFO *cs_save = thd->variables.character_set_client;
+      thd->variables.character_set_client = system_charset_info;
+      thd->thread_specific_used = true;
+
+      if (found_trans_table) {
+        Query_log_event qinfo(thd, s_query_trans.ptr(),
+                              s_query_trans.length() - 1, false, true, false,
+                              0);
+        qinfo.db = db.ptr();
+        qinfo.db_len = db.length();
+        thd->variables.character_set_client = cs_save;
+
+        thd->get_stmt_da()->set_overwrite_status(true);
+        if ((error = (mysql_bin_log.write_event(&qinfo) ||
+                      mysql_bin_log.commit(thd, true) || error))) {
+          /*
+            If we're here following THD::cleanup, thence the connection
+            has been closed already. So lets print a message to the
+            error log instead of pushing yet another error into the
+            Diagnostics_area.
+
+            Also, we keep the error flag so that we propagate the error
+            up in the stack. This way, if we're the SQL thread we notice
+            that close_temporary_tables failed. (Actually, the SQL
+            thread only calls close_temporary_tables while applying old
+            Start_log_event_v3 events.)
+          */
+          LogErr(ERROR_LEVEL, ER_BINLOG_FAILED_TO_WRITE_DROP_FOR_TEMP_TABLES);
+        }
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+
+      if (found_non_trans_table) {
+        Query_log_event qinfo(thd, s_query_non_trans.ptr(),
+                              s_query_non_trans.length() - 1, false, true,
+                              false, 0);
+        qinfo.db = db.ptr();
+        qinfo.db_len = db.length();
+        thd->variables.character_set_client = cs_save;
+
+        thd->get_stmt_da()->set_overwrite_status(true);
+        if ((error = (mysql_bin_log.write_event(&qinfo) ||
+                      mysql_bin_log.commit(thd, true) || error))) {
+          /*
+            If we're here following THD::cleanup, thence the connection
+            has been closed already. So lets print a message to the
+            error log instead of pushing yet another error into the
+            Diagnostics_area.
+
+            Also, we keep the error flag so that we propagate the error
+            up in the stack. This way, if we're the SQL thread we notice
+            that close_temporary_tables failed. (Actually, the SQL
+            thread only calls close_temporary_tables while applying old
+            Start_log_event_v3 events.)
+          */
+          LogErr(ERROR_LEVEL, ER_BINLOG_FAILED_TO_WRITE_DROP_FOR_TEMP_TABLES);
+        }
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+
+      thd->variables.pseudo_thread_id = save_pseudo_thread_id;
+      thd->thread_specific_used = save_thread_specific_used;
+    } else {
+      next = table->next;
+      /*
+        This is for those cases when we have acquired lock but drop temporary
+        table will not be logged.
+      */
+      mysql_lock_remove(thd, thd->lock, table);
+      close_temporary(thd, table, true, true);
+      slave_closed_temp_tables++;
+    }
+  }
+  lex->drop_temporary = sav_drop_temp;
+  lex->sql_command = sav_sql_command;
+
+  if (!was_quote_show)
+    thd->variables.option_bits &=
+        ~OPTION_QUOTE_SHOW_CREATE; /* restore option */
+
+  thd->temporary_tables = nullptr;
+  if (thd->slave_thread) {
+    atomic_replica_open_temp_tables -= slave_closed_temp_tables;
+    thd->rli_slave->get_c_rli()->atomic_channel_open_temp_tables -=
+        slave_closed_temp_tables;
+  }
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_table_entry_fini not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: mysql_rm_db
+bool mysql_rm_db(THD *thd, const LEX_CSTRING &db, bool if_exists) {
+  ulong deleted_tables = 0;
+  bool error = false;
+  char path[2 * FN_REFLEN + 16];
+  Table_ref *tables = nullptr;
+  Table_ref *table;
+  Drop_table_error_handler err_handler;
+  bool dropped_non_atomic = false;
+  std::set<handlerton *> post_ddl_htons;
+  Foreign_key_parents_invalidator fk_invalidator;
+
+  DBUG_TRACE;
+
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  // Reject dropping the system schema except for system threads.
+  if (!thd->is_dd_system_thread() &&
+      dd::get_dictionary()->is_dd_schema_name(dd::String_type(db.str))) {
+    my_error(ER_NO_SYSTEM_SCHEMA_ACCESS, MYF(0), db.str);
+    return true;
+  }
+
+  if (lock_schema_name(thd, db.str)) return true;
+
+  build_table_filename(path, sizeof(path) - 1, db.str, "", "", 0);
+
+  DEBUG_SYNC(thd, "before_acquire_in_drop_schema");
+  const dd::Schema *schema = nullptr;
+  if (thd->dd_client()->acquire(db.str, &schema)) return true;
+
+  DBUG_EXECUTE_IF("pretend_no_schema_in_drop_schema", { schema = nullptr; });
+
+  /* See if the directory exists */
+  MY_DIR *schema_dirp = my_dir(path, MYF(MY_DONT_SORT));
+
+  auto dirender = [](MY_DIR *dirp) { my_dirend(dirp); };
+  std::unique_ptr<MY_DIR, decltype(dirender)> grd{schema_dirp, dirender};
+
+  if (schema == nullptr)  // Schema not found in DD
+  {
+    if (schema_dirp != nullptr)  // Schema directory exists
+    {
+      // This is always an error, even when if_exists is true
+      my_error(ER_SCHEMA_DIR_UNKNOWN, MYF(0), db.str, path);
+      return true;
+    }
+
+    if (!if_exists)  // IF EXISTS not given
+    {
+      my_error(ER_DB_DROP_EXISTS, MYF(0), db.str);
+      return true;
+    }
+    push_warning_printf(thd, Sql_condition::SL_NOTE, ER_DB_DROP_EXISTS,
+                        ER_THD(thd, ER_DB_DROP_EXISTS), db.str);
+
+    /*
+      We don't have active transaction at this point so we can't use
+      binlog's trx cache, which requires transaction with valid XID.
+    */
+    if (write_db_cmd_to_binlog(thd, db.str, false)) return true;
+
+    if (trans_commit_stmt(thd) || trans_commit_implicit(thd)) return true;
+
+    /* Fall-through to resetting current database in connection. */
+  } else  // Schema found in DD
+  {
+    /* Database directory does not exist. */
+    if (schema_dirp == nullptr) {
+      if (!if_exists) {
+        my_error(ER_SCHEMA_DIR_MISSING, MYF(0), path);
+        return true;
+      }
+      push_warning_printf(thd, Sql_condition::SL_NOTE, ER_SCHEMA_DIR_MISSING,
+                          ER_THD(thd, ER_SCHEMA_DIR_MISSING), path);
+    } else {
+      if (find_unknown_and_remove_deletable_files(thd, schema_dirp, path)) {
+        return true;
+      }
+    }
+
+    if (find_db_tables(thd, *schema, db.str, &tables)) {
+      return true;
+    }
+
+    /* Lock all tables and stored routines about to be dropped. */
+    if (lock_table_names(thd, tables, nullptr, thd->variables.lock_wait_timeout,
+                         0) ||
+        rm_table_do_discovery_and_lock_fk_tables(thd, tables) ||
+        lock_check_constraint_names(thd, tables) ||
+        Events::lock_schema_events(thd, *schema) ||
+        lock_db_routines(thd, *schema) || lock_trigger_names(thd, tables))
+      return true;
+
+    /* mysql_ha_rm_tables() requires a non-null Table_ref. */
+    if (tables) mysql_ha_rm_tables(thd, tables);
+
+    for (table = tables; table; table = table->next_local) {
+      deleted_tables++;
+    }
+
+    if (thd->killed) return true;
+
+    thd->push_internal_handler(&err_handler);
+    if (tables)
+      error = mysql_rm_table_no_locks(thd, tables, true, false, true,
+                                      &dropped_non_atomic, &post_ddl_htons,
+                                      &fk_invalidator, nullptr);
+
+    DBUG_EXECUTE_IF("rm_db_fail_after_dropping_tables", {
+      my_error(ER_UNKNOWN_ERROR, MYF(0));
+      error = true;
+    });
+
+    if (!error) {
+      /*
+        We temporarily disable the binary log while dropping SPs
+        in the database. Since the DROP DATABASE statement is always
+        replicated as a statement, execution of it will drop all objects
+        in the database on the slave as well, so there is no need to
+        replicate the removal of the individual objects in the database
+        as well.
+
+        This is more of a safety precaution, since normally no objects
+        should be dropped while the database is being cleaned, but in
+        the event that a change in the code to remove other objects is
+        made, these drops should still not be logged.
+
+        Notice that the binary log have to be enabled over the call to
+        ha_drop_database(), since NDB otherwise detects the binary log
+        as disabled and will not log the drop database statement on any
+        other connected server.
+      */
+
+      ha_drop_database(path);
+      thd->clear_error(); /* @todo Do not ignore errors */
+      Disable_binlog_guard binlog_guard(thd);
+      error = Events::drop_schema_events(thd, *schema);
+      error = (error || sp_drop_db_routines(thd, *schema));
+    }
+    thd->pop_internal_handler();
+
+    if (!error) error = thd->dd_client()->drop(schema);
+
+    /*
+      If database exists and there was no error we should
+      write statement to binary log and remove DD entry.
+    */
+    if (!error) error = write_db_cmd_to_binlog(thd, db.str, true);
+
+    if (!error) error = trans_commit_stmt(thd) || trans_commit(thd);
+
+    /*
+      In case of error rollback the transaction in order to revert
+      changes which are possible to rollback (e.g. removal of tables
+      in SEs supporting atomic DDL, events and routines).
+    */
+    if (error) {
+      trans_rollback_stmt(thd);
+      /*
+        Play safe to be sure that THD::transaction_rollback_request is
+        cleared before work-around code below is run. This also necessary
+        to synchronize state of data-dicitionary on disk and in cache (to
+        clear cache of uncommitted objects).
+      */
+      trans_rollback_implicit(thd);
+    }
+
+    /*
+      Call post-DDL handlerton hook. For engines supporting atomic DDL
+      tables' files are removed from disk on this step.
+    */
+    for (handlerton *hton : post_ddl_htons) hton->post_ddl(thd);
+
+    fk_invalidator.invalidate(thd);
+
+    /*
+      Now we can try removing database directory.
+
+      If the directory is a symbolic link, remove the link first, then
+      remove the directory the symbolic link pointed at.
+
+      This can happen only after post-DDL handlerton hook removes files
+      from the directory.
+
+      Since the statement is committed already, we do not report unlikely
+      failure to remove the directory as an error. Instead we report it
+      as a warning, which is sent to user and written to server error log.
+    */
+    if (!error && schema_dirp != nullptr) {
+      Rmdir_error_handler rmdir_handler;
+      thd->push_internal_handler(&rmdir_handler);
+      (void)rm_dir_w_symlink(path, true);
+      thd->pop_internal_handler();
+    }
+
+    if (error) {
+      if (mysql_bin_log.is_open()) {
+        /*
+          If GTID_NEXT=='UUID:NUMBER', we must not log an incomplete
+          statement.  However, the incomplete DROP has already 'committed'
+          (some tables were removed).  So we generate an error and let
+          user fix the situation.
+        */
+        if (thd->variables.gtid_next.type == ASSIGNED_GTID &&
+            dropped_non_atomic) {
+          char gtid_buf[Gtid::MAX_TEXT_LENGTH + 1];
+          thd->variables.gtid_next.gtid.to_string(global_sid_map, gtid_buf,
+                                                  true);
+          my_error(ER_CANNOT_LOG_PARTIAL_DROP_DATABASE_WITH_GTID, MYF(0), path,
+                   gtid_buf, db.str);
+          return true;
+        }
+      }
+      return true;
+    }
+  }
+
+  /*
+    If this database was the client's selected database, we silently
+    change the client's selected database to nothing (to have an empty
+    SELECT DATABASE() in the future). For this we free() thd->db and set
+    it to 0.
+  */
+  if (thd->db().str && !strcmp(thd->db().str, db.str)) {
+    mysql_change_db_impl(thd, NULL_CSTR, 0, thd->variables.collation_server);
+    /*
+      Check if current database tracker is enabled. If so, set the 'changed'
+      flag.
+    */
+    if (thd->session_tracker.get_tracker(CURRENT_SCHEMA_TRACKER)
+            ->is_enabled()) {
+      thd->session_tracker.get_tracker(CURRENT_SCHEMA_TRACKER)
+          ->mark_as_changed(thd, {});
+    }
+  }
+
+  thd->server_status |= SERVER_STATUS_DB_DROPPED;
+  my_ok(thd, deleted_tables);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc
+Function: mysql_execute_command
+    KILL QUERY may come after cleanup in mysql_execute_command(). Next query
+    execution is interrupted due to this. So resetting THD::killed here.
+
+    THD::killed value can not be KILL_TIMEOUT here as timer used for statement
+    max execution time is disarmed in the cleanup stage of
+    mysql_execute_command. KILL CONNECTION should terminate the connection.
+    Hence resetting THD::killed only for KILL QUERY case here.
+  */
+  if (thd->killed == THD::KILL_QUERY) thd->killed = THD::NOT_KILLED;
+  thd->set_time();
+  if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == false) {
+    /*
+      If the time has gone past end of epoch we need to shutdown the server. But
+      there is possibility of getting invalid time value on some platforms.
+      For example, gettimeofday() might return incorrect value on solaris
+      platform. Hence validating the current time with 5 iterations before
+      initiating the normal server shutdown process because of time getting
+      past 2038.
+    */
+    const int max_tries = 5;
+    LogErr(WARNING_LEVEL, ER_CONFIRMING_THE_FUTURE, max_tries);
+
+    int tries = 0;
+    while (++tries <= max_tries) {
+      thd->set_time();
+      if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == true) {
+        LogErr(WARNING_LEVEL, ER_BACK_IN_TIME, tries);
+        break;
+      }
+      LogErr(WARNING_LEVEL, ER_FUTURE_DATE, tries);
+    }
+    if (tries > max_tries) {
+      /*
+        If the time has got past epoch, we need to shut this server down.
+        We do this by making sure every command is a shutdown and we
+        have enough privileges to shut the server down
+
+        TODO: remove this when we have full 64 bit my_time_t support
+      */
+      LogErr(ERROR_LEVEL, ER_UNSUPPORTED_DATE);
+      ulong master_access = thd->security_context()->master_access();
+      thd->security_context()->set_master_access(master_access | SHUTDOWN_ACL);
+      error = true;
+      kill_mysql();
+    }
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_table.cc
+Function: rm_table_eval_gtid_and_table_groups_state not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_admin.cc
+Function: Sql_cmd_analyze_table::handle_histogram_command
+bool Sql_cmd_analyze_table::handle_histogram_command(THD *thd,
+                                                     Table_ref *table) {
+  // This should not be empty here.
+  assert(!get_histogram_fields().empty());
+
+  histograms::results_map results;
+  bool res = false;
+  if (table->next_local != nullptr) {
+    /*
+      Only one table can be specified for
+      ANALYZE TABLE ... UPDATE/DROP HISTOGRAM
+    */
+    results.emplace("", histograms::Message::MULTIPLE_TABLES_SPECIFIED);
+    res = true;
+  } else {
+    if (read_only || thd->tx_read_only) {
+      // Do not try to update histograms when in read_only mode.
+      results.emplace("", histograms::Message::SERVER_READ_ONLY);
+      res = false;
+    } else {
+      Disable_autocommit_guard autocommit_guard(thd);
+
+      /* Prevent intermediate commits to invoke commit order */
+      Implicit_substatement_state_guard substatement_guard(
+          thd, enum_implicit_substatement_guard_mode ::
+                   DISABLE_GTID_AND_SPCO_IF_SPCO_ACTIVE);
+
+      /*
+        This statement will be written to the binary log even if it fails. But a
+        failing statement calls trans_rollback_stmt which calls
+        gtid_state->update_on_rollback, which releases GTID ownership. And GTID
+        ownership must be held when the statement is being written to the binary
+        log. Therefore, we set this flag before executing the statement. The
+        flag tells gtid_state->update_on_rollback to skip releasing ownership.
+      */
+      Variable_scope_guard<bool> skip_gtid_rollback_guard(
+          thd->skip_gtid_rollback);
+      if ((thd->variables.gtid_next.type == ASSIGNED_GTID ||
+           thd->variables.gtid_next.type == ANONYMOUS_GTID) &&
+          (!thd->skip_gtid_rollback))
+        thd->skip_gtid_rollback = true;
+
+      dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+      switch (get_histogram_command()) {
+        case Histogram_command::UPDATE_HISTOGRAM:
+          res = acquire_shared_backup_lock(thd,
+                                           thd->variables.lock_wait_timeout) ||
+                update_histogram(thd, table, results);
+          break;
+        case Histogram_command::DROP_HISTOGRAM:
+          res = acquire_shared_backup_lock(thd,
+                                           thd->variables.lock_wait_timeout) ||
+                drop_histogram(thd, table, results);
+
+          if (res) {
+            /*
+              Do a rollback. We can end up here if query was interrupted
+              during drop_histogram.
+            */
+            trans_rollback_stmt(thd);
+            trans_rollback(thd);
+          } else {
+            res = trans_commit_stmt(thd) || trans_commit(thd);
+          }
+          break;
+        case Histogram_command::NONE:
+          assert(false); /* purecov: deadcode */
+          break;
+      }
+
+      if (!res) {
+        /*
+          If a histogram was added, updated or removed, we will request the old
+          TABLE_SHARE to go away from the table definition cache. This is
+          because histogram data is cached in the TABLE_SHARE, so we want new
+          transactions to fetch the updated data into the TABLE_SHARE before
+          using it again.
+        */
+        tdc_remove_table(thd, TDC_RT_REMOVE_UNUSED, table->db,
+                         table->table_name, false);
+      }
+    }
+  }
+
+  thd->clear_error();
+  res = send_histogram_results(thd, results, table);
+  thd->get_stmt_da()->reset_condition_info(thd);
+  my_eof(thd);
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_admin.cc
+Function: mysql_admin_table
+      on it that is left from mysql_admin_table()'s attempt to
+      open it. Release the shared metadata lock before trying to
+      acquire the exclusive lock to satisfy MDL asserts and avoid
+      deadlocks.
+    */
+    thd->mdl_context.release_transactional_locks();
+    /*
+      Attempt to do full-blown table open in mysql_admin_table() has failed.
+      Let us try to open at least a .FRM for this table.
+    */
+    MDL_REQUEST_INIT(&table_list->mdl_request, MDL_key::TABLE, table_list->db,
+                     table_list->table_name, MDL_EXCLUSIVE, MDL_TRANSACTION);
+
+    if (lock_table_names(thd, table_list, table_list->next_global,
+                         thd->variables.lock_wait_timeout, 0))
+      return 0;
+    has_mdl_lock = true;
+
+    key_length = get_table_def_key(table_list, &key);
+
+    mysql_mutex_lock(&LOCK_open);
+    share = get_table_share(thd, table_list->db, table_list->table_name, key,
+                            key_length, false);
+    mysql_mutex_unlock(&LOCK_open);
+    if (share == nullptr) return 0;  // Can't open frm file
+
+    if (open_table_from_share(thd, share, "", 0, 0, 0, &tmp_table, false,
+                              nullptr)) {
+      mysql_mutex_lock(&LOCK_open);
+      release_table_share(share);
+      mysql_mutex_unlock(&LOCK_open);
+      return 0;  // Out of memory
+    }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group
+bool MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group(THD *first_seen) {
+  DBUG_TRACE;
+  bool error = false;
+  bool is_global_sid_locked = false;
+  rpl_sidno locked_sidno = 0;
+
+  for (THD *head = first_seen; head; head = head->next_to_commit) {
+    assert(head->variables.gtid_next.type != UNDEFINED_GTID);
+
+    /* Generate GTID */
+    if (head->variables.gtid_next.type == AUTOMATIC_GTID) {
+      if (!is_global_sid_locked) {
+        global_sid_lock->rdlock();
+        is_global_sid_locked = true;
+      }
+      if (gtid_state->generate_automatic_gtid(
+              head,
+              head->get_transaction()->get_rpl_transaction_ctx()->get_sidno(),
+              head->get_transaction()->get_rpl_transaction_ctx()->get_gno(),
+              &locked_sidno) != RETURN_STATUS_OK) {
+        head->commit_error = THD::CE_FLUSH_GNO_EXHAUSTED_ERROR;
+        error = true;
+      }
+    } else {
+      DBUG_PRINT("info",
+                 ("thd->variables.gtid_next.type=%d "
+                  "thd->owned_gtid.sidno=%d",
+                  head->variables.gtid_next.type, head->owned_gtid.sidno));
+      if (head->variables.gtid_next.type == ASSIGNED_GTID)
+        assert(head->owned_gtid.sidno > 0);
+      else {
+        assert(head->variables.gtid_next.type == ANONYMOUS_GTID);
+        assert(head->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS);
+      }
+    }
+  }
+
+  if (locked_sidno > 0) gtid_state->unlock_sidno(locked_sidno);
+
+  if (is_global_sid_locked) global_sid_lock->unlock();
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::gtid_end_transaction
+int MYSQL_BIN_LOG::gtid_end_transaction(THD *thd) {
+  DBUG_TRACE;
+
+  DBUG_PRINT("info", ("query=%s", thd->query().str));
+
+  if (thd->owned_gtid.sidno > 0) {
+    assert(thd->variables.gtid_next.type == ASSIGNED_GTID);
+
+    if (!opt_bin_log || (thd->slave_thread && !opt_log_replica_updates)) {
+      /*
+        If the binary log is disabled for this thread (either by
+        log_bin=0 or sql_log_bin=0 or by log_replica_updates=0 for a
+        slave thread), then the statement must not be written to the
+        binary log.  In this case, we just save the GTID into the
+        table directly.
+
+        (This only happens for DDL, since DML will save the GTID into
+        table and release ownership inside ha_commit_trans.)
+      */
+      if (gtid_state->save(thd) != 0) {
+        gtid_state->update_on_rollback(thd);
+        return 1;
+      } else if (!has_commit_order_manager(thd)) {
+        /*
+          The gtid_state->save implicitly performs the commit, in the following
+          stack:
+            Gtid_state::save ->
+            Gtid_table_persistor::save ->
+            Gtid_table_access_context::deinit ->
+            System_table_access::close_table ->
+            ha_commit_trans ->
+            Relay_log_info::pre_commit ->
+            Slave_worker::commit_positions(THD*) ->
+            Slave_worker::commit_positions(THD*,Log_event*,...) ->
+            Slave_worker::flush_info ->
+            Rpl_info_handler::flush_info ->
+            Rpl_info_table::do_flush_info ->
+            Rpl_info_table_access::close_table ->
+            System_table_access::close_table ->
+            ha_commit_trans ->
+            MYSQL_BIN_LOG::commit ->
+            ha_commit_low
+
+          If replica-preserve-commit-order is disabled, it does not call
+          update_on_commit from this stack. The reason is as follows:
+
+          In the normal case of MYSQL_BIN_LOG::commit, where the transaction is
+          going to be written to the binary log, it invokes
+          MYSQL_BIN_LOG::ordered_commit, which updates the GTID state (the call
+          gtid_state->update_commit_group(first) in process_commit_stage_queue).
+          However, when MYSQL_BIN_LOG::commit is invoked from this stack, it is
+          because the transaction is not going to be written to the binary log,
+          and then MYSQL_BIN_LOG::commit has a special case that calls
+          ha_commit_low directly, skipping ordered_commit. Therefore, the GTID
+          state is not updated in this stack.
+
+          On the other hand, if replica-preserve-commit-order is enabled, the
+          logic that orders commit carries out a subset of the binlog group
+          commit from within ha_commit_low, and this includes updating the GTID
+          state. In particular, there is the following call stack under
+          ha_commit_low:
+
+            ha_commit_low ->
+            Commit_order_manager::wait_and_finish ->
+            Commit_order_manager::finish ->
+            Commit_order_manager::flush_engine_and_signal_threads ->
+            Gtid_state::update_commit_group
+
+          Therefore, it is necessary to call update_on_commit only in case we
+          are not using replica-preserve-commit-order here.
+        */
+        gtid_state->update_on_commit(thd);
+      }
+    } else {
+      /*
+        If statement is supposed to be written to binlog, we write it
+        to the binary log.  Inserting into table and releasing
+        ownership will be done in the binlog commit handler.
+      */
+
+      /*
+        thd->cache_mngr may be uninitialized if the first transaction
+        executed by the client is empty.
+      */
+      if (thd->binlog_setup_trx_data()) return 1;
+      binlog_cache_data *cache_data = &thd_get_cache_mngr(thd)->trx_cache;
+
+      // Generate BEGIN event
+      Query_log_event qinfo(thd, STRING_WITH_LEN("BEGIN"), true, false, true, 0,
+                            true);
+      assert(!qinfo.is_using_immediate_logging());
+
+      /*
+        Write BEGIN event and then commit (which will generate commit
+        event and Gtid_log_event)
+      */
+      DBUG_PRINT("debug", ("Writing to trx_cache"));
+      if (cache_data->write_event(&qinfo) || mysql_bin_log.commit(thd, true))
+        return 1;
+    }
+  } else if (thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS ||
+             /*
+               A transaction with an empty owned gtid should call
+               end_gtid_violating_transaction(...) to clear the
+               flag thd->has_gtid_consistency_violatoin in case
+               it is set. It missed the clear in ordered_commit,
+               because its binlog transaction cache is empty.
+             */
+             thd->has_gtid_consistency_violation)
+
+  {
+    gtid_state->update_on_commit(thd);
+  } else if (thd->variables.gtid_next.type == ASSIGNED_GTID &&
+             thd->owned_gtid_is_empty()) {
+    assert(thd->has_gtid_consistency_violation == false);
+    gtid_state->update_on_commit(thd);
+  }
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: handle_gtid_consistency_violation
+    return handle_gtid_consistency_violation(
+        this, ER_GTID_UNSAFE_CREATE_SELECT,
+        ER_RPL_GTID_UNSAFE_STMT_CREATE_SELECT);
+  }
+
+  if ((is_create_temporary_table || is_drop_temporary_table) &&
+      is_binlog_format_statement &&
+      (is_in_transaction || is_in_sub_statement)) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Gtid_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Gtid_log_event::Gtid_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc
+Function: set_gtid_next
+bool set_gtid_next(THD *thd, const Gtid_specification &spec) {
+  DBUG_TRACE;
+
+  spec.dbug_print();
+  global_sid_lock->assert_some_lock();
+  // we may acquire and release locks throughout this function; this
+  // variable tells the error handler how many are left to release
+  int lock_count = 1;
+  bool ret = true;
+
+  // Check that we don't own a GTID or ANONYMOUS.
+  if (thd->owned_gtid.sidno > 0 ||
+      thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS) {
+    char buf[Gtid::MAX_TEXT_LENGTH + 1];
+    if (thd->owned_gtid.sidno > 0) {
+#ifndef NDEBUG
+      global_sid_lock->unlock();
+      global_sid_lock->wrlock();
+      assert(gtid_state->get_owned_gtids()->thread_owns_anything(
+          thd->thread_id()));
+#endif
+      thd->owned_gtid.to_string(thd->owned_sid, buf);
+    } else {
+      assert(gtid_state->get_anonymous_ownership_count() > 0);
+      strcpy(buf, "ANONYMOUS");
+    }
+    my_error(ER_CANT_SET_GTID_NEXT_WHEN_OWNING_GTID, MYF(0), buf);
+    goto err;
+  }
+
+  // At this point we should not own any GTID.
+  assert(thd->owned_gtid_is_empty());
+
+  switch (spec.type) {
+    case AUTOMATIC_GTID:
+      thd->variables.gtid_next.set_automatic();
+      break;
+
+    case ANONYMOUS_GTID:
+      if (global_gtid_mode.get() == Gtid_mode::ON) {
+        my_error(ER_CANT_SET_GTID_NEXT_TO_ANONYMOUS_WHEN_GTID_MODE_IS_ON,
+                 MYF(0));
+        goto err;
+      }
+
+      /*
+        The 'has_gtid_consistency_violation' must not be set,
+        since 'set_gtid_next' is invoked outside a transaction.
+      */
+      assert(!thd->has_gtid_consistency_violation);
+      thd->variables.gtid_next.set_anonymous();
+      thd->owned_gtid.sidno = THD::OWNED_SIDNO_ANONYMOUS;
+      thd->owned_gtid.gno = 0;
+      gtid_state->acquire_anonymous_ownership();
+      break;
+
+    case ASSIGNED_GTID:
+      assert(spec.gtid.sidno >= 1);
+      assert(spec.gtid.gno >= 1);
+      assert(spec.gtid.gno < GNO_END);
+      while (true) {
+        // loop invariant: we should always hold global_sid_lock.rdlock
+        assert(lock_count == 1);
+        global_sid_lock->assert_some_lock();
+
+        if (global_gtid_mode.get() == Gtid_mode::OFF) {
+          my_error(ER_CANT_SET_GTID_NEXT_TO_GTID_WHEN_GTID_MODE_IS_OFF, MYF(0));
+          goto err;
+        }
+
+        // acquire lock before checking conditions
+        gtid_state->lock_sidno(spec.gtid.sidno);
+        lock_count = 2;
+
+        // GTID already logged
+        if (gtid_state->is_executed(spec.gtid)) {
+          thd->variables.gtid_next = spec;
+          /*
+            Don't skip the statement here, skip it in
+            gtid_pre_statement_checks.
+          */
+          break;
+        }
+
+        // GTID not owned by anyone: acquire ownership
+        if (!gtid_state->is_owned(spec.gtid)) {
+          if (gtid_state->acquire_ownership(thd, spec.gtid)) goto err;
+          thd->variables.gtid_next = spec;
+          assert(thd->owned_gtid.sidno >= 1);
+          assert(thd->owned_gtid.gno >= 1);
+          assert(thd->owned_gtid.gno < GNO_END);
+          break;
+        }
+        // GTID owned by someone (other thread)
+        else {
+          // The call below releases the read lock on global_sid_lock and
+          // the mutex lock on SIDNO.
+          gtid_state->wait_for_gtid(thd, spec.gtid);
+
+          // global_sid_lock and mutex are now released
+          lock_count = 0;
+
+          // Check if thread was killed.
+          if (thd->killed || connection_events_loop_aborted()) {
+            goto err;
+          }
+          // If this thread is a slave SQL thread or slave SQL worker
+          // thread, we need this additional condition to determine if it
+          // has been stopped by STOP SLAVE [SQL_THREAD].
+          if ((thd->system_thread &
+               (SYSTEM_THREAD_SLAVE_SQL | SYSTEM_THREAD_SLAVE_WORKER)) != 0) {
+            // TODO: error is *not* reported on cancel
+            assert(thd->rli_slave != nullptr);
+            Relay_log_info *c_rli = thd->rli_slave->get_c_rli();
+            if (c_rli->abort_slave) {
+              goto err;
+            }
+          }
+          global_sid_lock->rdlock();
+          lock_count = 1;
+        }
+      }  // end while (true)
+      break;
+
+    case PRE_GENERATE_GTID: {
+      Gtid_specification new_spec = spec;
+      gtid_state->lock_sidno(new_spec.gtid.sidno);
+      lock_count = 2;
+      new_spec.gtid.gno = gtid_state->get_automatic_gno(new_spec.gtid.sidno);
+      if (new_spec.gtid.gno == -1) goto err;
+      if (gtid_state->acquire_ownership(thd, new_spec.gtid)) goto err;
+      new_spec.type = ASSIGNED_GTID;
+      thd->variables.gtid_next = new_spec;
+      break;
+    }
+
+    default:
+      // Not reached
+      assert(0);
+      break;
+  }
+
+  ret = false;
+
+err:
+  if (lock_count == 2) gtid_state->unlock_sidno(spec.gtid.sidno);
+
+  if (lock_count >= 1) global_sid_lock->unlock();
+
+  if (!ret) gtid_set_performance_schema_values(thd);
+  thd->owned_gtid.dbug_print(nullptr, "Set owned_gtid in set_gtid_next");
+
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc
+Function: is_already_logged_transaction
+bool is_already_logged_transaction(const THD *thd) {
+  DBUG_TRACE;
+
+  const Gtid_specification *gtid_next = &thd->variables.gtid_next;
+  const Gtid_set *gtid_next_list = thd->get_gtid_next_list_const();
+
+  if (gtid_next_list == nullptr) {
+    if (gtid_next->type == ASSIGNED_GTID) {
+      if (thd->owned_gtid.sidno == 0)
+        return true;
+      else
+        assert(thd->owned_gtid.equals(gtid_next->gtid));
+    } else
+      assert(thd->owned_gtid.sidno == 0 ||
+             thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS);
+  } else {
+#ifdef HAVE_GTID_NEXT_LIST
+    if (gtid_next->type == ASSIGNED_GTID) {
+      assert(gtid_next_list->contains_gtid(gtid_next->gtid));
+      if (!thd->owned_gtid_set.contains_gtid(gtid_next->gtid)) return true;
+    }
+#else
+    assert(0); /*NOTREACHED*/
+#endif
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc
+Function: gtid_reacquire_ownership_if_anonymous
+bool gtid_reacquire_ownership_if_anonymous(THD *thd) {
+  DBUG_TRACE;
+  Gtid_specification *gtid_next = &thd->variables.gtid_next;
+  /*
+    When the slave applier thread executes a
+    Format_description_log_event originating from a master
+    (corresponding to a new master binary log), it sets gtid_next to
+    NOT_YET_DETERMINED_GTID.  This allows any following
+    Gtid_log_event to set the GTID appropriately, but if there is no
+    Gtid_log_event, gtid_next will be converted to ANONYMOUS.
+  */
+  DBUG_PRINT("info", ("gtid_next->type=%d gtid_mode=%s", gtid_next->type,
+                      global_gtid_mode.get_string()));
+  if (gtid_next->type == NOT_YET_DETERMINED_GTID ||
+      (gtid_next->type == ANONYMOUS_GTID && thd->owned_gtid.sidno == 0)) {
+    Gtid_specification spec;
+    spec.set_anonymous();
+    DBUG_PRINT("info", ("acquiring ANONYMOUS ownership"));
+
+    global_sid_lock->rdlock();
+    // set_gtid_next releases global_sid_lock
+    if (set_gtid_next(thd, spec))
+      // this can happen if gtid_mode=on
+      return true;
+
+    thd->set_original_commit_timestamp_for_slave_thread();
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc
+Function: gtid_pre_statement_checks
+enum_gtid_statement_status gtid_pre_statement_checks(THD *thd) {
+  DBUG_TRACE;
+
+  Gtid_specification *gtid_next = &thd->variables.gtid_next;
+
+  DBUG_PRINT("info",
+             ("gtid_next->type=%d "
+              "owned_gtid.{sidno,gno}={%d,%" PRId64 "}",
+              gtid_next->type, thd->owned_gtid.sidno, thd->owned_gtid.gno));
+  assert(gtid_next->type != AUTOMATIC_GTID || thd->owned_gtid_is_empty());
+
+  if ((stmt_causes_implicit_commit(thd, CF_IMPLICIT_COMMIT_BEGIN) ||
+       thd->lex->sql_command == SQLCOM_BEGIN) &&
+      thd->in_active_multi_stmt_transaction() &&
+      gtid_next->type == ASSIGNED_GTID) {
+    my_error(ER_CANT_DO_IMPLICIT_COMMIT_IN_TRX_WHEN_GTID_NEXT_IS_SET, MYF(0));
+    return GTID_STATEMENT_CANCEL;
+  }
+
+  /*
+    Always allow:
+    - BEGIN/COMMIT/ROLLBACK;
+    - innocent statements, i.e., SET/SHOW/DO/SELECT which don't invoke
+      stored functions.
+
+    @todo: add flag to sql_command_flags to detect if statement
+    controls transactions instead of listing the commands in the
+    condition below
+
+    @todo: figure out how to handle SQLCOM_XA_*
+  */
+  const enum_sql_command sql_command = thd->lex->sql_command;
+  if (sql_command == SQLCOM_COMMIT || sql_command == SQLCOM_BEGIN ||
+      sql_command == SQLCOM_ROLLBACK || is_stmt_innocent(thd))
+    return GTID_STATEMENT_EXECUTE;
+
+  /*
+    If a transaction updates both non-transactional and transactional
+    table; or if it updates more than one non-transactional tables;
+    then the transaction must be stopped.  This is the case when on
+    master all updated tables are transactional but on slave at least
+    one is non-transactional, e.g.:
+
+    On master, tables are transactional:
+      CREATE TABLE t1 (a INT) Engine=InnoDB;
+      CREATE TABLE t2 (a INT) Engine=InnoDB;
+    On slave, one table is non-transactional:
+      CREATE TABLE t1 (a INT) Engine=MyISAM;
+      CREATE TABLE t2 (a INT) Engine=InnoDB;
+    On master, user executes:
+      BEGIN;
+      INSERT INTO t1 VALUES (1);
+      INSERT INTO t2 VALUES (1);
+      COMMIT;
+    On slave, the second statement must error due to a second statement
+    being executed after a statement that updated a non-transactional
+    table.
+  */
+  if (UNDEFINED_GTID == gtid_next->type) {
+    char buf[Gtid::MAX_TEXT_LENGTH + 1];
+    global_sid_lock->rdlock();
+    gtid_next->to_string(global_sid_map, buf);
+    global_sid_lock->unlock();
+    my_error(ER_GTID_NEXT_TYPE_UNDEFINED_GTID, MYF(0), buf);
+    return GTID_STATEMENT_CANCEL;
+  }
+
+  const Gtid_set *gtid_next_list = thd->get_gtid_next_list_const();
+
+  DBUG_PRINT("info", ("gtid_next_list=%p gtid_next->type=%d "
+                      "thd->owned_gtid.gtid.{sidno,gno}={%d,%" PRId64 "} "
+                      "thd->thread_id=%u",
+                      gtid_next_list, gtid_next->type, thd->owned_gtid.sidno,
+                      thd->owned_gtid.gno, thd->thread_id()));
+
+  const bool skip_transaction = is_already_logged_transaction(thd);
+  if (gtid_next_list == nullptr) {
+    if (skip_transaction) {
+      skip_statement(thd);
+      return GTID_STATEMENT_SKIP;
+    }
+    return GTID_STATEMENT_EXECUTE;
+  } else {
+#ifdef HAVE_GTID_NEXT_LIST
+    switch (gtid_next->type) {
+      case AUTOMATIC_GTID:
+        my_error(ER_GTID_NEXT_CANT_BE_AUTOMATIC_IF_GTID_NEXT_LIST_IS_NON_NULL,
+                 MYF(0));
+        return GTID_STATEMENT_CANCEL;
+      case ASSIGNED_GTID:
+        if (skip_transaction) {
+          skip_statement(thd);
+          return GTID_STATEMENT_SKIP;
+        }
+        [[fallthrough]];
+      case ANONYMOUS_GTID:
+        return GTID_STATEMENT_EXECUTE;
+      case INVALID_GTID:
+        assert(0); /*NOTREACHED*/
+    }
+#else
+    assert(0); /*NOTREACHED*/
+#endif
+  }
+  assert(0); /*NOTREACHED*/
+  return GTID_STATEMENT_CANCEL;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc
+Function: skip_statement
+static inline void skip_statement(THD *thd) {
+  DBUG_TRACE;
+
+  DBUG_PRINT("info", ("skipping statement '%s'. "
+                      "gtid_next->type=%d sql_command=%d "
+                      "thd->thread_id=%u",
+                      thd->query().str, thd->variables.gtid_next.type,
+                      thd->lex->sql_command, thd->thread_id()));
+
+  /*
+    Despite the transaction was skipped, there is still the need
+    to notify that its session ticket was consumed.
+  */
+  Commit_stage_manager::get_instance().finish_session_ticket(thd);
+
+#ifndef NDEBUG
+  const Gtid_set *executed_gtids = gtid_state->get_executed_gtids();
+  global_sid_lock->rdlock();
+  gtid_state->lock_sidno(thd->variables.gtid_next.gtid.sidno);
+  assert(executed_gtids->contains_gtid(thd->variables.gtid_next.gtid));
+  gtid_state->unlock_sidno(thd->variables.gtid_next.gtid.sidno);
+  global_sid_lock->unlock();
+#endif
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc
+Function: Gtid_state::update_gtids_impl_do_nothing
+bool Gtid_state::update_gtids_impl_do_nothing(THD *thd) {
+  if (thd->owned_gtid_is_empty() && !thd->has_gtid_consistency_violation) {
+    if (thd->variables.gtid_next.type == ASSIGNED_GTID)
+      thd->variables.gtid_next.set_undefined();
+    DBUG_PRINT("info", ("skipping update_gtids_impl because "
+                        "thread does not own anything and does not violate "
+                        "gtid consistency"));
+
+    return true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc
+Function: Gtid_state::update_gtids_impl_own_gtid
+void Gtid_state::update_gtids_impl_own_gtid(THD *thd, bool is_commit) {
+  assert_sidno_lock_owner(thd->owned_gtid.sidno);
+  /*
+    In Group Replication the GTID may additionally be owned by another
+    thread, and we won't remove that ownership (it will be rolled back later)
+  */
+  assert(owned_gtids.is_owned_by(thd->owned_gtid, thd->thread_id()));
+  owned_gtids.remove_gtid(thd->owned_gtid, thd->thread_id());
+
+  if (is_commit) {
+    assert(!executed_gtids.contains_gtid(thd->owned_gtid));
+    DBUG_EXECUTE_IF(
+        "rpl_gtid_update_on_commit_simulate_out_of_memory",
+        DBUG_SET("+d,rpl_gtid_get_free_interval_simulate_out_of_memory"););
+    /*
+      Any session adds transaction owned GTID into global executed_gtids.
+
+      If binlog is disabled, we report @@GLOBAL.GTID_PURGED from
+      executed_gtids, since @@GLOBAL.GTID_PURGED and @@GLOBAL.GTID_EXECUTED
+      are always same, so we did not save gtid into lost_gtids for every
+      transaction for improving performance.
+
+      If binlog is enabled and log_replica_updates is disabled, slave
+      SQL thread or slave worker thread adds transaction owned GTID
+      into global executed_gtids, lost_gtids and gtids_only_in_table.
+    */
+    CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_gtid_externalization");
+    executed_gtids._add_gtid(thd->owned_gtid);
+    thd->rpl_thd_ctx.session_gtids_ctx().notify_after_gtid_executed_update(thd);
+    if (thd->slave_thread && opt_bin_log && !opt_log_replica_updates) {
+      lost_gtids._add_gtid(thd->owned_gtid);
+      gtids_only_in_table._add_gtid(thd->owned_gtid);
+    }
+  } else {
+    if (thd->owned_gtid.sidno == server_sidno &&
+        next_free_gno > thd->owned_gtid.gno)
+      next_free_gno = thd->owned_gtid.gno;
+  }
+
+  thd->clear_owned_gtids();
+  if (thd->variables.gtid_next.type == ASSIGNED_GTID) {
+    assert(!thd->is_commit_in_middle_of_statement);
+    thd->variables.gtid_next.set_undefined();
+  } else {
+    /*
+      Can be UNDEFINED for statements where
+      gtid_pre_statement_checks skips the test for undefined,
+      e.g. ROLLBACK.
+    */
+    assert(thd->variables.gtid_next.type == AUTOMATIC_GTID ||
+           thd->variables.gtid_next.type == UNDEFINED_GTID);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc
+Function: Gtid_state::update_gtids_impl_own_anonymous
+void Gtid_state::update_gtids_impl_own_anonymous(THD *thd, bool *more_trx) {
+  assert(thd->variables.gtid_next.type == ANONYMOUS_GTID ||
+         thd->variables.gtid_next.type == AUTOMATIC_GTID);
+  /*
+    If there is more in the transaction cache, set more_trx to indicate this.
+
+    See comment for the update_gtids_impl_begin function.
+  */
+  if (opt_bin_log) {
+    // Needed before is_binlog_cache_empty.
+    thd->binlog_setup_trx_data();
+    if (!thd->is_binlog_cache_empty(true)) {
+      *more_trx = true;
+      DBUG_PRINT("info", ("Transaction cache is non-empty: setting "
+                          "more_transaction_with_same_gtid_next="
+                          "true."));
+    }
+  }
+  if (!(*more_trx && thd->variables.gtid_next.type == ANONYMOUS_GTID)) {
+    release_anonymous_ownership();
+    thd->clear_owned_gtids();
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc
+Function: Gtid_state::update_gtids_impl_own_nothing
+void Gtid_state::update_gtids_impl_own_nothing(THD *thd [[maybe_unused]]) {
+  assert(thd->commit_error != THD::CE_COMMIT_ERROR ||
+         thd->has_gtid_consistency_violation);
+  assert(thd->variables.gtid_next.type == AUTOMATIC_GTID);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc
+Function: Gtid_state::end_gtid_violating_transaction
+void Gtid_state::end_gtid_violating_transaction(THD *thd) {
+  DBUG_TRACE;
+  if (thd->has_gtid_consistency_violation) {
+    if (thd->variables.gtid_next.type == AUTOMATIC_GTID)
+      end_automatic_gtid_violating_transaction();
+    else {
+      assert(thd->variables.gtid_next.type == ANONYMOUS_GTID);
+      end_anonymous_gtid_violating_transaction();
+    }
+    thd->has_gtid_consistency_violation = false;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc
+Function: Gtid_state::generate_automatic_gtid
+enum_return_status Gtid_state::generate_automatic_gtid(
+    THD *thd, rpl_sidno specified_sidno, rpl_gno specified_gno,
+    rpl_sidno *locked_sidno) {
+  DBUG_TRACE;
+  enum_return_status ret = RETURN_STATUS_OK;
+
+  assert(thd->variables.gtid_next.type == AUTOMATIC_GTID);
+  assert(specified_sidno >= 0);
+  assert(specified_gno >= 0);
+  assert(thd->owned_gtid.is_empty());
+
+  bool locked_sidno_was_passed_null = (locked_sidno == nullptr);
+
+  if (locked_sidno_was_passed_null)
+    sid_lock->rdlock();
+  else
+    /* The caller must lock the sid_lock when locked_sidno is passed */
+    sid_lock->assert_some_lock();
+
+  // If GTID_MODE = ON_PERMISSIVE or ON, generate a new GTID
+  if (global_gtid_mode.get() >= Gtid_mode::ON_PERMISSIVE) {
+    Gtid automatic_gtid = {specified_sidno, specified_gno};
+
+    if (automatic_gtid.sidno == 0) automatic_gtid.sidno = get_server_sidno();
+
+    /*
+      We need to lock the sidno if locked_sidno wasn't passed as paramenter
+      or the already locked sidno doesn't match the one to generate the new
+      automatic GTID.
+    */
+    bool need_to_lock_sidno =
+        (locked_sidno_was_passed_null || *locked_sidno != automatic_gtid.sidno);
+    if (need_to_lock_sidno) {
+      /*
+        When locked_sidno contains a value greater than zero we must release
+        the current locked sidno. This should not happen with current code, as
+        the server only generates automatic GTIDs with server's UUID as sid.
+      */
+      if (!locked_sidno_was_passed_null && *locked_sidno != 0)
+        unlock_sidno(*locked_sidno);
+      lock_sidno(automatic_gtid.sidno);
+      /* Update the locked_sidno, so the caller would know what to unlock */
+      if (!locked_sidno_was_passed_null) *locked_sidno = automatic_gtid.sidno;
+    }
+
+    if (automatic_gtid.gno == 0) {
+      automatic_gtid.gno = get_automatic_gno(automatic_gtid.sidno);
+      if (automatic_gtid.sidno == get_server_sidno() &&
+          automatic_gtid.gno != -1)
+        next_free_gno = automatic_gtid.gno + 1;
+    }
+
+    if (automatic_gtid.gno == -1 || acquire_ownership(thd, automatic_gtid))
+      ret = RETURN_STATUS_REPORTED_ERROR;
+
+    /* The caller will unlock the sidno_lock if locked_sidno was passed */
+    if (locked_sidno_was_passed_null) unlock_sidno(automatic_gtid.sidno);
+
+  } else {
+    // If GTID_MODE = OFF or OFF_PERMISSIVE, just mark this thread as
+    // using an anonymous transaction.
+    thd->owned_gtid.sidno = THD::OWNED_SIDNO_ANONYMOUS;
+    thd->owned_gtid.gno = 0;
+    acquire_anonymous_ownership();
+    thd->owned_gtid.dbug_print(
+        nullptr, "set owned_gtid (anonymous) in generate_automatic_gtid");
+  }
+
+  /* The caller will unlock the sid_lock if locked_sidno was passed */
+  if (locked_sidno_was_passed_null) sid_lock->unlock();
+
+  gtid_set_performance_schema_values(thd);
+
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: Trans_delegate::before_commit
+int Trans_delegate::before_commit(THD *thd, bool all,
+                                  Binlog_cache_storage *trx_cache_log,
+                                  Binlog_cache_storage *stmt_cache_log,
+                                  ulonglong cache_log_max_size,
+                                  bool is_atomic_ddl_arg) {
+  DBUG_TRACE;
+  Trans_param param;
+  TRANS_PARAM_ZERO(param);
+  param.server_id = thd->server_id;
+  param.server_uuid = server_uuid;
+  param.thread_id = thd->thread_id();
+  param.gtid_info.type = thd->variables.gtid_next.type;
+  param.gtid_info.sidno = thd->variables.gtid_next.gtid.sidno;
+  param.gtid_info.gno = thd->variables.gtid_next.gtid.gno;
+  param.trx_cache_log = trx_cache_log;
+  param.stmt_cache_log = stmt_cache_log;
+  param.cache_log_max_size = cache_log_max_size;
+  param.original_commit_timestamp = &thd->variables.original_commit_timestamp;
+  param.is_atomic_ddl = is_atomic_ddl_arg;
+  param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
+  param.group_replication_consistency =
+      thd->variables.group_replication_consistency;
+  param.original_server_version = &(thd->variables.original_server_version);
+  param.immediate_server_version = &(thd->variables.immediate_server_version);
+  param.is_create_table_as_query_block =
+      (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+       !thd->lex->query_block->field_list_is_empty());
+
+  bool is_real_trans =
+      (all || !thd->get_transaction()->is_active(Transaction_ctx::SESSION));
+  if (is_real_trans) param.flags |= TRANS_IS_REAL_TRANS;
+
+  int ret = 0;
+
+  /* After this debug point we mark the transaction as committing in THD. */
+  DBUG_EXECUTE_IF("trans_delegate_before_commit_before_before_call_observers", {
+    const char act[] =
+        "now signal "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "reached "
+        "wait_for "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "waiting";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
+  thd->rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_BEFORE_COMMIT);
+
+  /**
+    If thread is killed or commits are blocked do not commit the transaction.
+    Post this thread cannot be killed.
+  */
+  if (thd->is_killed() || m_rollback_transaction_not_reached_before_commit) {
+    /**
+      Disconnect the client connection if not already done.
+      Do not KILL connection if the transaction is going to be rolledback.
+    */
+    if (!thd->is_killed()) {
+      mysql_mutex_lock(&thd->LOCK_thd_data);
+      thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&thd->LOCK_thd_data);
+    }
+    return 1;
+  }
+  FOREACH_OBSERVER(ret, before_commit, (&param));
+  plugin_foreach(thd, se_before_commit, MYSQL_STORAGE_ENGINE_PLUGIN, &param);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc
+Function: Relay_log_info::set_rli_description_event
+int Relay_log_info::set_rli_description_event(
+    Format_description_log_event *fe) {
+  DBUG_TRACE;
+  assert(!info_thd || !is_mts_worker(info_thd) || !fe);
+
+  if (fe) {
+    ulong fe_version = adapt_to_master_version(fe);
+
+    if (info_thd) {
+      /* @see rpl_rli_pdb.h:Slave_worker::set_rli_description_event for a
+         detailed explanation on the following code block's logic. */
+      if (info_thd->variables.gtid_next.type == AUTOMATIC_GTID ||
+          info_thd->variables.gtid_next.type == UNDEFINED_GTID) {
+        bool in_active_multi_stmt =
+            info_thd->in_active_multi_stmt_transaction();
+
+        if (!is_in_group() && !in_active_multi_stmt) {
+          DBUG_PRINT("info",
+                     ("Setting gtid_next.type to NOT_YET_DETERMINED_GTID"));
+          info_thd->variables.gtid_next.set_not_yet_determined();
+        } else if (in_active_multi_stmt) {
+          my_error(ER_VARIABLE_NOT_SETTABLE_IN_TRANSACTION, MYF(0),
+                   "gtid_next");
+          return 1;
+        }
+      }
+
+      if (is_parallel_exec() && fe_version > 0) {
+        /*
+          Prepare for workers' adaption to a new FD version. Workers
+          will see notification through scheduling of a first event of
+          a new post-new-FD.
+        */
+        for (Slave_worker **it = workers.begin(); it != workers.end(); ++it)
+          (*it)->fd_change_notified = false;
+      }
+    }
+  }
+  if (rli_description_event &&
+      --rli_description_event->atomic_usage_counter == 0)
+    delete rli_description_event;
+#ifndef NDEBUG
+  else
+    /* It must be MTS mode when the usage counter greater than 1. */
+    assert(!rli_description_event || is_parallel_exec());
+#endif
+  rli_description_event = fe;
+  if (rli_description_event) ++rli_description_event->atomic_usage_counter;
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.cc
+Function: Slave_worker::do_report
+void Slave_worker::do_report(loglevel level, int err_code, const char *msg,
+                             va_list args) const {
+  char buff_coord[MAX_SLAVE_ERRMSG];
+  char buff_gtid[Gtid::MAX_TEXT_LENGTH + 1];
+  const char *log_name =
+      const_cast<Slave_worker *>(this)->get_master_log_name();
+  ulonglong log_pos = const_cast<Slave_worker *>(this)->get_master_log_pos();
+  bool is_group_replication_applier_channel =
+      channel_map.is_group_replication_channel_name(c_rli->get_channel(), true);
+  const Gtid_specification *gtid_next = &info_thd->variables.gtid_next;
+  THD *thd = info_thd;
+
+  gtid_next->to_string(global_sid_map, buff_gtid, true);
+
+  if (level == ERROR_LEVEL && (!has_temporary_error(thd, err_code) ||
+                               thd->get_transaction()->cannot_safely_rollback(
+                                   Transaction_ctx::SESSION))) {
+    char coordinator_errmsg[MAX_SLAVE_ERRMSG];
+
+    if (is_group_replication_applier_channel) {
+      snprintf(coordinator_errmsg, MAX_SLAVE_ERRMSG,
+               "Coordinator stopped because there were error(s) in the "
+               "worker(s). "
+               "The most recent failure being: Worker %u failed executing "
+               "transaction '%s'. See error log and/or "
+               "performance_schema.replication_applier_status_by_worker "
+               "table for "
+               "more details about this failure or others, if any.",
+               internal_id, buff_gtid);
+    } else {
+      snprintf(coordinator_errmsg, MAX_SLAVE_ERRMSG,
+               "Coordinator stopped because there were error(s) in the "
+               "worker(s). "
+               "The most recent failure being: Worker %u failed executing "
+               "transaction '%s' at source log %s, end_log_pos %llu. "
+               "See error log and/or "
+               "performance_schema.replication_applier_status_by_worker "
+               "table for "
+               "more details about this failure or others, if any.",
+               internal_id, buff_gtid, log_name, log_pos);
+    }
+
+    /*
+      We want to update the errors in coordinator as well as worker.
+      The fill_coord_err_buf() function update the error number, message and
+      timestamp fields. This function is different from va_report() as
+      va_report() also logs the error message in the log apart from updating the
+      error fields. So, the worker does the job of reporting the error in the
+      log. We just make coordinator aware of the error.
+    */
+    c_rli->fill_coord_err_buf(level, err_code, coordinator_errmsg);
+  }
+
+  if (is_group_replication_applier_channel) {
+    snprintf(buff_coord, sizeof(buff_coord),
+             "Worker %u failed executing transaction '%s'", internal_id,
+             buff_gtid);
+  } else {
+    snprintf(buff_coord, sizeof(buff_coord),
+             "Worker %u failed executing transaction '%s' at "
+             "source log %s, end_log_pos %llu",
+             internal_id, buff_gtid, log_name, log_pos);
+  }
+
+  /*
+    Error reporting by the worker. The worker updates its error fields as well
+    as reports the error in the log.
+  */
+  this->va_report(level, err_code, buff_coord, msg, args);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.h
+Function: Slave_worker::set_rli_description_event
+    Relay_log_info::set_rli_description_event() the possibly existing
+    old FD is destroyed, carefully; each worker decrements
+    Format_description_log_event::atomic_usage_counter and when it is made
+    zero the destructor runs.
+    Unlike to Coordinator's role, the usage counter of the new FD is *not*
+    incremented, see @c Log_event::get_slave_worker() where and why it's done
+    there.
+
+    Notice, the method is run as well by Coordinator per each Worker at MTS
+    shutdown time.
+
+    Todo: consider to merge logics of the method with that of
+    Relay_log_info class.
+
+    @param fdle   pointer to a new Format_description_log_event
+
+    @return 1 if an error was encountered, 0 otherwise.
+  */
+  int set_rli_description_event(Format_description_log_event *fdle) override {
+    DBUG_TRACE;
+
+    if (fdle) {
+      /*
+        When the master rotates its binary log, set gtid_next to
+        NOT_YET_DETERMINED.  This tells the slave thread that:
+
+        - If a Gtid_log_event is read subsequently, gtid_next will be set to the
+          given GTID (this is done in gtid_pre_statement_checks()).
+
+        - If a statement is executed before any Gtid_log_event, then gtid_next
+          is set to anonymous (this is done in Gtid_log_event::do_apply_event().
+
+        It is important to not set GTID_NEXT=NOT_YET_DETERMINED in the middle of
+        a transaction.  If that would happen when GTID_MODE=ON, the next
+        statement would fail because it implicitly sets GTID_NEXT=ANONYMOUS,
+        which is disallowed when GTID_MODE=ON.  So then there would be no way to
+        end the transaction; any attempt to do so would result in this error.
+
+        There are three possible states when reaching this execution flow point
+        (see further below for a more detailed explanation on each):
+
+        - **No active transaction, and not in a group**: set `gtid_next` to
+          `NOT_YET_DETERMINED`.
+
+        - **No active transaction, and in a group**: do nothing regarding
+          `gtid_next`.
+
+        - **An active transaction exists**: impossible to set `gtid_next` and no
+          reason to process the `Format_description` event so, trigger an error.
+
+        For the sake of correctness, let's defined the meaning of having a
+        transaction "active" or "in a group".
+
+        A transaction is "active" if either BEGIN was executed or autocommit=0
+        and a DML statement was executed (@see
+        THD::in_active_multi_stmt_transaction).
+
+        A transaction is "in a group" if it is applied by the replication
+        applier, and the relay log position is between Gtid_log_event and the
+        committing event (@see Relay_log_info::is_in_group).
+
+        The three different states explained further:
+
+        **No active transaction, and not in a group**: It is normal to have
+        gtid_next=automatic/undefined and have a Format_description_log_event in
+        this condition. We are outside transaction context and should set
+        gtid_next to not_yet_determined.
+
+        **No active transaction, and in a group**: Having
+        gtid_next=automatic/undefined in a group is impossible if master is 5.7
+        or later, because the group always starts with a Gtid_log_event or an
+        Anonymous_gtid_log_event, which will set gtid_next to anonymous or
+        gtid. But it is possible to have gtid_next=undefined when replicating
+        from a 5.6 master with gtid_mode=off, because it does not generate any
+        such event. And then, it is possible to have no active transaction in a
+        group if the master has logged a DDL as a User_var_log_event followed by
+        a Query_log_event. The User_var_log_event will start a group, but not
+        start an active transaction or change gtid_next. In this case, it is
+        possible that a Format_description_log_event occurs, if the group
+        (transaction) is broken on two relay logs, so that User_var_log_event
+        appears at the end of one relay log and Query_log_event at the beginning
+        of the next one. In such cases, we should not set gtid_next.
+
+        **An active transaction exists**: It is possible to have
+        gtid_next=automatic/undefined in an active transaction, only if
+        gtid_next=automatic, which is only possible in a client connection using
+        gtid_next=automatic. In this scenario, there is no reason to execute a
+        Format_description_log_event. So we generate an error.
+      */
+      if (info_thd->variables.gtid_next.type == AUTOMATIC_GTID ||
+          info_thd->variables.gtid_next.type == UNDEFINED_GTID) {
+        bool in_active_multi_stmt =
+            info_thd->in_active_multi_stmt_transaction();
+
+        if (!is_in_group() && !in_active_multi_stmt) {
+          DBUG_PRINT("info",
+                     ("Setting gtid_next.type to NOT_YET_DETERMINED_GTID"));
+          info_thd->variables.gtid_next.set_not_yet_determined();
+        } else if (in_active_multi_stmt) {
+          my_error(ER_VARIABLE_NOT_SETTABLE_IN_TRANSACTION, MYF(0),
+                   "gtid_next");
+          return 1;
+        }
+      }
+      adapt_to_master_version_updown(fdle->get_product_version(),
+                                     get_master_server_version());
+    }
+    if (rli_description_event) {
+      assert(rli_description_event->atomic_usage_counter > 0);
+
+      if (--rli_description_event->atomic_usage_counter == 0) {
+        /* The being deleted by Worker FD can't be the latest one */
+        assert(rli_description_event != c_rli->get_rli_description_event());
+
+        delete rli_description_event;
+      }
+    }
+    rli_description_event = fdle;
+
+    return 0;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0repl.cc
+Function: Clone_persist_gtid::set_persist_gtid
+void Clone_persist_gtid::set_persist_gtid(trx_t *trx, bool set) {
+  bool thd_check = false;
+  auto thd = trx->mysql_thd;
+
+  /* Check conditions if the session is good for persisting GTID. */
+  static_cast<void>(has_gtid(trx, thd, thd_check));
+
+  /* For attachable transaction, skip both set and reset. */
+  if (thd == nullptr || thd->is_attachable_transaction_active() ||
+      trx->internal) {
+    return;
+  }
+
+  /* First do the reset. */
+  if (!set) {
+    thd->reset_gtid_persisted_by_se();
+    /* Reset transaction flag also. */
+    trx->persists_gtid = false;
+    return;
+  }
+
+  ut_ad(set);
+  /* Don't set if thread checks have failed. */
+  if (!thd_check) {
+    return;
+  }
+
+  /* This is an optimization to skip GTID allocation, if transaction
+  is guaranteed to not have GTID. */
+  if (!thd->se_persists_gtid()) {
+    auto gtid_next = thd->variables.gtid_next.type;
+
+    if (opt_bin_log) {
+      /* This transaction would not have GTID. */
+      if (gtid_next == ANONYMOUS_GTID) {
+        return;
+      }
+    } else {
+      /* If binary log is disabled, GTID must be directly assigned. */
+      if (gtid_next != ASSIGNED_GTID) {
+        return;
+      }
+    }
+  }
+
+  /* Test case to validate direct write to gtid_executed table. */
+  DBUG_EXECUTE_IF("simulate_err_on_write_gtid_into_table", { return; });
+  DBUG_EXECUTE_IF("disable_se_persists_gtid", { return; });
+
+  /* Set or Reset GTID persist flag in THD session. The transaction flag
+  is set later during prepare/commit/rollback. */
+  thd->set_gtid_persisted_by_se();
+}
+
+

@@ -1,0 +1,461 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::is_binlog_applier
+  bool is_binlog_applier() const {
+    return rli_fake && variables.pseudo_replica_mode;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::rpl_detach_engine_ha_data
+void THD::rpl_detach_engine_ha_data() {
+  Relay_log_info *rli =
+      is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : nullptr);
+
+  assert(!rli_fake || !rli_fake->is_engine_ha_data_detached());
+  assert(!rli_slave || !rli_slave->is_engine_ha_data_detached());
+
+  if (rli) rli->detach_engine_ha_data(this);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::rpl_reattach_engine_ha_data
+void THD::rpl_reattach_engine_ha_data() {
+  Relay_log_info *rli =
+      is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : nullptr);
+
+  assert(!rli_fake || rli_fake->is_engine_ha_data_detached());
+  assert(!rli_slave || rli_slave->is_engine_ha_data_detached());
+
+  if (rli) rli->reattach_engine_ha_data(this);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::is_engine_ha_data_detached
+bool THD::is_engine_ha_data_detached() const {
+  Relay_log_info *rli =
+      is_binlog_applier() ? rli_fake : (slave_thread ? rli_slave : nullptr);
+  return rli ? rli->is_engine_ha_data_detached() : false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: trans_register_ha
+  This is done by invoking trans_register_ha() server call.
+  Normally the engine registers itself whenever handler::external_lock()
+  is called. trans_register_ha() can be invoked many times: if
+  an engine is already registered, the call does nothing.
+  In case autocommit is not set, the engine must register itself
+  twice -- both in the statement list and in the normal transaction
+  list.
+  In which list to register is a parameter of trans_register_ha().
+
+  Note, that although the registration interface in itself is
+  fairly clear, the current usage practice often leads to undesired
+  effects. E.g. since a call to trans_register_ha() in most engines
+  is embedded into implementation of handler::external_lock(), some
+  DDL statements start a transaction (at least from the server
+  point of view) even though they are not expected to. E.g.
+  CREATE TABLE does not start a transaction, since
+  handler::external_lock() is never called during CREATE TABLE. But
+  CREATE TABLE ... SELECT does, since handler::external_lock() is
+  called for the table that is being selected from. This has no
+  practical effects currently, but must be kept in mind
+  nevertheless.
+
+  Once an engine is registered, the server will do the rest
+  of the work.
+
+  During statement execution, whenever any of data-modifying
+  PSEA API methods is used, e.g. handler::write_row() or
+  handler::update_row(), the read-write flag is raised in the
+  statement transaction for the involved engine.
+  Currently All PSEA calls are "traced", and the data can not be
+  changed in a way other than issuing a PSEA call. Important:
+  unless this invariant is preserved the server will not know that
+  a transaction in a given engine is read-write and will not
+  involve the two-phase commit protocol!
+
+  At the end of a statement, server call trans_commit_stmt is
+  invoked. This call in turn invokes handlerton::prepare()
+  for every involved engine. Prepare is followed by a call
+  to handlerton::commit_one_phase() If a one-phase commit
+  will suffice, handlerton::prepare() is not invoked and
+  the server only calls handlerton::commit_one_phase().
+  At statement commit, the statement-related read-write
+  engine flag is propagated to the corresponding flag in the
+  normal transaction.  When the commit is complete, the list
+  of registered engines is cleared.
+
+  Rollback is handled in a similar fashion.
+
+  Additional notes on DDL and the normal transaction.
+  ---------------------------------------------------
+
+  DDLs and operations with non-transactional engines
+  do not "register" in thd->transaction lists, and thus do not
+  modify the transaction state. Besides, each DDL in
+  MySQL is prefixed with an implicit normal transaction commit
+  (a call to trans_commit_implicit()), and thus leaves nothing
+  to modify.
+  However, as it has been pointed out with CREATE TABLE .. SELECT,
+  some DDL statements can start a *new* transaction.
+
+  Behaviour of the server in this case is currently badly
+  defined.
+  DDL statements use a form of "semantic" logging
+  to maintain atomicity: if CREATE TABLE .. SELECT failed,
+  the newly created table is deleted.
+  In addition, some DDL statements issue interim transaction
+  commits: e.g. ALTER TABLE issues a commit after data is copied
+  from the original table to the internal temporary table. Other
+  statements, e.g. CREATE TABLE ... SELECT do not always commit
+  after itself.
+  And finally there is a group of DDL statements such as
+  RENAME/DROP TABLE that doesn't start a new transaction
+  and doesn't commit.
+
+  This diversity makes it hard to say what will happen if
+  by chance a stored function is invoked during a DDL --
+  whether any modifications it makes will be committed or not
+  is not clear. Fortunately, SQL grammar of few DDLs allows
+  invocation of a stored function.
+
+  A consistent behaviour is perhaps to always commit the normal
+  transaction after all DDLs, just like the statement transaction
+  is always committed at the end of all statements.
+*/
+
+/**
+  Register a storage engine for a transaction.
+
+  Every storage engine MUST call this function when it starts
+  a transaction or a statement (that is it must be called both for the
+  "beginning of transaction" and "beginning of statement").
+  Only storage engines registered for the transaction/statement
+  will know when to commit/rollback it.
+
+  @note
+    trans_register_ha is idempotent - storage engine may register many
+    times per transaction.
+
+*/
+void trans_register_ha(THD *thd, bool all, handlerton *ht_arg,
+                       const ulonglong *trxid [[maybe_unused]]) {
+  Ha_trx_info *ha_info;
+  Transaction_ctx *trn_ctx = thd->get_transaction();
+  Transaction_ctx::enum_trx_scope trx_scope =
+      all ? Transaction_ctx::SESSION : Transaction_ctx::STMT;
+
+  DBUG_TRACE;
+  DBUG_PRINT("enter", ("%s", all ? "all" : "stmt"));
+
+  if (all) {
+    /*
+      Ensure no active backup engine data exists, unless the current
+      transaction is from replication and in active xa state.
+    */
+    assert(
+        thd->get_ha_data(ht_arg->slot)->ha_ptr_backup == nullptr ||
+        (thd->get_transaction()->xid_state()->has_state(XID_STATE::XA_ACTIVE)));
+    assert(thd->get_ha_data(ht_arg->slot)->ha_ptr_backup == nullptr ||
+           (thd->is_binlog_applier() || thd->slave_thread));
+
+    thd->server_status |= SERVER_STATUS_IN_TRANS;
+    if (thd->tx_read_only)
+      thd->server_status |= SERVER_STATUS_IN_TRANS_READONLY;
+    DBUG_PRINT("info", ("setting SERVER_STATUS_IN_TRANS"));
+  }
+
+  ha_info = thd->get_ha_data(ht_arg->slot)->ha_info + (all ? 1 : 0);
+
+  if (ha_info->is_started()) {
+    assert(trn_ctx->ha_trx_info(trx_scope));
+    return; /* already registered, return */
+  }
+
+  trn_ctx->register_ha(trx_scope, ha_info, ht_arg);
+  trn_ctx->set_ha_trx_info(trx_scope, ha_info);
+
+  if (ht_arg->prepare == nullptr) trn_ctx->set_no_2pc(trx_scope, true);
+
+  trn_ctx->xid_state()->set_query_id(thd->query_id);
+/*
+        Register transaction start in performance schema if not done already.
+        By doing this, we handle cases when the transaction is started
+   implicitly in autocommit=0 mode, and cases when we are in normal autocommit=1
+   mode and the executed statement is a single-statement transaction.
+
+        Explicitly started transactions are handled in trans_begin().
+
+        Do not register transactions in which binary log is the only
+   participating transactional storage engine.
+*/
+#ifdef HAVE_PSI_TRANSACTION_INTERFACE
+  if (thd->m_transaction_psi == nullptr && ht_arg->db_type != DB_TYPE_BINLOG &&
+      !thd->is_attachable_transaction_active()) {
+    const XID *xid = trn_ctx->xid_state()->get_xid();
+    bool autocommit = !thd->in_multi_stmt_transaction_mode();
+    thd->m_transaction_psi = MYSQL_START_TRANSACTION(
+        &thd->m_transaction_state, xid, trxid, thd->tx_isolation,
+        thd->tx_read_only, autocommit);
+    DEBUG_SYNC(thd, "after_set_transaction_psi_before_set_transaction_gtid");
+    gtid_set_performance_schema_values(thd);
+  }
+#endif
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::write_transaction
+bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
+                                      Binlog_event_writer *writer) {
+  DBUG_TRACE;
+
+  /*
+    The GTID for the THD was assigned at
+    assign_automatic_gtids_to_flush_group()
+  */
+  assert(thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS ||
+         thd->owned_gtid.sidno > 0);
+
+  int64 sequence_number, last_committed;
+  /* Generate logical timestamps for MTS */
+  m_dependency_tracker.get_dependency(thd, sequence_number, last_committed);
+
+  /*
+    In case both the transaction cache and the statement cache are
+    non-empty, both will be flushed in sequence and logged as
+    different transactions. Then the second transaction must only
+    be executed after the first one has committed. Therefore, we
+    need to set last_committed for the second transaction equal to
+    last_committed for the first transaction. This is done in
+    binlog_cache_data::flush. binlog_cache_data::flush uses the
+    condition trn_ctx->last_committed==SEQ_UNINIT to detect this
+    situation, hence the need to set it here.
+  */
+  thd->get_transaction()->last_committed = SEQ_UNINIT;
+
+  /*
+    For delayed replication and also for the purpose of lag monitoring,
+    we assume that the commit timestamp of the transaction is the time of
+    executing this code (the time of writing the Gtid_log_event to the binary
+    log).
+  */
+  ulonglong immediate_commit_timestamp = my_micro_time();
+
+  /*
+    When the original_commit_timestamp session variable is set to a value
+    other than UNDEFINED_COMMIT_TIMESTAMP, it means that either the timestamp
+    is known ( > 0 ) or the timestamp is not known ( == 0 ).
+  */
+  ulonglong original_commit_timestamp =
+      thd->variables.original_commit_timestamp;
+  /*
+    When original_commit_timestamp == UNDEFINED_COMMIT_TIMESTAMP, we assume
+    that:
+    a) it is not known if this thread is a slave applier ( = 0 );
+    b) this is a new transaction ( = immediate_commit_timestamp);
+  */
+  if (original_commit_timestamp == UNDEFINED_COMMIT_TIMESTAMP) {
+    /*
+      When applying a transaction using replication, assume that the
+      original commit timestamp is not known (the transaction wasn't
+      originated on the current server).
+    */
+    if (thd->slave_thread || thd->is_binlog_applier()) {
+      original_commit_timestamp = 0;
+    } else
+    /* Assume that this transaction is original from this server */
+    {
+      DBUG_EXECUTE_IF("rpl_invalid_gtid_timestamp",
+                      // add one our to the commit timestamps
+                      immediate_commit_timestamp += 3600000000;);
+      original_commit_timestamp = immediate_commit_timestamp;
+    }
+  } else {
+    // Clear the session variable to have cleared states for next transaction.
+    thd->variables.original_commit_timestamp = UNDEFINED_COMMIT_TIMESTAMP;
+  }
+
+  uint32_t trx_immediate_server_version =
+      do_server_version_int(::server_version);
+  // Clear the session variable to have cleared states for next transaction.
+  thd->variables.immediate_server_version = UNDEFINED_SERVER_VERSION;
+  DBUG_EXECUTE_IF("fixed_server_version",
+                  trx_immediate_server_version = 888888;);
+  DBUG_EXECUTE_IF("gr_fixed_server_version",
+                  trx_immediate_server_version = 777777;);
+
+  /*
+    When the original_server_version session variable is set to a value
+    other than UNDEFINED_SERVER_VERSION, it means that either the
+    server version is known or the server_version is not known
+    (UNKNOWN_SERVER_VERSION).
+  */
+  uint32_t trx_original_server_version = thd->variables.original_server_version;
+
+  /*
+    When original_server_version == UNDEFINED_SERVER_VERSION, we assume
+    that:
+    a) it is not known if this thread is a slave applier ( = 0 );
+    b) this is a new transaction ( = ::server_version);
+  */
+  if (trx_original_server_version == UNDEFINED_SERVER_VERSION) {
+    /*
+      When applying a transaction using replication, assume that the
+      original server version is not known (the transaction wasn't
+      originated on the current server).
+    */
+    if (thd->slave_thread || thd->is_binlog_applier()) {
+      trx_original_server_version = UNKNOWN_SERVER_VERSION;
+    } else
+    /* Assume that this transaction is original from this server */
+    {
+      trx_original_server_version = trx_immediate_server_version;
+    }
+  } else {
+    // Clear the session variable to have cleared states for next transaction.
+    thd->variables.original_server_version = UNDEFINED_SERVER_VERSION;
+  }
+  Gtid_log_event gtid_event(
+      thd, cache_data->is_trx_cache(), last_committed, sequence_number,
+      cache_data->may_have_sbr_stmts(), original_commit_timestamp,
+      immediate_commit_timestamp, trx_original_server_version,
+      trx_immediate_server_version);
+
+  // Set the transaction length, based on cache info
+  gtid_event.set_trx_length_by_cache_size(cache_data->get_byte_position(),
+                                          writer->is_checksum_enabled(),
+                                          cache_data->get_event_counter());
+
+  DBUG_PRINT("debug", ("cache_data->get_byte_position()= %llu",
+                       cache_data->get_byte_position()));
+  DBUG_PRINT("debug", ("cache_data->get_event_counter()= %lu",
+                       static_cast<ulong>(cache_data->get_event_counter())));
+  DBUG_PRINT("debug", ("writer->is_checksum_enabled()= %s",
+                       YESNO(writer->is_checksum_enabled())));
+  DBUG_PRINT("debug", ("gtid_event.get_event_length()= %lu",
+                       static_cast<ulong>(gtid_event.get_event_length())));
+  DBUG_PRINT("info",
+             ("transaction_length= %llu", gtid_event.transaction_length));
+
+  bool ret = gtid_event.write(writer);
+  if (ret) goto end;
+
+  /*
+    finally write the transaction data, if it was not compressed
+    and written as part of the gtid event already
+  */
+  ret = mysql_bin_log.write_cache(thd, cache_data, writer);
+
+  if (!ret) {
+    // update stats if monitoring is active
+    binlog::global_context.monitoring_context()
+        .transaction_compression()
+        .update(binlog::monitoring::log_type::BINARY,
+                cache_data->get_compression_type(), thd->owned_gtid,
+                gtid_event.immediate_commit_timestamp,
+                cache_data->get_compressed_size(),
+                cache_data->get_decompressed_size());
+  }
+
+end:
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_pseudo_replica_mode
+static bool check_pseudo_replica_mode(sys_var *self, THD *thd, set_var *var) {
+  if (check_session_admin_or_replication_applier(self, thd, var)) return true;
+  if (check_outside_trx(self, thd, var)) return true;
+  longlong previous_val = thd->variables.pseudo_replica_mode;
+  longlong val = (longlong)var->save_result.ulonglong_value;
+  bool rli_fake = false;
+
+  rli_fake = thd->rli_fake ? true : false;
+
+  if (rli_fake) {
+    if (!val) {
+      thd->rli_fake->end_info();
+      delete thd->rli_fake;
+      thd->rli_fake = nullptr;
+    } else if (previous_val && val)
+      goto ineffective;
+    else if (!previous_val && val)
+      push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                   "'pseudo_replica_mode' is already ON.");
+  } else {
+    if (!previous_val && !val)
+      goto ineffective;
+    else if (previous_val && !val)
+      push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+                   "Replica applier execution mode not active, "
+                   "statement ineffective.");
+  }
+  goto end;
+
+ineffective:
+  push_warning(thd, Sql_condition::SL_WARNING, ER_WRONG_VALUE_FOR_VAR,
+               "'pseudo_replica_mode' change was ineffective.");
+
+end:
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_sql_mode
+static bool check_sql_mode(sys_var *, THD *thd, set_var *var) {
+  sql_mode_t candidate_mode =
+      expand_sql_mode(var->save_result.ulonglong_value, thd);
+
+  if (candidate_mode & ~(MODE_ALLOWED_MASK | MODE_IGNORED_MASK)) {
+    my_error(ER_UNSUPPORTED_SQL_MODE, MYF(0),
+             candidate_mode & ~(MODE_ALLOWED_MASK | MODE_IGNORED_MASK));
+    return true;  // mode seems never supported before
+  }
+
+  if (candidate_mode & ~MODE_ALLOWED_MASK) {
+    if (thd->variables.pseudo_replica_mode &&  // (1)
+        thd->lex->sphead == nullptr) {         // (2)
+      /*
+        (1): catch the auto-generated SET SQL_MODE calls in the output of
+             mysqlbinlog,
+        (2): but ignore the other ones (e.g. nested SET SQL_MODE calls in
+             SBR-invoked trigger calls).
+      */
+      push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_WARN_REMOVED_SQL_MODE,
+          ER_THD(thd, ER_WARN_REMOVED_SQL_MODE),
+          static_cast<uint>(candidate_mode & ~MODE_ALLOWED_MASK));
+      // ignore obsolete mode flags in case this is an old mysqlbinlog:
+      candidate_mode &= MODE_ALLOWED_MASK;
+    } else {
+      my_error(ER_UNSUPPORTED_SQL_MODE, MYF(0),
+               candidate_mode & ~MODE_ALLOWED_MASK);
+      return true;  // error on obsolete mode flags
+    }
+  }
+
+  if (candidate_mode & MODE_PAD_CHAR_TO_FULL_LENGTH) {
+    push_warning_printf(
+        thd, Sql_condition::SL_WARNING, ER_WARN_DEPRECATED_SQLMODE,
+        ER_THD(thd, ER_WARN_DEPRECATED_SQLMODE), "PAD_CHAR_TO_FULL_LENGTH");
+  }
+
+  var->save_result.ulonglong_value = candidate_mode;
+  return false;
+}
+
+

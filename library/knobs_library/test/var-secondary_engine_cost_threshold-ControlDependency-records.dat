@@ -1,0 +1,27 @@
+Global Variable: System_variables.116
+Explicit Data Flow (5):
+  Instruction: %20 = load double, double* %secondary_engine_cost_threshold, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:947:23 | Function: retry_with_secondary_engine
+  Instruction: %cmp14 = fcmp ole double %18, %20, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:946:34 | Function: retry_with_secondary_engine
+  Instruction: br i1 %cmp14, label %if.then15, label %if.end29, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:945:7 | Function: retry_with_secondary_engine
+  Instruction: %31 = load double, double* %secondary_engine_cost_threshold25, align 8, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:956:43 | Function: retry_with_secondary_engine
+  Instruction: %call27 = invoke dereferenceable(56) %class.Opt_trace_struct* @_ZN16Opt_trace_struct3addEPKcd(%class.Opt_trace_struct* %29, i8* getelementptr inbounds ([10 x i8], [10 x i8]* @.str.121.16252, i64 0, i64 0), double %31)
+          to label %invoke.cont26 unwind label %lpad18, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:956:11 | Function: retry_with_secondary_engine
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+
+Implicit Control Flow:
+
+----------------------------------------

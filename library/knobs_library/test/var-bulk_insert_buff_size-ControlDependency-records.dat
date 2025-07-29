@@ -1,0 +1,14 @@
+Global Variable: System_variables.22
+Explicit Data Flow (2):
+  Instruction: %28 = load i64, i64* %bulk_insert_buff_size, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/ha_myisam.cc:1407:46 | Function: ha_myisam::start_bulk_insert
+  Instruction: %call = invoke i32 @_Z19mi_init_bulk_insertP7MI_INFOmy(%struct.MI_INFO* %26, i64 %28, i64 %29)
+          to label %invoke.cont25 unwind label %lpad, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/ha_myisam.cc:1407:5 | Function: ha_myisam::start_bulk_insert
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

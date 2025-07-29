@@ -1,0 +1,951 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: mysql_create_db
+bool mysql_create_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
+  DBUG_TRACE;
+
+  /*
+    Use Auto_releaser to keep uncommitted object for database until
+    trans_commit() call.
+  */
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  // Reject creation of the system schema except for system threads.
+  if (!thd->is_dd_system_thread() &&
+      dd::get_dictionary()->is_dd_schema_name(db) &&
+      !(create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS)) {
+    my_error(ER_NO_SYSTEM_SCHEMA_ACCESS, MYF(0), db);
+    return true;
+  }
+
+  if (ha_check_reserved_db_name(db)) {
+    my_error(ER_WRONG_DB_NAME, MYF(0), db);
+    return true;
+  }
+
+  /*
+    Check if user has permission to alter database, if encryption type
+    provided differ from global 'default_table_encryption' setting.
+    We use 'default_table_encryption' value if encryption is not supplied
+    by user.
+  */
+  bool encrypt_schema = false;
+  if (create_info->encrypt_type.str) {
+    encrypt_schema = dd::is_encrypted(create_info->encrypt_type);
+  } else {
+    encrypt_schema = thd->variables.default_table_encryption;
+  }
+  if (opt_table_encryption_privilege_check &&
+      encrypt_schema != thd->variables.default_table_encryption &&
+      check_table_encryption_admin_access(thd)) {
+    my_error(ER_CANNOT_SET_DATABASE_ENCRYPTION, MYF(0));
+    return true;
+  }
+
+  /*
+    When creating the schema, we must lock the schema name without case (for
+    correct MDL locking) when l_c_t_n == 2.
+  */
+  char name_buf[NAME_LEN + 1];
+  const char *lock_db_name = db;
+  if (lower_case_table_names == 2) {
+    my_stpcpy(name_buf, db);
+    my_casedn_str(&my_charset_utf8mb3_tolower_ci, name_buf);
+    lock_db_name = name_buf;
+  }
+  if (lock_schema_name(thd, lock_db_name)) return true;
+
+  dd::cache::Dictionary_client &dc = *thd->dd_client();
+  dd::String_type schema_name{db};
+  const dd::Schema *existing_schema = nullptr;
+  if (dc.acquire(schema_name, &existing_schema)) {
+    return true;
+  }
+
+  bool store_in_dd = true;
+  bool if_not_exists = (create_info->options & HA_LEX_CREATE_IF_NOT_EXISTS);
+  if (existing_schema != nullptr) {
+    if (if_not_exists == false) {
+      my_error(ER_DB_CREATE_EXISTS, MYF(0), db);
+      return true;
+    }
+    push_warning_printf(thd, Sql_condition::SL_NOTE, ER_DB_CREATE_EXISTS,
+                        ER_THD(thd, ER_DB_CREATE_EXISTS), db);
+
+    store_in_dd = false;
+  }
+
+  /* Check directory */
+  char path[FN_REFLEN + 16];
+  bool was_truncated;
+  size_t path_len = build_table_filename(path, sizeof(path) - 1, db, "", "", 0,
+                                         &was_truncated);
+  if (was_truncated) {
+    my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), sizeof(path) - 1, path);
+    return true;
+  }
+  path[path_len - 1] = 0;  // Remove last '/' from path
+
+  // If we are creating the system schema, then we create it physically
+  // only during first time server initialization. During ordinary restart,
+  // we still execute the CREATE statement to initialize the meta data, but
+  // the physical representation of the schema is not re-created since it
+  // already exists.
+  MY_STAT stat_info;
+  bool schema_dir_exists =
+      (mysql_file_stat(key_file_misc, path, &stat_info, MYF(0)) != nullptr);
+  if (thd->is_dd_system_thread() &&
+      (!opt_initialize || dd::upgrade_57::in_progress()) &&
+      dd::get_dictionary()->is_dd_schema_name(db)) {
+    /*
+      CREATE SCHEMA statement is being executed from bootstrap thread.
+      Server should either be in restart mode or upgrade mode to create only
+      dd::Schema object for the dictionary cache.
+    */
+    if (!schema_dir_exists) {
+      my_printf_error(ER_BAD_DB_ERROR,
+                      "System schema directory does not exist.", MYF(0));
+      return true;
+    }
+  } else if (store_in_dd) {
+    if (schema_dir_exists) {
+      my_error(ER_SCHEMA_DIR_EXISTS, MYF(0), path);
+      return true;
+    }
+
+    // Don't create folder inside data directory in case we are upgrading.
+    if (my_errno() != ENOENT) {
+      char errbuf[MYSYS_STRERROR_SIZE];
+      my_error(EE_STAT, MYF(0), path, my_errno(),
+               my_strerror(errbuf, sizeof(errbuf), my_errno()));
+      return true;
+    }
+    if (my_mkdir(path, 0777, MYF(0)) < 0) {
+      char errbuf[MYSQL_ERRMSG_SIZE];
+      my_error(ER_SCHEMA_DIR_CREATE_FAILED, MYF(0), db, my_errno(),
+               my_strerror(errbuf, MYSQL_ERRMSG_SIZE, my_errno()));
+      return true;
+    }
+  }
+
+  /*
+    Create schema in DD. This is done even when initializing the server
+    and creating the system schema. In that case, the shared cache will
+    store the object without storing it to disk. When the DD tables have
+    been created, the cached objects will be stored persistently.
+  */
+
+  if (store_in_dd) {
+    set_db_default_charset(thd, create_info);
+
+    if (dd::create_schema(thd, db, create_info->default_table_charset,
+                          encrypt_schema)) {
+      /*
+        We could be here due an deadlock or some error reported
+        by DD API framework. We remove the database directory
+        which we just created above.
+
+        It is expected that rm_dir_w_symlink() would not fail as
+        we already old MDL lock on database and no parallel
+        thread can remove the table before the current create
+        database operation. Even if the call fails due to some
+        other error we ignore the error as we anyway return
+        failure (true) here.
+      */
+      if (!schema_dir_exists) rm_dir_w_symlink(path, true);
+      return true;
+    }
+  }
+
+  // Log the query in the handler's binlog
+  ha_binlog_log_query(thd, nullptr, LOGCOM_CREATE_DB, thd->query().str,
+                      thd->query().length, db, "");
+
+  /*
+    If we have not added database to the data-dictionary we don't have
+    active transaction at this point. In this case we can't use
+    binlog's trx cache, which requires transaction with valid XID.
+  */
+  if (write_db_cmd_to_binlog(thd, db, store_in_dd)) {
+    if (!schema_dir_exists) rm_dir_w_symlink(path, true);
+    return true;
+  }
+
+  /*
+    Do commit locally instead of relying on caller in order to be
+    able to remove directory in case of failure.
+  */
+  if (trans_commit_stmt(thd) || trans_commit(thd)) {
+    if (!schema_dir_exists) rm_dir_w_symlink(path, true);
+    return true;
+  }
+
+  my_ok(thd, 1);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: mysql_alter_db
+bool mysql_alter_db(THD *thd, const char *db, HA_CREATE_INFO *create_info) {
+  DBUG_TRACE;
+
+  // Reject altering the system schema except for system threads.
+  if (!thd->is_dd_system_thread() &&
+      dd::get_dictionary()->is_dd_schema_name(db)) {
+    my_error(ER_NO_SYSTEM_SCHEMA_ACCESS, MYF(0), db);
+    return true;
+  }
+
+  /*
+    Check if user has permission to alter database, if encryption type
+    provided differ from global 'default_table_encryption' setting.
+  */
+  if (create_info->encrypt_type.str && opt_table_encryption_privilege_check &&
+      dd::is_encrypted(create_info->encrypt_type) !=
+          thd->variables.default_table_encryption &&
+      check_table_encryption_admin_access(thd)) {
+    my_error(ER_CANNOT_SET_DATABASE_ENCRYPTION, MYF(0));
+    return true;
+  }
+
+  if (lock_schema_name(thd, db)) return true;
+
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  dd::Schema *schema = nullptr;
+  if (thd->dd_client()->acquire_for_modification(db, &schema)) return true;
+
+  if (schema == nullptr) {
+    my_error(ER_NO_SUCH_DB, MYF(0), db);
+    return true;
+  }
+
+  /*
+    If the schema is in read_only state, then the only change allowed is to:
+
+    - Turn off read_only, possibly along with other option changes.
+    - Keep read_only turned on, i.e., a no-op. In this case, other options may
+      not be changed in the same statement.
+
+     This means we fail if:
+
+     - HA_CREATE_USED_READ_ONLY is not set.
+     - Or if we set other fields as well and set READ ONLY to true.
+
+     We check this before locking tables to avoid unnecessary lock acquisition.
+  */
+  bool schema_read_only = false;
+  schema_read_only = schema->read_only();
+  if (!thread_can_ignore_schema_read_only(thd) && schema_read_only) {
+    if (!(create_info->used_fields & HA_CREATE_USED_READ_ONLY) ||
+        ((create_info->used_fields & ~HA_CREATE_USED_READ_ONLY) &&
+         create_info->schema_read_only)) {
+      my_error(ER_SCHEMA_READ_ONLY, MYF(0), db);
+      return true;
+    }
+  }
+
+  /*
+    Lock all tables while under schema lock so that we block all transactions
+    from touching these tables until the ALTER is done. Because the schema read
+    only check and the COMMIT are not done atomically, we use the table MDL
+    to serialize ALTER SCHEMA and any write statements.
+  */
+  Table_ref *tables = nullptr;
+  if (find_db_tables(thd, *schema, db, &tables) ||
+      lock_table_names(thd, tables, nullptr, thd->variables.lock_wait_timeout,
+                       0))
+    return true;
+
+  // Set new collation ID if submitted in the statement.
+  if (create_info->used_fields & HA_CREATE_USED_DEFAULT_CHARSET) {
+    set_db_default_charset(thd, create_info);
+    schema->set_default_collation_id(
+        create_info->default_table_charset->number);
+  }
+
+  // Set encryption type.
+  if (create_info->used_fields & HA_CREATE_USED_DEFAULT_ENCRYPTION) {
+    assert(create_info->encrypt_type.length > 0);
+    schema->set_default_encryption(dd::is_encrypted(create_info->encrypt_type));
+  }
+
+  // Set read_only option.
+  if (create_info->used_fields & HA_CREATE_USED_READ_ONLY) {
+    schema->set_read_only(create_info->schema_read_only);
+  }
+
+  // Update schema.
+  if (thd->dd_client()->update(schema)) return true;
+
+  /*
+    The original query is submitted to the engine's log handler
+    because e.g. NDB needs to propagate the read only option to
+    other mysqld servers in the cluster.
+  */
+  ha_binlog_log_query(thd, nullptr, LOGCOM_ALTER_DB, thd->query().str,
+                      thd->query().length, db, "");
+
+  /*
+    The original query is written to the binlog and hence replicated.
+    Binlogging must be switched off while executing ALTER SCHEMA if
+    this is not desired.
+  */
+  if (write_db_cmd_to_binlog(thd, db, true)) return true;
+
+  /*
+    Commit the statement locally instead of relying on caller,
+    in order to be sure that it is successful, before changing
+    options of current database.
+  */
+  if (trans_commit_stmt(thd) || trans_commit(thd)) return true;
+
+  /*
+    Change collation options if the current database is being
+    altered and the clause is explicitly submitted in the ALTER
+    statement.
+  */
+  if (create_info->used_fields & HA_CREATE_USED_DEFAULT_CHARSET &&
+      thd->db().str && !my_strcasecmp(table_alias_charset, thd->db().str, db)) {
+    thd->db_charset = create_info->default_table_charset
+                          ? create_info->default_table_charset
+                          : thd->variables.collation_server;
+    thd->variables.collation_database = thd->db_charset;
+  }
+
+  /*
+    If the schema read only option was changed, then we must also evict the
+    tables belonging to the schema from the TDC since the option is cached
+    in the table shares. This is safe since we have already acquired
+    exclusive MDL for each table.
+  */
+  if (create_info->used_fields & HA_CREATE_USED_READ_ONLY) {
+    mysql_ha_flush_tables(thd, tables);
+    for (Table_ref *table = tables; table != nullptr;
+         table = table->next_global) {
+      tdc_remove_table(thd, TDC_RT_REMOVE_ALL, table->db, table->table_name,
+                       false);
+    }
+  }
+
+  my_ok(thd, 1);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc
+Function: Sql_cmd_create_tablespace::execute
+bool Sql_cmd_create_tablespace::execute(THD *thd) {
+  Rollback_guard rollback_on_return{thd};
+
+  if (check_global_access(thd, CREATE_TABLESPACE_ACL)) {
+    return true;
+  }
+
+  handlerton *hton = nullptr;
+  if (get_stmt_hton(thd, m_options->engine_name, m_tablespace_name.str,
+                    "CREATE TABLESPACE", &hton)) {
+    return true;
+  }
+  rollback_on_return.m_hton = hton;  // Allow rollback to call hton->post_ddl
+
+  // Check the tablespace name and acquire an MDL X lock.
+  if (validate_tablespace_name(CREATE_TABLESPACE, m_tablespace_name.str,
+                               hton) ||
+      lock_tablespace_names(thd, m_tablespace_name)) {
+    return true;
+  }
+
+  /*
+    Check if user has permission to create tablespace, if encryption type
+    provided differ from global 'default_table_encryption' setting.
+    We use 'default_table_encryption' value if encryption is not supplied
+    by user.
+  */
+  bool encrypt_tablespace = false;
+  dd::String_type encrypt_type;
+  if (m_options->encryption.str) {
+    encrypt_tablespace = dd::is_encrypted(m_options->encryption);
+    encrypt_type = dd::make_string_type(m_options->encryption);
+  } else {
+    encrypt_tablespace = thd->variables.default_table_encryption;
+    encrypt_type = encrypt_tablespace ? "Y" : "N";
+  }
+
+  if (opt_table_encryption_privilege_check &&
+      encrypt_tablespace != thd->variables.default_table_encryption &&
+      check_table_encryption_admin_access(thd)) {
+    my_error(ER_CANNOT_SET_TABLESPACE_ENCRYPTION, MYF(0));
+    return true;
+  }
+
+  auto &dc = *thd->dd_client();
+  dd::cache::Dictionary_client::Auto_releaser releaser{&dc};
+
+  // Check if same tablespace already exists.
+  auto tsn = dd::make_string_type(m_tablespace_name);
+  const dd::Tablespace *ts = nullptr;
+  if (dc.acquire(tsn, &ts)) {
+    return true;
+  }
+
+  if (ts != nullptr) {
+    my_error(ER_TABLESPACE_EXISTS, MYF(0), tsn.c_str());
+    return true;
+  }
+
+  // Create new tablespace.
+  std::unique_ptr<dd::Tablespace> tablespace(
+      dd::create_object<dd::Tablespace>());
+
+  // Set tablespace name
+  tablespace->set_name(tsn);
+
+  // Engine type
+  tablespace->set_engine(ha_resolve_storage_engine_name(hton));
+
+  // - Store ENCRYPTION if SE supports it.
+  // - Disallow encryption='y', if SE does not support it.
+  if (hton->flags & HTON_SUPPORTS_TABLE_ENCRYPTION) {
+    tablespace->options().set("encryption", encrypt_type);
+  } else if (encrypt_tablespace) {
+    my_error(ER_CHECK_NOT_IMPLEMENTED, MYF(0), "ENCRYPTION");
+    return true;
+  }
+
+  // Validate tablespace comment string
+  std::string invalid_sub_str;
+  if (is_invalid_string(
+          LEX_CSTRING{m_options->ts_comment.str, m_options->ts_comment.length},
+          system_charset_info, invalid_sub_str)) {
+    // Provide contextual information
+    my_error(ER_COMMENT_CONTAINS_INVALID_STRING, MYF(0), "tablespace",
+             m_tablespace_name.str, system_charset_info->csname,
+             invalid_sub_str.c_str());
+    return true;
+  }
+
+  size_t cl = m_options->ts_comment.length;
+  if (validate_comment_length(
+          thd, m_options->ts_comment.str, &cl, TABLESPACE_COMMENT_MAXLEN,
+          ER_TOO_LONG_TABLESPACE_COMMENT, m_tablespace_name.str)) {
+    return true;
+  }
+
+  tablespace->set_comment(dd::String_type{m_options->ts_comment.str, cl});
+
+  if (m_options->engine_attribute.str)
+    tablespace->set_engine_attribute(m_options->engine_attribute);
+
+  LEX_STRING tblspc_datafile_name = {m_datafile_name.str,
+                                     m_datafile_name.length};
+  if (m_auto_generate_datafile_name) {
+    char tmp_buf[40];
+    String str(tmp_buf, sizeof(tmp_buf), &my_charset_bin);
+    String *uuid = mysql_generate_uuid(&str);
+    if (hton->get_tablespace_filename_ext)
+      uuid->append(hton->get_tablespace_filename_ext());
+
+    tblspc_datafile_name.str =
+        thd->strmake(uuid->c_ptr_quick(), uuid->length());
+    tblspc_datafile_name.length = uuid->length();
+  }
+
+  if (tblspc_datafile_name.length > FN_REFLEN) {
+    my_error(ER_PATH_LENGTH, MYF(0), "DATAFILE");
+    return true;
+  }
+
+  // Add datafile
+  tablespace->add_file()->set_filename(
+      dd::make_string_type(tblspc_datafile_name));
+
+  tablespace->options().set("autoextend_size",
+                            m_options->autoextend_size.has_value()
+                                ? m_options->autoextend_size.value()
+                                : 0);
+
+  // Write changes to dictionary.
+  if (dc.store(tablespace.get())) {
+    return true;
+  }
+
+  const bool atomic_ddl = ddl_is_atomic(hton);
+  /*
+    Commit after creation of tablespace in the data-dictionary for
+    storage engines which don't support atomic DDL. We do this to
+    avoid being left with tablespace in SE but not in data-dictionary
+    in case of crash. Indeed, in this case, we can end-up with tablespace
+    present in the data-dictionary and not present in SE. But this can be
+    easily fixed by doing DROP TABLESPACE.
+  */
+  if (intermediate_commit_unless_atomic_ddl(thd, hton)) {
+    return true; /* purecov: inspected */
+  }
+
+  auto tsmp = get_mod_pair<dd::Tablespace>(&dc, m_tablespace_name.str);
+  if (tsmp.first == nullptr) {
+    my_error(ER_TABLESPACE_MISSING_WITH_NAME, MYF(0), m_tablespace_name.str);
+    return true;
+  }
+  st_alter_tablespace ts_info{m_tablespace_name.str,
+                              m_logfile_group_name.str,
+                              CREATE_TABLESPACE,
+                              TS_ALTER_TABLESPACE_TYPE_NOT_DEFINED,
+                              tblspc_datafile_name.str,
+                              nullptr,
+                              *m_options};
+
+  if (map_errors(
+          hton->alter_tablespace(hton, thd, &ts_info, tsmp.first, tsmp.second),
+          "CREATE TABLESPACE", &ts_info)) {
+    if (!atomic_ddl) {
+      /*
+        For engines which don't support atomic DDL addition of tablespace to
+        data-dictionary has been committed already so we need to revert it.
+      */
+      /* purecov: begin inspected */
+      if (dc.drop(tsmp.second)) {
+        return true;
+      }
+
+      Implicit_substatement_state_guard substatement_guard{thd};
+      (void)trans_commit_stmt(thd);
+      (void)trans_commit(thd);
+      /* purecov: end */
+    }
+    return true;
+  }  // if (map_errors
+
+  /*
+    Per convention only engines supporting atomic DDL are allowed to
+    modify data-dictionary objects in handler::create() and other
+    similar calls.
+  */
+  if (atomic_ddl && dc.update(tsmp.second)) {
+    return true; /* purecov: inspected */
+  }
+
+  if (complete_stmt(thd, hton, [&]() { rollback_on_return.disable(); })) {
+    return true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc
+Function: Sql_cmd_alter_tablespace::execute
+bool Sql_cmd_create_tablespace::execute(THD *thd) {
+  Rollback_guard rollback_on_return{thd};
+
+  if (check_global_access(thd, CREATE_TABLESPACE_ACL)) {
+    return true;
+  }
+
+  handlerton *hton = nullptr;
+  if (get_stmt_hton(thd, m_options->engine_name, m_tablespace_name.str,
+                    "CREATE TABLESPACE", &hton)) {
+    return true;
+  }
+  rollback_on_return.m_hton = hton;  // Allow rollback to call hton->post_ddl
+
+  // Check the tablespace name and acquire an MDL X lock.
+  if (validate_tablespace_name(CREATE_TABLESPACE, m_tablespace_name.str,
+                               hton) ||
+      lock_tablespace_names(thd, m_tablespace_name)) {
+    return true;
+  }
+
+  /*
+    Check if user has permission to create tablespace, if encryption type
+    provided differ from global 'default_table_encryption' setting.
+    We use 'default_table_encryption' value if encryption is not supplied
+    by user.
+  */
+  bool encrypt_tablespace = false;
+  dd::String_type encrypt_type;
+  if (m_options->encryption.str) {
+    encrypt_tablespace = dd::is_encrypted(m_options->encryption);
+    encrypt_type = dd::make_string_type(m_options->encryption);
+  } else {
+    encrypt_tablespace = thd->variables.default_table_encryption;
+    encrypt_type = encrypt_tablespace ? "Y" : "N";
+  }
+
+  if (opt_table_encryption_privilege_check &&
+      encrypt_tablespace != thd->variables.default_table_encryption &&
+      check_table_encryption_admin_access(thd)) {
+    my_error(ER_CANNOT_SET_TABLESPACE_ENCRYPTION, MYF(0));
+    return true;
+  }
+
+  auto &dc = *thd->dd_client();
+  dd::cache::Dictionary_client::Auto_releaser releaser{&dc};
+
+  // Check if same tablespace already exists.
+  auto tsn = dd::make_string_type(m_tablespace_name);
+  const dd::Tablespace *ts = nullptr;
+  if (dc.acquire(tsn, &ts)) {
+    return true;
+  }
+
+  if (ts != nullptr) {
+    my_error(ER_TABLESPACE_EXISTS, MYF(0), tsn.c_str());
+    return true;
+  }
+
+  // Create new tablespace.
+  std::unique_ptr<dd::Tablespace> tablespace(
+      dd::create_object<dd::Tablespace>());
+
+  // Set tablespace name
+  tablespace->set_name(tsn);
+
+  // Engine type
+  tablespace->set_engine(ha_resolve_storage_engine_name(hton));
+
+  // - Store ENCRYPTION if SE supports it.
+  // - Disallow encryption='y', if SE does not support it.
+  if (hton->flags & HTON_SUPPORTS_TABLE_ENCRYPTION) {
+    tablespace->options().set("encryption", encrypt_type);
+  } else if (encrypt_tablespace) {
+    my_error(ER_CHECK_NOT_IMPLEMENTED, MYF(0), "ENCRYPTION");
+    return true;
+  }
+
+  // Validate tablespace comment string
+  std::string invalid_sub_str;
+  if (is_invalid_string(
+          LEX_CSTRING{m_options->ts_comment.str, m_options->ts_comment.length},
+          system_charset_info, invalid_sub_str)) {
+    // Provide contextual information
+    my_error(ER_COMMENT_CONTAINS_INVALID_STRING, MYF(0), "tablespace",
+             m_tablespace_name.str, system_charset_info->csname,
+             invalid_sub_str.c_str());
+    return true;
+  }
+
+  size_t cl = m_options->ts_comment.length;
+  if (validate_comment_length(
+          thd, m_options->ts_comment.str, &cl, TABLESPACE_COMMENT_MAXLEN,
+          ER_TOO_LONG_TABLESPACE_COMMENT, m_tablespace_name.str)) {
+    return true;
+  }
+
+  tablespace->set_comment(dd::String_type{m_options->ts_comment.str, cl});
+
+  if (m_options->engine_attribute.str)
+    tablespace->set_engine_attribute(m_options->engine_attribute);
+
+  LEX_STRING tblspc_datafile_name = {m_datafile_name.str,
+                                     m_datafile_name.length};
+  if (m_auto_generate_datafile_name) {
+    char tmp_buf[40];
+    String str(tmp_buf, sizeof(tmp_buf), &my_charset_bin);
+    String *uuid = mysql_generate_uuid(&str);
+    if (hton->get_tablespace_filename_ext)
+      uuid->append(hton->get_tablespace_filename_ext());
+
+    tblspc_datafile_name.str =
+        thd->strmake(uuid->c_ptr_quick(), uuid->length());
+    tblspc_datafile_name.length = uuid->length();
+  }
+
+  if (tblspc_datafile_name.length > FN_REFLEN) {
+    my_error(ER_PATH_LENGTH, MYF(0), "DATAFILE");
+    return true;
+  }
+
+  // Add datafile
+  tablespace->add_file()->set_filename(
+      dd::make_string_type(tblspc_datafile_name));
+
+  tablespace->options().set("autoextend_size",
+                            m_options->autoextend_size.has_value()
+                                ? m_options->autoextend_size.value()
+                                : 0);
+
+  // Write changes to dictionary.
+  if (dc.store(tablespace.get())) {
+    return true;
+  }
+
+  const bool atomic_ddl = ddl_is_atomic(hton);
+  /*
+    Commit after creation of tablespace in the data-dictionary for
+    storage engines which don't support atomic DDL. We do this to
+    avoid being left with tablespace in SE but not in data-dictionary
+    in case of crash. Indeed, in this case, we can end-up with tablespace
+    present in the data-dictionary and not present in SE. But this can be
+    easily fixed by doing DROP TABLESPACE.
+  */
+  if (intermediate_commit_unless_atomic_ddl(thd, hton)) {
+    return true; /* purecov: inspected */
+  }
+
+  auto tsmp = get_mod_pair<dd::Tablespace>(&dc, m_tablespace_name.str);
+  if (tsmp.first == nullptr) {
+    my_error(ER_TABLESPACE_MISSING_WITH_NAME, MYF(0), m_tablespace_name.str);
+    return true;
+  }
+  st_alter_tablespace ts_info{m_tablespace_name.str,
+                              m_logfile_group_name.str,
+                              CREATE_TABLESPACE,
+                              TS_ALTER_TABLESPACE_TYPE_NOT_DEFINED,
+                              tblspc_datafile_name.str,
+                              nullptr,
+                              *m_options};
+
+  if (map_errors(
+          hton->alter_tablespace(hton, thd, &ts_info, tsmp.first, tsmp.second),
+          "CREATE TABLESPACE", &ts_info)) {
+    if (!atomic_ddl) {
+      /*
+        For engines which don't support atomic DDL addition of tablespace to
+        data-dictionary has been committed already so we need to revert it.
+      */
+      /* purecov: begin inspected */
+      if (dc.drop(tsmp.second)) {
+        return true;
+      }
+
+      Implicit_substatement_state_guard substatement_guard{thd};
+      (void)trans_commit_stmt(thd);
+      (void)trans_commit(thd);
+      /* purecov: end */
+    }
+    return true;
+  }  // if (map_errors
+
+  /*
+    Per convention only engines supporting atomic DDL are allowed to
+    modify data-dictionary objects in handler::create() and other
+    similar calls.
+  */
+  if (atomic_ddl && dc.update(tsmp.second)) {
+    return true; /* purecov: inspected */
+  }
+
+  if (complete_stmt(thd, hton, [&]() { rollback_on_return.disable(); })) {
+    return true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_set_default_table_encryption_access not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_set_default_table_encryption_access not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_set_default_table_encryption_access not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_set_default_table_encryption_access not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::run_bootstrap_thread
+bool run_bootstrap_thread(const char *file_name, MYSQL_FILE *file,
+                          bootstrap_functor boot_handler,
+                          enum_thread_type thread_type) {
+  DBUG_TRACE;
+
+  THD *thd = new THD;
+  thd->system_thread = thread_type;
+  thd->get_protocol_classic()->init_net(nullptr);
+  // Skip grants and set the system_user flag in THD.
+  thd->security_context()->skip_grants();
+
+  thd->set_new_thread_id();
+
+  handle_bootstrap_args args;
+
+  args.m_thd = thd;
+  args.m_bootstrap_handler = boot_handler;
+  args.m_file_name = file_name;
+  args.m_file = file;
+
+  // Set server default sql_mode irrespective of mysqld server command line
+  // argument.
+  thd->variables.sql_mode =
+      find_static_system_variable("sql_mode")->get_default();
+
+  // Set session server and connection collation irrespective of
+  // mysqld server command line argument.
+  thd->variables.collation_server =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+  thd->variables.collation_connection =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+
+  // Set session transaction completion type to server default to
+  // avoid problems due to transactions being active when they are
+  // not supposed to.
+  thd->variables.completion_type =
+      find_static_system_variable("completion_type")->get_default();
+
+  /*
+    Set default value for explicit_defaults_for_timestamp variable. Bootstrap
+    thread creates dictionary tables. The creation of dictionary tables should
+    be independent of the value of explicit_defaults_for_timestamp specified by
+    the user.
+  */
+  thd->variables.explicit_defaults_for_timestamp =
+      find_static_system_variable("explicit_defaults_for_timestamp")
+          ->get_default();
+
+  /*
+    The global table encryption default setting applies to user threads.
+    Setting it false for system threads.
+  */
+  thd->variables.default_table_encryption = false;
+
+  my_thread_attr_t thr_attr;
+  my_thread_attr_init(&thr_attr);
+#ifndef _WIN32
+  pthread_attr_setscope(&thr_attr, PTHREAD_SCOPE_SYSTEM);
+#endif
+  my_thread_attr_setdetachstate(&thr_attr, MY_THREAD_CREATE_JOINABLE);
+
+  // Default stack size may be too small.
+  size_t stacksize = 0;
+  my_thread_attr_getstacksize(&thr_attr, &stacksize);
+  if (stacksize < my_thread_stack_size) {
+    if (0 != my_thread_attr_setstacksize(&thr_attr, my_thread_stack_size)) {
+      assert(false);
+    }
+  }
+
+  my_thread_handle thread_handle;
+  // What about setting THD::real_id?
+  int error = mysql_thread_create(key_thread_bootstrap, &thread_handle,
+                                  &thr_attr, handle_bootstrap, &args);
+  if (error) {
+    /* purecov: begin inspected */
+    LogErr(WARNING_LEVEL, ER_BOOTSTRAP_CANT_THREAD, errno).os_errno(errno);
+    thd->release_resources();
+    delete thd;
+    return true;
+    /* purecov: end */
+  }
+  /* Wait for thread to die */
+  my_thread_join(&thread_handle, nullptr);
+  // Free Items that were created during this execution.
+  thd->free_items();
+  delete thd;
+  return args.m_bootstrap_error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::write
+   To be invoked in Log_event::write() stack.
+   The decision is positive
+
+    S,M) if it's been marked for checksumming with @c checksum_alg
+
+    M) otherwise, if @@global.binlog_checksum is not NONE and the event is
+       directly written to the binlog file.
+       The to-be-cached event decides at @c write_cache() time.
+
+   Otherwise the decision is negative.
+
+   @note   A side effect of the method is altering Log_event::checksum_alg
+           it the latter was undefined at calling.
+
+   @return true (positive) or false (negative)
+*/
+bool Log_event::need_checksum() {
+  DBUG_TRACE;
+  bool ret = false;
+  /*
+     few callers of Log_event::write
+     (incl FD::write, FD constructing code on the slave side, Rotate relay log
+     and Stop event)
+     provides their checksum alg preference through Log_event::checksum_alg.
+  */
+  if (common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+    ret = (common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF);
+  else if (binlog_checksum_options != binary_log::BINLOG_CHECKSUM_ALG_OFF &&
+           event_cache_type == Log_event::EVENT_NO_CACHE)
+    ret = (binlog_checksum_options != 0);
+  else
+    ret = false;
+
+  /*
+    FD calls the methods before data_written has been calculated.
+    The following invariant claims if the current is not the first
+    call (and therefore data_written is not zero) then `ret' must be
+    true. It may not be null because FD is always checksummed.
+  */
+
+  assert(get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT || ret ||
+         common_header->data_written == 0);
+
+  if (common_footer->checksum_alg == binary_log::BINLOG_CHECKSUM_ALG_UNDEF)
+    common_footer->checksum_alg =
+        ret ?  // calculated value stored
+            static_cast<enum_binlog_checksum_alg>(binlog_checksum_options)
+            : binary_log::BINLOG_CHECKSUM_ALG_OFF;
+
+  assert(!ret ||
+         ((common_footer->checksum_alg ==
+               static_cast<enum_binlog_checksum_alg>(binlog_checksum_options) ||
+           /*
+              Stop event closes the relay-log and its checksum alg
+              preference is set by the caller can be different
+              from the server's binlog_checksum_options.
+           */
+           get_type_code() == binary_log::STOP_EVENT ||
+           /*
+              Rotate:s can be checksummed regardless of the server's
+              binlog_checksum_options. That applies to both
+              the local RL's Rotate and the master's Rotate
+              which IO thread instantiates via queue_binlog_ver_3_event.
+           */
+           get_type_code() == binary_log::ROTATE_EVENT ||
+           /*
+              The previous event has its checksum option defined
+              according to the format description event.
+           */
+           get_type_code() == binary_log::PREVIOUS_GTIDS_LOG_EVENT ||
+           /* FD is always checksummed */
+           get_type_code() == binary_log::FORMAT_DESCRIPTION_EVENT ||
+           /*
+              View_change_log_event is queued into relay log by the
+              local member, which may have a different checksum algorithm
+              than the one of the event source.
+           */
+           get_type_code() == binary_log::VIEW_CHANGE_EVENT) &&
+          common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_OFF));
+
+  assert(common_footer->checksum_alg != binary_log::BINLOG_CHECKSUM_ALG_UNDEF);
+  assert(((get_type_code() != binary_log::ROTATE_EVENT &&
+           get_type_code() != binary_log::STOP_EVENT) ||
+          get_type_code() != binary_log::FORMAT_DESCRIPTION_EVENT) ||
+         event_cache_type == Log_event::EVENT_NO_CACHE);
+
+  return ret;
+}
+
+

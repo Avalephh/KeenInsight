@@ -1,0 +1,424 @@
+Global Variable: System_variables.28
+Explicit Data Flow (156):
+  Instruction: %10 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255455 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2975:33 | Function: mysqld_list_processes
+  Instruction: %cond = phi i64 [ %10, %cond.true ], [ 100, %cond.false ], !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2975:8 | Function: mysqld_list_processes
+  Instruction: store i64 %cond, i64* %max_query_length, align 8, !dbg !1255451 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2974:10 | Function: mysqld_list_processes
+  Instruction: %152 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255735 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_dom.cc:1684:49 | Function: wrapper_to_string
+  Instruction: %cmp266 = icmp ugt i64 %call265, %152, !dbg !1255736 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_dom.cc:1684:24 | Function: wrapper_to_string
+  Instruction: br i1 %cmp266, label %if.then267, label %if.end271, !dbg !1255737 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_dom.cc:1684:7 | Function: wrapper_to_string
+  Instruction: %160 = load i64, i64* %max_allowed_packet270, align 8, !dbg !1255745 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_dom.cc:1688:59 | Function: wrapper_to_string
+  Instruction: call void (%class.THD*, i32, i32, i8*, ...) @_Z19push_warning_printfP3THDN13Sql_condition19enum_severity_levelEjPKcz(%class.THD* %154, i32 1, i32 1301, i8* %call268, i8* %157, i64 %160), !dbg !1255746 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_dom.cc:1685:5 | Function: wrapper_to_string
+  Instruction: %4 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3977:60 | Function: Item_param::set_longdata
+  Instruction: %cmp = icmp ugt i64 %add, %4, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3977:35 | Function: Item_param::set_longdata
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3977:7 | Function: Item_param::set_longdata
+  Instruction: %14 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:782:39 | Function: Item_func_to_base64::val_str_ascii
+  Instruction: %cmp11 = icmp ugt i64 %11, %14, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:782:14 | Function: Item_func_to_base64::val_str_ascii
+  Instruction: br i1 %cmp11, label %if.then12, label %if.end15, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:782:7 | Function: Item_func_to_base64::val_str_ascii
+  Instruction: %24 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:771:46 | Function: Item_func_to_base64::resolve_type
+  Instruction: %cmp17 = icmp ugt i64 %conv16, %24, !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:771:29 | Function: Item_func_to_base64::resolve_type
+  Instruction: %25 = phi i1 [ true, %cond.end ], [ %cmp17, %lor.rhs ] | Location: :0:0 | Function: Item_func_to_base64::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %17, i1 zeroext %25), !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:770:5 | Function: Item_func_to_base64::resolve_type
+  Instruction: %4 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1475:38 | Function: Item_str_func::push_packet_overflow_warning
+  Instruction: call void (%class.THD*, i32, i32, i8*, ...) @_Z19push_warning_printfP3THDN13Sql_condition19enum_severity_levelEjPKcz(%class.THD* %0, i32 1, i32 1301, i8* %call, i8* %2, i64 %4), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1472:3 | Function: Item_str_func::push_packet_overflow_warning
+  Instruction: %14 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:812:39 | Function: Item_func_from_base64::val_str
+  Instruction: %cmp11 = icmp ugt i64 %11, %14, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:812:14 | Function: Item_func_from_base64::val_str
+  Instruction: br i1 %cmp11, label %if.then12, label %if.end15, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:812:7 | Function: Item_func_from_base64::val_str
+  Instruction: %30 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1095:24 | Function: Item_func_concat::val_str
+  Instruction: %cmp18 = icmp ugt i64 %add, %30, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1094:44 | Function: Item_func_concat::val_str
+  Instruction: br i1 %cmp18, label %if.then19, label %if.end22, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1094:9 | Function: Item_func_concat::val_str
+  Instruction: %30 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1119:61 | Function: Item_func_concat::resolve_type
+  Instruction: %cmp15 = icmp ugt i64 %conv14, %30, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1119:44 | Function: Item_func_concat::resolve_type
+  Instruction: %31 = phi i1 [ true, %for.end ], [ %cmp15, %lor.rhs ] | Location: :0:0 | Function: Item_func_concat::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %25, i1 zeroext %31), !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1119:3 | Function: Item_func_concat::resolve_type
+  Instruction: %35 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1150:24 | Function: Item_func_concat_ws::val_str
+  Instruction: %cmp32 = icmp ugt i64 %add31, %35, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1149:64 | Function: Item_func_concat_ws::val_str
+  Instruction: br i1 %cmp32, label %if.then33, label %if.end38, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1149:9 | Function: Item_func_concat_ws::val_str
+  Instruction: %40 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1178:61 | Function: Item_func_concat_ws::resolve_type
+  Instruction: %cmp25 = icmp ugt i64 %conv24, %40, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1178:44 | Function: Item_func_concat_ws::resolve_type
+  Instruction: %41 = phi i1 [ true, %for.end ], [ %cmp25, %lor.rhs ] | Location: :0:0 | Function: Item_func_concat_ws::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %35, i1 zeroext %41), !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1178:3 | Function: Item_func_concat_ws::resolve_type
+  Instruction: %49 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1258:49 | Function: Item_func_replace::val_str
+  Instruction: store i64 %49, i64* %max_size, align 8, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1258:23 | Function: Item_func_replace::val_str
+  Instruction: %73 = load i64, i64* %max_size, align 8, !dbg !1255446 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1270:15 | Function: Item_func_replace::val_str
+  Instruction: %cmp67 = icmp ugt i64 %add66, %73, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1269:73 | Function: Item_func_replace::val_str
+  Instruction: br i1 %cmp67, label %if.then68, label %if.end75, !dbg !1255448 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1268:11 | Function: Item_func_replace::val_str
+  Instruction: %30 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1308:61 | Function: Item_func_replace::resolve_type
+  Instruction: %cmp24 = icmp ugt i64 %conv23, %30, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1308:44 | Function: Item_func_replace::resolve_type
+  Instruction: %31 = phi i1 [ true, %if.end21 ], [ %cmp24, %lor.rhs ] | Location: :0:0 | Function: Item_func_replace::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %25, i1 zeroext %31), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1308:3 | Function: Item_func_replace::resolve_type
+  Instruction: %67 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255415 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1349:53 | Function: Item_func_insert::val_str
+  Instruction: %cmp56 = icmp ugt i64 %add, %67, !dbg !1255416 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1348:66 | Function: Item_func_insert::val_str
+  Instruction: br i1 %cmp56, label %if.then57, label %if.end62, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1348:7 | Function: Item_func_insert::val_str
+  Instruction: %31 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1375:61 | Function: Item_func_insert::resolve_type
+  Instruction: %cmp = icmp ugt i64 %conv27, %31, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1375:44 | Function: Item_func_insert::resolve_type
+  Instruction: %32 = phi i1 [ true, %if.end15 ], [ %cmp, %lor.rhs ] | Location: :0:0 | Function: Item_func_insert::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %26, i1 zeroext %32), !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1375:3 | Function: Item_func_insert::resolve_type
+  Instruction: %41 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2613:39 | Function: Item_func_repeat::val_str
+  Instruction: %div = udiv i64 %41, %conv39, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2613:58 | Function: Item_func_repeat::val_str
+  Instruction: %cmp40 = icmp ugt i64 %38, %div, !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2613:14 | Function: Item_func_repeat::val_str
+  Instruction: br i1 %cmp40, label %if.then41, label %if.end44, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2613:7 | Function: Item_func_repeat::val_str
+  Instruction: %45 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2573:46 | Function: Item_func_repeat::resolve_type
+  Instruction: %cmp37 = icmp ugt i64 %conv36, %45, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2573:29 | Function: Item_func_repeat::resolve_type
+  Instruction: %46 = phi i1 [ true, %if.end31 ], [ %cmp37, %lor.rhs ] | Location: :0:0 | Function: Item_func_repeat::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %40, i1 zeroext %46), !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2572:5 | Function: Item_func_repeat::resolve_type
+  Instruction: %28 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2680:43 | Function: Item_func_space::val_str
+  Instruction: %cmp17 = icmp ugt i64 %25, %28, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2680:18 | Function: Item_func_space::val_str
+  Instruction: br i1 %cmp17, label %if.then18, label %if.end21, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2680:7 | Function: Item_func_space::val_str
+  Instruction: %32 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2654:46 | Function: Item_func_space::resolve_type
+  Instruction: %cmp = icmp ugt i64 %conv, %32, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2654:29 | Function: Item_func_space::resolve_type
+  Instruction: %33 = phi i1 [ true, %if.end26 ], [ %cmp, %lor.rhs ] | Location: :0:0 | Function: Item_func_space::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %27, i1 zeroext %33), !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2653:5 | Function: Item_func_space::resolve_type
+  Instruction: %60 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255421 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2761:49 | Function: Item_func_rpad::val_str
+  Instruction: %cmp56 = icmp ugt i64 %57, %60, !dbg !1255422 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2761:24 | Function: Item_func_rpad::val_str
+  Instruction: br i1 %cmp56, label %if.then57, label %if.end60, !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2761:7 | Function: Item_func_rpad::val_str
+  Instruction: %38 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2707:46 | Function: Item_func_rpad::resolve_type
+  Instruction: %cmp32 = icmp ugt i64 %conv, %38, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2707:29 | Function: Item_func_rpad::resolve_type
+  Instruction: %39 = phi i1 [ true, %if.end30 ], [ %cmp32, %lor.rhs ] | Location: :0:0 | Function: Item_func_rpad::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %33, i1 zeroext %39), !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2706:5 | Function: Item_func_rpad::resolve_type
+  Instruction: %64 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255422 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2968:49 | Function: Item_func_lpad::val_str
+  Instruction: %cmp71 = icmp ugt i64 %61, %64, !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2968:24 | Function: Item_func_lpad::val_str
+  Instruction: br i1 %cmp71, label %if.then72, label %if.end77, !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2968:7 | Function: Item_func_lpad::val_str
+  Instruction: %38 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2806:46 | Function: Item_func_lpad::resolve_type
+  Instruction: %cmp32 = icmp ugt i64 %conv, %38, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2806:29 | Function: Item_func_lpad::resolve_type
+  Instruction: %39 = phi i1 [ true, %if.end30 ], [ %cmp32, %lor.rhs ] | Location: :0:0 | Function: Item_func_lpad::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %33, i1 zeroext %39), !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2805:5 | Function: Item_func_lpad::resolve_type
+  Instruction: %12 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3511:48 | Function: Item_charset_conversion::val_str
+  Instruction: %cmp8 = icmp ugt i64 %10, %12, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3510:67 | Function: Item_charset_conversion::val_str
+  Instruction: br i1 %cmp8, label %if.then9, label %if.end16, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3510:7 | Function: Item_charset_conversion::val_str
+  Instruction: %46 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3643:61 | Function: Item_charset_conversion::resolve_type
+  Instruction: %cmp51 = icmp ugt i64 %conv50, %46, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3643:44 | Function: Item_charset_conversion::resolve_type
+  Instruction: %47 = phi i1 [ true, %cond.end46 ], [ %cmp51, %lor.rhs ] | Location: :0:0 | Function: Item_charset_conversion::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %41, i1 zeroext %47), !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3643:3 | Function: Item_charset_conversion::resolve_type
+  Instruction: %51 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255415 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3723:53 | Function: Item_load_file::val_str
+  Instruction: %cmp86 = icmp ugt i64 %call85, %51, !dbg !1255416 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3723:28 | Function: Item_load_file::val_str
+  Instruction: br i1 %cmp86, label %if.then87, label %if.end91, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3723:9 | Function: Item_load_file::val_str
+  Instruction: %71 = load i64, i64* %max_allowed_packet79, align 8, !dbg !1255412 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3780:30 | Function: Item_func_export_set::val_str
+  Instruction: store i64 %71, i64* %max_allowed_packet, align 8, !dbg !1255409 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3779:19 | Function: Item_func_export_set::val_str
+  Instruction: %81 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255435 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3786:35 | Function: Item_func_export_set::val_str
+  Instruction: %cmp94 = icmp ugt i64 %80, %81, !dbg !1255436 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3786:33 | Function: Item_func_export_set::val_str
+  Instruction: %call96 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp94)
+          to label %invoke.cont95 unwind label %lpad4, !dbg !1255437 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3786:7 | Function: Item_func_export_set::val_str
+  Instruction: br i1 %call96, label %if.then97, label %if.end102, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3786:7 | Function: Item_func_export_set::val_str
+  Instruction: %38 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3817:61 | Function: Item_func_export_set::resolve_type
+  Instruction: %cmp34 = icmp ugt i64 %conv33, %38, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3817:44 | Function: Item_func_export_set::resolve_type
+  Instruction: %39 = phi i1 [ true, %cond.end ], [ %cmp34, %lor.rhs ] | Location: :0:0 | Function: Item_func_export_set::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %33, i1 zeroext %39), !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3817:3 | Function: Item_func_export_set::resolve_type
+  Instruction: %143 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255612 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4005:43 | Function: Item_func_quote::val_str
+  Instruction: %cmp149 = icmp ugt i64 %140, %143, !dbg !1255613 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4005:18 | Function: Item_func_quote::val_str
+  Instruction: br i1 %cmp149, label %if.then150, label %if.end155, !dbg !1255614 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4005:7 | Function: Item_func_quote::val_str
+  Instruction: %22 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3836:61 | Function: Item_func_quote::resolve_type
+  Instruction: %cmp16 = icmp ugt i64 %conv14, %22, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3836:44 | Function: Item_func_quote::resolve_type
+  Instruction: %23 = phi i1 [ true, %if.end12 ], [ %cmp16, %lor.rhs ] | Location: :0:0 | Function: Item_func_quote::resolve_type
+  Instruction: call void @_ZN4Item12set_nullableEb(%class.Item* %17, i1 zeroext %23), !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3836:3 | Function: Item_func_quote::resolve_type
+  Instruction: %64 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3317:48 | Function: Item_func_weight_string::val_str
+  Instruction: %cmp70 = icmp ugt i64 %61, %64, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3317:23 | Function: Item_func_weight_string::val_str
+  Instruction: br i1 %cmp70, label %if.then71, label %if.end74, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3317:7 | Function: Item_func_weight_string::val_str
+  Instruction: %22 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4145:41 | Function: Item_func_uncompress::val_str
+  Instruction: %cmp14 = icmp ugt i64 %19, %22, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4145:16 | Function: Item_func_uncompress::val_str
+  Instruction: br i1 %cmp14, label %if.then15, label %if.end20, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4145:7 | Function: Item_func_uncompress::val_str
+  Instruction: %29 = load i64, i64* %max_allowed_packet18, align 8, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4149:49 | Function: Item_func_uncompress::val_str
+  Instruction: %conv19 = trunc i64 %29 to i32, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4149:26 | Function: Item_func_uncompress::val_str
+  Instruction: call void (%class.THD*, i32, i32, i8*, ...) @_Z19push_warning_printfP3THDN13Sql_condition19enum_severity_levelEjPKcz(%class.THD* %24, i32 1, i32 1256, i8* %call16, i32 %conv19), !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:4146:5 | Function: Item_func_uncompress::val_str
+  Instruction: %2 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.h:192:35 | Function: regexp::Regexp_engine::HardLimit
+  Instruction: %div = udiv i64 %2, 2, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.h:192:54 | Function: regexp::Regexp_engine::HardLimit
+  Instruction: ret i64 %div, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.h:192:5 | Function: regexp::Regexp_engine::HardLimit
+  Instruction: %call18 = call i64 @_ZN6regexp13Regexp_engine9HardLimitEv(%"class.regexp::Regexp_engine"* %this1), !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:88:62 | Function: regexp::Regexp_engine::Replace
+  Instruction: store i64 %call18, i64* %ref.tmp17, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:88:62 | Function: regexp::Regexp_engine::Replace
+  Instruction: %call19 = call dereferenceable(8) i64* @_ZSt3minImERKT_S2_S2_(i64* dereferenceable(8) %ref.tmp, i64* dereferenceable(8) %ref.tmp17), !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:88:27 | Function: regexp::Regexp_engine::Replace
+  Instruction: %11 = load i64, i64* %call19, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:88:27 | Function: regexp::Regexp_engine::Replace
+  Instruction: call void @_ZNSt7__cxx1112basic_stringIDsSt11char_traitsIDsESaIDsEE6resizeEm(%"class.std::__cxx11::basic_string.693"* %m_replace_buffer, i64 %11), !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:88:20 | Function: regexp::Regexp_engine::Replace
+  Instruction: %call3 = invoke i64 @_ZN6regexp13Regexp_engine9HardLimitEv(%"class.regexp::Regexp_engine"* %this1)
+          to label %invoke.cont2 unwind label %lpad, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:156:33 | Function: regexp::Regexp_engine::AppendReplacement
+  Instruction: %cmp4 = icmp uge i64 %4, %call3, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:156:30 | Function: regexp::Regexp_engine::AppendReplacement
+  Instruction: br i1 %cmp4, label %if.then5, label %if.end, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:156:9 | Function: regexp::Regexp_engine::AppendReplacement
+  Instruction: %call3 = invoke i64 @_ZN6regexp13Regexp_engine9HardLimitEv(%"class.regexp::Regexp_engine"* %this1)
+          to label %invoke.cont2 unwind label %lpad, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:187:33 | Function: regexp::Regexp_engine::AppendTail
+  Instruction: %cmp4 = icmp uge i64 %3, %call3, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:187:30 | Function: regexp::Regexp_engine::AppendTail
+  Instruction: br i1 %cmp4, label %if.then5, label %if.end, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/regexp/regexp_engine.cc:187:9 | Function: regexp::Regexp_engine::AppendTail
+  Instruction: %112 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255606 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_binary.cc:856:55 | Function: json_binary::serialize_json_value
+  Instruction: %cmp115 = icmp ugt i64 %call114, %112, !dbg !1255607 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_binary.cc:856:38 | Function: json_binary::serialize_json_value
+  Instruction: br i1 %cmp115, label %if.then116, label %if.end119, !dbg !1255608 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_binary.cc:856:7 | Function: json_binary::serialize_json_value
+  Instruction: %114 = load i64, i64* %max_allowed_packet118, align 8, !dbg !1255612 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_binary.cc:858:55 | Function: json_binary::serialize_json_value
+  Instruction: call void (i32, i32, ...) @_Z8my_erroriiz(i32 1301, i32 0, i8* getelementptr inbounds ([23 x i8], [23 x i8]* @.str.14.38128, i64 0, i64 0), i64 %114), !dbg !1255613 | Location: /root/LLVM/mysql-8.0.36/sql-common/json_binary.cc:857:5 | Function: json_binary::serialize_json_value
+  Instruction: %92 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255534 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:4491:46 | Function: Item_func_spatial_collection::val_str
+  Instruction: %cmp136 = icmp ugt i64 %call135, %92, !dbg !1255535 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:4491:21 | Function: Item_func_spatial_collection::val_str
+  Instruction: br i1 %cmp136, label %if.then137, label %if.end147, !dbg !1255536 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:4491:7 | Function: Item_func_spatial_collection::val_str
+  Instruction: %101 = load i64, i64* %max_allowed_packet145, align 8, !dbg !1255544 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:4495:61 | Function: Item_func_spatial_collection::val_str
+  Instruction: invoke void (%class.THD*, i32, i32, i8*, ...) @_Z19push_warning_printfP3THDN13Sql_condition19enum_severity_levelEjPKcz(%class.THD* %94, i32 1, i32 1301, i8* %call139, i8* %call143, i64 %101)
+          to label %invoke.cont146 unwind label %lpad, !dbg !1255545 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:4492:5 | Function: Item_func_spatial_collection::val_str
+  Instruction: %3 = load i64, i64* %max_allowed_packet, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:3330:48 | Function: log_loaded_block
+  Instruction: %conv = trunc i64 %3 to i32, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:3330:25 | Function: log_loaded_block
+  Instruction: store i32 %conv, i32* %max_event_size, align 4, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:3330:8 | Function: log_loaded_block
+  Instruction: %call37 = invoke dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %max_allowed_packet, i64* dereferenceable(8) %ref.tmp35)
+          to label %invoke.cont36 unwind label %lpad6, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:3401:9 | Function: bool show_binlog_events
+  Instruction: %call37 = invoke dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %max_allowed_packet, i64* dereferenceable(8) %ref.tmp35)
+          to label %invoke.cont36 unwind label %lpad6, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:3401:9 | Function: bool show_binlog_events
+  Instruction: store i64 1073741824, i64* %max_allowed_packet, align 8, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_binlog_sender.cc:347:37 | Function: Binlog_sender::init
+  Instruction: %max_allowed_packet = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 28, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_binlog_sender.cc:347:18 | Function: Binlog_sender::init
+  Instruction: %max_allowed_packet = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 28, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:379:18 | Function: set_replica_max_allowed_packet
+  Instruction: store i64 %4, i64* %max_allowed_packet, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:379:37 | Function: set_replica_max_allowed_packet
+  Instruction: %max_allowed_packet = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 28, !dbg !1255613 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_channel_service_interface.cc:400:20 | Function: channel_create
+  Instruction: store i64 %103, i64* %max_allowed_packet, align 8, !dbg !1255614 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_channel_service_interface.cc:400:39 | Function: channel_create
+  Instruction: store i64 %10, i64* %max_allowed_packet, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_binlog_sender.cc:368:37 | Function: Binlog_sender::cleanup
+  Instruction: %max_allowed_packet = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 28, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_binlog_sender.cc:368:18 | Function: Binlog_sender::cleanup
+  Instruction: %call = invoke dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %max_allowed_packet, i64* dereferenceable(8) %ref.tmp)
+          to label %invoke.cont2 unwind label %lpad, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_binlog_sender.cc:384:7 | Function: Binlog_sender::run
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: ER_THD
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: push_warning_printf
+  Controlled Function: my_message
+  Controlled Function: String::append
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_to_base64::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::alloc
+  Controlled Function: Item::error_str
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: base64_encode
+  Controlled Function: __assert_fail
+  Controlled Function: String::length
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_from_base64::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::alloc
+  Controlled Function: Item::error_str
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: base64_decode
+  Controlled Function: Item::null_return_str
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::append
+  Controlled Function: Item::error_str
+  Controlled Function: eval_string_arg
+  Controlled Function: String::set_charset
+  Controlled Function: THD::is_error
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: __assert_fail
+  Controlled Function: Item::is_nullable
+  Controlled Function: Item::error_str
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::~String
+  Controlled Function: Item::error_str
+  Controlled Function: Item::error_str
+  Controlled Function: eval_string_arg
+  Controlled Function: THD::is_error
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: Item::error_str
+  Controlled Function: String::length
+  Controlled Function: String::append
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: StringBuffer
+  Controlled Function: StringBuffer
+  Controlled Function: Item::error_str
+  Controlled Function: StringBuffer
+  Controlled Function: StringBuffer
+  Controlled Function: bool std::equal
+  Controlled Function: String::charset
+  Controlled Function: String::charset
+  Controlled Function: String::length
+  Controlled Function: my_ismbchar
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: Item::error_str
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::uses_buffer_owned_by
+  Controlled Function: String::alloc
+  Controlled Function: copy_if_not_alloced
+  Controlled Function: Item::error_str
+  Controlled Function: String::copy
+  Controlled Function: String::replace
+  Controlled Function: String::set_charset
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_repeat::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::uses_buffer_owned_by
+  Controlled Function: String::alloc
+  Controlled Function: alloc_buffer
+  Controlled Function: Item::error_str
+  Controlled Function: String::copy
+  Controlled Function: Item::error_str
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: String::ptr
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_space::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::alloc
+  Controlled Function: Item::error_str
+  Controlled Function: String::length
+  Controlled Function: String::set_charset
+  Controlled Function: String::ptr
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_rpad::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: Item::make_empty_result
+  Controlled Function: alloc_buffer
+  Controlled Function: Item::error_str
+  Controlled Function: String::ptr
+  Controlled Function: String::ptr
+  Controlled Function: String::charpos
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_lpad::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: StringBuffer
+  Controlled Function: Item::make_empty_result
+  Controlled Function: String::alloc
+  Controlled Function: StringBuffer
+  Controlled Function: my_error
+  Controlled Function: String::length
+  Controlled Function: Item::error_str
+  Controlled Function: String::set_charset
+  Controlled Function: String::append
+  Controlled Function: String::ptr
+  Controlled Function: String::append
+  Controlled Function: String::charpos
+  Controlled Function: String::append
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: String::copy
+  Controlled Function: String::alloced_length
+  Controlled Function: Item::error_str
+  Controlled Function: Item::check_well_formed_result
+  Controlled Function: String::set_charset
+  Controlled Function: Item::error_str
+  Controlled Function: String::length
+  Controlled Function: String::charpos
+  Controlled Function: snprintf
+  Controlled Function: String::alloced_length
+  Controlled Function: ErrConvString::ErrConvString
+  Controlled Function: ER_THD
+  Controlled Function: ErrConvString::ptr
+  Controlled Function: push_warning_printf
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: __assert_fail
+  Controlled Function: String::alloced_length
+  Controlled Function: String::operator=
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: String::reserve
+  Controlled Function: String::reserve
+  Controlled Function: Item::error_str
+  Controlled Function: Item::error_str
+  Controlled Function: String::copy
+  Controlled Function: inline_mysql_file_close
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_load_file::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: inline_mysql_file_read
+  Controlled Function: inline_mysql_file_close
+  Controlled Function: Item::is_nullable
+  Controlled Function: __assert_fail
+  Controlled Function: char* pointer_cast
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item::error_str
+  Controlled Function: inline_mysql_file_close
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_export_set::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::~String
+  Controlled Function: String::~String
+  Controlled Function: String::ptr
+  Controlled Function: String::~String
+  Controlled Function: String::~String
+  Controlled Function: String::~String
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: Item::make_empty_result
+  Controlled Function: String::append
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::length
+  Controlled Function: String::set_charset
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: Item_func_weight_string::func_name
+  Controlled Function: Item_str_func::push_packet_overflow_warning
+  Controlled Function: String::alloc
+  Controlled Function: Item::error_str
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: String::ptr
+  Controlled Function: unsigned long const& std::min
+  Controlled Function: String::ptr
+  Controlled Function: String::ptr
+  Controlled Function: __assert_fail
+  Controlled Function: String::ptr
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: ER_THD
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: push_warning_printf
+  Controlled Function: String::mem_realloc
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char const* pointer_cast
+  Controlled Function: String::length
+  Controlled Function: uncompress
+  Controlled Function: String::length
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: ER_THD
+  Controlled Function: push_warning
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: ER_THD
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: ER_THD
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: regexp::Regexp_engine::TryToAppendReplacement
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: regexp::Regexp_engine::TryToAppendTail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_error
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: ER_THD
+  Controlled Function: String::~String
+  Controlled Function: Geometry::construct
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: push_warning_printf
+  Controlled Function: my_error
+  Controlled Function: Item::error_str
+  Controlled Function: my_error
+  Controlled Function: String::~String
+  Controlled Function: Item::error_str
+
+Implicit Control Flow:
+
+----------------------------------------

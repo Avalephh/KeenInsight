@@ -1,0 +1,325 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init
+void THD::init(void) {
+  plugin_thdvar_init(this, m_enable_plugins);
+  /*
+    variables= global_system_variables above has reset
+    variables.pseudo_thread_id to 0. We need to correct it here to
+    avoid temporary tables replication failure.
+  */
+  variables.pseudo_thread_id = m_thread_id;
+
+  /*
+    NOTE: reset_connection command will reset the THD to its default state.
+    All system variables whose scope is SESSION ONLY should be set to their
+    default values here.
+  */
+  reset_first_successful_insert_id();
+  user_time.tv_sec = user_time.tv_usec = 0;
+  start_time.tv_sec = start_time.tv_usec = 0;
+  set_time();
+  auto_inc_intervals_forced.clear();
+  {
+    ulong tmp;
+    tmp = sql_rnd_with_mutex();
+    randominit(&rand,
+               tmp + static_cast<ulong>(reinterpret_cast<uintptr_t>(&rand)),
+               tmp + (ulong)::atomic_global_query_id);
+  }
+
+  server_status = SERVER_STATUS_AUTOCOMMIT;
+  if (variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES)
+    server_status |= SERVER_STATUS_NO_BACKSLASH_ESCAPES;
+
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+  open_options = ha_open_options;
+  update_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY : TL_WRITE);
+  insert_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY
+                                      : TL_WRITE_CONCURRENT_INSERT);
+  tx_isolation = (enum_tx_isolation)variables.transaction_isolation;
+  tx_read_only = variables.transaction_read_only;
+  tx_priority = 0;
+  thd_tx_priority = 0;
+  update_charset();
+  reset_current_stmt_binlog_format_row();
+  reset_binlog_local_stmt_filter();
+  memset(&status_var, 0, sizeof(status_var));
+  binlog_row_event_extra_data = nullptr;
+
+  if (variables.sql_log_bin)
+    variables.option_bits |= OPTION_BIN_LOG;
+  else
+    variables.option_bits &= ~OPTION_BIN_LOG;
+
+#if defined(ENABLED_DEBUG_SYNC)
+  /* Initialize the Debug Sync Facility. See debug_sync.cc. */
+  debug_sync_init_thread(this);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
+
+  /* Initialize session_tracker and create all tracker objects */
+  session_tracker.init(this->charset());
+  session_tracker.enable(this);
+
+  owned_gtid.clear();
+  owned_sid.clear();
+  m_se_gtid_flags.reset();
+  owned_gtid.dbug_print(nullptr, "set owned_gtid (clear) in THD::init");
+
+  /*
+    This will clear the writeset session history and re-set delegate state to
+    INIT
+  */
+  rpl_thd_ctx.init();
+
+  /*
+    This variable is used to temporarily disable the password validation plugin
+    when a RANDOM PASSWORD is generated during SET PASSWORD,CREATE USER or
+    ALTER USER statements.
+  */
+  m_disable_password_validation = false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::cleanup_connection
+    cleanup_connection()
+
+  IMPLEMENTATION
+    Reset all resources that are connection specific
+*/
+
+void THD::cleanup_connection(void) {
+  mysql_mutex_lock(&LOCK_status);
+  add_to_status(&global_status_var, &status_var);
+  reset_system_status_vars(&status_var);
+  mysql_mutex_unlock(&LOCK_status);
+
+  cleanup();
+#if defined(ENABLED_DEBUG_SYNC)
+  /* End the Debug Sync Facility. See debug_sync.cc. */
+  debug_sync_end_thread(this);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
+  killed = NOT_KILLED;
+  rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_CONNECTION_CLEANED);
+  running_explain_analyze = false;
+  m_thd_life_cycle_stage = enum_thd_life_cycle_stages::ACTIVE;
+  init();
+  stmt_map.reset();
+  user_vars.clear();
+  sp_cache_clear(&sp_proc_cache);
+  sp_cache_clear(&sp_func_cache);
+
+  clear_error();
+  // clear the warnings
+  get_stmt_da()->reset_condition_info(this);
+  // clear profiling information
+#if defined(ENABLED_PROFILING)
+  profiling->cleanup();
+#endif
+
+#ifndef NDEBUG
+  /* DEBUG code only (begin) */
+  bool check_cleanup = false;
+  DBUG_EXECUTE_IF("debug_test_cleanup_connection", check_cleanup = true;);
+  if (check_cleanup) {
+    /* isolation level should be default */
+    assert(variables.transaction_isolation == ISO_REPEATABLE_READ);
+    /* check autocommit is ON by default */
+    assert(server_status == SERVER_STATUS_AUTOCOMMIT);
+    /* check prepared stmts are cleaned up */
+    assert(prepared_stmt_count == 0);
+    /* check diagnostic area is cleaned up */
+    assert(get_stmt_da()->status() == Diagnostics_area::DA_EMPTY);
+    /* check if temp tables are deleted */
+    assert(temporary_tables == nullptr);
+    /* check if tables are unlocked */
+    assert(locked_tables_list.locked_tables() == nullptr);
+  }
+  /* DEBUG code only (end) */
+#endif
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/transaction_impl.h
+Function: dd::Transaction_ro::Transaction_ro
+  Transaction_ro(THD *thd, enum_tx_isolation isolation)
+      : otx(thd, TL_READ), m_thd(thd), m_kill_immunizer(thd) {
+    thd->begin_attachable_ro_transaction();
+    thd->tx_isolation = isolation;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/transaction.cc
+Function: trans_reset_one_shot_chistics
+void trans_reset_one_shot_chistics(THD *thd) {
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+    TX_TRACKER_GET(tst);
+    tst->set_read_flags(thd, TX_READ_INHERIT);
+    tst->set_isol_level(thd, TX_ISOL_INHERIT);
+  }
+
+  thd->tx_isolation = (enum_tx_isolation)thd->variables.transaction_isolation;
+  thd->tx_read_only = thd->variables.transaction_read_only;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/transaction.cc
+Function: trans_begin
+bool trans_begin(THD *thd, uint flags) {
+  bool res = false;
+  DBUG_TRACE;
+
+  if (trans_check_state(thd)) return true;
+
+  TX_TRACKER_GET(tst);
+
+  thd->locked_tables_list.unlock_locked_tables(thd);
+
+  assert(!thd->locked_tables_mode);
+
+  if (thd->in_multi_stmt_transaction_mode() ||
+      (thd->variables.option_bits & OPTION_TABLE_LOCK)) {
+    thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
+    thd->server_status &=
+        ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
+    DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
+    res = ha_commit_trans(thd, true);
+  }
+
+  thd->variables.option_bits &= ~OPTION_BEGIN;
+  thd->get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+
+  if (res) return true;
+
+  /*
+    Release transactional metadata locks only after the
+    transaction has been committed.
+  */
+  thd->mdl_context.release_transactional_locks();
+
+  // The RO/RW options are mutually exclusive.
+  assert(!((flags & MYSQL_START_TRANS_OPT_READ_ONLY) &&
+           (flags & MYSQL_START_TRANS_OPT_READ_WRITE)));
+  if (flags & MYSQL_START_TRANS_OPT_READ_ONLY) {
+    thd->tx_read_only = true;
+    if (tst) tst->set_read_flags(thd, TX_READ_ONLY);
+  } else if (flags & MYSQL_START_TRANS_OPT_READ_WRITE) {
+    /*
+      Explicitly starting a RW transaction when the server is in
+      read-only mode, is not allowed unless the user has SUPER priv.
+      Implicitly starting a RW transaction is allowed for backward
+      compatibility.
+    */
+    if (check_readonly(thd, true)) return true;
+    thd->tx_read_only = false;
+    /*
+      This flags that tx_read_only was set explicitly, rather than
+      just from the session's default.
+    */
+    if (tst) tst->set_read_flags(thd, TX_READ_WRITE);
+  }
+
+  DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
+    assert(thd->tx_priority == 0);
+    thd->tx_priority = 1;
+  });
+
+  thd->variables.option_bits |= OPTION_BEGIN;
+  thd->server_status |= SERVER_STATUS_IN_TRANS;
+  if (thd->tx_read_only) thd->server_status |= SERVER_STATUS_IN_TRANS_READONLY;
+  DBUG_PRINT("info", ("setting SERVER_STATUS_IN_TRANS"));
+
+  if (tst) tst->add_trx_state(thd, TX_EXPLICIT);
+
+  /* ha_start_consistent_snapshot() relies on OPTION_BEGIN flag set. */
+  if (flags & MYSQL_START_TRANS_OPT_WITH_CONS_SNAPSHOT) {
+    if (tst) tst->add_trx_state(thd, TX_WITH_SNAPSHOT);
+    res = ha_start_consistent_snapshot(thd);
+  }
+
+  /*
+    Register transaction start in performance schema if not done already.
+    We handle explicitly started transactions here, implicitly started
+    transactions (and single-statement transactions in autocommit=1 mode)
+    are handled in trans_register_ha().
+    We can't handle explicit transactions in the same way as implicit
+    because we want to correctly attribute statements which follow
+    BEGIN but do not touch any transactional tables.
+  */
+#ifdef HAVE_PSI_TRANSACTION_INTERFACE
+  if (thd->m_transaction_psi == nullptr) {
+    thd->m_transaction_psi =
+        MYSQL_START_TRANSACTION(&thd->m_transaction_state, nullptr, nullptr,
+                                thd->tx_isolation, thd->tx_read_only, false);
+    DEBUG_SYNC(thd, "after_set_transaction_psi_before_set_transaction_gtid");
+    gtid_set_performance_schema_values(thd);
+  }
+#endif
+
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc
+Function: Ndb_binlog_index_table_util::remove_rows_for_file
+  static bool remove_rows_for_file(THD *thd, const char *filename) {
+    Ndb_local_connection mysqld(thd);
+
+    // Set isolation level to be independent from server settings
+    thd->variables.transaction_isolation = ISO_REPEATABLE_READ;
+
+    // Turn autocommit on, this will make delete_rows() commit
+    thd->variables.option_bits &= ~OPTION_NOT_AUTOCOMMIT;
+
+    // Ensure that file paths are escaped in a way that does not
+    // interfere with path separator on Windows
+    thd->variables.sql_mode |= MODE_NO_BACKSLASH_ESCAPES;
+
+    // ignore "table does not exist" as it is a "consistent" behavior
+    const bool ignore_no_such_table = true;
+    std::string where;
+    where.append("File='").append(filename).append("'");
+    if (mysqld.delete_rows(DB_NAME, TABLE_NAME, ignore_no_such_table, where)) {
+      // Failed
+      return true;
+    }
+    return false;
+  }
+
+

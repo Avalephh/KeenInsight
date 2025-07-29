@@ -1,0 +1,478 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: close_temporary_tables
+bool close_temporary_tables(THD *thd) {
+  DBUG_TRACE;
+  TABLE *table;
+  TABLE *next = nullptr;
+  TABLE *prev_table;
+  /* Assume thd->variables.option_bits has OPTION_QUOTE_SHOW_CREATE */
+  bool was_quote_show = true;
+  bool error = false;
+  int slave_closed_temp_tables = 0;
+
+  if (!thd->temporary_tables) return false;
+
+  assert(!thd->slave_thread ||
+         thd->system_thread != SYSTEM_THREAD_SLAVE_WORKER);
+
+  /*
+    Ensure we don't have open HANDLERs for tables we are about to close.
+    This is necessary when close_temporary_tables() is called as part
+    of execution of BINLOG statement (e.g. for format description event).
+  */
+  mysql_ha_rm_temporary_tables(thd);
+  if (!mysql_bin_log.is_open()) {
+    TABLE *tmp_next;
+    for (TABLE *t = thd->temporary_tables; t; t = tmp_next) {
+      tmp_next = t->next;
+      mysql_lock_remove(thd, thd->lock, t);
+      /*
+        We should not meet temporary tables created by ALTER TABLE here.
+        It is responsibility of ALTER statement to close them. Otherwise
+        it might be necessary to remove them from DD as well.
+      */
+      assert(t->s->tmp_table_def);
+      close_temporary(thd, t, true, true);
+      slave_closed_temp_tables++;
+    }
+
+    thd->temporary_tables = nullptr;
+    if (thd->slave_thread) {
+      atomic_replica_open_temp_tables -= slave_closed_temp_tables;
+      thd->rli_slave->get_c_rli()->atomic_channel_open_temp_tables -=
+          slave_closed_temp_tables;
+    }
+
+    return false;
+  }
+
+  /*
+    We are about to generate DROP TEMPORARY TABLE statements for all
+    the left out temporary tables. If GTID_NEXT is set (e.g. if user
+    did SET GTID_NEXT just before disconnecting the client), we must
+    ensure that it will be able to generate GTIDs for the statements
+    with this server's UUID. Therefore we set gtid_next to
+    AUTOMATIC_GTID.
+  */
+  gtid_state->update_on_rollback(thd);
+  thd->variables.gtid_next.set_automatic();
+
+  /*
+    We must separate transactional temp tables and
+    non-transactional temp tables in two distinct DROP statements
+    to avoid the splitting if a slave server reads from this binlog.
+  */
+
+  /* Better add "if exists", in case a RESET MASTER has been done */
+  const char stub[] = "DROP /*!40005 TEMPORARY */ TABLE IF EXISTS ";
+  uint stub_len = sizeof(stub) - 1;
+  char buf_trans[256], buf_non_trans[256];
+  String s_query_trans =
+      String(buf_trans, sizeof(buf_trans), system_charset_info);
+  String s_query_non_trans =
+      String(buf_non_trans, sizeof(buf_non_trans), system_charset_info);
+  bool found_user_tables = false;
+  bool found_trans_table = false;
+  bool found_non_trans_table = false;
+
+  memcpy(buf_trans, stub, stub_len);
+  memcpy(buf_non_trans, stub, stub_len);
+
+  /*
+    Insertion sort of temp tables by pseudo_thread_id to build ordered list
+    of sublists of equal pseudo_thread_id
+  */
+
+  for (prev_table = thd->temporary_tables, table = prev_table->next; table;
+       prev_table = table, table = table->next) {
+    TABLE *prev_sorted /* same as for prev_table */, *sorted;
+    /*
+      We should not meet temporary tables created by ALTER TABLE here.
+      It is responsibility of ALTER statement to close them. Otherwise
+      it might be necessary to remove them from DD as well.
+    */
+    assert(table->s->tmp_table_def);
+    if (is_user_table(table)) {
+      if (!found_user_tables) found_user_tables = true;
+      for (prev_sorted = nullptr, sorted = thd->temporary_tables;
+           sorted != table; prev_sorted = sorted, sorted = sorted->next) {
+        if (!is_user_table(sorted) || tmpkeyval(sorted) > tmpkeyval(table)) {
+          /* move into the sorted part of the list from the unsorted */
+          prev_table->next = table->next;
+          table->next = sorted;
+          if (prev_sorted) {
+            prev_sorted->next = table;
+          } else {
+            thd->temporary_tables = table;
+          }
+          table = prev_table;
+          break;
+        }
+      }
+    }
+  }
+
+  /* We always quote db,table names though it is slight overkill */
+  if (found_user_tables && !(was_quote_show = (thd->variables.option_bits &
+                                               OPTION_QUOTE_SHOW_CREATE))) {
+    thd->variables.option_bits |= OPTION_QUOTE_SHOW_CREATE;
+  }
+
+  /*
+    Make LEX consistent with DROP TEMPORARY TABLES statement which we
+    are going to log. This is important for the binary logging code.
+  */
+  LEX *lex = thd->lex;
+  enum_sql_command sav_sql_command = lex->sql_command;
+  bool sav_drop_temp = lex->drop_temporary;
+  lex->sql_command = SQLCOM_DROP_TABLE;
+  lex->drop_temporary = true;
+
+  /* scan sorted tmps to generate sequence of DROP */
+  for (table = thd->temporary_tables; table; table = next) {
+    if (is_user_table(table) && table->should_binlog_drop_if_temp()) {
+      bool save_thread_specific_used = thd->thread_specific_used;
+      my_thread_id save_pseudo_thread_id = thd->variables.pseudo_thread_id;
+      /* Set pseudo_thread_id to be that of the processed table */
+      thd->variables.pseudo_thread_id = tmpkeyval(table);
+      String db;
+      db.append(table->s->db.str);
+      /* Loop forward through all tables that belong to a common database
+         within the sublist of common pseudo_thread_id to create single
+         DROP query
+      */
+      for (s_query_trans.length(stub_len), s_query_non_trans.length(stub_len),
+           found_trans_table = false, found_non_trans_table = false;
+           table && is_user_table(table) &&
+           tmpkeyval(table) == thd->variables.pseudo_thread_id &&
+           table->s->db.length == db.length() &&
+           strcmp(table->s->db.str, db.ptr()) == 0;
+           table = next) {
+        /* Separate transactional from non-transactional temp tables */
+        if (table->should_binlog_drop_if_temp()) {
+          /* Separate transactional from non-transactional temp tables */
+          if (table->s->tmp_table == TRANSACTIONAL_TMP_TABLE) {
+            found_trans_table = true;
+            /*
+              We are going to add ` around the table names and possible more
+              due to special characters
+            */
+            append_identifier(thd, &s_query_trans, table->s->table_name.str,
+                              strlen(table->s->table_name.str));
+            s_query_trans.append(',');
+          } else if (table->s->tmp_table == NON_TRANSACTIONAL_TMP_TABLE) {
+            found_non_trans_table = true;
+            /*
+              We are going to add ` around the table names and possible more
+              due to special characters
+            */
+            append_identifier(thd, &s_query_non_trans, table->s->table_name.str,
+                              strlen(table->s->table_name.str));
+            s_query_non_trans.append(',');
+          }
+        }
+
+        next = table->next;
+        mysql_lock_remove(thd, thd->lock, table);
+        close_temporary(thd, table, true, true);
+        slave_closed_temp_tables++;
+      }
+      thd->clear_error();
+      const CHARSET_INFO *cs_save = thd->variables.character_set_client;
+      thd->variables.character_set_client = system_charset_info;
+      thd->thread_specific_used = true;
+
+      if (found_trans_table) {
+        Query_log_event qinfo(thd, s_query_trans.ptr(),
+                              s_query_trans.length() - 1, false, true, false,
+                              0);
+        qinfo.db = db.ptr();
+        qinfo.db_len = db.length();
+        thd->variables.character_set_client = cs_save;
+
+        thd->get_stmt_da()->set_overwrite_status(true);
+        if ((error = (mysql_bin_log.write_event(&qinfo) ||
+                      mysql_bin_log.commit(thd, true) || error))) {
+          /*
+            If we're here following THD::cleanup, thence the connection
+            has been closed already. So lets print a message to the
+            error log instead of pushing yet another error into the
+            Diagnostics_area.
+
+            Also, we keep the error flag so that we propagate the error
+            up in the stack. This way, if we're the SQL thread we notice
+            that close_temporary_tables failed. (Actually, the SQL
+            thread only calls close_temporary_tables while applying old
+            Start_log_event_v3 events.)
+          */
+          LogErr(ERROR_LEVEL, ER_BINLOG_FAILED_TO_WRITE_DROP_FOR_TEMP_TABLES);
+        }
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+
+      if (found_non_trans_table) {
+        Query_log_event qinfo(thd, s_query_non_trans.ptr(),
+                              s_query_non_trans.length() - 1, false, true,
+                              false, 0);
+        qinfo.db = db.ptr();
+        qinfo.db_len = db.length();
+        thd->variables.character_set_client = cs_save;
+
+        thd->get_stmt_da()->set_overwrite_status(true);
+        if ((error = (mysql_bin_log.write_event(&qinfo) ||
+                      mysql_bin_log.commit(thd, true) || error))) {
+          /*
+            If we're here following THD::cleanup, thence the connection
+            has been closed already. So lets print a message to the
+            error log instead of pushing yet another error into the
+            Diagnostics_area.
+
+            Also, we keep the error flag so that we propagate the error
+            up in the stack. This way, if we're the SQL thread we notice
+            that close_temporary_tables failed. (Actually, the SQL
+            thread only calls close_temporary_tables while applying old
+            Start_log_event_v3 events.)
+          */
+          LogErr(ERROR_LEVEL, ER_BINLOG_FAILED_TO_WRITE_DROP_FOR_TEMP_TABLES);
+        }
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+
+      thd->variables.pseudo_thread_id = save_pseudo_thread_id;
+      thd->thread_specific_used = save_thread_specific_used;
+    } else {
+      next = table->next;
+      /*
+        This is for those cases when we have acquired lock but drop temporary
+        table will not be logged.
+      */
+      mysql_lock_remove(thd, thd->lock, table);
+      close_temporary(thd, table, true, true);
+      slave_closed_temp_tables++;
+    }
+  }
+  lex->drop_temporary = sav_drop_temp;
+  lex->sql_command = sav_sql_command;
+
+  if (!was_quote_show)
+    thd->variables.option_bits &=
+        ~OPTION_QUOTE_SHOW_CREATE; /* restore option */
+
+  thd->temporary_tables = nullptr;
+  if (thd->slave_thread) {
+    atomic_replica_open_temp_tables -= slave_closed_temp_tables;
+    thd->rli_slave->get_c_rli()->atomic_channel_open_temp_tables -=
+        slave_closed_temp_tables;
+  }
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: create_table_def_key_tmp not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: create_table_def_key_tmp not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: find_temporary_table
+TABLE *find_temporary_table(THD *thd, const char *db, const char *table_name) {
+  char key[MAX_DBKEY_LENGTH];
+  size_t key_length = create_table_def_key_tmp(thd, db, table_name, key);
+  return find_temporary_table(thd, key, key_length);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_temporary_table
+    open_temporary_table() must be used to open temporary tables.
+    A derived table cannot be opened with this.
+  */
+  assert(table_list->is_view() || table_list->table == nullptr);
+
+  /* an open table operation needs a lot of the stack space */
+  if (check_stack_overrun(thd, STACK_MIN_SIZE_FOR_OPEN, (uchar *)&alias))
+    return true;
+
+  // New DD- In current_thd->is_strict_mode() mode we call open_table
+  // on new DD tables like mysql.tables/* when CREATE fails and we
+  // try to abort the operation and invoke quick_rm_table().
+  // Currently, we ignore deleting table in strict mode. Need to fix this.
+  // TODO.
+
+  DBUG_EXECUTE_IF("kill_query_on_open_table_from_tz_find", {
+    /*
+      When on calling my_tz_find the following
+      tables are opened in specified order: time_zone_name,
+      time_zone, time_zone_transition_type,
+      time_zone_transition. Emulate killing a query
+      on opening the second table in the list.
+    */
+    if (!strcmp("time_zone", table_list->table_name))
+      thd->killed = THD::KILL_QUERY;
+  });
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_table_uncached not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_table_uncached not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_table_uncached not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_mta_submode.cc
+Function: Mts_submode_logical_clock::attach_temp_tables
+void Mts_submode_database::attach_temp_tables(THD *thd, const Relay_log_info *,
+                                              Query_log_event *ev) {
+  int i, parts;
+  DBUG_TRACE;
+  if (!is_mts_worker(thd) || (ev->ends_group() || ev->starts_group())) return;
+  assert(!thd->temporary_tables);
+  // in over max-db:s case just one special partition is locked
+  parts = ((ev->mts_accessed_dbs == OVER_MAX_DBS_IN_EVENT_MTS)
+               ? 1
+               : ev->mts_accessed_dbs);
+  for (i = 0; i < parts; i++) {
+    mts_move_temp_tables_to_thd(
+        thd, ev->mts_assigned_partitions[i]->temporary_tables);
+    ev->mts_assigned_partitions[i]->temporary_tables = nullptr;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init
+void THD::init(void) {
+  plugin_thdvar_init(this, m_enable_plugins);
+  /*
+    variables= global_system_variables above has reset
+    variables.pseudo_thread_id to 0. We need to correct it here to
+    avoid temporary tables replication failure.
+  */
+  variables.pseudo_thread_id = m_thread_id;
+
+  /*
+    NOTE: reset_connection command will reset the THD to its default state.
+    All system variables whose scope is SESSION ONLY should be set to their
+    default values here.
+  */
+  reset_first_successful_insert_id();
+  user_time.tv_sec = user_time.tv_usec = 0;
+  start_time.tv_sec = start_time.tv_usec = 0;
+  set_time();
+  auto_inc_intervals_forced.clear();
+  {
+    ulong tmp;
+    tmp = sql_rnd_with_mutex();
+    randominit(&rand,
+               tmp + static_cast<ulong>(reinterpret_cast<uintptr_t>(&rand)),
+               tmp + (ulong)::atomic_global_query_id);
+  }
+
+  server_status = SERVER_STATUS_AUTOCOMMIT;
+  if (variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES)
+    server_status |= SERVER_STATUS_NO_BACKSLASH_ESCAPES;
+
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+  open_options = ha_open_options;
+  update_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY : TL_WRITE);
+  insert_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY
+                                      : TL_WRITE_CONCURRENT_INSERT);
+  tx_isolation = (enum_tx_isolation)variables.transaction_isolation;
+  tx_read_only = variables.transaction_read_only;
+  tx_priority = 0;
+  thd_tx_priority = 0;
+  update_charset();
+  reset_current_stmt_binlog_format_row();
+  reset_binlog_local_stmt_filter();
+  memset(&status_var, 0, sizeof(status_var));
+  binlog_row_event_extra_data = nullptr;
+
+  if (variables.sql_log_bin)
+    variables.option_bits |= OPTION_BIN_LOG;
+  else
+    variables.option_bits &= ~OPTION_BIN_LOG;
+
+#if defined(ENABLED_DEBUG_SYNC)
+  /* Initialize the Debug Sync Facility. See debug_sync.cc. */
+  debug_sync_init_thread(this);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
+
+  /* Initialize session_tracker and create all tracker objects */
+  session_tracker.init(this->charset());
+  session_tracker.enable(this);
+
+  owned_gtid.clear();
+  owned_sid.clear();
+  m_se_gtid_flags.reset();
+  owned_gtid.dbug_print(nullptr, "set owned_gtid (clear) in THD::init");
+
+  /*
+    This will clear the writeset session history and re-set delegate state to
+    INIT
+  */
+  rpl_thd_ctx.init();
+
+  /*
+    This variable is used to temporarily disable the password validation plugin
+    when a RANDOM PASSWORD is generated during SET PASSWORD,CREATE USER or
+    ALTER USER statements.
+  */
+  m_disable_password_validation = false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::set_new_thread_id
+void THD::set_new_thread_id() {
+  m_thread_id = Global_THD_manager::get_instance()->get_new_thread_id();
+  variables.pseudo_thread_id = m_thread_id;
+  thr_lock_info_init(&lock_info, m_thread_id, &COND_thr_lock);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_connection_id::val_int
+longlong Item_func_connection_id::val_int() {
+  assert(fixed);
+  return current_thd->variables.pseudo_thread_id;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+

@@ -1,0 +1,311 @@
+Global Variable: srv_log_buffer_size
+Explicit Data Flow (90):
+  Instruction: %9 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:369:29 | Function: recv_sys_resize_buf
+  Instruction: %cond = phi i64 [ %9, %cond.true ], [ %mul9, %cond.false ], !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:23 | Function: recv_sys_resize_buf
+  Instruction: store i64 %cond, i64* %buf_len10, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:21 | Function: recv_sys_resize_buf
+  Instruction: %buf_len10 = getelementptr inbounds %struct.recv_sys_t.223406, %struct.recv_sys_t.223406* %12, i32 0, i32 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:13 | Function: recv_sys_resize_buf
+  Instruction: %buf_len = getelementptr inbounds %struct.recv_sys_t.223406, %struct.recv_sys_t.223406* %48, i32 0, i32 8, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: %49 = load i64, i64* %buf_len, align 8, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: %cmp59 = icmp ule i64 %47, %49, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: %conv60 = zext i1 %cmp59 to i32, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: %cmp61 = icmp eq i32 0, %conv60, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: %call62 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp61), !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: br i1 %call62, label %if.then63, label %if.end64, !dbg !1255409 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:3333:5 | Function: recv_sys_add_to_parsing_buf
+  Instruction: %8 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:51 | Function: recv_sys_resize_buf
+  Instruction: %cmp7 = icmp uge i64 %mul, %8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:48 | Function: recv_sys_resize_buf
+  Instruction: br i1 %cmp7, label %cond.true, label %cond.false, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:23 | Function: recv_sys_resize_buf
+  Instruction: call void @_ZN2ib5errorC2IJRmEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured, i32 12548, i64* dereferenceable(8) @srv_log_buffer_size), !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:353:5 | Function: recv_sys_resize_buf
+  Instruction: %5 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:352:28 | Function: recv_sys_resize_buf
+  Instruction: %cmp3 = icmp eq i64 %4, %5, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:352:25 | Function: recv_sys_resize_buf
+  Instruction: br i1 %cmp3, label %if.then4, label %if.end5, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:352:7 | Function: recv_sys_resize_buf
+  Instruction: %2 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:348:3 | Function: recv_sys_resize_buf
+  Instruction: %cmp = icmp ule i64 %1, %2, !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:348:3 | Function: recv_sys_resize_buf
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:348:3 | Function: recv_sys_resize_buf
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:348:3 | Function: recv_sys_resize_buf
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:348:3 | Function: recv_sys_resize_buf
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:348:3 | Function: recv_sys_resize_buf
+  Instruction: %call4 = call dereferenceable(8) i64* @_ZSt3minImERKT_S2_S2_(i64* dereferenceable(8) %ref.tmp, i64* dereferenceable(8) @srv_log_buffer_size), !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:547:7 | Function: recv_sys_init
+  Instruction: %11 = load i64, i64* %call4, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:547:7 | Function: recv_sys_init
+  Instruction: store i64 %11, i64* %buf_len, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:546:21 | Function: recv_sys_init
+  Instruction: %buf_len = getelementptr inbounds %struct.recv_sys_t.223406, %struct.recv_sys_t.223406* %12, i32 0, i32 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:546:13 | Function: recv_sys_init
+  Instruction: %6 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1335:35 | Function: log_allocate_buffer
+  Instruction: call void @_ZN2ut5CountC2Em(%union.anon.0* %agg.tmp19, i64 %6), !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1335:25 | Function: log_allocate_buffer
+  Instruction: %2 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1331:3 | Function: log_allocate_buffer
+  Instruction: %cmp11 = icmp uge i64 %2, %mul, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1331:3 | Function: log_allocate_buffer
+  Instruction: %conv12 = zext i1 %cmp11 to i32, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1331:3 | Function: log_allocate_buffer
+  Instruction: %cmp13 = icmp eq i32 0, %conv12, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1331:3 | Function: log_allocate_buffer
+  Instruction: %call14 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp13), !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1331:3 | Function: log_allocate_buffer
+  Instruction: br i1 %call14, label %if.then15, label %if.end16, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1331:3 | Function: log_allocate_buffer
+  Instruction: %1 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1330:3 | Function: log_allocate_buffer
+  Instruction: %cmp3 = icmp ule i64 %1, -1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1330:3 | Function: log_allocate_buffer
+  Instruction: %conv4 = zext i1 %cmp3 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1330:3 | Function: log_allocate_buffer
+  Instruction: %cmp5 = icmp eq i32 0, %conv4, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1330:3 | Function: log_allocate_buffer
+  Instruction: %call6 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp5), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1330:3 | Function: log_allocate_buffer
+  Instruction: br i1 %call6, label %if.then7, label %if.end8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1330:3 | Function: log_allocate_buffer
+  Instruction: %0 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1329:3 | Function: log_allocate_buffer
+  Instruction: %cmp = icmp uge i64 %0, 262144, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1329:3 | Function: log_allocate_buffer
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1329:3 | Function: log_allocate_buffer
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1329:3 | Function: log_allocate_buffer
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1329:3 | Function: log_allocate_buffer
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1329:3 | Function: log_allocate_buffer
+  Instruction: %2 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1308:18 | Function: log_calc_buf_size
+  Instruction: store i64 %2, i64* %buf_size, align 16, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1308:16 | Function: log_calc_buf_size
+  Instruction: %buf_size = getelementptr inbounds %struct.log_t, %struct.log_t* %3, i32 0, i32 9, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1308:7 | Function: log_calc_buf_size
+  Instruction: %buf_size = getelementptr inbounds %struct.log_t, %struct.log_t* %9, i32 0, i32 9, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %10 = load i64, i64* %buf_size, align 16, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %add.ptr14 = getelementptr inbounds i8, i8* %call13, i64 %10, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %cmp15 = icmp ule i8* %add.ptr, %add.ptr14, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %conv16 = zext i1 %cmp15 to i32, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %cmp17 = icmp eq i32 0, %conv16, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %call18 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp17), !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: br i1 %call18, label %if.then19, label %if.end20, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1620:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %1 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1306:3 | Function: log_calc_buf_size
+  Instruction: %cmp3 = icmp ule i64 %1, -1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1306:3 | Function: log_calc_buf_size
+  Instruction: %conv4 = zext i1 %cmp3 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1306:3 | Function: log_calc_buf_size
+  Instruction: %cmp5 = icmp eq i32 0, %conv4, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1306:3 | Function: log_calc_buf_size
+  Instruction: %call6 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp5), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1306:3 | Function: log_calc_buf_size
+  Instruction: br i1 %call6, label %if.then7, label %if.end8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1306:3 | Function: log_calc_buf_size
+  Instruction: %0 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1305:3 | Function: log_calc_buf_size
+  Instruction: %cmp = icmp uge i64 %0, 262144, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1305:3 | Function: log_calc_buf_size
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1305:3 | Function: log_calc_buf_size
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1305:3 | Function: log_calc_buf_size
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1305:3 | Function: log_calc_buf_size
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1305:3 | Function: log_calc_buf_size
+  Instruction: %57 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1262:3 | Function: log_buffer_resize_low
+  Instruction: %cmp62 = icmp eq i64 %57, %59, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1262:3 | Function: log_buffer_resize_low
+  Instruction: %conv63 = zext i1 %cmp62 to i32, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1262:3 | Function: log_buffer_resize_low
+  Instruction: %cmp64 = icmp eq i32 0, %conv63, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1262:3 | Function: log_buffer_resize_low
+  Instruction: %call65 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp64), !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1262:3 | Function: log_buffer_resize_low
+  Instruction: br i1 %call65, label %if.then66, label %if.end67, !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1262:3 | Function: log_buffer_resize_low
+  Instruction: %65 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4850:3 | Function: innodb_init_params
+  Instruction: %cmp145 = icmp ugt i64 %65, 0, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4850:3 | Function: innodb_init_params
+  Instruction: %conv146 = zext i1 %cmp145 to i32, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4850:3 | Function: innodb_init_params
+  Instruction: %cmp147 = icmp eq i32 0, %conv146, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4850:3 | Function: innodb_init_params
+  Instruction: %call149 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp147)
+          to label %invoke.cont148 unwind label %lpad2, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4850:3 | Function: innodb_init_params
+  Instruction: br i1 %call149, label %if.then150, label %if.end152, !dbg !1255457 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4850:3 | Function: innodb_init_params
+  Instruction: %64 = load i64, i64* @srv_log_buffer_size, align 8, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+  Instruction: %rem = urem i64 %64, 512, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+  Instruction: %cmp136 = icmp eq i64 %rem, 0, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+  Instruction: %conv137 = zext i1 %cmp136 to i32, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+  Instruction: %cmp138 = icmp eq i32 0, %conv137, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+  Instruction: %call140 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp138)
+          to label %invoke.cont139 unwind label %lpad2, !dbg !1255447 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+  Instruction: br i1 %call140, label %if.then141, label %if.end143, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4849:3 | Function: innodb_init_params
+
+Implicit Data Flow (1):
+  Instruction: %cond = phi i64 [ %9, %cond.true ], [ %mul9, %cond.false ], !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc:368:23recv_sys_resize_buf
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::realloc_withkey
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::realloc_withkey
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::Count::Count
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::Count::Count
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::Count::Count
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: void log_sync_point
+  Controlled Function: ut_uint64_align_down
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Log_data_block_header::set_lsn
+  Controlled Function: log_block_get_first_rec_group
+  Controlled Function: log_data_block_header_serialize
+  Controlled Function: log_block_store_checksum
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_translate_lsn_to_sn
+  Controlled Function: std::__atomic_base
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_translate_lsn_to_sn
+  Controlled Function: std::__atomic_base
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: __assert_fail
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: unsigned long const& std::max
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innodb_log_checksums_func_update
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innobase_commit_concurrency_init_default
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::info::~info
+  Controlled Function: os_is_o_direct_supported
+  Controlled Function: unlikely
+  Controlled Function: strlen
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: page_size_t::page_size_t
+  Controlled Function: ib::warn::warn
+  Controlled Function: page_size_t::copy_from
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: Tablespace::set_space_id
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fsp_flags_init
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: fsp_flags_set_sdi
+  Controlled Function: ib::warn::~warn
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: fsp_flags_init
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: innodb_buffer_pool_size_init
+  Controlled Function: innodb_undo_tablespaces_deprecate
+  Controlled Function: innodb_redo_log_capacity_init
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: buf_pool_size_align
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: __assert_fail
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: unsigned long const& std::max
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innodb_log_checksums_func_update
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innobase_commit_concurrency_init_default
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::info::~info
+  Controlled Function: os_is_o_direct_supported
+  Controlled Function: unlikely
+  Controlled Function: strlen
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: page_size_t::page_size_t
+  Controlled Function: ib::warn::warn
+  Controlled Function: page_size_t::copy_from
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: Tablespace::set_space_id
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fsp_flags_init
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: fsp_flags_set_sdi
+  Controlled Function: ib::warn::~warn
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: fsp_flags_init
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: innodb_buffer_pool_size_init
+  Controlled Function: innodb_undo_tablespaces_deprecate
+  Controlled Function: innodb_redo_log_capacity_init
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: buf_pool_size_align
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+
+Implicit Control Flow:
+
+----------------------------------------

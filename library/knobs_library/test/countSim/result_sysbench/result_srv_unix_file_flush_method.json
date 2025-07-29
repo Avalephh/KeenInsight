@@ -1,0 +1,18 @@
+[
+    {
+        "knob_name": "srv_unix_file_flush_method",
+        "data_matched_functions": [
+            "Double_write::write_dblwr_pages",
+            "Log_file_handle::fsync",
+            "Double_write::sync_page_flush"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "Log_files_capacity::hard_logical_capacity_for_physical",
+            "log_concurrency_margin",
+            "__errno_location"
+        ],
+        "control_matched_count": 3,
+        "matched_count": 6
+    }
+]

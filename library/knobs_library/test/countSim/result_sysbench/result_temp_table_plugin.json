@@ -1,0 +1,27 @@
+[
+    {
+        "knob_name": "temp_table_plugin",
+        "data_matched_functions": [
+            "EstimateMaterializeCost"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "MEM_ROOT::ClearForReuse",
+            "THD::pop_internal_handler",
+            "bitmap_init",
+            "plugin_unlock",
+            "get_new_handler",
+            "memdup_root",
+            "MEM_ROOT::Clear",
+            "THD::push_internal_handler",
+            "my_free",
+            "KEY_PART_INFO::init_flags",
+            "open_table",
+            "Field::null_offset",
+            "strmake_root",
+            "MEM_ROOT::Alloc"
+        ],
+        "control_matched_count": 14,
+        "matched_count": 15
+    }
+]

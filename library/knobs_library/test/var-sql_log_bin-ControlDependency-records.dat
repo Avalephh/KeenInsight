@@ -1,0 +1,138 @@
+Global Variable: System_variables.69
+Explicit Data Flow (58):
+  Instruction: %1 = load i8, i8* %sql_log_bin, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4360:59 | Function: read_lock_type_for_table
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4360:59 | Function: read_lock_type_for_table
+  Instruction: %2 = phi i1 [ false, %entry ], [ %tobool, %land.rhs ], !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:0:0 | Function: read_lock_type_for_table
+  Instruction: %frombool1 = zext i1 %2 to i8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4360:8 | Function: read_lock_type_for_table
+  Instruction: store i8 %frombool1, i8* %log_on, align 1, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4360:8 | Function: read_lock_type_for_table
+  Instruction: %3 = load i8, i8* %log_on, align 1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4366:7 | Function: read_lock_type_for_table
+  Instruction: %tobool2 = trunc i8 %3 to i1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4366:7 | Function: read_lock_type_for_table
+  Instruction: %conv = zext i1 %tobool2 to i32, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4366:7 | Function: read_lock_type_for_table
+  Instruction: %cmp = icmp eq i32 %conv, 0, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4366:14 | Function: read_lock_type_for_table
+  Instruction: br i1 %cmp, label %if.then, label %lor.lhs.false, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:4366:23 | Function: read_lock_type_for_table
+  Instruction: %15 = load i8, i8* %sql_log_bin, align 8, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1097:17 | Function: THD::init
+  Instruction: %tobool24 = trunc i8 %15 to i1, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1097:17 | Function: THD::init
+  Instruction: br i1 %tobool24, label %if.then25, label %if.else, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1097:7 | Function: THD::init
+  Instruction: %10 = load i8, i8* %sql_log_bin, align 8, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7097:27 | Function: check_binlog_row_value_options
+  Instruction: %tobool = trunc i8 %10 to i1, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7097:27 | Function: check_binlog_row_value_options
+  Instruction: br i1 %tobool, label %if.else9, label %if.then8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7097:11 | Function: check_binlog_row_value_options
+  Instruction: %4 = load i8, i8* %sql_log_bin, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5505:22 | Function: fix_sql_log_bin_after_update
+  Instruction: %tobool = trunc i8 %4 to i1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5505:22 | Function: fix_sql_log_bin_after_update
+  Instruction: br i1 %tobool, label %if.then, label %if.else, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5505:7 | Function: fix_sql_log_bin_after_update
+  Instruction: %2 = load i8, i8* %sql_log_bin, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:183:56 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: %tobool = trunc i8 %2 to i1, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:183:56 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: %frombool = zext i1 %tobool to i8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:183:21 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: store i8 %frombool, i8* %m_saved_sql_log_bin, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:183:21 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: %m_saved_sql_log_bin = getelementptr inbounds %class.Disable_binlog_guard, %class.Disable_binlog_guard* %this1, i32 0, i32 1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:183:21 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: %m_saved_sql_log_bin = getelementptr inbounds %class.Disable_binlog_guard, %class.Disable_binlog_guard* %this1, i32 0, i32 1, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:188:36 | Function: Disable_sql_log_bin_guard::~Disable_sql_log_bin_guard
+  Instruction: %0 = load i8, i8* %m_saved_sql_log_bin, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:188:36 | Function: Disable_sql_log_bin_guard::~Disable_sql_log_bin_guard
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:188:36 | Function: Disable_sql_log_bin_guard::~Disable_sql_log_bin_guard
+  Instruction: %frombool = zext i1 %tobool to i8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:188:34 | Function: Disable_sql_log_bin_guard::~Disable_sql_log_bin_guard
+  Instruction: store i8 %frombool, i8* %sql_log_bin, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:188:34 | Function: Disable_sql_log_bin_guard::~Disable_sql_log_bin_guard
+  Instruction: %sql_log_bin = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 69, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:188:22 | Function: Disable_sql_log_bin_guard::~Disable_sql_log_bin_guard
+  Instruction: %sql_log_bin = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 69, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:734:44 | Function: prepare_transaction_context
+  Instruction: %1 = load i8, i8* %sql_log_bin, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:734:44 | Function: prepare_transaction_context
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:734:44 | Function: prepare_transaction_context
+  Instruction: %frombool = zext i1 %tobool to i8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:734:27 | Function: prepare_transaction_context
+  Instruction: store i8 %frombool, i8* %binlog_enabled, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:734:27 | Function: prepare_transaction_context
+  Instruction: %binlog_enabled = getelementptr inbounds %struct.Trans_context_info, %struct.Trans_context_info* %2, i32 0, i32 0, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:734:12 | Function: prepare_transaction_context
+  Instruction: %binlog_enabled = getelementptr inbounds %struct.Trans_context_info, %struct.Trans_context_info* %1, i32 0, i32 0, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_group_replication.cc:487:16 | Function: get_server_startup_prerequirements
+  Instruction: store i8 %frombool, i8* %binlog_enabled, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_group_replication.cc:487:31 | Function: get_server_startup_prerequirements
+  Instruction: store i8 0, i8* %sql_log_bin3, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:184:32 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: %sql_log_bin3 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables2, i32 0, i32 69, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:184:20 | Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  Instruction: %1 = load i8, i8* %sql_log_bin, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:189:66 | Function: bootstrap::process_iterator
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:189:66 | Function: bootstrap::process_iterator
+  Instruction: %frombool1 = zext i1 %tobool to i8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:189:14 | Function: bootstrap::process_iterator
+  Instruction: store i8 %frombool1, i8* %saved_sql_log_bin, align 1, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:189:14 | Function: bootstrap::process_iterator
+  Instruction: %72 = load i8, i8* %sql_log_bin92, align 8, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:281:5 | Function: bootstrap::process_iterator
+  Instruction: %tobool93 = trunc i8 %72 to i1, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:281:5 | Function: bootstrap::process_iterator
+  Instruction: %conv94 = zext i1 %tobool93 to i32, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:281:5 | Function: bootstrap::process_iterator
+  Instruction: %cmp95 = icmp eq i32 %conv, %conv94, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:281:5 | Function: bootstrap::process_iterator
+  Instruction: %73 = phi i1 [ true, %cond.end ], [ %cmp95, %lor.rhs89 ] | Location: :0:0 | Function: bootstrap::process_iterator
+  Instruction: br i1 %73, label %cond.true97, label %cond.false98, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:281:5 | Function: bootstrap::process_iterator
+  Instruction: %7 = load i8, i8* %sql_log_bin, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6629:59 | Function: get_var_with_binlog
+  Instruction: %tobool = trunc i8 %7 to i1, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6629:59 | Function: get_var_with_binlog
+  Instruction: %8 = phi i1 [ false, %entry ], [ %tobool, %land.rhs ], !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:0:0 | Function: get_var_with_binlog
+  Instruction: %frombool = zext i1 %8 to i8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6629:8 | Function: get_var_with_binlog
+  Instruction: store i8 %frombool, i8* %log_on, align 1, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6629:8 | Function: get_var_with_binlog
+  Instruction: %9 = load i8, i8* %log_on, align 1, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6637:9 | Function: get_var_with_binlog
+  Instruction: %tobool5 = trunc i8 %9 to i1, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6637:9 | Function: get_var_with_binlog
+  Instruction: br i1 %tobool5, label %land.lhs.true, label %if.then, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6637:16 | Function: get_var_with_binlog
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: is_update_query
+  Controlled Function: __assert_fail
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: Key_length_error_handler::~Key_length_error_handler
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Key_length_error_handler::~Key_length_error_handler
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Query_arena::alloc
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: THD::set_query
+  Controlled Function: THD::send_statement_status
+  Controlled Function: next_query_id
+  Controlled Function: THD::set_query_id
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::query
+  Controlled Function: _db_doprnt_
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: THD::query
+  Controlled Function: THD::query
+  Controlled Function: THD::set_time
+  Controlled Function: Parser_state::Parser_state
+  Controlled Function: THD::query
+  Controlled Function: THD::query
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: Parser_state::init
+  Controlled Function: THD::send_statement_status
+  Controlled Function: THD::push_internal_handler
+  Controlled Function: THD::pop_internal_handler
+  Controlled Function: THD::is_error
+  Controlled Function: THD::send_statement_status
+  Controlled Function: std::unique_ptr
+  Controlled Function: my_printf_error
+  Controlled Function: MEM_ROOT::ClearForReuse
+  Controlled Function: __assert_fail
+  Controlled Function: is_update_query
+  Controlled Function: List
+  Controlled Function: user_var_entry::used_query_id
+  Controlled Function: Item::operator new
+  Controlled Function: user_var_entry::used_query_id
+  Controlled Function: MYSQL_BIN_LOG::is_query_in_union
+  Controlled Function: Item_null::Item_null
+  Controlled Function: Item::default_charset
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: DTCollation::set
+  Controlled Function: Item::operator delete
+  Controlled Function: operator new
+  Controlled Function: List
+  Controlled Function: Item::operator new
+  Controlled Function: user_var_entry::set_used_query_id
+  Controlled Function: Prealloced_array
+  Controlled Function: sql_set_variables
+  Controlled Function: set_var_user::set_var_user
+  Controlled Function: Item_func_set_user_var::Item_func_set_user_var
+  Controlled Function: __assert_fail
+  Controlled Function: my_decimal::sanity_check
+  Controlled Function: my_decimal::my_decimal
+  Controlled Function: inline_mysql_mutex_lock
+  Controlled Function: Item::operator delete
+  Controlled Function: get_variable
+  Controlled Function: operator delete
+  Controlled Function: inline_mysql_mutex_unlock
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,275 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::rollback
+int MYSQL_BIN_LOG::rollback(THD *thd, bool all) {
+  int error = 0;
+  bool stuff_logged = false;
+  binlog_cache_mngr *cache_mngr = thd_get_cache_mngr(thd);
+  bool is_empty = false;
+
+  DBUG_TRACE;
+  DBUG_PRINT("enter",
+             ("all: %s, cache_mngr: 0x%llx, thd->is_error: %s", YESNO(all),
+              (ulonglong)cache_mngr, YESNO(thd->is_error())));
+  /*
+    Defer XA-transaction rollback until its XA-rollback event is recorded.
+    When we are executing a ROLLBACK TO SAVEPOINT, we
+    should only clear the caches since this function is called as part
+    of the engine rollback.
+    In other cases we roll back the transaction in the engines early
+    since this will release locks and allow other transactions to
+    start executing.
+  */
+  if (is_xa_rollback(thd)) {
+    auto xs = thd->get_transaction()->xid_state();
+
+    assert(all || !xs->is_binlogged() ||
+           (!xs->is_detached() && thd->is_error()));
+
+    is_empty = !xs->is_binlogged();
+
+    if ((error = this->write_xa_to_cache(thd)) != 0) goto end;
+
+    cache_mngr = thd_get_cache_mngr(thd);
+  } else if (thd->lex->sql_command != SQLCOM_ROLLBACK_TO_SAVEPOINT)
+    if ((error = trx_coordinator::rollback_in_engines(thd, all))) goto end;
+
+  /*
+    If there is no cache manager, or if there is nothing in the
+    caches, there are no caches to roll back, so we're trivially done
+    unless XA-ROLLBACK that yet to run rollback_low().
+  */
+  if (cache_mngr == nullptr || cache_mngr->is_binlog_empty()) {
+    goto end;
+  }
+
+  DBUG_PRINT("debug", ("all.cannot_safely_rollback(): %s, trx_cache_empty: %s",
+                       YESNO(thd->get_transaction()->cannot_safely_rollback(
+                           Transaction_ctx::SESSION)),
+                       YESNO(cache_mngr->trx_cache.is_binlog_empty())));
+  DBUG_PRINT("debug",
+             ("stmt.cannot_safely_rollback(): %s, stmt_cache_empty: %s",
+              YESNO(thd->get_transaction()->cannot_safely_rollback(
+                  Transaction_ctx::STMT)),
+              YESNO(cache_mngr->stmt_cache.is_binlog_empty())));
+
+  /*
+    If an incident event is set we do not flush the content of the statement
+    cache because it may be corrupted.
+  */
+  if (cache_mngr->stmt_cache.has_incident()) {
+    const char *err_msg =
+        "The content of the statement cache is corrupted "
+        "while writing a rollback record of the transaction "
+        "to the binary log.";
+    error = write_incident(thd, true /*need_lock_log=true*/, err_msg);
+    cache_mngr->stmt_cache.reset();
+  } else if (!cache_mngr->stmt_cache.is_binlog_empty()) {
+    if (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+        !thd->lex->query_block->field_list_is_empty() && /* With select */
+        !(thd->lex->create_info->options & HA_LEX_CREATE_TMP_TABLE) &&
+        thd->is_current_stmt_binlog_format_row()) {
+      /*
+        In row based binlog format, we reset the binlog statement cache
+        when rolling back a single statement 'CREATE...SELECT' transaction,
+        since the 'CREATE TABLE' event was put in the binlog statement cache.
+      */
+      cache_mngr->stmt_cache.reset();
+    } else {
+      if ((error = cache_mngr->stmt_cache.finalize(thd))) goto end;
+      stuff_logged = true;
+    }
+  }
+
+  if (ending_trans(thd, all)) {
+    if (trans_cannot_safely_rollback(thd)) {
+      auto xs = thd->get_transaction()->xid_state();
+      std::string query{"ROLLBACK"};
+
+      if (is_xa_rollback(thd)) {
+        /* this block is relevant only for not prepared yet and "local" xa trx
+         */
+        assert(
+            thd->get_transaction()->xid_state()->has_state(XID_STATE::XA_IDLE));
+
+        std::ostringstream oss;
+        oss << "XA ROLLBACK " << *xs->get_xid() << std::flush;
+        query = oss.str();
+      }
+      /*
+        If the transaction is being rolled back and contains changes that
+        cannot be rolled back, the trx-cache's content is flushed.
+      */
+      Query_log_event end_evt(thd, query.data(), query.length(), true, false,
+                              true, 0, true);
+      error = thd->lex->sql_command != SQLCOM_XA_ROLLBACK
+                  ? cache_mngr->trx_cache.finalize(thd, &end_evt)
+                  : cache_mngr->trx_cache.finalize(thd, &end_evt, xs);
+      stuff_logged = true;
+    } else {
+      /*
+        If the transaction is being rolled back and its changes can be
+        rolled back, the trx-cache's content is truncated.
+      */
+      error = cache_mngr->trx_cache.truncate(thd, all);
+
+      DBUG_EXECUTE_IF("ensure_binlog_cache_is_reset", {
+        /* Assert that binlog cache is reset at rollback time. */
+        assert(binlog_cache_is_reset);
+        binlog_cache_is_reset = false;
+      };);
+    }
+  } else {
+    /*
+      If a statement is being rolled back, it is necessary to know
+      exactly why a statement may not be safely rolled back as in
+      some specific situations the trx-cache can be truncated.
+
+      If a temporary table is created or dropped, the trx-cache is not
+      truncated. Note that if the stmt-cache is used, there is nothing
+      to truncate in the trx-cache.
+
+      If a non-transactional table is updated and the binlog format is
+      statement, the trx-cache is not truncated. The trx-cache is used
+      when the direct option is off and a transactional table has been
+      updated before the current statement in the context of the
+      current transaction. Note that if the stmt-cache is used there is
+      nothing to truncate in the trx-cache.
+
+      If other binlog formats are used, updates to non-transactional
+      tables are written to the stmt-cache and trx-cache can be safely
+      truncated, if necessary.
+    */
+    if (thd->get_transaction()->has_dropped_temp_table(Transaction_ctx::STMT) ||
+        thd->get_transaction()->has_created_temp_table(Transaction_ctx::STMT) ||
+        (thd->get_transaction()->has_modified_non_trans_table(
+             Transaction_ctx::STMT) &&
+         thd->variables.binlog_format == BINLOG_FORMAT_STMT)) {
+      /*
+        If the statement is being rolled back and dropped or created a
+        temporary table or modified a non-transactional table and the
+        statement-based replication is in use, the statement's changes
+        in the trx-cache are preserved.
+      */
+      cache_mngr->trx_cache.set_prev_position(MY_OFF_T_UNDEF);
+    } else {
+      /*
+        Otherwise, the statement's changes in the trx-cache are
+        truncated.
+      */
+      error = cache_mngr->trx_cache.truncate(thd, all);
+    }
+  }
+  if (stuff_logged) {
+    Transaction_ctx *trn_ctx = thd->get_transaction();
+    trn_ctx->store_commit_parent(
+        m_dependency_tracker.get_max_committed_timestamp());
+  }
+
+  DBUG_PRINT("debug", ("error: %d", error));
+  if (error == 0 && stuff_logged) {
+    CONDITIONAL_SYNC_POINT_FOR_TIMESTAMP("before_invoke_before_commit_hook");
+    if (RUN_HOOK(
+            transaction, before_commit,
+            (thd, all, thd_get_cache_mngr(thd)->get_trx_cache(),
+             thd_get_cache_mngr(thd)->get_stmt_cache(),
+             max<my_off_t>(max_binlog_cache_size, max_binlog_stmt_cache_size),
+             false))) {
+      // Reset the thread OK status before changing the outcome.
+      if (thd->get_stmt_da()->is_ok())
+        thd->get_stmt_da()->reset_diagnostics_area();
+      my_error(ER_RUN_HOOK_ERROR, MYF(0), "before_commit");
+      return RESULT_ABORTED;
+    }
+    // XA rollback is always accepted.
+    assert(!thd->get_transaction()
+                ->get_rpl_transaction_ctx()
+                ->is_transaction_rollback());
+
+    error = ordered_commit(thd, all, /* skip_commit */ true);
+
+    // Inform hook listeners that a XA ROLLBACK did commit, that
+    // is, did log a transaction to the binary log.
+    if (!error && is_xa_rollback(thd))
+      (void)RUN_HOOK(transaction, after_commit, (thd, all));
+  }
+
+  if (check_write_error(thd)) {
+    /*
+      We reach this point if the effect of a statement did not properly get into
+      a cache and need to be rolled back.
+    */
+    error |= cache_mngr->trx_cache.truncate(thd, all);
+  }
+
+end:
+  // The caches may be empty if an `XA ROLLBACK` was issued just after `XA
+  // END`. In that case, the BCG will not be invoked and we need to
+  // rollback in SEs and finalize GTID state.
+  if (!error && !stuff_logged && is_xa_rollback(thd)) {
+    error = trx_coordinator::rollback_in_engines(thd, all);
+    if (!error && !thd->is_error()) {
+      /*
+        XA-rollback ignores the gtid_state, if the transaciton
+        is empty.
+      */
+      if (is_empty && !thd->slave_thread) gtid_state->update_on_rollback(thd);
+      /*
+        XA-rollback commits the new gtid_state, if transaction
+        is not empty.
+      */
+      else {
+        gtid_state->update_on_commit(thd);
+        /*
+          Inform hook listeners that a XA ROLLBACK did commit, that
+          is, did log a transaction to the binary log.
+        */
+        (void)RUN_HOOK(transaction, after_commit, (thd, all));
+      }
+    }
+  }
+  /*
+    When a statement errors out on auto-commit mode it is rollback
+    implicitly, so the same should happen to its GTID.
+  */
+  if (!thd->in_active_multi_stmt_transaction())
+    gtid_state->update_on_rollback(thd);
+
+  /*
+    TODO: some errors are overwritten, which may cause problem,
+    fix it later.
+  */
+  DBUG_PRINT("return", ("error: %d", error));
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: binlog_cache_mngr::init
+bool init() {
+    return stmt_cache.open(binlog_stmt_cache_size,
+                           max_binlog_stmt_cache_size) ||
+           trx_cache.open(binlog_cache_size, max_binlog_cache_size);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: check_binlog_cache_size
+void check_binlog_cache_size(THD *thd) {
+  if (binlog_cache_size > max_binlog_cache_size) {
+    if (thd) {
+      push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX,
+          ER_THD(thd, ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX),
+          (ulong)binlog_cache_size, (ulong)max_binlog_cache_size);
+    } else {
+      LogErr(WARNING_LEVEL, ER_BINLOG_CACHE_SIZE_TOO_LARGE, binlog_cache_size,
+             (ulong)max_binlog_cache_size);
+    }
+    binlog_cache_size = static_cast<ulong>(max_binlog_cache_size);
+  }
+}
+
+

@@ -1,0 +1,27 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: find_cost_for_ref
+double find_cost_for_ref(const THD *thd, TABLE *table, unsigned keyno,
+                         double num_rows, double worst_seeks) {
+  // Limit the number of matched rows
+  num_rows = std::min(num_rows, double(thd->variables.max_seeks_for_key));
+  //  The costs can be calculated only if the table is materialized.
+  if (table->pos_in_table_list->is_derived_unfinished_materialization()) {
+    return worst_seeks;
+  }
+  if (table->covering_keys.is_set(keyno)) {
+    // We can use only index tree
+    const Cost_estimate index_read_cost =
+        table->file->index_scan_cost(keyno, 1, num_rows);
+    return index_read_cost.total_cost();
+  }
+  if (keyno == table->s->primary_key &&
+      table->file->primary_key_is_clustered()) {
+    const Cost_estimate table_read_cost =
+        table->file->read_cost(keyno, 1, num_rows);
+    return table_read_cost.total_cost();
+  }
+  return min(table->file->page_read_cost(keyno, num_rows), worst_seeks);
+}
+
+

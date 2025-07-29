@@ -1,0 +1,76 @@
+Global Variable: System_variables.81
+Explicit Data Flow (6):
+  Instruction: %10 = load i8, i8* %new_mode, align 2, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:6389:60 | Function: Field_string::sql_type
+  Instruction: %tobool = trunc i8 %10 to i1, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:6389:60 | Function: Field_string::sql_type
+  Instruction: br i1 %tobool, label %cond.false, label %cond.true, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:6389:8 | Function: Field_string::sql_type
+  Instruction: %29 = load i8, i8* %new_mode, align 2, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster.cc:14884:33 | Function: create_table_set_up_partition_info
+  Instruction: %tobool29 = trunc i8 %29 to i1, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster.cc:14884:33 | Function: create_table_set_up_partition_info
+  Instruction: br i1 %tobool29, label %if.end34, label %if.then30, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster.cc:14884:9 | Function: create_table_set_up_partition_info
+
+Implicit Data Flow (1):
+  Instruction: %cond8 = phi i8* [ %cond, %cond.true ], [ %cond7, %cond.false ], !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:6389:8Field_string::sql_type
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Field_string::has_charset
+  Controlled Function: Field_string::has_charset
+  Controlled Function: String::length
+  Controlled Function: _db_pargs_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_enabled_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_doprnt_
+  Controlled Function: NdbDictionary::Column::setName
+  Controlled Function: NdbDictionary::Column::setType
+  Controlled Function: NdbDictionary::Column::setLength
+  Controlled Function: NdbDictionary::Column::setNullable
+  Controlled Function: NdbDictionary::Column::setPrimaryKey
+  Controlled Function: NdbDictionary::Column::setAutoIncrement
+  Controlled Function: NdbDictionary::Table::addColumn
+  Controlled Function: operator new[]
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: my_error
+  Controlled Function: operator new[]
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: my_error
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::setRangeListData
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: _db_pargs_
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::setRangeListData
+  Controlled Function: std::unique_ptr
+  Controlled Function: _db_enabled_
+  Controlled Function: my_error
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::setDefaultNoPartitionsFlag
+  Controlled Function: my_error
+  Controlled Function: _db_doprnt_
+  Controlled Function: NdbDictionary::Table::setLinearFlag
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::getFragmentType
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::setFragmentType
+  Controlled Function: operator new[]
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: List_iterator
+  Controlled Function: my_error
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: __assert_fail
+  Controlled Function: List_iterator
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::setFragmentCount
+  Controlled Function: std::unique_ptr
+  Controlled Function: NdbDictionary::Table::setFragmentData
+  Controlled Function: NdbDictionary::Table::setPartitionBalance
+  Controlled Function: std::unique_ptr
+
+Implicit Control Flow:
+
+----------------------------------------

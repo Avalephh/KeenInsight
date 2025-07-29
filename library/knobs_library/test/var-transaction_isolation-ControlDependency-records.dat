@@ -1,0 +1,154 @@
+Global Variable: System_variables.72
+Explicit Data Flow (26):
+  Instruction: %12 = load i64, i64* %transaction_isolation, align 8, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1087:47 | Function: THD::init
+  Instruction: %conv = trunc i64 %12 to i32, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1087:18 | Function: THD::init
+  Instruction: store i32 %conv, i32* %tx_isolation, align 4, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1087:16 | Function: THD::init
+  Instruction: %tx_isolation = getelementptr inbounds %class.THD, %class.THD* %this1, i32 0, i32 143, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1087:3 | Function: THD::init
+  Instruction: %tx_isolation = getelementptr inbounds %class.THD, %class.THD* %5, i32 0, i32 143, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/transaction_impl.h:135:10 | Function: dd::Transaction_ro::Transaction_ro
+  Instruction: store i32 %4, i32* %tx_isolation, align 4, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/transaction_impl.h:135:23 | Function: dd::Transaction_ro::Transaction_ro
+  Instruction: %tx_isolation = getelementptr inbounds %class.THD, %class.THD* %11, i32 0, i32 143, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:747:32 | Function: prepare_transaction_context
+  Instruction: %12 = load i32, i32* %tx_isolation, align 4, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:747:32 | Function: prepare_transaction_context
+  Instruction: store i32 %12, i32* %tx_isolation5, align 4, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:747:25 | Function: prepare_transaction_context
+  Instruction: %tx_isolation5 = getelementptr inbounds %struct.Trans_context_info, %struct.Trans_context_info* %13, i32 0, i32 11, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:747:12 | Function: prepare_transaction_context
+  Instruction: %2 = load i64, i64* %transaction_isolation, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1188:5 | Function: THD::cleanup_connection
+  Instruction: %cmp = icmp eq i64 %2, 2, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1188:5 | Function: THD::cleanup_connection
+  Instruction: br i1 %cmp, label %cond.true, label %cond.false, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1188:5 | Function: THD::cleanup_connection
+  Instruction: %9 = load i64, i64* %transaction_isolation, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:78:57 | Function: trans_reset_one_shot_chistics
+  Instruction: %conv = trunc i64 %9 to i32, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:78:23 | Function: trans_reset_one_shot_chistics
+  Instruction: store i32 %conv, i32* %tx_isolation, align 4, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:78:21 | Function: trans_reset_one_shot_chistics
+  Instruction: %tx_isolation = getelementptr inbounds %class.THD.35342, %class.THD.35342* %10, i32 0, i32 143, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:78:8 | Function: trans_reset_one_shot_chistics
+  Instruction: %tx_isolation = getelementptr inbounds %class.THD.35342, %class.THD.35342* %64, i32 0, i32 143, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: %65 = load i32, i32* %tx_isolation, align 4, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: %call115 = invoke %struct.PSI_transaction_locker* @_ZL30inline_mysql_start_transactionP31PSI_transaction_locker_state_v1PKvPKyibbPKci(%struct.PSI_transaction_locker_state_v1* %m_transaction_state, i8* null, i64* null, i32 %65, i1 zeroext %tobool113, i1 zeroext false, i8* getelementptr inbounds ([43 x i8], [43 x i8]* @.str.20545, i64 0, i64 0), i32 209)
+          to label %invoke.cont114 unwind label %lpad, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: %573 = load i64, i64* %transaction_isolation, align 8, !dbg !1255915 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4823:28 | Function: Query_log_event::do_apply_event
+  Instruction: %cmp763 = icmp ugt i64 %573, 1, !dbg !1255916 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4823:50 | Function: Query_log_event::do_apply_event
+  Instruction: br i1 %cmp763, label %land.lhs.true764, label %if.end794, !dbg !1255917 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4823:71 | Function: Query_log_event::do_apply_event
+  Instruction: store i64 2, i64* %transaction_isolation, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:4694:42 | Function: Ndb_binlog_index_table_util::remove_rows_for_file
+  Instruction: %transaction_isolation = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 72, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:4694:20 | Function: Ndb_binlog_index_table_util::remove_rows_for_file
+  Instruction: %transaction_isolation = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables762, i32 0, i32 72, !dbg !1255915 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4823:28 | Function: Query_log_event::do_apply_event
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::status
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: Locked_tables_list::locked_tables
+  Controlled Function: __assert_fail
+  Controlled Function: String::String
+  Controlled Function: THD::update_slow_query_status
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: log_slow_statement
+  Controlled Function: THD::query
+  Controlled Function: String::~String
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: Scope_guard
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: ER_THD
+  Controlled Function: Rpl_filter::get_rewrite_db_statistics
+  Controlled Function: Scope_guard
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: String::c_ptr
+  Controlled Function: Rpl_filter_statistics::increase_counter
+  Controlled Function: THD::is_error
+  Controlled Function: Query_log_event::detach_temp_tables_worker
+  Controlled Function: THD::set_catalog
+  Controlled Function: THD::set_db
+  Controlled Function: String::~String
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::query
+  Controlled Function: THD::rewritten_query
+  Controlled Function: THD::query
+  Controlled Function: String::length
+  Controlled Function: _db_pargs_
+  Controlled Function: Query_logger::general_log_write
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::is_error
+  Controlled Function: THD::rewritten_query
+  Controlled Function: String::ptr
+  Controlled Function: _db_doprnt_
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::rewritten_query
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::is_error
+  Controlled Function: String::length
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::is_error
+  Controlled Function: Query_logger::general_log_write
+  Controlled Function: inline_mysql_end_statement
+  Controlled Function: gtid_pre_statement_checks
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::reset_rewritten_query
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: _db_pargs_
+  Controlled Function: MEM_ROOT::ClearForReuse
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: _db_doprnt_
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: THD::db
+  Controlled Function: Rpl_filter::db_ok
+  Controlled Function: concurrency_error_code
+  Controlled Function: ignored_error_code
+  Controlled Function: is_atomic_ddl
+  Controlled Function: concurrency_error_code
+  Controlled Function: _db_pargs_
+  Controlled Function: is_silent_error
+  Controlled Function: THD::is_fatal_error
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: _db_enabled_
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: ignored_error_code
+  Controlled Function: my_error
+  Controlled Function: _db_doprnt_
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: ignored_error_code
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: THD::db
+  Controlled Function: print_slave_db_safe
+  Controlled Function: _db_keyword_
+  Controlled Function: ignored_error_code
+  Controlled Function: ignored_error_code
+  Controlled Function: clear_all_errors
+  Controlled Function: std::atomic
+  Controlled Function: strcmp
+  Controlled Function: ER_THD_NONCONST
+  Controlled Function: ER_THD
+  Controlled Function: strcmp
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: ER_THD_NONCONST
+  Controlled Function: Error_log_throttle::log
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: THD::get_transaction
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: clear_all_errors
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: print_slave_db_safe
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: std::atomic
+
+Implicit Control Flow:
+
+----------------------------------------

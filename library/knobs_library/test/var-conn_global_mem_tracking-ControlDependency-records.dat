@@ -1,0 +1,30 @@
+Global Variable: System_variables.134
+Explicit Data Flow (6):
+  Instruction: %31 = load i8, i8* %conn_global_mem_tracking, align 8, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:196:24 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %tobool49 = trunc i8 %31 to i1, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:196:24 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: br i1 %tobool49, label %land.lhs.true50, label %if.end87, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:196:49 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %2 = load i8, i8* %conn_global_mem_tracking, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:248:24 | Function: Thd_mem_cnt::reset
+  Instruction: %tobool = trunc i8 %2 to i1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:248:24 | Function: Thd_mem_cnt::reset
+  Instruction: br i1 %tobool, label %land.lhs.true, label %if.end20, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:248:49 | Function: Thd_mem_cnt::reset
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: unsigned long long const& std::max
+  Controlled Function: _db_keyword_
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: __assert_fail
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Thd_mem_cnt::generate_error
+
+Implicit Control Flow:
+
+----------------------------------------

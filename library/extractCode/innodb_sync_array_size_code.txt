@@ -1,0 +1,190 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc
+Function: sync_array_init
+/** Create the primary system wait array(s), they are protected by an OS mutex
+ */
+void sync_array_init(ulint n_threads) /*!< in: Number of slots to
+                                      create in all arrays */
+{
+  ut_a(sync_wait_array == nullptr);
+  ut_a(srv_sync_array_size > 0);
+  ut_a(n_threads > 0);
+
+  sync_array_size = srv_sync_array_size;
+
+  sync_wait_array = ut::new_arr_withkey<sync_array_t *>(
+      UT_NEW_THIS_FILE_PSI_KEY, ut::Count{sync_array_size});
+
+  ulint n_slots = 1 + (n_threads - 1) / sync_array_size;
+
+  for (ulint i = 0; i < sync_array_size; ++i) {
+    sync_wait_array[i] =
+        ut::new_withkey<sync_array_t>(UT_NEW_THIS_FILE_PSI_KEY, n_slots);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc
+Function: sync_array_detect_deadlock
+void sync_array_detect_deadlock() {
+  for (ulint i = 0; i < sync_array_size; ++i) {
+    auto arr = sync_wait_array[i];
+    sync_array_enter(arr);
+    ut_d(rw_lock_debug_mutex_enter());
+    ut_a(arr->last_scan % 2 == 0);
+    ++arr->last_scan;
+    size_t count{0};
+    for (size_t i = 0; count < arr->n_reserved; ++i) {
+      auto cell = sync_array_get_nth_cell(arr, i);
+      if (cell->latch.mutex) {
+        ++count;
+        if (cell->last_scan == arr->last_scan + 1) {
+          continue;
+        }
+        ut_a(cell->last_scan != arr->last_scan);
+        sync_array_detect_deadlock(arr, cell, 0);
+      }
+    }
+    ++arr->last_scan;
+    ut_a(arr->last_scan % 2 == 0);
+    ut_d(rw_lock_debug_mutex_exit());
+    sync_array_exit(arr);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc
+Function: sync_arr_wake_threads_if_sema_free
+void sync_arr_wake_threads_if_sema_free(void) {
+  for (ulint i = 0; i < sync_array_size; ++i) {
+    sync_array_wake_threads_if_sema_free_low(sync_wait_array[i]);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc
+Function: sync_array_print_long_waits
+/** Prints warnings of long semaphore waits to stderr.
+ @return true if fatal semaphore wait threshold was exceeded */
+bool sync_array_print_long_waits(
+    std::thread::id *waiter, /*!< out: longest waiting thread */
+    const void **sema)       /*!< out: longest-waited-for semaphore */
+{
+  ulint i;
+  bool fatal = false;
+  bool noticed = false;
+
+  for (i = 0; i < sync_array_size; ++i) {
+    sync_array_t *arr = sync_wait_array[i];
+
+    sync_array_enter(arr);
+
+    if (sync_array_print_long_waits_low(arr, waiter, sema, &noticed)) {
+      fatal = true;
+    }
+
+    sync_array_exit(arr);
+  }
+
+  if (noticed) {
+    fprintf(stderr,
+            "InnoDB: ###### Starts InnoDB Monitor"
+            " for 30 secs to print diagnostic info:\n");
+
+    /* If some crucial semaphore is reserved, then also the InnoDB
+    Monitor can hang, and we do not get diagnostics. Since in
+    many cases an InnoDB hang is caused by a pwrite() or a pread()
+    call hanging inside the operating system, let us print right
+    now the values of pending calls of these. */
+
+    fprintf(stderr, "InnoDB: Pending preads %lu, pwrites %lu\n",
+            (ulong)os_n_pending_reads, (ulong)os_n_pending_writes);
+
+    srv_innodb_needs_monitoring++;
+
+#ifndef UNIV_NO_ERR_MSGS
+    lock_set_timeout_event();
+#endif /* !UNIV_NO_ERR_MSGS */
+
+    std::this_thread::sleep_for(std::chrono::seconds(30));
+
+    srv_innodb_needs_monitoring--;
+    fprintf(stderr,
+            "InnoDB: ###### Diagnostic info printed"
+            " to the standard error stream\n");
+  }
+
+  return (fatal);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc
+Function: sync_array_close
+void sync_array_close(void) {
+  for (ulint i = 0; i < sync_array_size; ++i) {
+    sync_array_free(sync_wait_array[i]);
+  }
+
+  ut::delete_arr(sync_wait_array);
+  sync_wait_array = nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc
+Function: sync_array_print
+void sync_array_print(FILE *file) /*!< in/out: Print to this stream */
+{
+  for (ulint i = 0; i < sync_array_size; ++i) {
+    sync_array_print_info(file, sync_wait_array[i]);
+  }
+
+  fprintf(file, "OS WAIT ARRAY INFO: signal count " ULINTPF "\n", sg_count);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic
+Function: sync_array_get 
+/** Get an instance of the sync wait array.
+ @return an instance of the sync wait array. */
+
+static inline sync_array_t *sync_array_get() {
+  if (sync_array_size <= 1) {
+    return (sync_wait_array[0]);
+  }
+
+  return (
+      sync_wait_array[default_indexer_t<>::get_rnd_index() % sync_array_size]);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic
+Function: sync_array_get_and_reserve_cell 
+static inline sync_array_t *sync_array_get_and_reserve_cell(
+    void *object, ulint type, ut::Location location, sync_cell_t **cell) {
+  sync_array_t *sync_arr = nullptr;
+
+  *cell = nullptr;
+  for (ulint i = 0; i < sync_array_size && *cell == nullptr; ++i) {
+    /* Although the sync_array is get in a random way currently,
+    we still try at most sync_array_size times, in case any
+    of the sync_array we get is full */
+    sync_arr = sync_array_get();
+    *cell = sync_array_reserve_cell(sync_arr, object, type, location);
+  }
+
+  /* This won't be true every time, for the loop above may execute
+  more than srv_sync_array_size times to reserve a cell.
+  But an assertion here makes the code more solid. */
+  ut_a(*cell != nullptr);
+
+  return (sync_arr);
+}
+
+

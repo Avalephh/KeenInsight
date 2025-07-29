@@ -1,0 +1,21 @@
+[
+    {
+        "knob_name": "sql_log_bin",
+        "data_matched_functions": [
+            "read_lock_type_for_table"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "Diagnostics_area::reset_diagnostics_area",
+            "THD::send_statement_status",
+            "THD::set_time",
+            "THD::set_query",
+            "MEM_ROOT::ClearForReuse",
+            "THD::pop_internal_handler",
+            "THD::push_internal_handler",
+            "MEM_ROOT::Alloc"
+        ],
+        "control_matched_count": 8,
+        "matched_count": 9
+    }
+]

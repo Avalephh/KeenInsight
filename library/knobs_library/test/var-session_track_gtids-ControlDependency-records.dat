@@ -1,0 +1,36 @@
+Global Variable: System_variables.103
+Explicit Data Flow (16):
+  Instruction: %3 = load i64, i64* %session_track_gtids, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1658:23 | Function: Session_gtids_tracker::update
+  Instruction: %cmp = icmp ne i64 %3, 0, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1658:43 | Function: Session_gtids_tracker::update
+  Instruction: %conv2 = zext i1 %cmp to i32, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1658:7 | Function: Session_gtids_tracker::update
+  Instruction: %cmp3 = icmp eq i32 %conv, %conv2, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1657:17 | Function: Session_gtids_tracker::update
+  Instruction: br i1 %cmp3, label %if.then, label %if.end, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1657:7 | Function: Session_gtids_tracker::update
+  Instruction: %5 = load i64, i64* %session_track_gtids5, align 8, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1661:30 | Function: Session_gtids_tracker::update
+  Instruction: %cmp6 = icmp ne i64 %5, 0, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1661:50 | Function: Session_gtids_tracker::update
+  Instruction: br i1 %cmp6, label %land.rhs, label %land.end, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1661:77 | Function: Session_gtids_tracker::update
+  Instruction: %1 = load i64, i64* %session_track_gtids, align 8, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:141:47 | Function: Session_consistency_gtids_ctx::update_tracking_activeness_from_session_variable
+  Instruction: store i64 %1, i64* %m_curr_session_track_gtids, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:141:30 | Function: Session_consistency_gtids_ctx::update_tracking_activeness_from_session_variable
+  Instruction: %m_curr_session_track_gtids = getelementptr inbounds %class.Session_consistency_gtids_ctx, %class.Session_consistency_gtids_ctx* %this1, i32 0, i32 4, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:141:3 | Function: Session_consistency_gtids_ctx::update_tracking_activeness_from_session_variable
+  Instruction: %m_curr_session_track_gtids = getelementptr inbounds %class.Session_consistency_gtids_ctx, %class.Session_consistency_gtids_ctx* %this1, i32 0, i32 4, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:44:7 | Function: Session_consistency_gtids_ctx::Session_consistency_gtids_ctx
+  Instruction: store i64 0, i64* %m_curr_session_track_gtids, align 8, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:44:7 | Function: Session_consistency_gtids_ctx::Session_consistency_gtids_ctx
+  Instruction: store i64 0, i64* %session_track_gtids, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:4003:38 | Function: set_slave_thread_options
+  Instruction: %session_track_gtids = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables5, i32 0, i32 103, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:4003:18 | Function: set_slave_thread_options
+  Instruction: %session_track_gtids = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 103, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:141:47 | Function: Session_consistency_gtids_ctx::update_tracking_activeness_from_session_variable
+
+Implicit Data Flow (1):
+  Instruction: %8 = phi i1 [ false, %if.end ], [ %cmp7, %land.rhs ], !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:0:0Session_gtids_tracker::update
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Rpl_thd_context::session_gtids_ctx
+  Controlled Function: Session_consistency_gtids_ctx::register_ctx_change_listener
+  Controlled Function: operator new
+  Controlled Function: Session_gtids_ctx_encoder_string::Session_gtids_ctx_encoder_string
+  Controlled Function: Rpl_thd_context::session_gtids_ctx
+  Controlled Function: Session_consistency_gtids_ctx::register_ctx_change_listener
+  Controlled Function: operator new
+  Controlled Function: Session_gtids_ctx_encoder_string::Session_gtids_ctx_encoder_string
+
+Implicit Control Flow:
+
+----------------------------------------

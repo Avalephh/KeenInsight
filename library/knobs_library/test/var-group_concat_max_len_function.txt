@@ -1,0 +1,252 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_blob::store
+type_conversion_status Field::store(const char *to, size_t length,
+                                    const CHARSET_INFO *cs,
+                                    enum_check_fields check_level) {
+  THD *thd = current_thd;
+  enum_check_fields old_check_level = thd->check_for_truncated_fields;
+  thd->check_for_truncated_fields = check_level;
+  const type_conversion_status res = store(to, length, cs);
+  thd->check_for_truncated_fields = old_check_level;
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::fix_fields
+bool Item_sum::fix_fields(THD *thd, Item **ref [[maybe_unused]]) {
+  assert(fixed == 0);
+  if (m_window != nullptr) {
+    if (m_window_resolved) return false;
+
+    if (Window::resolve_reference(thd, this, &m_window)) return true;
+
+    m_window_resolved = true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::Item_func_group_concat not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::Item_func_group_concat not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::Item_func_group_concat not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::Item_func_group_concat not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::setup
+bool Aggregator_distinct::setup(THD *thd) {
+  endup_done = false;
+  /*
+    Setup can be called twice for ROLLUP items. This is a bug.
+    Please add assert(tree == 0) here when it's fixed.
+  */
+  if (tree || table || tmp_table_param) return false;
+
+  assert(thd->lex->current_query_block() == item_sum->aggr_query_block);
+
+  if (item_sum->setup(thd)) return true;
+  if (item_sum->sum_func() == Item_sum::COUNT_FUNC ||
+      item_sum->sum_func() == Item_sum::COUNT_DISTINCT_FUNC) {
+    mem_root_deque<Item *> list(thd->mem_root);
+    Query_block *query_block = item_sum->aggr_query_block;
+
+    if (!(tmp_table_param = new (thd->mem_root) Temp_table_param)) return true;
+
+    /**
+      Create a table with an unique key over all parameters.
+      If the list contains only const values, const_distinct
+      is set to CONST_NOT_NULL to avoid creation of temp table
+      and thereby counting as count(distinct of const values)
+      will always be 1. If any of these const values is null,
+      const_distinct is set to CONST_NULL to ensure aggregation
+      does not happen.
+     */
+    uint const_items = 0;
+    uint num_args = item_sum->argument_count();
+    assert(num_args);
+    for (uint i = 0; i < num_args; i++) {
+      Item *item = item_sum->get_arg(i);
+      list.push_back(item);
+      if (item->const_item()) {
+        const bool is_null = item->is_null();
+        if (thd->is_error()) return true;  // is_null can fail
+        if (is_null) {
+          const_distinct = CONST_NULL;
+          return false;
+        } else
+          const_items++;
+      }
+    }
+    if (num_args == const_items) {
+      const_distinct = CONST_NOT_NULL;
+      return false;
+    }
+    count_field_types(query_block, tmp_table_param, list, false, false);
+    tmp_table_param->force_copy_fields = item_sum->has_force_copy_fields();
+    assert(table == nullptr);
+    /*
+      Make create_tmp_table() convert BIT columns to BIGINT.
+      This is needed because BIT fields store parts of their data in table's
+      null bits, and we don't have methods to compare two table records, which
+      is needed by Unique which is used when HEAP table is used.
+    */
+    for (Item *item : list) {
+      if (item->type() == Item::FIELD_ITEM &&
+          ((Item_field *)item)->field->type() == FIELD_TYPE_BIT)
+        item->marker = Item::MARKER_BIT;
+      assert(!item->hidden);
+    }
+    if (!(table = create_tmp_table(thd, tmp_table_param, list, nullptr, true,
+                                   false, query_block->active_options(),
+                                   HA_POS_ERROR, "")))
+      return true;
+    table->file->ha_extra(HA_EXTRA_NO_ROWS);  // Don't update rows
+    table->no_rows = true;
+    if (table->hash_field) table->file->ha_index_init(0, false);
+
+    if ((table->s->db_type() == temptable_hton ||
+         table->s->db_type() == heap_hton) &&
+        (table->s->blob_fields == 0)) {
+      /*
+        No blobs:
+        set up a compare function and its arguments to use with Unique.
+      */
+      qsort2_cmp compare_key;
+      void *cmp_arg;
+      Field **field = table->field;
+      Field **field_end = field + table->s->fields;
+      bool all_binary = true;
+
+      for (tree_key_length = 0; field < field_end; ++field) {
+        Field *f = *field;
+        enum enum_field_types type = f->type();
+        tree_key_length += f->pack_length();
+        if ((type == MYSQL_TYPE_VARCHAR) ||
+            (!f->binary() &&
+             (type == MYSQL_TYPE_STRING || type == MYSQL_TYPE_VAR_STRING))) {
+          all_binary = false;
+          break;
+        }
+      }
+      if (all_binary) {
+        cmp_arg = (void *)&tree_key_length;
+        compare_key = simple_raw_key_cmp;
+      } else {
+        if (table->s->fields == 1) {
+          /*
+            If we have only one field, which is the most common use of
+            count(distinct), it is much faster to use a simpler key
+            compare method that can take advantage of not having to worry
+            about other fields.
+          */
+          compare_key = simple_str_key_cmp;
+          cmp_arg = (void *)table->field[0];
+          /* tree_key_length has been set already */
+        } else {
+          uint32 *length;
+          compare_key = composite_key_cmp;
+          cmp_arg = (void *)this;
+          field_lengths =
+              (uint32 *)thd->alloc(table->s->fields * sizeof(uint32));
+          for (tree_key_length = 0, length = field_lengths,
+              field = table->field;
+               field < field_end; ++field, ++length) {
+            *length = (*field)->pack_length();
+            tree_key_length += *length;
+          }
+        }
+      }
+      assert(tree == nullptr);
+      tree = new (thd->mem_root) Unique(compare_key, cmp_arg, tree_key_length,
+                                        item_sum->ram_limitation(thd));
+      /*
+        The only time tree_key_length could be 0 is if someone does
+        count(distinct) on a char(0) field - stupid thing to do,
+        but this has to be handled - otherwise someone can crash
+        the server with a DoS attack
+      */
+      if (!tree) return true;
+    }
+    return false;
+  } else {
+    List<Create_field> field_list;
+    Create_field field_def; /* field definition */
+    Item *arg;
+    DBUG_TRACE;
+    /* It's legal to call setup() more than once when in a subquery */
+    if (tree) return false;
+
+    /*
+      Virtual table and the tree are created anew on each re-execution of
+      PS/SP. Hence all further allocations are performed in the runtime
+      mem_root.
+    */
+    if (field_list.push_back(&field_def)) return true;
+
+    item_sum->set_nullable(true);
+    item_sum->null_value = true;
+    item_sum->allow_group_via_temp_table = false;
+
+    assert(item_sum->get_arg(0)->fixed);
+
+    arg = item_sum->get_arg(0);
+    if (arg->const_item()) {
+      if (arg->update_null_value()) return true;
+      if (arg->null_value) {
+        const_distinct = CONST_NULL;
+        return false;
+      }
+    }
+
+    enum enum_field_types field_type =
+        calc_tmp_field_type(arg->data_type(), arg->result_type());
+
+    field_def.init_for_tmp_table(
+        field_type, arg->max_length,
+        field_type == MYSQL_TYPE_NEWDECIMAL
+            ? min<unsigned int>(arg->decimals, DECIMAL_MAX_SCALE)
+            : arg->decimals,
+        arg->is_nullable(), arg->unsigned_flag, 0);
+
+    if (!(table = create_tmp_table_from_fields(thd, field_list))) return true;
+
+    /* XXX: check that the case of CHAR(0) works OK */
+    tree_key_length = table->s->reclength - table->s->null_bytes;
+
+    /*
+      Unique handles all unique elements in a tree until they can't fit
+      in.  Then the tree is dumped to the temporary file. We can use
+      simple_raw_key_cmp because the table contains numbers only; decimals
+      are converted to binary representation as well.
+    */
+    tree = new (thd->mem_root)
+        Unique(simple_raw_key_cmp, &tree_key_length, tree_key_length,
+               item_sum->ram_limitation(thd));
+
+    return tree == nullptr;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.h
+Function: Item_func_group_concat::Item_func_group_concat not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.h
+Function: Item_func_group_concat::Item_func_group_concat not found.
+

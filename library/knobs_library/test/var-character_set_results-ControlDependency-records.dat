@@ -1,0 +1,51 @@
+Global Variable: System_variables.89
+Explicit Data Flow (22):
+  Instruction: store %struct.CHARSET_INFO* %2, %struct.CHARSET_INFO** %character_set_results4, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2013:40 | Function: set_var_collation_client::update
+  Instruction: %character_set_results4 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables3, i32 0, i32 89, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2013:18 | Function: set_var_collation_client::update
+  Instruction: %character_set_results = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables15, i32 0, i32 89, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:340:18 | Function: ndb_create_thd
+  Instruction: store %struct.CHARSET_INFO* %23, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:340:40 | Function: ndb_create_thd
+  Instruction: %character_set_results = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 89, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1178:47 | Function: net_send_error_packet
+  Instruction: %9 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1178:47 | Function: net_send_error_packet
+  Instruction: %call5 = call zeroext i1 @_ZL21net_send_error_packetP3NETjPKcS2_bmPK12CHARSET_INFO(%struct.NET* %call1, i32 %1, i8* %2, i8* %3, i1 zeroext %call2, i64 %call4, %struct.CHARSET_INFO* %9), !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1174:10 | Function: net_send_error_packet
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2826:51 | Function: THD::send_result_metadata
+  Instruction: %call5 = invoke zeroext i1 %5(%class.Protocol* %0, i32 %conv, i32 %2, %struct.CHARSET_INFO* %3)
+          to label %invoke.cont4 unwind label %lpad2, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2825:19 | Function: THD::send_result_metadata
+  Instruction: store %struct.CHARSET_INFO* %15, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:413:42 | Function: thd_init_client_charset
+  Instruction: %character_set_results = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables9, i32 0, i32 89, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:413:20 | Function: thd_init_client_charset
+  Instruction: store %struct.CHARSET_INFO* %20, %struct.CHARSET_INFO** %character_set_results19, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:422:42 | Function: thd_init_client_charset
+  Instruction: %character_set_results19 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables18, i32 0, i32 89, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:422:20 | Function: thd_init_client_charset
+  Instruction: %2 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:3951:43 | Function: Protocol_local::store_string
+  Instruction: store %struct.CHARSET_INFO* %2, %struct.CHARSET_INFO** %dst_cs, align 8, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:3951:10 | Function: Protocol_local::store_string
+  Instruction: %6 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %dst_cs, align 8, !dbg !1255418 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:3952:44 | Function: Protocol_local::store_string
+  Instruction: %call = call zeroext i1 @_ZN14Protocol_local12store_stringEPKcmPK12CHARSET_INFOS4_(%class.Protocol_local* %this1, i8* %3, i64 %4, %struct.CHARSET_INFO* %5, %struct.CHARSET_INFO* %6), !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:3952:10 | Function: Protocol_local::store_string
+  Instruction: %16 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/srv_session.cc:1149:37 | Function: Srv_session::execute_command
+  Instruction: %cmp36 = icmp ne %struct.CHARSET_INFO* %16, %17, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/srv_session.cc:1149:59 | Function: Srv_session::execute_command
+  Instruction: br i1 %cmp36, label %land.lhs.true37, label %if.end43, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/srv_session.cc:1149:72 | Function: Srv_session::execute_command
+  Instruction: %2 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_results, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3271:54 | Function: Protocol_classic::send_field_metadata
+  Instruction: store %struct.CHARSET_INFO* %2, %struct.CHARSET_INFO** %thd_charset, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3271:23 | Function: Protocol_classic::send_field_metadata
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: thd_init_client_charset
+  Controlled Function: Protocol_callback::Protocol_callback
+  Controlled Function: THD::push_protocol
+  Controlled Function: mysql_audit_release
+  Controlled Function: Protocol_callback::~Protocol_callback
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: mysql_thread_set_secondary_engine
+  Controlled Function: __assert_fail
+  Controlled Function: THD::pop_protocol
+  Controlled Function: THD::db
+  Controlled Function: THD::get_protocol
+  Controlled Function: THD::db
+  Controlled Function: THD::charset
+  Controlled Function: __assert_fail
+  Controlled Function: inline_mysql_start_statement
+  Controlled Function: Protocol_callback::~Protocol_callback
+
+Implicit Control Flow:
+
+----------------------------------------

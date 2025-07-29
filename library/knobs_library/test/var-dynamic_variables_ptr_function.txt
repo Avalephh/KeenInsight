@@ -1,0 +1,451 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: cleanup_variables
+static void cleanup_variables(THD *thd, struct System_variables *vars) {
+  if (thd) {
+    /* Block the Performance Schema from accessing THD::variables. */
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    plugin_var_memalloc_free(&thd->variables);
+    /* Remove references to session_sysvar_res_mgr memory before freeing it. */
+    thd->variables.track_sysvars_ptr = nullptr;
+    thd->session_sysvar_res_mgr.deinit();
+  }
+  assert(vars->table_plugin == nullptr);
+  assert(vars->temp_table_plugin == nullptr);
+
+  my_free(vars->dynamic_variables_ptr);
+  vars->dynamic_variables_ptr = nullptr;
+  vars->dynamic_variables_size = 0;
+  vars->dynamic_variables_version = 0;
+
+  if (thd) mysql_mutex_unlock(&thd->LOCK_thd_data);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_bool
+static bool *mysql_sys_var_bool(THD *thd, int offset) {
+  return (bool *)intern_sys_var_ptr(thd, offset, true);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_int
+static int *mysql_sys_var_int(THD *thd, int offset) {
+  return (int *)intern_sys_var_ptr(thd, offset, true);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_uint not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_uint not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_uint not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_ulong not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_ulong not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_ulong not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_ulonglong not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_ulonglong not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_ulonglong not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_str
+static char **mysql_sys_var_str(THD *thd, int offset) {
+  return (char **)intern_sys_var_ptr(thd, offset, true);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: mysql_sys_var_double
+static double *mysql_sys_var_double(THD *thd, int offset) {
+  return (double *)intern_sys_var_ptr(thd, offset, true);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: plugin_vars_free_values
+  Unlike plugin_vars_free_values() it frees all variables of all plugins,
+  it's used on shutdown.
+*/
+static void cleanup_variables(THD *thd, struct System_variables *vars) {
+  if (thd) {
+    /* Block the Performance Schema from accessing THD::variables. */
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    plugin_var_memalloc_free(&thd->variables);
+    /* Remove references to session_sysvar_res_mgr memory before freeing it. */
+    thd->variables.track_sysvars_ptr = nullptr;
+    thd->session_sysvar_res_mgr.deinit();
+  }
+  assert(vars->table_plugin == nullptr);
+  assert(vars->temp_table_plugin == nullptr);
+
+  my_free(vars->dynamic_variables_ptr);
+  vars->dynamic_variables_ptr = nullptr;
+  vars->dynamic_variables_size = 0;
+  vars->dynamic_variables_version = 0;
+
+  if (thd) mysql_mutex_unlock(&thd->LOCK_thd_data);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: alloc_and_copy_thd_dynamic_variables
+void alloc_and_copy_thd_dynamic_variables(THD *thd, bool global_lock) {
+  mysql_mutex_assert_not_owner(&LOCK_plugin);
+  mysql_rwlock_rdlock(&LOCK_system_variables_hash);
+
+  if (global_lock) mysql_mutex_lock(&LOCK_global_system_variables);
+
+  mysql_mutex_assert_owner(&LOCK_global_system_variables);
+
+  /*
+    MAINTAINER:
+    The following assert is wrong on purpose, useful to debug
+    when thd dynamic variables are expanded:
+    assert(thd->variables.dynamic_variables_ptr == NULL);
+  */
+
+  thd->variables.dynamic_variables_ptr = (char *)my_realloc(
+      key_memory_THD_variables, thd->variables.dynamic_variables_ptr,
+      global_variables_dynamic_size, MYF(MY_WME | MY_FAE | MY_ALLOW_ZERO_PTR));
+
+  /*
+    Debug hook which allows tests to check that this code is not
+    called for InnoDB after connection was created.
+  */
+  DBUG_EXECUTE_IF("verify_innodb_thdvars", assert(0););
+
+  memcpy(thd->variables.dynamic_variables_ptr +
+             thd->variables.dynamic_variables_size,
+         global_system_variables.dynamic_variables_ptr +
+             thd->variables.dynamic_variables_size,
+         global_system_variables.dynamic_variables_size -
+             thd->variables.dynamic_variables_size);
+
+  /*
+    Iterate through newly copied vars of string type with MEMALLOC
+    flag and strdup value.
+  */
+  for (const auto &key_and_value :
+       *malloced_string_type_sysvars_bookmark_hash) {
+    sys_var_pluginvar *pi;
+    sys_var *var;
+    int varoff;
+    char **thdvar, **sysvar;
+    st_bookmark *v = key_and_value.second;
+
+    if (v->version <= thd->variables.dynamic_variables_version ||
+        !(var = intern_find_sys_var(v->key + 1, v->name_len)) ||
+        var->check_if_sensitive_in_context(thd) ||
+        !(pi = var->cast_pluginvar()) ||
+        v->key[0] != (pi->plugin_var->flags & PLUGIN_VAR_TYPEMASK))
+      continue;
+
+    varoff = *(int *)(pi->plugin_var + 1);
+    thdvar = (char **)(thd->variables.dynamic_variables_ptr + varoff);
+    sysvar = (char **)(global_system_variables.dynamic_variables_ptr + varoff);
+    *thdvar = nullptr;
+    plugin_var_memalloc_session_update(thd, nullptr, thdvar, *sysvar);
+  }
+
+  if (global_lock) mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  thd->variables.dynamic_variables_version =
+      global_system_variables.dynamic_variables_version;
+  thd->variables.dynamic_variables_head =
+      global_system_variables.dynamic_variables_head;
+  thd->variables.dynamic_variables_size =
+      global_system_variables.dynamic_variables_size;
+
+  mysql_rwlock_unlock(&LOCK_system_variables_hash);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: plugin_thdvar_init
+void plugin_thdvar_init(THD *thd, bool enable_plugins) {
+  plugin_ref old_table_plugin = thd->variables.table_plugin;
+  plugin_ref old_temp_table_plugin = thd->variables.temp_table_plugin;
+  DBUG_TRACE;
+
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+  cleanup_variables(thd, &thd->variables);
+
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  thd->variables = global_system_variables;
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+
+  thd->variables.dynamic_variables_version = 0;
+  thd->variables.dynamic_variables_size = 0;
+  thd->variables.dynamic_variables_ptr = nullptr;
+
+  if (enable_plugins) {
+    mysql_mutex_lock(&LOCK_plugin);
+    thd->variables.table_plugin =
+        my_intern_plugin_lock(nullptr, global_system_variables.table_plugin);
+    intern_plugin_unlock(nullptr, old_table_plugin);
+    thd->variables.temp_table_plugin = my_intern_plugin_lock(
+        nullptr, global_system_variables.temp_table_plugin);
+    intern_plugin_unlock(nullptr, old_temp_table_plugin);
+    mysql_mutex_unlock(&LOCK_plugin);
+  }
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  /* Initialize all Sys_var_charptr variables here. */
+
+  // @@session.session_track_system_variables
+  thd->session_sysvar_res_mgr.init(&thd->variables.track_sysvars_ptr);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: intern_sys_var_ptr
+uchar *intern_sys_var_ptr(THD *thd, int offset, bool global_lock) {
+  assert(offset >= 0);
+  assert((uint)offset <= global_system_variables.dynamic_variables_head);
+
+  if (!thd)
+    return (uchar *)global_system_variables.dynamic_variables_ptr + offset;
+
+  /*
+    dynamic_variables_head points to the largest valid offset
+  */
+  if (!thd->variables.dynamic_variables_ptr ||
+      (uint)offset > thd->variables.dynamic_variables_head) {
+    /* Current THD only. Don't trigger resync on remote THD. */
+    if (current_thd == thd)
+      alloc_and_copy_thd_dynamic_variables(thd, global_lock);
+    else
+      return (uchar *)global_system_variables.dynamic_variables_ptr + offset;
+  }
+
+  return (uchar *)thd->variables.dynamic_variables_ptr + offset;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::real_value_ptr
+uchar *sys_var_pluginvar::real_value_ptr(THD *thd, enum_var_type type) {
+  assert(thd || (type == OPT_GLOBAL) || (type == OPT_PERSIST));
+  if (plugin_var->flags & PLUGIN_VAR_THDLOCAL) {
+    /* scope of OPT_PERSIST is always GLOBAL */
+    if (type == OPT_GLOBAL || type == OPT_PERSIST) thd = nullptr;
+
+    return intern_sys_var_ptr(thd, *(int *)(plugin_var + 1), false);
+  }
+  return *(uchar **)(plugin_var + 1);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::session_update
+bool sys_var_pluginvar::session_update(THD *thd, set_var *var) {
+  bool rc = false;
+  assert(!is_readonly());
+  assert(plugin_var->flags & PLUGIN_VAR_THDLOCAL);
+  assert(thd == current_thd);
+
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  void *tgt = real_value_ptr(thd, var->type);
+  const void *src = var->value ? (void *)&var->save_result
+                               : (void *)real_value_ptr(thd, OPT_GLOBAL);
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  if ((plugin_var->flags & PLUGIN_VAR_TYPEMASK) == PLUGIN_VAR_STR &&
+      plugin_var->flags & PLUGIN_VAR_MEMALLOC)
+    rc = plugin_var_memalloc_session_update(thd, plugin_var,
+                                            static_cast<char **>(tgt),
+                                            *static_cast<char *const *>(src));
+  else
+    plugin_var->update(thd, plugin_var, tgt, src);
+
+  return rc;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::global_update
+bool sys_var_pluginvar::global_update(THD *thd, set_var *var) {
+  bool rc = false;
+  assert(!is_readonly());
+  mysql_mutex_assert_owner(&LOCK_global_system_variables);
+
+  void *tgt = real_value_ptr(thd, var->type);
+  const void *src = &var->save_result;
+
+  if (!var->value) {
+    switch (plugin_var->flags & (PLUGIN_VAR_TYPEMASK | PLUGIN_VAR_THDLOCAL)) {
+      case PLUGIN_VAR_INT:
+        src = &((sysvar_uint_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_LONG:
+        src = &((sysvar_ulong_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_LONGLONG:
+        src = &((sysvar_ulonglong_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_ENUM:
+        src = &((sysvar_enum_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_SET:
+        src = &((sysvar_set_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_BOOL:
+        src = &((sysvar_bool_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_STR:
+        src = &((sysvar_str_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_DOUBLE:
+        src = &((sysvar_double_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_INT | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_uint_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_LONG | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_ulong_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_LONGLONG | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_ulonglong_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_ENUM | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_enum_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_SET | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_set_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_BOOL | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_bool_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_STR | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_str_t *)plugin_var)->def_val;
+        break;
+      case PLUGIN_VAR_DOUBLE | PLUGIN_VAR_THDLOCAL:
+        src = &((thdvar_double_t *)plugin_var)->def_val;
+        break;
+      default:
+        assert(0);
+    }
+  }
+
+  if ((plugin_var->flags & PLUGIN_VAR_TYPEMASK) == PLUGIN_VAR_STR &&
+      plugin_var->flags & PLUGIN_VAR_MEMALLOC) {
+    rc = plugin_var_memalloc_global_update(thd, plugin_var,
+                                           static_cast<char **>(tgt),
+                                           *static_cast<char *const *>(src));
+  } else {
+    plugin_var->update(thd, plugin_var, tgt, src);
+    return (thd->is_error() ? 1 : 0);
+  }
+
+  return rc;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.h
+Function: sys_var_pluginvar::session_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.h
+Function: sys_var_pluginvar::session_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.h
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.h
+Function: sys_var_pluginvar::do_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.h
+Function: sys_var_pluginvar::global_value_ptr not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.h
+Function: sys_var_pluginvar::global_value_ptr not found.
+

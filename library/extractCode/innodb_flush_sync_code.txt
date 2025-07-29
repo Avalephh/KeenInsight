@@ -1,0 +1,487 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc
+Function: log_request_sync_flush
+static bool log_request_sync_flush(const log_t &log, lsn_t new_oldest) {
+  if (log_test != nullptr) {
+    return false;
+  }
+
+  /* A flush is urgent: we have to do a synchronous flush,
+  because the oldest dirty page is too old.
+
+  Note, that this could fire even if we did not run out
+  of space in log files (users still may write to redo). */
+
+  if (new_oldest == LSN_MAX
+      /* Forced flush request is processed by page_cleaner, if
+      it's not active, then we must do flush ourselves. */
+      || !buf_flush_page_cleaner_is_active()
+      /* Reason unknown. */
+      || srv_is_being_started) {
+    buf_flush_sync_all_buf_pools();
+
+    return true;
+
+  } else if (srv_flush_sync) {
+    /* Wake up page cleaner asking to perform sync flush
+    (unless user explicitly disabled sync-flushes). */
+
+    int64_t sig_count = os_event_reset(buf_flush_tick_event);
+
+    os_event_set(buf_flush_event);
+
+    /* Wait until flush is finished or timeout happens. This is to delay
+    furious checkpoint writing when sync flush is active. However, if the
+    log_writer entered its extra_margin, it's better to be more aggressive
+    with checkpoint writing, because the problem very likely is related to
+    missing log_free_check() calls and oldest dirt page being also the newest
+    page that was modified and can't be flushed due to missing space in redo.
+    In such case, it is very desired to move checkpoint forward even a little
+    bit. If there is a sequence of such pages, then it becomes problematic and
+    we would better not delay the checkpointing that much.
+
+    The log.m_writer_inside_extra_margin is read without mutex protection for
+    performance reasons (not to keep the mutex acquired when waiting below).
+    In case of torn read or race, in the worst case we would use different
+    timeout than the desired one. It doesn't affect correctness. */
+
+    const auto time_to_wait_ms = log.m_writer_inside_extra_margin ? 1 : 1000;
+
+    os_event_wait_time_low(buf_flush_tick_event,
+                           std::chrono::milliseconds{time_to_wait_ms},
+                           sig_count);
+
+    return true;
+
+  } else {
+    return false;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: buf_flush_page_coordinator_thread
+static void buf_flush_page_coordinator_thread() {
+  auto loop_start_time = std::chrono::steady_clock::now();
+  ulint n_flushed = 0;
+  ulint last_activity = srv_get_activity_count();
+  ulint last_pages = 0;
+
+  THD *thd = create_internal_thd();
+
+#ifdef UNIV_LINUX
+  /* linux might be able to set different setting for each thread.
+  worth to try to set high priority for page cleaner threads */
+  if (buf_flush_page_cleaner_set_priority(buf_flush_page_cleaner_priority)) {
+    ib::info(ER_IB_MSG_126) << "page_cleaner coordinator priority: "
+                            << buf_flush_page_cleaner_priority;
+  } else {
+    ib::info(ER_IB_MSG_127) << "If the mysqld execution user is authorized,"
+                               " page cleaner thread priority can be changed."
+                               " See the man page of setpriority().";
+  }
+#endif /* UNIV_LINUX */
+
+  /* We start from 1 because the coordinator thread is part of the
+  same set */
+  for (size_t i = 1; i < srv_threads.m_page_cleaner_workers_n; ++i) {
+    srv_threads.m_page_cleaner_workers[i] = os_thread_create(
+        page_flush_thread_key, i, buf_flush_page_cleaner_thread);
+
+    srv_threads.m_page_cleaner_workers[i].start();
+  }
+
+  while (!srv_read_only_mode &&
+         srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP &&
+         recv_sys->spaces != nullptr) {
+    /* treat flushing requests during recovery. */
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+
+    os_event_wait(recv_sys->flush_start);
+
+    if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP ||
+        recv_sys->spaces == nullptr) {
+      break;
+    }
+
+    switch (recv_sys->flush_type) {
+      case BUF_FLUSH_LRU:
+        /* Flush pages from end of LRU if required */
+        pc_request(0, LSN_MAX);
+        while (pc_flush_slot() > 0) {
+        }
+        pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+        break;
+
+      case BUF_FLUSH_LIST:
+        /* Flush all pages */
+        do {
+          pc_request(ULINT_MAX, LSN_MAX);
+          while (pc_flush_slot() > 0) {
+          }
+        } while (!pc_wait_finished(&n_flushed_lru, &n_flushed_list));
+        break;
+
+      default:
+        ut_d(ut_error);
+    }
+
+    os_event_reset(recv_sys->flush_start);
+    os_event_set(recv_sys->flush_end);
+  }
+
+  os_event_wait(buf_flush_event);
+
+  ulint ret_sleep = 0;
+  ulint n_evicted = 0;
+  ulint n_flushed_last = 0;
+  ulint warn_interval = 1;
+  ulint warn_count = 0;
+  bool is_sync_flush = false;
+  bool was_server_active = true;
+  int64_t sig_count = os_event_reset(buf_flush_event);
+
+  while (srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP) {
+    /* We consider server active if either we have just discovered a first
+    activity after a period of inactive server, or we are after the period
+    of active server in which case, it could be just the beginning of the
+    next period, so there is no reason to consider it idle yet.
+    The withdrawing blocks process when shrinking the buffer pool always
+    needs the page_cleaner activity. So, we consider server is active
+    during the withdrawing blocks process also. */
+
+    bool is_withdrawing = false;
+    for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+      buf_pool_t *buf_pool = buf_pool_from_array(i);
+      if (buf_get_withdraw_depth(buf_pool) > 0) {
+        is_withdrawing = true;
+        break;
+      }
+    }
+
+    const bool is_server_active = is_withdrawing || was_server_active ||
+                                  srv_check_activity(last_activity);
+
+    /* The page_cleaner skips sleep if the server is
+    idle and there are no pending IOs in the buffer pool
+    and there is work to do. */
+    if ((is_server_active || buf_get_n_pending_read_ios() || n_flushed == 0) &&
+        !is_sync_flush) {
+      ret_sleep = pc_sleep_if_needed(loop_start_time + std::chrono::seconds{1},
+                                     sig_count);
+
+      if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP) {
+        break;
+      }
+    } else if (std::chrono::steady_clock::now() >
+               loop_start_time + std::chrono::seconds{1}) {
+      ret_sleep = OS_SYNC_TIME_EXCEEDED;
+    } else {
+      ret_sleep = 0;
+    }
+
+    sig_count = os_event_reset(buf_flush_event);
+
+    if (ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+      const auto curr_time = std::chrono::steady_clock::now();
+
+      if (curr_time > loop_start_time + std::chrono::seconds{4}) {
+        if (warn_count == 0) {
+          auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+              curr_time - loop_start_time);
+
+          ib::info(ER_IB_MSG_128)
+              << "Page cleaner took " << diff_ms.count() << "ms to flush "
+              << n_flushed_last << " and evict " << n_evicted << " pages";
+
+          if (warn_interval > 300) {
+            warn_interval = 600;
+          } else {
+            warn_interval *= 2;
+          }
+
+          warn_count = warn_interval;
+        } else {
+          --warn_count;
+        }
+      } else {
+        /* reset counter */
+        warn_interval = 1;
+        warn_count = 0;
+      }
+
+      loop_start_time = curr_time;
+      n_flushed_last = n_evicted = 0;
+
+      was_server_active = srv_check_activity(last_activity);
+      last_activity = srv_get_activity_count();
+    }
+
+    lsn_t lsn_limit;
+    if (srv_flush_sync && !srv_read_only_mode) {
+      /* lsn_limit!=0 means there are requests. needs to check the lsn. */
+      lsn_limit = log_sync_flush_lsn(*log_sys);
+      if (lsn_limit != 0) {
+        /* Avoid aggressive sync flush beyond limit when redo is disabled. */
+        if (mtr_t::s_logging.is_enabled()) {
+          lsn_limit += Adaptive_flush::lsn_avg_rate * buf_flush_lsn_scan_factor;
+        }
+        is_sync_flush = true;
+      } else {
+        /* Stop the sync flush. */
+        is_sync_flush = false;
+      }
+    } else {
+      is_sync_flush = false;
+      lsn_limit = LSN_MAX;
+    }
+
+    if (!srv_read_only_mode && mtr_t::s_logging.is_enabled() &&
+        ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+      /* For smooth page flushing along with WAL,
+      flushes log as much as possible. */
+      log_sys->recent_written.advance_tail();
+      auto wait_stats = log_write_up_to(
+          *log_sys, log_buffer_ready_for_write_lsn(*log_sys), true);
+      MONITOR_INC_WAIT_STATS_EX(MONITOR_ON_LOG_, _PAGE_WRITTEN, wait_stats);
+    }
+
+    if (is_sync_flush || is_server_active) {
+      ulint n_to_flush;
+
+      /* Estimate pages from flush_list to be flushed */
+      if (is_sync_flush) {
+        ut_a(lsn_limit > 0);
+        ut_a(lsn_limit < LSN_MAX);
+        n_to_flush =
+            Adaptive_flush::page_recommendation(last_pages, true, lsn_limit);
+        last_pages = 0;
+        /* Flush n_to_flush pages or stop if you reach lsn_limit earlier.
+        This is because in sync-flush mode we want finer granularity of
+        flushes through all BP instances. */
+      } else if (ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+        n_to_flush =
+            Adaptive_flush::page_recommendation(last_pages, false, LSN_MAX);
+        lsn_limit = LSN_MAX;
+        last_pages = 0;
+      } else {
+        n_to_flush = 0;
+        lsn_limit = 0;
+      }
+
+      /* Request flushing for threads */
+      pc_request(n_to_flush, lsn_limit);
+
+      const auto flush_start = std::chrono::steady_clock::now();
+
+      /* Coordinator also treats requests */
+      while (pc_flush_slot() > 0) {
+        /* No op */
+      }
+
+      /* only coordinator is using these counters,
+      so no need to protect by lock. */
+      page_cleaner->flush_time +=
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - flush_start);
+      page_cleaner->flush_pass++;
+
+      /* Wait for all slots to be finished */
+      ulint n_flushed_lru = 0;
+      ulint n_flushed_list = 0;
+
+      pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+      if (n_flushed_list > 0 || n_flushed_lru > 0) {
+        buf_flush_stats(n_flushed_list, n_flushed_lru);
+      }
+
+      if (n_to_flush != 0) {
+        last_pages = n_flushed_list;
+      }
+
+      n_evicted += n_flushed_lru;
+      n_flushed_last += n_flushed_list;
+
+      n_flushed = n_flushed_lru + n_flushed_list;
+
+      if (is_sync_flush) {
+        MONITOR_INC_VALUE_CUMULATIVE(
+            MONITOR_FLUSH_SYNC_TOTAL_PAGE, MONITOR_FLUSH_SYNC_COUNT,
+            MONITOR_FLUSH_SYNC_PAGES, n_flushed_lru + n_flushed_list);
+      } else {
+        if (n_flushed_lru) {
+          MONITOR_INC_VALUE_CUMULATIVE(
+              MONITOR_LRU_BATCH_FLUSH_TOTAL_PAGE, MONITOR_LRU_BATCH_FLUSH_COUNT,
+              MONITOR_LRU_BATCH_FLUSH_PAGES, n_flushed_lru);
+        }
+        if (n_flushed_list) {
+          MONITOR_INC_VALUE_CUMULATIVE(
+              MONITOR_FLUSH_ADAPTIVE_TOTAL_PAGE, MONITOR_FLUSH_ADAPTIVE_COUNT,
+              MONITOR_FLUSH_ADAPTIVE_PAGES, n_flushed_list);
+        }
+      }
+
+    } else if (ret_sleep == OS_SYNC_TIME_EXCEEDED && srv_idle_flush_pct) {
+      /* no activity, slept enough */
+      buf_flush_lists(PCT_IO(srv_idle_flush_pct), LSN_MAX, &n_flushed);
+
+      n_flushed_last += n_flushed;
+
+      if (n_flushed) {
+        MONITOR_INC_VALUE_CUMULATIVE(MONITOR_FLUSH_BACKGROUND_TOTAL_PAGE,
+                                     MONITOR_FLUSH_BACKGROUND_COUNT,
+                                     MONITOR_FLUSH_BACKGROUND_PAGES, n_flushed);
+      }
+
+    } else {
+      /* no activity, but woken up by event */
+      n_flushed = 0;
+    }
+
+    ut_d(buf_flush_page_cleaner_disabled_loop());
+  }
+
+  /* This is just for test scenarios. */
+  srv_thread_delay_cleanup_if_needed(thd);
+
+  ut_ad(srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP);
+
+  if (srv_fast_shutdown == 2 ||
+      srv_shutdown_state.load() == SRV_SHUTDOWN_EXIT_THREADS) {
+    /* In very fast shutdown or when innodb failed to start, we
+    simulate a crash of the buffer pool. We are not required to do
+    any flushing. */
+    goto thread_exit;
+  }
+
+  /* In case of normal and slow shutdown the page_cleaner thread
+  must wait for all other activity in the server to die down.
+  Note that we can start flushing the buffer pool as soon as the
+  server enters shutdown phase but we must stay alive long enough
+  to ensure that any work done by the master or purge threads is
+  also flushed.
+  During shutdown we pass through three stages. In the first stage,
+  when SRV_SHUTDOWN_CLEANUP is set other threads like the master
+  and the purge threads may be working as well. We start flushing
+  the buffer pool but can't be sure that no new pages are being
+  dirtied until we enter SRV_SHUTDOWN_FLUSH_PHASE phase which is
+  the last phase (meanwhile we visit SRV_SHUTDOWN_MASTER_STOP).
+
+  Note, that if we are handling fatal error, we set the state
+  directly to EXIT_THREADS in which case we also might exit the loop
+  below, but still some new dirty pages could be arriving...
+  In such case we just want to stop and don't care about the new pages.
+  However we need to be careful not to crash (e.g. in assertions). */
+
+  do {
+    pc_request(ULINT_MAX, LSN_MAX);
+
+    while (pc_flush_slot() > 0) {
+    }
+
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+    pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+    n_flushed = n_flushed_lru + n_flushed_list;
+
+    /* We sleep only if there are no pages to flush */
+    if (n_flushed == 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  } while (srv_shutdown_state.load() < SRV_SHUTDOWN_FLUSH_PHASE);
+
+  /* At this point all threads including the master and the purge
+  thread must have been closed, unless we are handling some error
+  during initialization of InnoDB (srv_init_abort). In such case
+  we could have SRV_SHUTDOWN_EXIT_THREADS set directly from the
+  srv_shutdown_exit_threads(). */
+  if (srv_shutdown_state.load() != SRV_SHUTDOWN_EXIT_THREADS) {
+    /* We could have srv_shutdown_state.load() >= FLUSH_PHASE only
+    when either: shutdown started or init is being aborted. In the
+    first case we would have FLUSH_PHASE and keep waiting until
+    this thread is alive before we switch to LAST_PHASE.
+
+    In the second case, we would jump to EXIT_THREADS from NONE,
+    so we would not enter here. */
+    ut_a(!srv_is_being_started);
+    ut_a(srv_shutdown_state.load() == SRV_SHUTDOWN_FLUSH_PHASE);
+
+    ut_a(!srv_master_thread_is_active());
+    if (!srv_read_only_mode) {
+      ut_a(!srv_purge_threads_active());
+      ut_a(!srv_thread_is_active(srv_threads.m_dict_stats));
+      ut_a(!srv_thread_is_active(srv_threads.m_ts_alter_encrypt));
+    }
+  }
+
+  /* We can now make a final sweep on flushing the buffer pool
+  and exit after we have cleaned the whole buffer pool.
+  It is important that we wait for any running batch that has
+  been triggered by us to finish. Otherwise we can end up
+  considering end of that batch as a finish of our final
+  sweep and we'll come out of the loop leaving behind dirty pages
+  in the flush_list */
+  buf_flush_wait_batch_end(nullptr, BUF_FLUSH_LIST);
+  buf_flush_wait_LRU_batch_end();
+
+  bool success;
+  bool are_any_read_ios_still_underway;
+
+  do {
+    /* If there are any read operations pending, they can result in the ibuf
+    merges and a dirtying page after the read is completed. If there are any
+    IO reads running before we run the flush loop, we risk having some dirty
+    pages after flushing reports n_flushed == 0. The ibuf change merging on
+    page results in dirtying the page and is followed by decreasing the
+    n_pend_reads counter, thus it's safe to check it before flush loop and
+    have guarantees if it was seen with value of 0. These reads could be issued
+    in the previous stage(s), the srv_master thread on shutdown tasks clear the
+    ibuf unless it's the fast shutdown. */
+    are_any_read_ios_still_underway = buf_get_n_pending_read_ios() > 0;
+    pc_request(ULINT_MAX, LSN_MAX);
+
+    while (pc_flush_slot() > 0) {
+    }
+
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+    success = pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+    n_flushed = n_flushed_lru + n_flushed_list;
+
+    buf_flush_wait_batch_end(nullptr, BUF_FLUSH_LIST);
+    buf_flush_wait_LRU_batch_end();
+
+  } while (!success || n_flushed > 0 || are_any_read_ios_still_underway);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    ut_a(UT_LIST_GET_LEN(buf_pool->flush_list) == 0);
+  }
+
+  /* Mark that it is safe to recover as we have already flushed all dirty
+  pages in buffer pools. */
+  if (mtr_t::s_logging.is_disabled() && !srv_read_only_mode) {
+    log_persist_crash_safe(*log_sys);
+  }
+  log_crash_safe_validate(*log_sys);
+
+  /* We have lived our life. Time to die. */
+
+thread_exit:
+  /* All worker threads are waiting for the event here,
+  and no more access to page_cleaner structure by them.
+  Wakes worker threads up just to make them exit. */
+  page_cleaner->is_running = false;
+  os_event_set(page_cleaner->is_requested);
+
+  buf_flush_page_cleaner_close();
+
+  destroy_internal_thd(thd);
+}
+
+

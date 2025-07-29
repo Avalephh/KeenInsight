@@ -1,0 +1,96 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: is_xa_tran_detached_on_prepare
+inline bool is_xa_tran_detached_on_prepare(const THD *thd) {
+  return thd->variables.xa_detach_on_prepare;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_temporary_table
+    open_temporary_table() must be used to open temporary tables.
+    A derived table cannot be opened with this.
+  */
+  assert(table_list->is_view() || table_list->table == nullptr);
+
+  /* an open table operation needs a lot of the stack space */
+  if (check_stack_overrun(thd, STACK_MIN_SIZE_FOR_OPEN, (uchar *)&alias))
+    return true;
+
+  // New DD- In current_thd->is_strict_mode() mode we call open_table
+  // on new DD tables like mysql.tables/* when CREATE fails and we
+  // try to abort the operation and invoke quick_rm_table().
+  // Currently, we ignore deleting table in strict mode. Need to fix this.
+  // TODO.
+
+  DBUG_EXECUTE_IF("kill_query_on_open_table_from_tz_find", {
+    /*
+      When on calling my_tz_find the following
+      tables are opened in specified order: time_zone_name,
+      time_zone, time_zone_transition_type,
+      time_zone_transition. Emulate killing a query
+      on opening the second table in the list.
+    */
+    if (!strcmp("time_zone", table_list->table_name))
+      thd->killed = THD::KILL_QUERY;
+  });
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/xa.cc
+Function: applier_reset_xa_trans
+bool applier_reset_xa_trans(THD *thd) {
+  DBUG_TRACE;
+  Transaction_ctx *trn_ctx = thd->get_transaction();
+
+  if (!is_xa_tran_detached_on_prepare(thd)) {
+    XID_STATE *xid_state = trn_ctx->xid_state();
+
+    if (MDL_context_backup_manager::instance().create_backup(
+            &thd->mdl_context, xid_state->get_xid()->key(),
+            xid_state->get_xid()->key_length()))
+      return true;
+
+    /*
+      In the following the server transaction state gets reset for
+      a slave applier thread similarly to xa_commit logics
+      except commit does not run.
+    */
+    thd->variables.option_bits &= ~OPTION_BEGIN;
+    trn_ctx->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+    thd->server_status &= ~SERVER_STATUS_IN_TRANS;
+    /* Server transaction ctx is detached from THD */
+    xa::Transaction_cache::detach(trn_ctx);
+    xid_state->reset();
+  }
+  /*
+     The current engine transactions is detached from THD, and
+     previously saved is restored.
+  */
+  attach_native_trx(thd);
+  trn_ctx->set_ha_trx_info(Transaction_ctx::SESSION, nullptr);
+  trn_ctx->set_no_2pc(Transaction_ctx::SESSION, false);
+  trn_ctx->cleanup();
+#ifdef HAVE_PSI_TRANSACTION_INTERFACE
+  thd->m_transaction_psi = nullptr;
+#endif
+  thd->mdl_context.release_transactional_locks();
+  /*
+    On client sessions a XA PREPARE will always be followed by a XA COMMIT
+    or a XA ROLLBACK, and both statements will reset the tx isolation level
+    and access mode when the statement is finishing a transaction.
+
+    For replicated workload it is possible to have other transactions between
+    the XA PREPARE and the XA [COMMIT|ROLLBACK].
+
+    So, if the slave applier changed the current transaction isolation level,
+    it needs to be restored to the session default value after having the
+    XA transaction prepared.
+  */
+  trans_reset_one_shot_chistics(thd);
+
+  return thd->is_error();
+}
+
+

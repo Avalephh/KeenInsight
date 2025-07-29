@@ -1,0 +1,474 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_self_write_up_to not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_self_write_up_to not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_self_write_up_to not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_self_write_up_to not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_self_write_up_to not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc
+Function: log_buffer_s_lock_wait
+static inline void log_buffer_s_lock_wait(log_t &log, const sn_t start_sn) {
+  int64_t signal_count = 0;
+  uint32_t i = 0;
+
+  if (log.sn_locked.load(std::memory_order_acquire) <= start_sn) {
+    do {
+      if (srv_spin_wait_delay) {
+        ut_delay(ut::random_from_interval_fast(0, srv_spin_wait_delay));
+      }
+      if (i < srv_n_spin_wait_rounds) {
+        i++;
+      } else {
+        signal_count = os_event_reset(log.sn_lock_event);
+        if ((log.sn.load(std::memory_order_acquire) & SN_LOCKED) == 0 ||
+            log.sn_locked.load(std::memory_order_acquire) > start_sn) {
+          break;
+        }
+        os_event_wait_time_low(log.sn_lock_event, std::chrono::seconds{1},
+                               signal_count);
+      }
+    } while ((log.sn.load(std::memory_order_acquire) & SN_LOCKED) != 0 &&
+             log.sn_locked.load(std::memory_order_acquire) <= start_sn);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc
+Function: log_buffer_x_lock_enter
+void log_buffer_x_lock_enter(log_t &log) {
+  log_sync_point("log_buffer_x_lock_enter_before_lock");
+
+#ifdef UNIV_PFS_RWLOCK
+  PSI_rwlock_locker *locker = nullptr;
+  PSI_rwlock_locker_state state;
+  if (log.pfs_psi != nullptr) {
+    if (log.pfs_psi->m_enabled) {
+      /* Record the acquisition of a read-write lock in exclusive
+      mode in performance schema */
+      locker = PSI_RWLOCK_CALL(start_rwlock_wrwait)(
+          &state, log.pfs_psi, PSI_RWLOCK_EXCLUSIVELOCK, __FILE__,
+          static_cast<uint>(__LINE__));
+    }
+  }
+#endif /* UNIV_PFS_RWLOCK */
+
+  /* locks log.sn_locked value */
+  mutex_enter(&(log.sn_x_lock_mutex));
+
+  /* locks log.sn value */
+  sn_t sn = log.sn.load(std::memory_order_acquire);
+  sn_t sn_locked;
+  do {
+    ut_ad((sn & SN_LOCKED) == 0);
+    sn_locked = sn | SN_LOCKED;
+    /* needs to update log.sn_locked before log.sn */
+    /* Indicates x-locked sn value */
+    log.sn_locked.store(sn, std::memory_order_relaxed);
+  } while (
+      !log.sn.compare_exchange_weak(sn, sn_locked, std::memory_order_acq_rel));
+
+  /* Some s-lockers might wait for the new log.sn_locked value. */
+  os_event_set(log.sn_lock_event);
+
+  if (sn > 0) {
+    /* redo log system has been started */
+    const lsn_t current_lsn = log_translate_sn_to_lsn(sn);
+    lsn_t closed_lsn = log_buffer_dirty_pages_added_up_to_lsn(log);
+    uint32_t i = 0;
+    /* must wait for closed_lsn == current_lsn */
+    while (i < srv_n_spin_wait_rounds && closed_lsn < current_lsn) {
+      if (srv_spin_wait_delay) {
+        ut_delay(ut::random_from_interval_fast(0, srv_spin_wait_delay));
+      }
+      i++;
+      closed_lsn = log_buffer_dirty_pages_added_up_to_lsn(log);
+    }
+    if (closed_lsn < current_lsn) {
+      log.recent_closed.advance_tail();
+      closed_lsn = log_buffer_dirty_pages_added_up_to_lsn(log);
+    }
+    if (closed_lsn < current_lsn) {
+      std::this_thread::yield();
+      closed_lsn = log_buffer_dirty_pages_added_up_to_lsn(log);
+    }
+    while (closed_lsn < current_lsn) {
+      std::this_thread::sleep_for(std::chrono::microseconds(20));
+      log.recent_closed.advance_tail();
+      closed_lsn = log_buffer_dirty_pages_added_up_to_lsn(log);
+    }
+  }
+
+  ut_d(
+      rw_lock_add_debug_info(log.sn_lock_inst, 0, RW_LOCK_X, UT_LOCATION_HERE));
+#ifdef UNIV_PFS_RWLOCK
+  if (locker != nullptr) {
+    PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+  }
+#endif /* UNIV_PFS_RWLOCK */
+
+  log_sync_point("log_buffer_x_lock_enter_after_lock");
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/lock/lock0lock.cc
+Function: lock_trx_release_locks
+void lock_trx_release_locks(trx_t *trx) /*!< in/out: transaction */
+{
+  DEBUG_SYNC_C("before_lock_trx_release_locks");
+
+  trx_mutex_enter(trx);
+
+  check_trx_state(trx);
+  ut_ad(trx_state_eq(trx, TRX_STATE_COMMITTED_IN_MEMORY));
+  ut_ad(!trx->in_rw_trx_list);
+
+  if (trx_is_referenced(trx)) {
+    while (trx_is_referenced(trx)) {
+      trx_mutex_exit(trx);
+
+      DEBUG_SYNC_C("waiting_trx_is_not_referenced");
+
+      /** Doing an implicit to explicit conversion
+      should not be expensive. */
+      ut_delay(ut::random_from_interval_fast(0, srv_spin_wait_delay));
+
+      trx_mutex_enter(trx);
+    }
+  }
+
+  ut_ad(!trx_is_referenced(trx));
+  trx_mutex_exit(trx);
+
+  while (!locksys::try_release_all_locks(trx)) {
+    std::this_thread::yield();
+  }
+
+  /* We don't free the locks one by one for efficiency reasons.
+  We simply empty the heap one go. Similarly we reset n_rec_locks count to 0.
+  At this point there should be no one else interested in our trx's
+  locks as we've released and removed all of them, and the trx is no longer
+  referenced so nobody will attempt implicit to explicit conversion neither.
+  Please note that we are either the thread which runs the transaction, or we
+  are the thread of a high priority transaction which decided to kill trx, in
+  which case it had to first make sure that it is no longer running in InnoDB.
+  So no race is expected to happen.
+  All that being said, it does not cost us anything in terms of performance to
+  protect these operations with trx->mutex, which makes some class of errors
+  impossible even if the above reasoning was wrong. */
+  trx_mutex_enter(trx);
+  trx->lock.n_rec_locks.store(0);
+
+  ut_a(UT_LIST_GET_LEN(trx->lock.trx_locks) == 0);
+  ut_a(ib_vector_is_empty(trx->lock.autoinc_locks));
+
+  mem_heap_empty(trx->lock.lock_heap);
+  trx_mutex_exit(trx);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_s_lock_spin
+void rw_lock_s_lock_spin(rw_lock_t *lock, ulint pass, ut::Location location) {
+  ulint i = 0; /* spin round count */
+  sync_array_t *sync_arr;
+  uint64_t count_os_wait = 0;
+
+  /* We reuse the thread id to index into the counter, cache
+  it here for efficiency. */
+
+  ut_ad(rw_lock_validate(lock));
+
+lock_loop:
+
+  /* Spin waiting for the writer field to become free */
+  os_rmb;
+  while (i < srv_n_spin_wait_rounds && lock->lock_word <= 0) {
+    if (srv_spin_wait_delay) {
+      ut_delay(ut::random_from_interval_fast(0, srv_spin_wait_delay));
+    }
+
+    i++;
+  }
+
+  if (i >= srv_n_spin_wait_rounds) {
+    std::this_thread::yield();
+  }
+
+  /* We try once again to obtain the lock */
+  if (rw_lock_s_lock_low(lock, pass, location)) {
+    if (count_os_wait > 0) {
+      lock->count_os_wait += static_cast<uint32_t>(count_os_wait);
+    }
+
+    return; /* Success */
+  } else {
+    if (i < srv_n_spin_wait_rounds) {
+      goto lock_loop;
+    }
+
+    ++count_os_wait;
+
+    sync_cell_t *cell;
+
+    sync_arr =
+        sync_array_get_and_reserve_cell(lock, RW_LOCK_S, location, &cell);
+
+    /* Set waiters before checking lock_word to ensure wake-up
+    signal is sent. This may lead to some unnecessary signals. */
+    rw_lock_set_waiter_flag(lock);
+
+    if (rw_lock_s_lock_low(lock, pass, location)) {
+      sync_array_free_cell(sync_arr, cell);
+
+      if (count_os_wait > 0) {
+        lock->count_os_wait += static_cast<uint32_t>(count_os_wait);
+      }
+
+      return; /* Success */
+    }
+
+    /* see comments in trx_commit_low() to
+    before_trx_state_committed_in_memory explaining
+    this care to invoke the following sync check.*/
+#ifdef UNIV_DEBUG
+    if (lock->get_level() != SYNC_DICT_OPERATION) {
+      DEBUG_SYNC_C("rw_s_lock_waiting");
+    }
+#endif
+    sync_array_wait_event(sync_arr, cell);
+
+    i = 0;
+
+    goto lock_loop;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_x_lock_func
+void rw_lock_x_lock_func(rw_lock_t *lock, ulint pass, ut::Location location) {
+  ulint i = 0;
+  sync_array_t *sync_arr;
+  uint64_t count_os_wait = 0;
+  bool spinning = false;
+
+  ut_ad(rw_lock_validate(lock));
+  ut_ad(!rw_lock_own(lock, RW_LOCK_S));
+
+lock_loop:
+
+  if (rw_lock_x_lock_low(lock, pass, location.filename, location.line)) {
+    if (count_os_wait > 0) {
+      lock->count_os_wait += static_cast<uint32_t>(count_os_wait);
+    }
+
+    /* Locking succeeded */
+    return;
+
+  } else {
+    if (!spinning) {
+      spinning = true;
+    }
+
+    /* Spin waiting for the lock_word to become free */
+    os_rmb;
+    while (i < srv_n_spin_wait_rounds && lock->lock_word <= X_LOCK_HALF_DECR) {
+      if (srv_spin_wait_delay) {
+        ut_delay(ut::random_from_interval_fast(0, srv_spin_wait_delay));
+      }
+
+      i++;
+    }
+
+    if (i >= srv_n_spin_wait_rounds) {
+      std::this_thread::yield();
+
+    } else {
+      goto lock_loop;
+    }
+  }
+
+  sync_cell_t *cell;
+
+  sync_arr = sync_array_get_and_reserve_cell(lock, RW_LOCK_X, location, &cell);
+
+  /* Waiters must be set before checking lock_word, to ensure signal
+  is sent. This could lead to a few unnecessary wake-up signals. */
+  rw_lock_set_waiter_flag(lock);
+
+  if (rw_lock_x_lock_low(lock, pass, location.filename, location.line)) {
+    sync_array_free_cell(sync_arr, cell);
+
+    if (count_os_wait > 0) {
+      lock->count_os_wait += static_cast<uint32_t>(count_os_wait);
+    }
+
+    /* Locking succeeded */
+    return;
+  }
+
+  ++count_os_wait;
+
+  sync_array_wait_event(sync_arr, cell);
+
+  i = 0;
+
+  goto lock_loop;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_x_lock_wait_func not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_x_lock_wait_func not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_x_lock_wait_func not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_x_lock_wait_func not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_x_lock_wait_func not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc
+Function: rw_lock_sx_lock_func
+void rw_lock_sx_lock_func(rw_lock_t *lock, ulint pass, ut::Location location) {
+  ulint i = 0;
+  sync_array_t *sync_arr;
+  uint64_t count_os_wait = 0;
+
+  ut_ad(rw_lock_validate(lock));
+  ut_ad(!rw_lock_own(lock, RW_LOCK_S));
+
+lock_loop:
+
+  if (rw_lock_sx_lock_low(lock, pass, location)) {
+    if (count_os_wait > 0) {
+      lock->count_os_wait += static_cast<uint32_t>(count_os_wait);
+    }
+
+    /* Locking succeeded */
+    return;
+
+  } else {
+    /* Spin waiting for the lock_word to become free */
+    os_rmb;
+    while (i < srv_n_spin_wait_rounds && lock->lock_word <= X_LOCK_HALF_DECR) {
+      if (srv_spin_wait_delay) {
+        ut_delay(ut::random_from_interval_fast(0, srv_spin_wait_delay));
+      }
+
+      i++;
+    }
+
+    if (i >= srv_n_spin_wait_rounds) {
+      std::this_thread::yield();
+
+    } else {
+      goto lock_loop;
+    }
+  }
+
+  sync_cell_t *cell;
+
+  sync_arr = sync_array_get_and_reserve_cell(lock, RW_LOCK_SX, location, &cell);
+
+  /* Waiters must be set before checking lock_word, to ensure signal
+  is sent. This could lead to a few unnecessary wake-up signals. */
+  rw_lock_set_waiter_flag(lock);
+
+  if (rw_lock_sx_lock_low(lock, pass, location)) {
+    sync_array_free_cell(sync_arr, cell);
+
+    if (count_os_wait > 0) {
+      lock->count_os_wait += static_cast<uint32_t>(count_os_wait);
+    }
+
+    /* Locking succeeded */
+    return;
+  }
+
+  ++count_os_wait;
+
+  sync_array_wait_event(sync_arr, cell);
+
+  i = 0;
+
+  goto lock_loop;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: Fil_shard::acquire
+  void acquire(int line) const {
+#ifndef UNIV_HOTBACKUP
+    m_mutex.enter(srv_n_spin_wait_rounds, srv_spin_wait_delay, __FILE__, line);
+#else
+    mutex_enter(&m_mutex);
+#endif /* !UNIV_HOTBACKUP */
+  }
+
+

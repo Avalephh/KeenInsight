@@ -1,0 +1,33 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_week::itemize
+bool Item_func_week::itemize(Parse_context *pc, Item **res) {
+  if (skip_itemize(res)) return false;
+  if (args[1] == nullptr) {
+    THD *thd = pc->thd;
+    args[1] = new (pc->mem_root)
+        Item_int(NAME_STRING("0"), thd->variables.default_week_format, 1);
+    if (args[1] == nullptr) return true;
+  }
+  return super::itemize(pc, res);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_extract::val_int
+longlong Item_func_period_add::val_int() {
+  assert(fixed == 1);
+  longlong period = args[0]->val_int();
+  if ((null_value = args[0]->null_value)) return 0;
+  longlong months = args[1]->val_int();
+  if ((null_value = args[1]->null_value)) return 0;
+
+  if (!valid_period(period)) {
+    my_error(ER_WRONG_ARGUMENTS, MYF(0), func_name());
+    return error_int();
+  }
+  return convert_month_to_period(convert_period_to_month(period) + months);
+}
+
+

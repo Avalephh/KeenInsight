@@ -1,0 +1,28 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: binlog_cache_mngr::init
+bool init() {
+    return stmt_cache.open(binlog_stmt_cache_size,
+                           max_binlog_stmt_cache_size) ||
+           trx_cache.open(binlog_cache_size, max_binlog_cache_size);
+  }
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: check_binlog_cache_size
+void check_binlog_cache_size(THD *thd) {
+  if (binlog_cache_size > max_binlog_cache_size) {
+    if (thd) {
+      push_warning_printf(
+          thd, Sql_condition::SL_WARNING, ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX,
+          ER_THD(thd, ER_BINLOG_CACHE_SIZE_GREATER_THAN_MAX),
+          (ulong)binlog_cache_size, (ulong)max_binlog_cache_size);
+    } else {
+      LogErr(WARNING_LEVEL, ER_BINLOG_CACHE_SIZE_TOO_LARGE, binlog_cache_size,
+             (ulong)max_binlog_cache_size);
+    }
+    binlog_cache_size = static_cast<ulong>(max_binlog_cache_size);
+  }
+}
+
+

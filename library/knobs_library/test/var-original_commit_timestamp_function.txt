@@ -1,0 +1,367 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::set_original_commit_timestamp_for_slave_thread
+void THD::set_original_commit_timestamp_for_slave_thread() {
+  /*
+    This function may be called in four cases:
+
+    - From SQL thread while executing Gtid_log_event::do_apply_event
+
+    - From an mts worker thread that executes a Gtid_log_event::do_apply_event.
+
+    - From an mts worker thread that is processing an old binlog that
+      is missing Gtid events completely, from gtid_pre_statement_checks().
+
+    - From a normal client thread that is executing output from
+      mysqlbinlog when mysqlbinlog is processing an old binlog file
+      that is missing Gtid events completely, from
+      gtid_pre_statement_checks() for a statement that appears after a
+      BINLOG statement containing a Format_description_log_event
+      originating from the master.
+
+    Because of the last case, we need to add the following conditions to set
+    original_commit_timestamp.
+  */
+  if (system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+      system_thread == SYSTEM_THREAD_SLAVE_WORKER) {
+    rli_slave->original_commit_timestamp = variables.original_commit_timestamp;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::write_transaction
+bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
+                                      Binlog_event_writer *writer) {
+  DBUG_TRACE;
+
+  /*
+    The GTID for the THD was assigned at
+    assign_automatic_gtids_to_flush_group()
+  */
+  assert(thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS ||
+         thd->owned_gtid.sidno > 0);
+
+  int64 sequence_number, last_committed;
+  /* Generate logical timestamps for MTS */
+  m_dependency_tracker.get_dependency(thd, sequence_number, last_committed);
+
+  /*
+    In case both the transaction cache and the statement cache are
+    non-empty, both will be flushed in sequence and logged as
+    different transactions. Then the second transaction must only
+    be executed after the first one has committed. Therefore, we
+    need to set last_committed for the second transaction equal to
+    last_committed for the first transaction. This is done in
+    binlog_cache_data::flush. binlog_cache_data::flush uses the
+    condition trn_ctx->last_committed==SEQ_UNINIT to detect this
+    situation, hence the need to set it here.
+  */
+  thd->get_transaction()->last_committed = SEQ_UNINIT;
+
+  /*
+    For delayed replication and also for the purpose of lag monitoring,
+    we assume that the commit timestamp of the transaction is the time of
+    executing this code (the time of writing the Gtid_log_event to the binary
+    log).
+  */
+  ulonglong immediate_commit_timestamp = my_micro_time();
+
+  /*
+    When the original_commit_timestamp session variable is set to a value
+    other than UNDEFINED_COMMIT_TIMESTAMP, it means that either the timestamp
+    is known ( > 0 ) or the timestamp is not known ( == 0 ).
+  */
+  ulonglong original_commit_timestamp =
+      thd->variables.original_commit_timestamp;
+  /*
+    When original_commit_timestamp == UNDEFINED_COMMIT_TIMESTAMP, we assume
+    that:
+    a) it is not known if this thread is a slave applier ( = 0 );
+    b) this is a new transaction ( = immediate_commit_timestamp);
+  */
+  if (original_commit_timestamp == UNDEFINED_COMMIT_TIMESTAMP) {
+    /*
+      When applying a transaction using replication, assume that the
+      original commit timestamp is not known (the transaction wasn't
+      originated on the current server).
+    */
+    if (thd->slave_thread || thd->is_binlog_applier()) {
+      original_commit_timestamp = 0;
+    } else
+    /* Assume that this transaction is original from this server */
+    {
+      DBUG_EXECUTE_IF("rpl_invalid_gtid_timestamp",
+                      // add one our to the commit timestamps
+                      immediate_commit_timestamp += 3600000000;);
+      original_commit_timestamp = immediate_commit_timestamp;
+    }
+  } else {
+    // Clear the session variable to have cleared states for next transaction.
+    thd->variables.original_commit_timestamp = UNDEFINED_COMMIT_TIMESTAMP;
+  }
+
+  uint32_t trx_immediate_server_version =
+      do_server_version_int(::server_version);
+  // Clear the session variable to have cleared states for next transaction.
+  thd->variables.immediate_server_version = UNDEFINED_SERVER_VERSION;
+  DBUG_EXECUTE_IF("fixed_server_version",
+                  trx_immediate_server_version = 888888;);
+  DBUG_EXECUTE_IF("gr_fixed_server_version",
+                  trx_immediate_server_version = 777777;);
+
+  /*
+    When the original_server_version session variable is set to a value
+    other than UNDEFINED_SERVER_VERSION, it means that either the
+    server version is known or the server_version is not known
+    (UNKNOWN_SERVER_VERSION).
+  */
+  uint32_t trx_original_server_version = thd->variables.original_server_version;
+
+  /*
+    When original_server_version == UNDEFINED_SERVER_VERSION, we assume
+    that:
+    a) it is not known if this thread is a slave applier ( = 0 );
+    b) this is a new transaction ( = ::server_version);
+  */
+  if (trx_original_server_version == UNDEFINED_SERVER_VERSION) {
+    /*
+      When applying a transaction using replication, assume that the
+      original server version is not known (the transaction wasn't
+      originated on the current server).
+    */
+    if (thd->slave_thread || thd->is_binlog_applier()) {
+      trx_original_server_version = UNKNOWN_SERVER_VERSION;
+    } else
+    /* Assume that this transaction is original from this server */
+    {
+      trx_original_server_version = trx_immediate_server_version;
+    }
+  } else {
+    // Clear the session variable to have cleared states for next transaction.
+    thd->variables.original_server_version = UNDEFINED_SERVER_VERSION;
+  }
+  Gtid_log_event gtid_event(
+      thd, cache_data->is_trx_cache(), last_committed, sequence_number,
+      cache_data->may_have_sbr_stmts(), original_commit_timestamp,
+      immediate_commit_timestamp, trx_original_server_version,
+      trx_immediate_server_version);
+
+  // Set the transaction length, based on cache info
+  gtid_event.set_trx_length_by_cache_size(cache_data->get_byte_position(),
+                                          writer->is_checksum_enabled(),
+                                          cache_data->get_event_counter());
+
+  DBUG_PRINT("debug", ("cache_data->get_byte_position()= %llu",
+                       cache_data->get_byte_position()));
+  DBUG_PRINT("debug", ("cache_data->get_event_counter()= %lu",
+                       static_cast<ulong>(cache_data->get_event_counter())));
+  DBUG_PRINT("debug", ("writer->is_checksum_enabled()= %s",
+                       YESNO(writer->is_checksum_enabled())));
+  DBUG_PRINT("debug", ("gtid_event.get_event_length()= %lu",
+                       static_cast<ulong>(gtid_event.get_event_length())));
+  DBUG_PRINT("info",
+             ("transaction_length= %llu", gtid_event.transaction_length));
+
+  bool ret = gtid_event.write(writer);
+  if (ret) goto end;
+
+  /*
+    finally write the transaction data, if it was not compressed
+    and written as part of the gtid event already
+  */
+  ret = mysql_bin_log.write_cache(thd, cache_data, writer);
+
+  if (!ret) {
+    // update stats if monitoring is active
+    binlog::global_context.monitoring_context()
+        .transaction_compression()
+        .update(binlog::monitoring::log_type::BINARY,
+                cache_data->get_compression_type(), thd->owned_gtid,
+                gtid_event.immediate_commit_timestamp,
+                cache_data->get_compressed_size(),
+                cache_data->get_decompressed_size());
+  }
+
+end:
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: Trans_delegate::before_commit
+int Trans_delegate::before_commit(THD *thd, bool all,
+                                  Binlog_cache_storage *trx_cache_log,
+                                  Binlog_cache_storage *stmt_cache_log,
+                                  ulonglong cache_log_max_size,
+                                  bool is_atomic_ddl_arg) {
+  DBUG_TRACE;
+  Trans_param param;
+  TRANS_PARAM_ZERO(param);
+  param.server_id = thd->server_id;
+  param.server_uuid = server_uuid;
+  param.thread_id = thd->thread_id();
+  param.gtid_info.type = thd->variables.gtid_next.type;
+  param.gtid_info.sidno = thd->variables.gtid_next.gtid.sidno;
+  param.gtid_info.gno = thd->variables.gtid_next.gtid.gno;
+  param.trx_cache_log = trx_cache_log;
+  param.stmt_cache_log = stmt_cache_log;
+  param.cache_log_max_size = cache_log_max_size;
+  param.original_commit_timestamp = &thd->variables.original_commit_timestamp;
+  param.is_atomic_ddl = is_atomic_ddl_arg;
+  param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
+  param.group_replication_consistency =
+      thd->variables.group_replication_consistency;
+  param.original_server_version = &(thd->variables.original_server_version);
+  param.immediate_server_version = &(thd->variables.immediate_server_version);
+  param.is_create_table_as_query_block =
+      (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+       !thd->lex->query_block->field_list_is_empty());
+
+  bool is_real_trans =
+      (all || !thd->get_transaction()->is_active(Transaction_ctx::SESSION));
+  if (is_real_trans) param.flags |= TRANS_IS_REAL_TRANS;
+
+  int ret = 0;
+
+  /* After this debug point we mark the transaction as committing in THD. */
+  DBUG_EXECUTE_IF("trans_delegate_before_commit_before_before_call_observers", {
+    const char act[] =
+        "now signal "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "reached "
+        "wait_for "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "waiting";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
+  thd->rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_BEFORE_COMMIT);
+
+  /**
+    If thread is killed or commits are blocked do not commit the transaction.
+    Post this thread cannot be killed.
+  */
+  if (thd->is_killed() || m_rollback_transaction_not_reached_before_commit) {
+    /**
+      Disconnect the client connection if not already done.
+      Do not KILL connection if the transaction is going to be rolledback.
+    */
+    if (!thd->is_killed()) {
+      mysql_mutex_lock(&thd->LOCK_thd_data);
+      thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&thd->LOCK_thd_data);
+    }
+    return 1;
+  }
+  FOREACH_OBSERVER(ret, before_commit, (&param));
+  plugin_foreach(thd, se_before_commit, MYSQL_STORAGE_ENGINE_PLUGIN, &param);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Gtid_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc
+Function: Relay_log_info::cleanup_context
+void Relay_log_info::cleanup_context(THD *thd, bool error) {
+  DBUG_TRACE;
+
+  assert(info_thd == thd);
+  /*
+    1) Instances of Table_map_log_event, if ::do_apply_event() was called on
+    them, may have opened tables, which we cannot be sure have been closed
+    (because maybe the Rows_log_event have not been found or will not be,
+    because slave SQL thread is stopping, or relay log has a missing tail etc).
+    So we close all thread's tables. And so the table mappings have to be
+    cancelled. 2) Rows_log_event::do_apply_event() may even have started
+    statements or transactions on them, which we need to rollback in case of
+    error. 3) If finding a Format_description_log_event after a BEGIN, we also
+    need to rollback before continuing with the next events. 4) so we need this
+    "context cleanup" function.
+  */
+  if (error) {
+    trans_rollback_stmt(thd);  // if a "statement transaction"
+    trans_rollback(thd);       // if a "real transaction"
+    thd->variables.original_commit_timestamp = UNDEFINED_COMMIT_TIMESTAMP;
+  }
+  if (rows_query_ev) {
+    /*
+      In order to avoid invalid memory access, THD::reset_query() should be
+      called before deleting the rows_query event.
+    */
+    info_thd->reset_query();
+    info_thd->reset_query_for_display();
+    delete rows_query_ev;
+    rows_query_ev = nullptr;
+    DBUG_EXECUTE_IF("after_deleting_the_rows_query_ev", {
+      const char action[] =
+          "now SIGNAL deleted_rows_query_ev WAIT_FOR go_ahead";
+      assert(!debug_sync_set_action(info_thd, STRING_WITH_LEN(action)));
+    };);
+  }
+  m_table_map.clear_tables();
+  slave_close_thread_tables(thd);
+  if (error) {
+    /*
+      trans_rollback above does not rollback XA transactions.
+      It could be done only after necessarily closing tables which dictates
+      the following placement.
+    */
+    XID_STATE *xid_state = thd->get_transaction()->xid_state();
+    if (!xid_state->has_state(XID_STATE::XA_NOTR)) {
+      assert(DBUG_EVALUATE_IF("simulate_commit_failure", 1,
+                              xid_state->has_state(XID_STATE::XA_ACTIVE) ||
+                                  xid_state->has_state(XID_STATE::XA_IDLE)));
+
+      xa_trans_force_rollback(thd);
+      xid_state->reset();
+      cleanup_trans_state(thd);
+      if (thd->is_engine_ha_data_detached()) thd->rpl_reattach_engine_ha_data();
+    }
+    thd->mdl_context.release_transactional_locks();
+  }
+  clear_flag(IN_STMT);
+  /*
+    Cleanup for the flags that have been set at do_apply_event.
+  */
+  thd->variables.option_bits &= ~OPTION_NO_FOREIGN_KEY_CHECKS;
+  thd->variables.option_bits &= ~OPTION_RELAXED_UNIQUE_CHECKS;
+
+  /*
+    Reset state related to long_find_row notes in the error log:
+    - timestamp
+    - flag that decides whether the slave prints or not
+  */
+  reset_row_stmt_start_timestamp();
+  unset_long_find_row_note_printed();
+
+  /*
+    If the slave applier changed the current transaction isolation level,
+    it need to be restored to the session default value once having the
+    current transaction cleared.
+
+    We should call "trans_reset_one_shot_chistics()" only if the "error"
+    flag is "true", because "cleanup_context()" is called at the end of each
+    set of Table_maps/Rows representing a statement (when the rows event
+    is tagged with the STMT_END_F) with the "error" flag as "false".
+
+    So, without the "if (error)" below, the isolation level might be reset
+    in the middle of a pure row based transaction.
+  */
+  if (error) trans_reset_one_shot_chistics(thd);
+}
+
+

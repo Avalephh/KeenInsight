@@ -1,0 +1,29 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: update_cached_long_query_time not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: update_cached_long_query_time not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: update_cached_long_query_time not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: update_cached_long_query_time not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: update_cached_long_query_time not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::update_slow_query_status
+void THD::update_slow_query_status() {
+  if (my_micro_time() > start_utime + variables.long_query_time)
+    server_status |= SERVER_QUERY_WAS_SLOW;
+}
+
+

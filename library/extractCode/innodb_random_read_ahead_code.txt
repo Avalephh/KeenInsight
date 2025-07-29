@@ -1,0 +1,139 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc
+Function: buf_read_ahead_random
+ulint buf_read_ahead_random(const page_id_t &page_id,
+                            const page_size_t &page_size, bool inside_ibuf) {
+  buf_pool_t *buf_pool = buf_pool_get(page_id);
+  ulint recent_blocks = 0;
+  ulint ibuf_mode;
+  ulint count;
+  page_no_t low, high;
+  dberr_t err;
+  page_no_t i;
+  const page_no_t buf_read_ahead_random_area = buf_pool->read_ahead_area;
+
+  if (!srv_random_read_ahead) {
+    /* Disabled by user */
+    return (0);
+  }
+
+  if (srv_startup_is_before_trx_rollback_phase) {
+    /* No read-ahead to avoid thread deadlocks */
+    return (0);
+  }
+
+  if (ibuf_bitmap_page(page_id, page_size) || trx_sys_hdr_page(page_id)) {
+    /* If it is an ibuf bitmap page or trx sys hdr, we do
+    no read-ahead, as that could break the ibuf page access
+    order */
+
+    return (0);
+  }
+
+  low = (page_id.page_no() / buf_read_ahead_random_area) *
+        buf_read_ahead_random_area;
+
+  high = (page_id.page_no() / buf_read_ahead_random_area + 1) *
+         buf_read_ahead_random_area;
+
+  /* Remember the tablespace version before we ask the tablespace size
+  below: if DISCARD + IMPORT changes the actual .ibd file meanwhile, we
+  do not try to read outside the bounds of the tablespace! */
+  if (fil_space_t *space = fil_space_acquire_silent(page_id.space())) {
+    if (high > space->size) {
+      high = space->size;
+    }
+    fil_space_release(space);
+  } else {
+    return (0);
+  }
+
+  os_rmb;
+  if (buf_pool->n_pend_reads >
+      buf_pool->curr_size / BUF_READ_AHEAD_PEND_LIMIT) {
+    return (0);
+  }
+
+  /* Count how many blocks in the area have been recently accessed,
+  that is, reside near the start of the LRU list. */
+
+  for (i = low; i < high; i++) {
+    rw_lock_t *hash_lock;
+    const buf_page_t *bpage;
+
+    bpage = buf_page_hash_get_s_locked(buf_pool, page_id_t(page_id.space(), i),
+                                       &hash_lock);
+
+    if (bpage != nullptr &&
+        buf_page_is_accessed(bpage) !=
+            std::chrono::steady_clock::time_point{} &&
+        buf_page_peek_if_young(bpage)) {
+      recent_blocks++;
+
+      if (recent_blocks >= BUF_READ_AHEAD_RANDOM_THRESHOLD(buf_pool)) {
+        rw_lock_s_unlock(hash_lock);
+        goto read_ahead;
+      }
+    }
+
+    if (bpage != nullptr) {
+      rw_lock_s_unlock(hash_lock);
+    }
+  }
+
+  /* Do nothing */
+  return (0);
+
+read_ahead:
+  /* Read all the suitable blocks within the area */
+
+  if (inside_ibuf) {
+    ibuf_mode = BUF_READ_IBUF_PAGES_ONLY;
+  } else {
+    ibuf_mode = BUF_READ_ANY_PAGE;
+  }
+
+  count = 0;
+
+  for (i = low; i < high; i++) {
+    /* It is only sensible to do read-ahead in the non-sync aio
+    mode: hence false as the first parameter */
+
+    const page_id_t cur_page_id(page_id.space(), i);
+
+    if (!ibuf_bitmap_page(cur_page_id, page_size)) {
+      count += buf_read_page_low(&err, false, IORequest::DO_NOT_WAKE, ibuf_mode,
+                                 cur_page_id, page_size, false);
+
+      if (err == DB_TABLESPACE_DELETED) {
+        ib::warn(ER_IB_MSG_140) << "Random readahead trying to"
+                                   " access page "
+                                << cur_page_id
+                                << " in nonexisting or"
+                                   " being-dropped tablespace";
+        break;
+      }
+    }
+  }
+
+  /* In simulated aio we wake the aio handler threads only after
+  queuing all aio requests.  */
+
+  os_aio_simulated_wake_handler_threads();
+
+  if (count) {
+    DBUG_PRINT("ib_buf",
+               ("random read-ahead %u pages, %u:%u", (unsigned)count,
+                (unsigned)page_id.space(), (unsigned)page_id.page_no()));
+  }
+
+  /* Read ahead is considered one I/O operation for the purpose of
+  LRU policy decision. */
+  buf_LRU_stat_inc_io();
+
+  buf_pool->stat.n_ra_pages_read_rnd += count;
+  srv_stats.buf_pool_reads.add(count);
+  return (count);
+}
+
+

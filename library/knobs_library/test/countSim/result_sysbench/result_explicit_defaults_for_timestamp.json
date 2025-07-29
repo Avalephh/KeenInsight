@@ -1,0 +1,20 @@
+[
+    {
+        "knob_name": "explicit_defaults_for_timestamp",
+        "data_matched_functions": [
+            "Query_log_event::write"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "MDL_request::init_with_source",
+            "MDL_context::acquire_locks",
+            "__errno_location",
+            "dd::get_dictionary",
+            "MDL_context::acquire_lock",
+            "Session_tracker::get_tracker",
+            "ER_THD"
+        ],
+        "control_matched_count": 7,
+        "matched_count": 8
+    }
+]

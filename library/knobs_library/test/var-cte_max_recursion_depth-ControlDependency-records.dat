@@ -1,0 +1,20 @@
+Global Variable: System_variables.24
+Explicit Data Flow (3):
+  Instruction: %7 = load i32, i32* %cte_max_recursion_depth, align 4, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/basic_row_iterators.cc:402:26 | Function: FollowTailIterator::Read
+  Instruction: %cmp5 = icmp ugt i32 %inc, %7, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/basic_row_iterators.cc:401:39 | Function: FollowTailIterator::Read
+  Instruction: br i1 %cmp5, label %if.then6, label %if.end8, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/basic_row_iterators.cc:401:9 | Function: FollowTailIterator::Read
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_error
+  Controlled Function: unlikely
+  Controlled Function: TableRowIterator::table
+  Controlled Function: handler::ha_rnd_next
+  Controlled Function: debug_sync
+  Controlled Function: TableRowIterator::HandleError
+
+Implicit Control Flow:
+
+----------------------------------------

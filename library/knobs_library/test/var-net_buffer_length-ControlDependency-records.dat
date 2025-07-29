@@ -1,0 +1,28 @@
+Global Variable: System_variables.35
+Explicit Data Flow (12):
+  Instruction: %172 = load i64, i64* %net_buffer_length, align 8, !dbg !1255570 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:630:26 | Function: check_connection
+  Instruction: %call253 = call zeroext i1 @_ZN6String5allocEm(%class.String* %call252, i64 %172), !dbg !1255571 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:629:57 | Function: check_connection
+  Instruction: %61 = load i64, i64* %net_buffer_length, align 8, !dbg !1255463 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1433:22 | Function: do_command
+  Instruction: invoke void @_ZN6String6shrinkEm(%class.String* %call133, i64 %61)
+          to label %invoke.cont135 unwind label %lpad, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1432:53 | Function: do_command
+  Instruction: %71 = load i64, i64* %net_buffer_length155, align 8, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1441:22 | Function: do_command
+  Instruction: invoke void @_ZN6String6shrinkEm(%class.String* %call153, i64 %71)
+          to label %invoke.cont156 unwind label %lpad, !dbg !1255485 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1440:53 | Function: do_command
+  Instruction: %7 = load i64, i64* %net_buffer_length, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1304:35 | Function: Protocol_classic::send_ok
+  Instruction: invoke void @_ZN6String6shrinkEm(%class.String* %convert, i64 %7)
+          to label %invoke.cont4 unwind label %lpad, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1304:11 | Function: Protocol_classic::send_ok
+  Instruction: %14 = load i64, i64* %net_buffer_length, align 8, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1330:35 | Function: Protocol_classic::send_eof
+  Instruction: invoke void @_ZN6String6shrinkEm(%class.String* %convert, i64 %14)
+          to label %invoke.cont18 unwind label %lpad, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1330:11 | Function: Protocol_classic::send_eof
+  Instruction: %5 = load i64, i64* %net_buffer_length, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1346:35 | Function: Protocol_classic::send_error
+  Instruction: invoke void @_ZN6String6shrinkEm(%class.String* %convert, i64 %5)
+          to label %invoke.cont4 unwind label %lpad, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:1346:11 | Function: Protocol_classic::send_error
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

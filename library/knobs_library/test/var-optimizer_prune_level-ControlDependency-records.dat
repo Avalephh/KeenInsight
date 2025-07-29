@@ -1,0 +1,63 @@
+Global Variable: System_variables.41
+Explicit Data Flow (8):
+  Instruction: %9 = load i64, i64* %optimizer_prune_level, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:130:34 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %conv7 = trunc i64 %9 to i32, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:130:19 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: store i32 %conv7, i32* %prune_level, align 4, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:130:7 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %prune_level = getelementptr inbounds %class.Optimize_table_order.16374, %class.Optimize_table_order.16374* %this1, i32 0, i32 3, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:130:7 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %prune_level204 = getelementptr inbounds %class.Optimize_table_order.16374, %class.Optimize_table_order.16374* %this1, i32 0, i32 3, !dbg !1255612 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2868:13 | Function: Optimize_table_order::best_extension_by_limited_search
+  Instruction: %164 = load i32, i32* %prune_level204, align 4, !dbg !1255612 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2868:13 | Function: Optimize_table_order::best_extension_by_limited_search
+  Instruction: %cmp205 = icmp eq i32 %164, 1, !dbg !1255615 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2868:25 | Function: Optimize_table_order::best_extension_by_limited_search
+  Instruction: br i1 %cmp205, label %land.lhs.true206, label %if.end245, !dbg !1255616 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2868:30 | Function: Optimize_table_order::best_extension_by_limited_search
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: Optimize_table_order::best_extension_by_limited_search
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: Table_map_restorer::~Table_map_restorer
+  Controlled Function: Optimize_table_order::eq_ref_extension_by_limited_search
+  Controlled Function: _db_keyword_
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Optimize_table_order::backout_nj_state
+  Controlled Function: Table_map_restorer::~Table_map_restorer
+  Controlled Function: Optimize_table_order::backout_nj_state
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Optimize_table_order::backout_nj_state
+  Controlled Function: _ZSt4swapIP8JOIN_TABENSt9enable_ifIXsr6__and_ISt6__not_ISt15__is_tuple_likeIT_EESt21is_move_constructibleIS5_ESt18is_move_assignableIS5_EEE5valueEvE4typeERS5_SE_
+  Controlled Function: Optimize_table_order::check_interleaving_with_nj
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: unlikely
+  Controlled Function: trace_plan_prefix
+  Controlled Function: __assert_fail
+  Controlled Function: Table_map_restorer::restore
+  Controlled Function: Optimize_table_order::best_access_path
+  Controlled Function: POSITION::set_prefix_join_cost
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Optimize_table_order::advance_sj_state
+  Controlled Function: POSITION::no_semijoin
+  Controlled Function: Optimize_table_order::recalculate_lateral_deps_incrementally
+  Controlled Function: _db_keyword_
+  Controlled Function: Optimize_table_order::consider_plan
+  Controlled Function: QEP_shared_owner::table
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: _db_keyword_
+  Controlled Function: Optimize_table_order::backout_nj_state
+  Controlled Function: __assert_fail
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Optimize_table_order::backout_nj_state
+
+Implicit Control Flow:
+
+----------------------------------------

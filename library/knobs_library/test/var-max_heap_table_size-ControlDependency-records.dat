@@ -1,0 +1,73 @@
+Global Variable: System_variables.5
+Explicit Data Flow (48):
+  Instruction: %50 = load i64, i64* %max_heap_table_size, align 8, !dbg !1255412 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:10979:57 | Function: calculate_materialization_costs
+  Instruction: %conv24 = uitofp i64 %50 to double, !dbg !1255409 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:10979:36 | Function: calculate_materialization_costs
+  Instruction: %cmp25 = fcmp olt double %mul23, %conv24, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:10979:34 | Function: calculate_materialization_costs
+  Instruction: br i1 %cmp25, label %if.then26, label %if.else27, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:10979:7 | Function: calculate_materialization_costs
+  Instruction: %38 = load i64, i64* %max_heap_table_size, align 8, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:934:26 | Function: Optimize_table_order::lateral_derived_cost
+  Instruction: %conv25 = uitofp i64 %38 to double, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:934:11 | Function: Optimize_table_order::lateral_derived_cost
+  Instruction: %cmp26 = fcmp olt double %mul, %conv25, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:933:61 | Function: Optimize_table_order::lateral_derived_cost
+  Instruction: br i1 %cmp26, label %if.then27, label %if.else, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:933:11 | Function: Optimize_table_order::lateral_derived_cost
+  Instruction: %76 = load i64, i64* %max_heap_table_size, align 8, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:4022:47 | Function: Optimize_table_order::semijoin_dupsweedout_access_paths
+  Instruction: %conv60 = uitofp i64 %76 to double, !dbg !1255460 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:4022:32 | Function: Optimize_table_order::semijoin_dupsweedout_access_paths
+  Instruction: %cmp61 = fcmp olt double %mul59, %conv60, !dbg !1255463 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:4022:30 | Function: Optimize_table_order::semijoin_dupsweedout_access_paths
+  Instruction: br i1 %cmp61, label %if.then62, label %if.else63, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:4022:7 | Function: Optimize_table_order::semijoin_dupsweedout_access_paths
+  Instruction: %call32 = call dereferenceable(8) i64* @_ZSt3minIyERKT_S2_S2_(i64* dereferenceable(8) %tmp_table_size30, i64* dereferenceable(8) %max_heap_table_size), !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2209:40 | Function: alloc_record_buffers
+  Instruction: %39 = load i64, i64* %call32, align 8, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2209:40 | Function: alloc_record_buffers
+  Instruction: %cond = phi i64 [ %39, %cond.true ], [ %41, %cond.false ], !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2208:34 | Function: alloc_record_buffers
+  Instruction: %div = udiv i64 %cond, %43, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2211:71 | Function: alloc_record_buffers
+  Instruction: store i64 %div, i64* %max_rows36, align 8, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2208:21 | Function: alloc_record_buffers
+  Instruction: %max_rows36 = getelementptr inbounds %struct.TABLE_SHARE.27877, %struct.TABLE_SHARE.27877* %44, i32 0, i32 36, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2208:12 | Function: alloc_record_buffers
+  Instruction: %max_rows = getelementptr inbounds %struct.TABLE_SHARE.27877, %struct.TABLE_SHARE.27877* %61, i32 0, i32 36, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2344:39 | Function: trace_tmp_table
+  Instruction: %62 = load i64, i64* %max_rows, align 8, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2344:39 | Function: trace_tmp_table
+  Instruction: %call76 = invoke dereferenceable(56) %class.Opt_trace_struct* @_ZN16Opt_trace_struct3addEPKcy(%class.Opt_trace_struct* %call74, i8* getelementptr inbounds ([19 x i8], [19 x i8]* @.str.86.17903, i64 0, i64 0), i64 %62)
+          to label %invoke.cont75 unwind label %lpad, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2344:10 | Function: trace_tmp_table
+  Instruction: %call = call dereferenceable(8) i64* @_ZSt3minIyERKT_S2_S2_(i64* dereferenceable(8) %tmp_table_size, i64* dereferenceable(8) %max_heap_table_size), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:129:7 | Function: Item_sum::ram_limitation
+  Instruction: %2 = load i64, i64* %call, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:129:7 | Function: Item_sum::ram_limitation
+  Instruction: store i64 %2, i64* %limitation, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:128:13 | Function: Item_sum::ram_limitation
+  Instruction: store i64 32, i64* %limitation, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:131:3 | Function: Item_sum::ram_limitation
+  Instruction: %3 = load i64, i64* %limitation, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:133:10 | Function: Item_sum::ram_limitation
+  Instruction: ret i64 %3, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:133:3 | Function: Item_sum::ram_limitation
+  Instruction: %call232 = invoke i64 @_ZN8Item_sum14ram_limitationEP3THD(%class.THD.71762* %180)
+          to label %invoke.cont231 unwind label %lpad230, !dbg !1255603 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:1160:41 | Function: Aggregator_distinct::setup
+  Instruction: invoke void @_ZN6UniqueC1EPFiPKvS1_S1_EPvjy(%class.Unique* %174, i32 (i8*, i8*, i8*)* %175, i8* %176, i32 %177, i64 %call232)
+          to label %invoke.cont233 unwind label %lpad230, !dbg !1255605 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:1159:34 | Function: Aggregator_distinct::setup
+  Instruction: %call333 = invoke i64 @_ZN8Item_sum14ram_limitationEP3THD(%class.THD.71762* %248)
+          to label %invoke.cont332 unwind label %lpad331, !dbg !1255722 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:1223:16 | Function: Aggregator_distinct::setup
+  Instruction: invoke void @_ZN6UniqueC1EPFiPKvS1_S1_EPvjy(%class.Unique* %243, i32 (i8*, i8*, i8*)* @_ZL18simple_raw_key_cmpPKvS0_S0_, i8* %244, i32 %245, i64 %call333)
+          to label %invoke.cont334 unwind label %lpad331, !dbg !1255724 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:1222:9 | Function: Aggregator_distinct::setup
+  Instruction: %call217 = invoke i64 @_ZN8Item_sum14ram_limitationEP3THD(%class.THD.71762* %145)
+          to label %invoke.cont216 unwind label %lpad215, !dbg !1255570 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4630:33 | Function: Item_func_group_concat::setup
+  Instruction: invoke void @_ZN6UniqueC1EPFiPKvS1_S1_EPvjy(%class.Unique* %142, i32 (i8*, i8*, i8*)* @_Z34group_concat_key_cmp_with_distinctPKvS0_S0_, i8* %143, i32 %144, i64 %call217)
+          to label %invoke.cont218 unwind label %lpad215, !dbg !1255571 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4629:9 | Function: Item_func_group_concat::setup
+  Instruction: %6 = load i64, i64* %max_heap_table_size, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:132:58 | Function: AddCost
+  Instruction: %conv1 = uitofp i64 %6 to double, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:132:43 | Function: AddCost
+  Instruction: %cmp = fcmp olt double %mul, %conv1, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:132:41 | Function: AddCost
+  Instruction: br i1 %cmp, label %if.then, label %if.else, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:132:11 | Function: AddCost
+  Instruction: %128 = load i64, i64* %max_heap_table_size, align 8, !dbg !1255599 | Location: /root/LLVM/mysql-8.0.36/storage/heap/ha_heap.cc:619:59 | Function: heap_prepare_hp_create_info
+  Instruction: store i64 %128, i64* %max_table_size, align 8, !dbg !1255602 | Location: /root/LLVM/mysql-8.0.36/storage/heap/ha_heap.cc:619:34 | Function: heap_prepare_hp_create_info
+  Instruction: %max_table_size = getelementptr inbounds %struct.HP_CREATE_INFO, %struct.HP_CREATE_INFO* %129, i32 0, i32 7, !dbg !1255601 | Location: /root/LLVM/mysql-8.0.36/storage/heap/ha_heap.cc:619:19 | Function: heap_prepare_hp_create_info
+  Instruction: %max_table_size = getelementptr inbounds %struct.HP_CREATE_INFO, %struct.HP_CREATE_INFO* %197, i32 0, i32 7, !dbg !1255740 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_create.cc:201:42 | Function: heap_create
+  Instruction: %198 = load i64, i64* %max_table_size, align 8, !dbg !1255740 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_create.cc:201:42 | Function: heap_create
+  Instruction: store i64 %198, i64* %max_table_size229, align 8, !dbg !1255743 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_create.cc:201:27 | Function: heap_create
+  Instruction: %max_table_size229 = getelementptr inbounds %struct.HP_SHARE, %struct.HP_SHARE* %199, i32 0, i32 6, !dbg !1255742 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_create.cc:201:12 | Function: heap_create
+  Instruction: %max_table_size = getelementptr inbounds %struct.HP_SHARE, %struct.HP_SHARE* %29, i32 0, i32 6, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_write.cc:148:58 | Function: next_free_record_pos
+  Instruction: %30 = load i64, i64* %max_table_size, align 8, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_write.cc:148:58 | Function: next_free_record_pos
+  Instruction: %cmp13 = icmp uge i64 %add, %30, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_write.cc:148:49 | Function: next_free_record_pos
+  Instruction: br i1 %cmp13, label %if.then14, label %if.end16, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/storage/heap/hp_write.cc:147:9 | Function: next_free_record_pos
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: set_my_errno
+  Controlled Function: hp_get_new_block
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+
+Implicit Control Flow:
+
+----------------------------------------

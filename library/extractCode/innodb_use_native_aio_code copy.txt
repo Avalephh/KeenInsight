@@ -1,0 +1,297 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_aio_func
+dberr_t os_aio_func(IORequest &type, AIO_mode aio_mode, const char *name,
+                    pfs_os_file_t file, void *buf, os_offset_t offset, ulint n,
+                    bool read_only, fil_node_t *m1, void *m2) {
+  ut_a(!type.is_log());
+#ifdef WIN_ASYNC_IO
+  BOOL ret = TRUE;
+#endif /* WIN_ASYNC_IO */
+
+  const file::Block *e_block = type.get_encrypted_block();
+
+#ifdef UNIV_DEBUG
+  if (type.is_write() && e_block != nullptr) {
+    ut_ad(os_block_get_frame(e_block) == buf);
+  }
+#endif /* UNIV_DEBUG */
+
+  ut_ad(n > 0);
+  ut_ad((n % OS_FILE_LOG_BLOCK_SIZE) == 0);
+  ut_ad((offset % OS_FILE_LOG_BLOCK_SIZE) == 0);
+  ut_ad(os_aio_validate_skip());
+
+#ifdef WIN_ASYNC_IO
+  ut_ad((n & 0xFFFFFFFFUL) == n);
+#endif /* WIN_ASYNC_IO */
+
+  if (aio_mode == AIO_mode::SYNC) {
+    /* This is actually an ordinary synchronous read or write:
+    no need to use an i/o-handler thread. NOTE that if we use
+    Windows "async" overlapped i/o, Windows does not allow us to use
+    ordinary synchronous operations etc. on the same file. The os_file_read()
+    and os_file_write() are handling this case correctly.
+    Also note that the Performance Schema instrumentation has
+    been performed by current os_aio_func()'s wrapper function
+    pfs_os_aio_func(). So we would no longer need to call
+    Performance Schema instrumented os_file_read() and
+    os_file_write(). Instead, we should use os_file_read_func()
+    and os_file_write_func() */
+
+    if (type.is_read()) {
+      return (os_file_read_func(type, name, file.m_file, buf, offset, n));
+    }
+
+    ut_ad(type.is_write());
+    return (os_file_write_func(type, name, file.m_file, buf, offset, n));
+  }
+
+try_again:
+
+  auto array = AIO::select_slot_array(type, read_only, aio_mode);
+
+  auto slot =
+      array->reserve_slot(type, m1, m2, file, name, buf, offset, n, e_block);
+
+  if (type.is_read()) {
+    if (srv_use_native_aio) {
+      ++os_n_file_reads;
+
+      os_bytes_read_since_printout += n;
+#ifdef WIN_ASYNC_IO
+      ret = ReadFile(file.m_file, slot->ptr, slot->len, &slot->n_bytes,
+                     &slot->control);
+#elif defined(LINUX_NATIVE_AIO)
+      if (!array->linux_dispatch(slot)) {
+        goto err_exit;
+      }
+#endif /* WIN_ASYNC_IO */
+    } else if (type.is_wake()) {
+      AIO::wake_simulated_handler_thread(
+          AIO::get_segment_no_from_slot(array, slot));
+    }
+  } else if (type.is_write()) {
+    if (srv_use_native_aio) {
+      ++os_n_file_writes;
+
+#ifdef WIN_ASYNC_IO
+      ret = WriteFile(file.m_file, slot->ptr, slot->len, &slot->n_bytes,
+                      &slot->control);
+#elif defined(LINUX_NATIVE_AIO)
+      if (!array->linux_dispatch(slot)) {
+        goto err_exit;
+      }
+#endif /* WIN_ASYNC_IO */
+
+    } else if (type.is_wake()) {
+      AIO::wake_simulated_handler_thread(
+          AIO::get_segment_no_from_slot(array, slot));
+    }
+  } else {
+    ut_error;
+  }
+
+#ifdef WIN_ASYNC_IO
+  if (srv_use_native_aio) {
+    if ((!ret && GetLastError() != ERROR_IO_PENDING) ||
+        (ret && slot->len != slot->n_bytes)) {
+      goto err_exit;
+    }
+  }
+#endif /* WIN_ASYNC_IO */
+
+  /* AIO request was queued successfully! */
+  return (DB_SUCCESS);
+
+#if defined LINUX_NATIVE_AIO || defined WIN_ASYNC_IO
+err_exit:
+#endif /* LINUX_NATIVE_AIO || WIN_ASYNC_IO */
+
+  array->release_with_mutex(slot);
+  if (os_file_handle_error(name, type.is_read() ? "aio read" : "aio write")) {
+    goto try_again;
+  }
+
+  return (DB_IO_ERROR);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::wake_simulated_handler_thread
+void AIO::wake_simulated_handler_thread(ulint global_segment) {
+  ut_ad(!srv_use_native_aio);
+
+  AIO *array{};
+
+  auto segment = get_array_and_local_segment(array, global_segment);
+
+  array->wake_simulated_handler_thread(global_segment, segment);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_aio_simulated_wake_handler_threads
+void os_aio_simulated_wake_handler_threads() {
+  if (srv_use_native_aio) {
+    /* We do not use simulated aio: do nothing */
+
+    return;
+  }
+
+  os_aio_recommend_sleep_for_read_threads = false;
+
+  for (ulint i = 0; i < os_aio_n_segments; ++i) {
+    AIO::wake_simulated_handler_thread(i);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::reserve_slot not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: AIO::init
+dberr_t AIO::init() {
+  ut_a(!m_slots.empty());
+
+#ifdef _WIN32
+  ut_a(m_handles == NULL);
+
+  m_handles =
+      ut::new_withkey<Handles>(UT_NEW_THIS_FILE_PSI_KEY, m_slots.size());
+#endif /* _WIN32 */
+
+  if (srv_use_native_aio) {
+#ifdef LINUX_NATIVE_AIO
+    dberr_t err = init_linux_native_aio();
+
+    if (err != DB_SUCCESS) {
+      return (err);
+    }
+
+#endif /* LINUX_NATIVE_AIO */
+  }
+
+  return (init_slots());
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_aio_handler
+dberr_t os_aio_handler(ulint segment, fil_node_t **m1, void **m2,
+                       IORequest *request) {
+  dberr_t err;
+
+  if (srv_use_native_aio) {
+    srv_set_io_thread_op_info(segment, "native aio handle");
+
+#ifdef WIN_ASYNC_IO
+
+    err = os_aio_windows_handler(segment, m1, m2, request);
+
+#elif defined(LINUX_NATIVE_AIO)
+
+    err = os_aio_linux_handler(segment, m1, m2, request);
+#else
+    ut_error;
+
+    err = DB_ERROR; /* Eliminate compiler warning */
+
+#endif /* WIN_ASYNC_IO */
+
+  } else {
+    srv_set_io_thread_op_info(segment, "simulated aio handle");
+
+    err = os_aio_simulated_handler(segment, m1, m2, request);
+  }
+
+  return (err);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_get_last_error_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_get_last_error_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_get_last_error_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_get_last_error_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_get_last_error_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_get_last_error_low not found.
+

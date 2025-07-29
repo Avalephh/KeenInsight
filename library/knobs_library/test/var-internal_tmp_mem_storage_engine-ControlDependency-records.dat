@@ -1,0 +1,20 @@
+Global Variable: System_variables.113
+Explicit Data Flow (9):
+  Instruction: %8 = load i64, i64* %internal_tmp_mem_storage_engine, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2105:28 | Function: setup_tmp_table_handler
+  Instruction: %conv = trunc i64 %8 to i32, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2104:9 | Function: setup_tmp_table_handler
+  Instruction: store i32 %conv, i32* %mem_engine, align 4, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2103:42 | Function: setup_tmp_table_handler
+  Instruction: %10 = load i32, i32* %mem_engine, align 4, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2116:26 | Function: setup_tmp_table_handler
+  Instruction: %cmp3 = icmp eq i32 %10, 1, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2116:37 | Function: setup_tmp_table_handler
+  Instruction: br i1 %cmp3, label %if.then4, label %if.end, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2116:9 | Function: setup_tmp_table_handler
+  Instruction: store i32 0, i32* %mem_engine, align 4, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2117:18 | Function: setup_tmp_table_handler
+  Instruction: %15 = load i32, i32* %mem_engine, align 4, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2121:55 | Function: setup_tmp_table_handler
+  Instruction: %call = call zeroext i1 @_ZL27use_tmp_disk_storage_engineP3THDP5TABLEyb36enum_internal_tmp_mem_storage_engine(%class.THD.28129* %11, %struct.TABLE.27905* %12, i64 %13, i1 zeroext %tobool5, i32 %15), !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2120:9 | Function: setup_tmp_table_handler
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

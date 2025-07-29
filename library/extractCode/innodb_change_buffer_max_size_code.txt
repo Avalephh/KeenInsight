@@ -1,0 +1,704 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_init_files
+/** Open or create InnoDB data files.
+@param[in]      dict_init_mode  whether to create or open the files
+@param[in,out]  tablespaces     predefined tablespaces created by the DDSE
+@return 0 on success, 1 on failure */
+static int innobase_init_files(dict_init_mode_t dict_init_mode,
+                               List<const Plugin_tablespace> *tablespaces) {
+  DBUG_TRACE;
+
+  ut_ad(dict_init_mode == DICT_INIT_CREATE_FILES ||
+        dict_init_mode == DICT_INIT_CHECK_FILES ||
+        dict_init_mode == DICT_INIT_UPGRADE_57_FILES);
+
+  bool create = (dict_init_mode == DICT_INIT_CREATE_FILES);
+
+  /* Check if the data files exist or not. */
+  dberr_t err =
+      srv_sys_space.check_file_spec(create, MIN_EXPECTED_TABLESPACE_SIZE);
+
+  if (err != DB_SUCCESS) {
+    return innodb_init_abort();
+  }
+
+  srv_is_upgrade_mode = (dict_init_mode == DICT_INIT_UPGRADE_57_FILES);
+
+  /* Start the InnoDB server. */
+  err = srv_start(create);
+
+  if (err != DB_SUCCESS) {
+    return innodb_init_abort();
+  }
+
+  if (srv_is_upgrade_mode) {
+    if (!dict_sys_table_id_build()) {
+      return innodb_init_abort();
+    }
+
+    if (trx_sys->found_prepared_trx) {
+      ib::error(ER_DD_UPGRADE_FOUND_PREPARED_XA_TRANSACTION);
+      return innodb_init_abort();
+    }
+
+    /* Disable AHI when we start loading tables for purge.
+    These tables are evicted anyway after purge. */
+
+    bool old_btr_search_value = btr_search_enabled;
+    btr_search_enabled = false;
+
+    /* Load all tablespaces upfront from InnoDB Dictionary.
+    This is needed for applying purge and ibuf from 5.7 */
+    dict_load_tablespaces_for_upgrade();
+
+    /* Start purge threads immediately and wait for purge to
+    become empty. All table_ids will be adjusted by a fixed
+    offset during upgrade. So purge cannot load a table by
+    table_id later. Also InnoDB dictionary will be dropped
+    during the process of upgrade. So apply all the purge
+    now. */
+    srv_start_purge_threads();
+
+    uint64_t rseg_history_len;
+    while ((rseg_history_len = trx_sys->rseg_history_len.load()) != 0) {
+      ib::info(ER_IB_MSG_547)
+          << "Waiting for purge to become empty:"
+          << " current purge history len is " << rseg_history_len;
+      sleep(1);
+    }
+
+    srv_upgrade_old_undo_found = false;
+
+    buf_flush_sync_all_buf_pools();
+
+    dict_upgrade_evict_tables_cache();
+
+    dict_stats_evict_tablespaces();
+
+    btr_search_enabled = old_btr_search_value;
+  }
+
+  bool ret;
+
+  // For upgrade from 5.7, create mysql.ibd
+  create |= (dict_init_mode == DICT_INIT_UPGRADE_57_FILES);
+  ret = create ? dd_create_hardcoded(dict_sys_t::s_dict_space_id,
+                                     dict_sys_t::s_dd_space_file_name)
+               : dd_open_hardcoded(dict_sys_t::s_dict_space_id,
+                                   dict_sys_t::s_dd_space_file_name);
+
+  /* Once hardcoded tablespace mysql is created or opened,
+  prepare it along with innodb system tablespace for server.
+  Tell server that these two hardcoded tablespaces exist.  */
+  if (!ret) {
+    const size_t len =
+        30 + sizeof("id=;flags=;server_version=;space_version=;state=normal");
+    const char *fmt =
+        "id=%u;flags=%u;server_version=%u;space_version=%u;state=normal";
+    static char se_private_data_innodb_system[len];
+    static char se_private_data_dd[len];
+    snprintf(se_private_data_innodb_system, len, fmt, TRX_SYS_SPACE,
+             predefined_flags, DD_SPACE_CURRENT_SRV_VERSION,
+             DD_SPACE_CURRENT_SPACE_VERSION);
+    snprintf(se_private_data_dd, len, fmt, dict_sys_t::s_dict_space_id,
+             predefined_flags, DD_SPACE_CURRENT_SRV_VERSION,
+             DD_SPACE_CURRENT_SPACE_VERSION);
+
+    static Plugin_tablespace dd_space(dict_sys_t::s_dd_space_name, "",
+                                      se_private_data_dd, "",
+                                      innobase_hton_name);
+    static Plugin_tablespace::Plugin_tablespace_file dd_file(
+        dict_sys_t::s_dd_space_file_name, "");
+    dd_space.add_file(&dd_file);
+    tablespaces->push_back(&dd_space);
+
+    static Plugin_tablespace innodb(dict_sys_t::s_sys_space_name, "",
+                                    se_private_data_innodb_system, "",
+                                    innobase_hton_name);
+    Tablespace::files_t::const_iterator end = srv_sys_space.m_files.end();
+    Tablespace::files_t::const_iterator begin = srv_sys_space.m_files.begin();
+    for (Tablespace::files_t::const_iterator it = begin; it != end; ++it) {
+      innobase_sys_files.push_back(
+          ut::new_withkey<Plugin_tablespace::Plugin_tablespace_file>(
+              UT_NEW_THIS_FILE_PSI_KEY, it->name(), ""));
+      innodb.add_file(innobase_sys_files.back());
+    }
+    tablespaces->push_back(&innodb);
+
+  } else {
+    return innodb_init_abort();
+  }
+
+  innobase_old_blocks_pct = static_cast<uint>(
+      buf_LRU_old_ratio_update(innobase_old_blocks_pct, true));
+
+  ibuf_max_size_update(srv_change_buffer_max_size);
+
+  innobase_open_tables = ut::new_<hash_table_t>(200);
+  mysql_mutex_init(innobase_share_mutex_key.m_value, &innobase_share_mutex,
+                   MY_MUTEX_INIT_FAST);
+  mysql_mutex_init(commit_cond_mutex_key.m_value, &commit_cond_m,
+                   MY_MUTEX_INIT_FAST);
+  mysql_cond_init(commit_cond_key.m_value, &commit_cond);
+  mysql_mutex_init(resume_encryption_cond_mutex_key.m_value,
+                   &resume_encryption_cond_m, MY_MUTEX_INIT_FAST);
+  mysql_cond_init(resume_encryption_cond_key.m_value, &resume_encryption_cond);
+  recovery_lock_taken = os_event_create();
+  innodb_inited = true;
+#ifdef MYSQL_DYNAMIC_PLUGIN
+  if (innobase_hton != p) {
+    innobase_hton = reinterpret_cast<handlerton *>(p);
+    *innobase_hton = *innodb_hton_ptr;
+  }
+#endif /* MYSQL_DYNAMIC_PLUGIN */
+
+  /* Do this as late as possible so server is fully starts up,
+  since  we might get some initial stats if user choose to turn
+  on some counters from start up */
+  if (innobase_enable_monitor_counter) {
+    innodb_enable_monitor_at_startup(innobase_enable_monitor_counter);
+  }
+
+  /* Turn on monitor counters that are default on */
+  srv_mon_default_on();
+
+  /* Unit Tests */
+#ifdef UNIV_ENABLE_UNIT_TEST_GET_PARENT_DIR
+  unit_test_os_file_get_parent_dir();
+#endif /* UNIV_ENABLE_UNIT_TEST_GET_PARENT_DIR */
+
+#ifdef UNIV_ENABLE_UNIT_TEST_MAKE_FILEPATH
+  test_make_filepath();
+#endif /*UNIV_ENABLE_UNIT_TEST_MAKE_FILEPATH */
+
+#ifdef UNIV_ENABLE_DICT_STATS_TEST
+  test_dict_stats_all();
+#endif /*UNIV_ENABLE_DICT_STATS_TEST */
+
+#ifdef UNIV_ENABLE_UNIT_TEST_ROW_RAW_FORMAT_INT
+#ifdef HAVE_UT_CHRONO_T
+  test_row_raw_format_int();
+#endif /* HAVE_UT_CHRONO_T */
+#endif /* UNIV_ENABLE_UNIT_TEST_ROW_RAW_FORMAT_INT */
+
+  return 0;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_change_buffer_max_size_update 
+/** Update the system variable innodb_old_blocks_pct using the "saved"
+ value. This function is registered as a callback with MySQL. */
+static void innodb_change_buffer_max_size_update(
+    THD *,            /*!< in: thread handle */
+    SYS_VAR *,        /*!< in: pointer to
+                                      system variable */
+    void *,           /*!< out: where the
+                      formal string goes */
+    const void *save) /*!< in: immediate result
+                      from check function */
+{
+  srv_change_buffer_max_size = (*static_cast<const uint *>(save));
+  ibuf_max_size_update(srv_change_buffer_max_size);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc
+Function: buf_pool_resize
+static void buf_pool_resize() {
+  buf_pool_t *buf_pool;
+  ulint new_instance_size;
+  bool warning = false;
+
+  NUMA_MEMPOLICY_INTERLEAVE_IN_SCOPE;
+
+  ut_ad(!buf_pool_resizing);
+  ut_ad(srv_buf_pool_chunk_unit > 0);
+
+  /* Assumes that buf_resize_thread has already issued the necessary
+  memory barrier to read srv_buf_pool_size and srv_buf_pool_old_size */
+  new_instance_size = srv_buf_pool_size / srv_buf_pool_instances;
+  new_instance_size /= UNIV_PAGE_SIZE;
+
+  buf_resize_status(
+      BUF_POOL_RESIZE_START,
+      "Resizing buffer pool from " ULINTPF " to " ULINTPF " (unit=%llu).",
+      srv_buf_pool_old_size, srv_buf_pool_size, srv_buf_pool_chunk_unit);
+
+  /* set new limit for all buffer pool for resizing */
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool = buf_pool_from_array(i);
+
+    // No locking needed to read, same thread updated those
+    ut_ad(buf_pool->curr_size == buf_pool->old_size);
+    ut_ad(buf_pool->n_chunks_new == buf_pool->n_chunks);
+#ifdef UNIV_DEBUG
+    ut_ad(UT_LIST_GET_LEN(buf_pool->withdraw) == 0);
+
+    buf_flush_list_mutex_enter(buf_pool);
+    ut_ad(buf_pool->flush_rbt == nullptr);
+    buf_flush_list_mutex_exit(buf_pool);
+#endif
+
+    buf_pool->curr_size = new_instance_size;
+
+    ut_ad(srv_buf_pool_chunk_unit % UNIV_PAGE_SIZE == 0);
+    buf_pool->n_chunks_new =
+        new_instance_size * UNIV_PAGE_SIZE / srv_buf_pool_chunk_unit;
+    buf_resize_status_progress_update(i + 1, srv_buf_pool_instances);
+
+    os_wmb;
+  }
+
+  buf_resize_status_progress_reset();
+  buf_resize_status(BUF_POOL_RESIZE_DISABLE_AHI,
+                    "Disabling adaptive hash index.");
+
+  /* disable AHI if needed */
+  const bool btr_search_was_enabled = btr_search_disable();
+
+  if (btr_search_was_enabled) {
+    ib::info(ER_IB_MSG_60) << "disabled adaptive hash index.";
+  }
+
+  /* set withdraw target */
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool = buf_pool_from_array(i);
+    if (buf_pool->curr_size < buf_pool->old_size) {
+      ulint withdraw_target = 0;
+
+      const buf_chunk_t *chunk = buf_pool->chunks + buf_pool->n_chunks_new;
+      const buf_chunk_t *echunk = buf_pool->chunks + buf_pool->n_chunks;
+
+      while (chunk < echunk) {
+        withdraw_target += chunk->size;
+        ++chunk;
+      }
+
+      ut_ad(buf_pool->withdraw_target == 0);
+      buf_pool->withdraw_target = withdraw_target;
+    }
+    buf_resize_status_progress_update(i + 1, srv_buf_pool_instances);
+  }
+
+  buf_resize_status_progress_reset();
+  buf_resize_status(BUF_POOL_RESIZE_WITHDRAW_BLOCKS,
+                    "Withdrawing blocks to be shrunken.");
+
+  auto withdraw_start_time = std::chrono::system_clock::now();
+  std::chrono::minutes message_interval{1};
+  ulint retry_interval = 1;
+
+withdraw_retry:
+  bool should_retry_withdraw = false;
+
+  /* wait for the number of blocks fit to the new size (if needed)*/
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool = buf_pool_from_array(i);
+    if (buf_pool->curr_size < buf_pool->old_size) {
+      should_retry_withdraw |= buf_pool_withdraw_blocks(buf_pool);
+    }
+    if (!should_retry_withdraw) {
+      buf_resize_status_progress_update(i + 1, srv_buf_pool_instances);
+    }
+  }
+
+  if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP) {
+    /* abort to resize for shutdown. */
+    return;
+  }
+
+  /* abort buffer pool load */
+  buf_load_abort();
+
+  if (should_retry_withdraw &&
+      std::chrono::system_clock::now() - withdraw_start_time >=
+          message_interval) {
+    if (message_interval > std::chrono::minutes{15}) {
+      message_interval = std::chrono::minutes{30};
+    } else {
+      message_interval *= 2;
+    }
+
+    {
+      /* lock_trx_print_wait_and_mvcc_state() requires exclusive global latch */
+      locksys::Global_exclusive_latch_guard guard{UT_LOCATION_HERE};
+      trx_sys_mutex_enter();
+      bool found = false;
+      for (auto trx : trx_sys->mysql_trx_list) {
+        /* Note that trx->state might be changed from TRX_STATE_NOT_STARTED to
+        TRX_STATE_ACTIVE without usage of trx_sys->mutex when the transaction
+        is read-only (look inside trx_start_low() for details).
+
+        These loads below might be inconsistent for read-only transactions,
+        because state and start_time for such transactions are saved using
+        the std::memory_order_relaxed, not to risk performance regression
+        on ARM (and this code here is the only victim of the issue, so seems
+        it is a minor issue with potentially incorrect warning message).
+
+        TODO: check performance gain from this micro-optimization */
+        const auto trx_state = trx->state.load(std::memory_order_relaxed);
+        const auto trx_start = trx->start_time.load(std::memory_order_relaxed);
+        if (trx_state != TRX_STATE_NOT_STARTED && trx->mysql_thd != nullptr &&
+            trx_start != std::chrono::system_clock::time_point{} &&
+            withdraw_start_time > trx_start) {
+          if (!found) {
+            ib::warn(ER_IB_MSG_61)
+                << "The following trx might hold the blocks in buffer pool to "
+                   "be withdrawn. Buffer pool resizing can complete only after "
+                   "all the transactions below release the blocks.";
+            found = true;
+          }
+
+          lock_trx_print_wait_and_mvcc_state(stderr, trx);
+        }
+      }
+      trx_sys_mutex_exit();
+    }
+
+    withdraw_start_time = std::chrono::system_clock::now();
+  }
+
+  if (should_retry_withdraw) {
+    ib::info(ER_IB_MSG_62) << "Will retry to withdraw " << retry_interval
+                           << " seconds later.";
+    std::this_thread::sleep_for(std::chrono::seconds(retry_interval));
+
+    if (retry_interval > 5) {
+      retry_interval = 10;
+    } else {
+      retry_interval *= 2;
+    }
+
+    goto withdraw_retry;
+  }
+
+  buf_resize_status_progress_reset();
+  buf_resize_status(BUF_POOL_RESIZE_GLOBAL_LOCK,
+                    "Latching whole of buffer pool.");
+
+#ifdef UNIV_DEBUG
+  {
+    bool should_wait = true;
+
+    while (should_wait) {
+      should_wait = false;
+      DBUG_EXECUTE_IF(
+          "ib_buf_pool_resize_wait_before_resize", should_wait = true;
+          std::this_thread::sleep_for(std::chrono::milliseconds(10)););
+    }
+  }
+#endif /* UNIV_DEBUG */
+
+  if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP) {
+    return;
+  }
+
+  /* Indicate critical path */
+  buf_pool_resizing = true;
+
+  /* Acquire all buffer pool mutexes and hash table locks */
+  /* TODO: while we certainly lock a lot here, it does not necessarily
+  buy us enough correctness. Exploits the fact that freed pages must
+  have no pointers to them from the buffer pool nor from any other thread
+  except for the freeing one to remove redundant locking. The same applies
+  to freshly allocated pages before any pointers to them are published.*/
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    mutex_enter(&(buf_pool_from_array(i)->chunks_mutex));
+  }
+  buf_resize_status_progress_update(1, 7);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    mutex_enter(&(buf_pool_from_array(i)->LRU_list_mutex));
+  }
+  buf_resize_status_progress_update(2, 7);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    hash_lock_x_all(buf_pool_from_array(i)->page_hash);
+  }
+  buf_resize_status_progress_update(3, 7);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    mutex_enter(&(buf_pool_from_array(i)->zip_free_mutex));
+  }
+  buf_resize_status_progress_update(4, 7);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    mutex_enter(&(buf_pool_from_array(i)->free_list_mutex));
+  }
+  buf_resize_status_progress_update(5, 7);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    mutex_enter(&(buf_pool_from_array(i)->zip_hash_mutex));
+  }
+  buf_resize_status_progress_update(6, 7);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    mutex_enter(&(buf_pool_from_array(i)->flush_state_mutex));
+  }
+  buf_resize_status_progress_update(7, 7);
+
+  ut::delete_(buf_chunk_map_reg);
+  buf_chunk_map_reg =
+      ut::new_withkey<buf_pool_chunk_map_t>(UT_NEW_THIS_FILE_PSI_KEY);
+
+  buf_resize_status_progress_reset();
+  buf_resize_status(BUF_POOL_RESIZE_IN_PROGRESS, "Starting pool resize");
+  /* add/delete chunks */
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    buf_chunk_t *chunk;
+    buf_chunk_t *echunk;
+
+    buf_resize_status(BUF_POOL_RESIZE_IN_PROGRESS,
+                      "buffer pool " ULINTPF
+                      " :"
+                      " resizing with chunks " ULINTPF " to " ULINTPF ".",
+                      i, buf_pool->n_chunks, buf_pool->n_chunks_new);
+
+    if (buf_pool->n_chunks_new < buf_pool->n_chunks) {
+      /* delete chunks */
+      chunk = buf_pool->chunks + buf_pool->n_chunks_new;
+      echunk = buf_pool->chunks + buf_pool->n_chunks;
+
+      ulint sum_freed = 0;
+
+      while (chunk < echunk) {
+        buf_block_t *block = chunk->blocks;
+
+        for (ulint j = chunk->size; j--; block++) {
+          mutex_free(&block->mutex);
+          rw_lock_free(&block->lock);
+
+          ut_d(rw_lock_free(&block->debug_latch));
+        }
+
+        buf_pool->deallocate_chunk(chunk);
+
+        sum_freed += chunk->size;
+
+        ++chunk;
+      }
+
+      /* discard withdraw list */
+      buf_pool->withdraw.clear();
+      buf_pool->withdraw_target = 0;
+
+      ib::info(ER_IB_MSG_63)
+          << "buffer pool " << i << " : "
+          << buf_pool->n_chunks - buf_pool->n_chunks_new << " chunks ("
+          << sum_freed << " blocks) were freed.";
+
+      buf_pool->n_chunks = buf_pool->n_chunks_new;
+    }
+
+    {
+      /* reallocate buf_pool->chunks */
+      const ulint new_chunks_size = buf_pool->n_chunks_new * sizeof(*chunk);
+
+      buf_chunk_t *new_chunks = reinterpret_cast<buf_chunk_t *>(
+          ut::zalloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, new_chunks_size));
+
+      DBUG_EXECUTE_IF("buf_pool_resize_chunk_null",
+                      buf_pool_resize_chunk_make_null(&new_chunks););
+
+      if (new_chunks == nullptr) {
+        ib::error(ER_IB_MSG_64) << "buffer pool " << i
+                                << " : failed to allocate"
+                                   " the chunk array.";
+        buf_pool->n_chunks_new = buf_pool->n_chunks;
+        warning = true;
+        buf_pool->chunks_old = nullptr;
+        for (ulint j = 0; j < buf_pool->n_chunks_new; j++) {
+          buf_pool_register_chunk(&buf_pool->chunks[j]);
+        }
+        goto calc_buf_pool_size;
+      }
+
+      ulint n_chunks_copy =
+          std::min(buf_pool->n_chunks_new, buf_pool->n_chunks);
+
+      memcpy(new_chunks, buf_pool->chunks, n_chunks_copy * sizeof(*chunk));
+
+      for (ulint j = 0; j < n_chunks_copy; j++) {
+        buf_pool_register_chunk(&new_chunks[j]);
+      }
+
+      buf_pool->chunks_old = buf_pool->chunks;
+      buf_pool->chunks = new_chunks;
+    }
+
+    if (buf_pool->n_chunks_new > buf_pool->n_chunks) {
+      /* add chunks */
+      chunk = buf_pool->chunks + buf_pool->n_chunks;
+      echunk = buf_pool->chunks + buf_pool->n_chunks_new;
+
+      ulint sum_added = 0;
+      ulint n_chunks = buf_pool->n_chunks;
+
+      while (chunk < echunk) {
+        ulonglong unit = srv_buf_pool_chunk_unit;
+
+        if (!buf_chunk_init(buf_pool, chunk, unit, nullptr)) {
+          ib::error(ER_IB_MSG_65) << "buffer pool " << i
+                                  << " : failed to allocate"
+                                     " new memory.";
+
+          warning = true;
+
+          buf_pool->n_chunks_new = n_chunks;
+
+          break;
+        }
+
+        sum_added += chunk->size;
+
+        ++n_chunks;
+        ++chunk;
+      }
+
+      ib::info(ER_IB_MSG_66)
+          << "buffer pool " << i << " : "
+          << buf_pool->n_chunks_new - buf_pool->n_chunks << " chunks ("
+          << sum_added << " blocks) were added.";
+
+      buf_pool->n_chunks = n_chunks;
+    }
+  calc_buf_pool_size:
+
+    /* recalc buf_pool->curr_size */
+    ulint new_size = 0;
+
+    chunk = buf_pool->chunks;
+    do {
+      new_size += chunk->size;
+    } while (++chunk < buf_pool->chunks + buf_pool->n_chunks);
+
+    buf_pool->curr_size = new_size;
+    buf_pool->n_chunks_new = buf_pool->n_chunks;
+
+    if (buf_pool->chunks_old) {
+      ut::free(buf_pool->chunks_old);
+      buf_pool->chunks_old = nullptr;
+    }
+    buf_resize_status_progress_update(i + 1, srv_buf_pool_instances);
+  }
+
+  /* set instance sizes */
+  {
+    ulint curr_size = 0;
+
+    for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+      buf_pool = buf_pool_from_array(i);
+
+      ut_ad(UT_LIST_GET_LEN(buf_pool->withdraw) == 0);
+
+      buf_pool->read_ahead_area = static_cast<page_no_t>(std::min(
+          BUF_READ_AHEAD_PAGES,
+          ut_2_power_up(buf_pool->curr_size / BUF_READ_AHEAD_PORTION)));
+      buf_pool->curr_pool_size = buf_pool->curr_size * UNIV_PAGE_SIZE;
+      curr_size += buf_pool->curr_pool_size;
+      buf_pool->old_size = buf_pool->curr_size;
+    }
+    srv_buf_pool_curr_size = curr_size;
+    innodb_set_buf_pool_size(buf_pool_size_align(curr_size));
+  }
+
+  const bool new_size_too_diff =
+      srv_buf_pool_base_size > srv_buf_pool_size * 2 ||
+      srv_buf_pool_base_size * 2 < srv_buf_pool_size;
+
+  /* Normalize page_hash and zip_hash,
+  if the new size is too different */
+  if (!warning && new_size_too_diff) {
+    buf_resize_status_progress_reset();
+    buf_resize_status(BUF_POOL_RESIZE_HASH, "Resizing hash tables.");
+
+    for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+      buf_pool_t *buf_pool = buf_pool_from_array(i);
+
+      buf_pool_resize_hash(buf_pool);
+
+      ib::info(ER_IB_MSG_67)
+          << "buffer pool " << i << " : hash tables were resized.";
+      buf_resize_status_progress_update(i + 1, srv_buf_pool_instances);
+    }
+  }
+
+  /* Release all buf_pool_mutex/page_hash */
+  for (ulint i = 0; i < srv_buf_pool_instances; ++i) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+
+    mutex_exit(&buf_pool->chunks_mutex);
+    mutex_exit(&buf_pool->flush_state_mutex);
+    mutex_exit(&buf_pool->zip_hash_mutex);
+    mutex_exit(&buf_pool->free_list_mutex);
+    mutex_exit(&buf_pool->zip_free_mutex);
+    hash_unlock_x_all(buf_pool->page_hash);
+    mutex_exit(&buf_pool->LRU_list_mutex);
+  }
+  buf_pool_resizing = false;
+
+  /* Normalize other components, if the new size is too different */
+  if (!warning && new_size_too_diff) {
+    srv_buf_pool_base_size = srv_buf_pool_size;
+
+    buf_resize_status(BUF_POOL_RESIZE_HASH, "Resizing also other hash tables.");
+
+    /* normalize lock_sys */
+    srv_lock_table_size = 5 * (srv_buf_pool_size / UNIV_PAGE_SIZE);
+    lock_sys_resize(srv_lock_table_size);
+
+    /* normalize btr_search_sys */
+    btr_search_sys_resize(buf_pool_get_curr_size() / sizeof(void *) / 64);
+
+    /* normalize dict_sys */
+    dict_resize();
+
+    ib::info(ER_IB_MSG_68) << "Resized hash tables at lock_sys,"
+                              " adaptive hash index, dictionary.";
+  }
+
+  /* normalize ibuf->max_size */
+  ibuf_max_size_update(srv_change_buffer_max_size);
+
+  if (srv_buf_pool_old_size != srv_buf_pool_size) {
+    ib::info(ER_IB_MSG_69) << "Completed to resize buffer pool from "
+                           << srv_buf_pool_old_size << " to "
+                           << srv_buf_pool_size << ".";
+    srv_buf_pool_old_size = srv_buf_pool_size;
+    os_wmb;
+  }
+
+  /* enable AHI if needed */
+  if (btr_search_was_enabled) {
+    btr_search_enable();
+    ib::info(ER_IB_MSG_70) << "Re-enabled adaptive hash index.";
+  }
+
+  char now[32];
+
+  ut_sprintf_timestamp(now);
+  if (!warning) {
+    buf_resize_status_progress_reset();
+    buf_resize_status(BUF_POOL_RESIZE_COMPLETE,
+                      "Completed resizing buffer pool at %s.", now);
+    buf_resize_status_progress_update(1, 1);
+  } else {
+    buf_resize_status_progress_reset();
+    buf_resize_status(BUF_POOL_RESIZE_FAILED,
+                      "Resizing buffer pool failed,"
+                      " finished resizing at %s.",
+                      now);
+    buf_resize_status_progress_update(1, 1);
+  }
+
+#if defined UNIV_DEBUG || defined UNIV_BUF_DEBUG
+  ut_a(buf_validate());
+#endif /* UNIV_DEBUG || UNIV_BUF_DEBUG */
+
+  return;
+}
+
+

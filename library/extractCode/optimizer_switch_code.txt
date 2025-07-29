@@ -1,0 +1,1244 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::optimizer_switch_flag
+  inline bool optimizer_switch_flag(ulonglong flag) const {
+    return (variables.optimizer_switch & flag);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc
+Function: test_quick_select
+      test_quick_select()
+
+
+  KeyTupleFormat
+  ~~~~~~~~~~~~~~
+  The code in this file (and elsewhere) makes operations on key value tuples.
+  Those tuples are stored in the following format:
+
+  The tuple is a sequence of key part values. The length of key part value
+  depends only on its type (and not depends on the what value is stored)
+
+    KeyTuple: keypart1-data, keypart2-data, ...
+
+  The value of each keypart is stored in the following format:
+
+    keypart_data: [isnull_byte] keypart-value-bytes
+
+  If a keypart may have a NULL value (key_part->field->is_nullable() can
+  be used to check this), then the first byte is a NULL indicator with the
+  following valid values:
+    1  - keypart has NULL value.
+    0  - keypart has non-NULL value.
+
+  <questionable-statement> If isnull_byte==1 (NULL value), then the following
+  keypart->length bytes must be 0.
+  </questionable-statement>
+
+  keypart-value-bytes holds the value. Its format depends on the field type.
+  The length of keypart-value-bytes may or may not depend on the value being
+  stored. The default is that length is static and equal to
+  KEY_PART_INFO::length.
+
+  Key parts with (key_part_flag & HA_BLOB_PART) have length depending of the
+  value:
+
+     keypart-value-bytes: value_length value_bytes
+
+  The value_length part itself occupies HA_KEY_BLOB_LENGTH=2 bytes.
+
+  See key_copy() and key_restore() for code to move data between index tuple
+  and table record
+
+  CAUTION: the above description is only sergefp's understanding of the
+           subject and may omit some details.
+*/
+
+#include "sql/range_optimizer/range_optimizer.h"
+
+#include <float.h>
+#include <stdio.h>
+#include <string.h>
+#include <algorithm>
+#include <queue>
+#include <set>
+
+#include "field_types.h"  // enum_field_types
+#include "m_ctype.h"
+#include "m_string.h"
+#include "my_alloc.h"
+#include "my_bitmap.h"
+#include "my_compiler.h"
+#include "my_dbug.h"
+#include "my_sqlcommand.h"
+#include "mysql/udf_registration_types.h"
+#include "mysql_com.h"
+#include "scope_guard.h"
+#include "sql/check_stack.h"
+#include "sql/current_thd.h"
+#include "sql/field_common_properties.h"
+#include "sql/item.h"
+#include "sql/item_func.h"
+#include "sql/join_optimizer/access_path.h"
+#include "sql/key.h"  // is_key_used
+#include "sql/mem_root_array.h"
+#include "sql/mysqld.h"
+#include "sql/opt_costmodel.h"
+#include "sql/opt_hints.h"  // hint_key_state
+#include "sql/opt_trace.h"  // Opt_trace_array
+#include "sql/opt_trace_context.h"
+#include "sql/psi_memory_key.h"
+#include "sql/range_optimizer/group_index_skip_scan_plan.h"
+#include "sql/range_optimizer/index_merge_plan.h"
+#include "sql/range_optimizer/index_range_scan_plan.h"
+#include "sql/range_optimizer/index_skip_scan_plan.h"
+#include "sql/range_optimizer/internal.h"
+#include "sql/range_optimizer/path_helpers.h"
+#include "sql/range_optimizer/range_analysis.h"
+#include "sql/range_optimizer/range_opt_param.h"
+#include "sql/range_optimizer/range_optimizer.h"
+#include "sql/range_optimizer/rowid_ordered_retrieval_plan.h"
+#include "sql/range_optimizer/tree.h"
+#include "sql/sql_class.h"  // THD
+#include "sql/sql_lex.h"
+#include "sql/sql_list.h"
+#include "sql/sql_optimizer.h"  // JOIN
+#include "sql/sql_select.h"
+#include "sql/system_variables.h"
+#include "sql/table.h"
+#include "sql/thr_malloc.h"
+#include "sql/uniques.h"  // Unique
+
+using std::min;
+
+static AccessPath *get_best_disjunct_quick(
+    THD *thd, RANGE_OPT_PARAM *param, TABLE *table,
+    bool index_merge_union_allowed, bool index_merge_sort_union_allowed,
+    bool index_merge_intersect_allowed, bool skip_records_in_range,
+    const MY_BITMAP *needed_fields, SEL_IMERGE *imerge, const double cost_est,
+    Key_map *needed_reg);
+#ifndef NDEBUG
+static void print_quick(AccessPath *path, const Key_map *needed_reg);
+#endif
+
+namespace opt_range {
+SEL_ARG *null_element = nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/set_var.cc
+Function: sql_set_variables
+int sql_set_variables(THD *thd, List<set_var_base> *var_list, bool opened) {
+  int error;
+  List_iterator_fast<set_var_base> it(*var_list);
+  DBUG_TRACE;
+
+  DEBUG_SYNC(thd, "after_error_checking");
+
+  LEX *lex = thd->lex;
+  set_var_base *var;
+  if (!thd->lex->unit->is_prepared()) {
+    lex->set_using_hypergraph_optimizer(
+        thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
+
+    Prepared_stmt_arena_holder ps_arena_holder(thd);
+    while ((var = it++)) {
+      if ((error = var->resolve(thd))) goto err;
+    }
+    if ((error = thd->is_error())) goto err;
+    thd->lex->unit->set_prepared();
+    if (!thd->stmt_arena->is_regular()) thd->lex->save_cmd_properties(thd);
+  }
+  if (opened && lock_tables(thd, lex->query_tables, lex->table_count, 0)) {
+    error = 1;
+    goto err;
+  }
+  thd->lex->set_exec_started();
+  it.rewind();
+  while ((var = it++)) {
+    if ((error = var->check(thd))) goto err;
+  }
+  if ((error = thd->is_error())) goto err;
+
+  it.rewind();
+  while ((var = it++)) {
+    if ((error = var->update(thd)))  // Returns 0, -1 or 1
+      goto err;
+  }
+  if (!error) {
+    /* At this point SET statement is considered a success. */
+    Persisted_variables_cache *pv = nullptr;
+    it.rewind();
+    while ((var = it++)) {
+      set_var *setvar = dynamic_cast<set_var *>(var);
+      if (setvar &&
+          (setvar->type == OPT_PERSIST || setvar->type == OPT_PERSIST_ONLY)) {
+        pv = Persisted_variables_cache::get_instance();
+        /* update in-memory copy of persistent options */
+        if (pv->set_variable(thd, setvar)) return 1;
+      }
+    }
+    /* flush all persistent options to a file */
+    if (pv && pv->flush_to_file()) {
+      my_error(ER_VARIABLE_NOT_PERSISTED, MYF(0));
+      return 1;
+    }
+  }
+
+err:
+  for (set_var_base &v : *var_list) {
+    v.cleanup();
+  }
+  free_underlaid_joins(thd->lex->query_block);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_optimizer_switch not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: TABLE_SHARE::usable_indexes
+Key_map TABLE_SHARE::usable_indexes(const THD *thd) const {
+  Key_map usable_indexes(keys_in_use);
+  if (!thd->optimizer_switch_flag(OPTIMIZER_SWITCH_USE_INVISIBLE_INDEXES))
+    usable_indexes.intersect(visible_indexes);
+  return usable_indexes;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: Table_ref::process_index_hints
+bool Table_ref::process_index_hints(const THD *thd, TABLE *tbl) {
+  /* initialize the result variables */
+  tbl->keys_in_use_for_query = tbl->keys_in_use_for_group_by =
+      tbl->keys_in_use_for_order_by = tbl->s->usable_indexes(thd);
+
+  /* index hint list processing */
+  if (index_hints) {
+    /* Temporary variables used to collect hints of each kind. */
+    Key_map index_join[INDEX_HINT_FORCE + 1];
+    Key_map index_order[INDEX_HINT_FORCE + 1];
+    Key_map index_group[INDEX_HINT_FORCE + 1];
+    Index_hint *hint;
+    bool have_empty_use_join = false, have_empty_use_order = false,
+         have_empty_use_group = false;
+    List_iterator<Index_hint> iter(*index_hints);
+
+    /* iterate over the hints list */
+    while ((hint = iter++)) {
+      uint pos;
+
+      /* process empty USE INDEX () */
+      if (hint->type == INDEX_HINT_USE && !hint->key_name.str) {
+        if (hint->clause & INDEX_HINT_MASK_JOIN) {
+          index_join[hint->type].clear_all();
+          have_empty_use_join = true;
+        }
+        if (hint->clause & INDEX_HINT_MASK_ORDER) {
+          index_order[hint->type].clear_all();
+          have_empty_use_order = true;
+        }
+        if (hint->clause & INDEX_HINT_MASK_GROUP) {
+          index_group[hint->type].clear_all();
+          have_empty_use_group = true;
+        }
+        continue;
+      }
+
+      /*
+        Check if an index with the given name exists and get his offset in
+        the keys bitmask for the table
+      */
+      if (tbl->s->keynames.type_names == nullptr ||
+          (pos = find_type(&tbl->s->keynames, hint->key_name.str,
+                           hint->key_name.length, true)) <= 0 ||
+          (!tbl->s->key_info[pos - 1].is_visible &&
+           !thd->optimizer_switch_flag(
+               OPTIMIZER_SWITCH_USE_INVISIBLE_INDEXES))) {
+        my_error(ER_KEY_DOES_NOT_EXITS, MYF(0), hint->key_name.str, alias);
+        return true;
+      }
+
+      pos--;
+
+      /* add to the appropriate clause mask */
+      if (hint->clause & INDEX_HINT_MASK_JOIN)
+        index_join[hint->type].set_bit(pos);
+      if (hint->clause & INDEX_HINT_MASK_ORDER)
+        index_order[hint->type].set_bit(pos);
+      if (hint->clause & INDEX_HINT_MASK_GROUP)
+        index_group[hint->type].set_bit(pos);
+    }
+
+    /* cannot mix USE INDEX and FORCE INDEX */
+    if ((!index_join[INDEX_HINT_FORCE].is_clear_all() ||
+         !index_order[INDEX_HINT_FORCE].is_clear_all() ||
+         !index_group[INDEX_HINT_FORCE].is_clear_all()) &&
+        (!index_join[INDEX_HINT_USE].is_clear_all() || have_empty_use_join ||
+         !index_order[INDEX_HINT_USE].is_clear_all() || have_empty_use_order ||
+         !index_group[INDEX_HINT_USE].is_clear_all() || have_empty_use_group)) {
+      my_error(ER_WRONG_USAGE, MYF(0), index_hint_type_name[INDEX_HINT_USE],
+               index_hint_type_name[INDEX_HINT_FORCE]);
+      return true;
+    }
+
+    /* process FORCE INDEX as USE INDEX with a flag */
+    if (!index_order[INDEX_HINT_FORCE].is_clear_all()) {
+      tbl->force_index_order = true;
+      index_order[INDEX_HINT_USE].merge(index_order[INDEX_HINT_FORCE]);
+    }
+
+    if (!index_group[INDEX_HINT_FORCE].is_clear_all()) {
+      tbl->force_index_group = true;
+      index_group[INDEX_HINT_USE].merge(index_group[INDEX_HINT_FORCE]);
+    }
+
+    /*
+      TODO: get rid of tbl->force_index (on if any FORCE INDEX is specified) and
+      create tbl->force_index_join instead.
+      Then use the correct force_index_XX instead of the global one.
+    */
+    if (!index_join[INDEX_HINT_FORCE].is_clear_all() ||
+        tbl->force_index_group || tbl->force_index_order) {
+      tbl->force_index = true;
+      index_join[INDEX_HINT_USE].merge(index_join[INDEX_HINT_FORCE]);
+    }
+
+    /* apply USE INDEX */
+    if (!index_join[INDEX_HINT_USE].is_clear_all() || have_empty_use_join)
+      tbl->keys_in_use_for_query.intersect(index_join[INDEX_HINT_USE]);
+    if (!index_order[INDEX_HINT_USE].is_clear_all() || have_empty_use_order)
+      tbl->keys_in_use_for_order_by.intersect(index_order[INDEX_HINT_USE]);
+    if (!index_group[INDEX_HINT_USE].is_clear_all() || have_empty_use_group)
+      tbl->keys_in_use_for_group_by.intersect(index_group[INDEX_HINT_USE]);
+
+    /* apply IGNORE INDEX */
+    tbl->keys_in_use_for_query.subtract(index_join[INDEX_HINT_IGNORE]);
+    tbl->keys_in_use_for_order_by.subtract(index_order[INDEX_HINT_IGNORE]);
+    tbl->keys_in_use_for_group_by.subtract(index_group[INDEX_HINT_IGNORE]);
+  }
+
+  /* make sure covering_keys don't include indexes disabled with a hint */
+  tbl->covering_keys.intersect(tbl->keys_in_use_for_query);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field::is_part_of_actual_key
+bool Field::is_part_of_actual_key(THD *thd, uint cur_index,
+                                  KEY *cur_index_info) const {
+  return thd->optimizer_switch_flag(OPTIMIZER_SWITCH_USE_INDEX_EXTENSIONS) &&
+                 !(cur_index_info->flags & HA_NOSAME)
+             ? part_of_key.is_set(cur_index)
+             : part_of_key_not_extended.is_set(cur_index);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: DsMrr_impl::choose_mrr_impl
+      choose_mrr_impl(keyno, rows, flags, bufsz, cost)) {
+    /* Default implementation is chosen */
+    DBUG_PRINT("info", ("Default MRR implementation choosen"));
+    *flags = def_flags;
+    *bufsz = def_bufsz;
+    assert(*flags & HA_MRR_USE_DEFAULT_IMPL);
+  } else {
+    /* *flags and *bufsz were set by choose_mrr_impl */
+    DBUG_PRINT("info", ("DS-MRR implementation choosen"));
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc
+Function: Sql_cmd_create_table::execute
+bool Sql_cmd_create_table::execute(THD *thd) {
+  LEX *const lex = thd->lex;
+  Query_block *const query_block = lex->query_block;
+  Query_expression *const query_expression = lex->unit;
+  Table_ref *const create_table = lex->query_tables;
+  partition_info *part_info = lex->part_info;
+
+  /*
+    Code below (especially in mysql_create_table() and Query_result_create
+    methods) may modify HA_CREATE_INFO structure in LEX, so we have to
+    use a copy of this structure to make execution prepared statement-
+    safe. A shallow copy is enough as this code won't modify any memory
+    referenced from this structure.
+  */
+  HA_CREATE_INFO create_info(*lex->create_info);
+  /*
+    We need to copy alter_info for the same reasons of re-execution
+    safety, only in case of Alter_info we have to do (almost) a deep
+    copy.
+  */
+  Alter_info alter_info(*m_alter_info, thd->mem_root);
+
+  if (thd->is_error()) {
+    /* If out of memory when creating a copy of alter_info. */
+    return true;
+  }
+
+  if (((lex->create_info->used_fields & HA_CREATE_USED_DATADIR) != 0 ||
+       (lex->create_info->used_fields & HA_CREATE_USED_INDEXDIR) != 0) &&
+      check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "FILE");
+    return true;
+  }
+
+  if (!thd->is_plugin_fake_ddl()) {
+    if (create_table_precheck(thd, query_expression_tables, create_table))
+      return true;
+  }
+
+  /* Might have been updated in create_table_precheck */
+  create_info.alias = create_table->alias;
+
+  /*
+    If no engine type was given, work out the default now
+    rather than at parse-time.
+  */
+  if (!(create_info.used_fields & HA_CREATE_USED_ENGINE))
+    create_info.db_type = create_info.options & HA_LEX_CREATE_TMP_TABLE
+                              ? ha_default_temp_handlerton(thd)
+                              : ha_default_handlerton(thd);
+
+  assert(create_info.db_type != nullptr);
+  if ((m_alter_info->flags & Alter_info::ANY_ENGINE_ATTRIBUTE) != 0 &&
+      ((create_info.db_type->flags & HTON_SUPPORTS_ENGINE_ATTRIBUTE) == 0 &&
+       DBUG_EVALUATE_IF("simulate_engine_attribute_support", false, true))) {
+    my_error(ER_ENGINE_ATTRIBUTE_NOT_SUPPORTED, MYF(0),
+             ha_resolve_storage_engine_name(create_info.db_type));
+    return true;
+  }
+
+  /*
+    Assign target tablespace name to enable locking in lock_table_names().
+    Reject invalid names.
+  */
+  if (create_info.tablespace) {
+    if (validate_tablespace_name_length(create_info.tablespace) ||
+        validate_tablespace_name(TS_CMD_NOT_DEFINED, create_info.tablespace,
+                                 create_info.db_type))
+      return true;
+
+    if (lex_string_strmake(thd->mem_root, &create_table->target_tablespace_name,
+                           create_info.tablespace,
+                           strlen(create_info.tablespace)))
+      return true;
+  }
+
+  // Reject invalid tablespace names specified for partitions.
+  if (validate_partition_tablespace_name_lengths(part_info) ||
+      validate_partition_tablespace_names(part_info, create_info.db_type))
+    return true;
+
+  /* Fix names if symlinked or relocated tables */
+  if (prepare_index_and_data_dir_path(thd, &create_info.data_file_name,
+                                      &create_info.index_file_name,
+                                      create_table->table_name))
+    return true;
+
+  {
+    partition_info *part = thd->lex->part_info;
+    if (part != nullptr && has_external_data_or_index_dir(*part) &&
+        check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+      return true;
+    }
+    if (part && !(part = thd->lex->part_info->get_clone(thd, true)))
+      return true;
+    thd->work_part_info = part;
+  }
+
+  if (part_info != nullptr && part_info->part_expr &&
+      part_info->part_expr->fixed) {  // @todo Code may be redundant
+    part_info->fixed = true;
+  }
+  bool res = false;
+
+  if (!query_block->field_list_is_empty())  // With select
+  {
+    /*
+      CREATE TABLE...IGNORE/REPLACE SELECT... can be unsafe, unless
+      ORDER BY PRIMARY KEY clause is used in SELECT statement. We therefore
+      use row based logging if mixed or row based logging is available.
+      TODO: Check if the order of the output of the select statement is
+      deterministic. Waiting for BUG#42415
+    */
+    if (lex->is_ignore())
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_IGNORE_SELECT);
+
+    if (lex->duplicates == DUP_REPLACE)
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_REPLACE_SELECT);
+
+    /**
+      Disallow creation of foreign keys if,
+
+      - SE supports atomic DDL's.
+      - The binlogging is enabled.
+      - The binlog format is ROW.
+
+      This is done to avoid complications involved in locking,
+      updating and invalidation (in case of rollback) of DD cache
+      for parent table.
+    */
+    if ((alter_info.flags & Alter_info::ADD_FOREIGN_KEY) &&
+        (create_info.db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+        mysql_bin_log.is_open() &&
+        (thd->variables.option_bits & OPTION_BIN_LOG) &&
+        thd->variables.binlog_format == BINLOG_FORMAT_ROW) {
+      my_error(ER_FOREIGN_KEY_WITH_ATOMIC_CREATE_SELECT, MYF(0));
+      return true;
+    }
+
+    // Reject request to CREATE TABLE AS SELECT with START TRANSACTION.
+    if (create_info.m_transactional_ddl) {
+      my_error(ER_NOT_ALLOWED_WITH_START_TRANSACTION, MYF(0),
+               "with CREATE TABLE ... AS SELECT statement.");
+      return true;
+    }
+
+    /*
+      If:
+      a) we inside an SP and there was NAME_CONST substitution,
+      b) binlogging is on (STMT mode),
+      c) we log the SP as separate statements
+      raise a warning, as it may cause problems
+      (see 'NAME_CONST issues' in 'Binary Logging of Stored Programs')
+     */
+    if (thd->query_name_consts && mysql_bin_log.is_open() &&
+        thd->variables.binlog_format == BINLOG_FORMAT_STMT &&
+        !mysql_bin_log.is_query_in_union(thd, thd->query_id)) {
+      uint splocal_refs = 0;
+      /* Count SP local vars in the top-level SELECT list */
+      for (Item *item : query_block->visible_fields()) {
+        if (item->is_splocal()) splocal_refs++;
+      }
+      /*
+        If it differs from number of NAME_CONST substitution applied,
+        we may have a SOME_FUNC(NAME_CONST()) in the SELECT list,
+        that may cause a problem with binary log (see BUG#35383),
+        raise a warning.
+      */
+      if (splocal_refs != thd->query_name_consts)
+        push_warning(
+            thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+            "Invoked routine ran a statement that may cause problems with "
+            "binary log, see 'NAME_CONST issues' in 'Binary Logging of Stored "
+            "Programs' "
+            "section of the manual.");
+    }
+
+    /*
+      Disable non-empty MERGE tables with CREATE...SELECT. Too
+      complicated. See Bug #26379. Empty MERGE tables are read-only
+      and don't allow CREATE...SELECT anyway.
+    */
+    if (create_info.used_fields & HA_CREATE_USED_UNION) {
+      my_error(ER_WRONG_OBJECT, MYF(0), create_table->db,
+               create_table->table_name, "BASE TABLE");
+      return true;
+    }
+
+    if (query_expression->is_prepared()) {
+      cleanup(thd);
+    }
+    auto cleanup_se_guard = create_scope_guard(
+        [lex] { lex->set_secondary_engine_execution_context(nullptr); });
+    if (open_tables_for_query(thd, lex->query_tables, false)) return true;
+
+    /* The table already exists */
+    if (create_table->table || create_table->is_view()) {
+      if (create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+        push_warning_printf(thd, Sql_condition::SL_NOTE, ER_TABLE_EXISTS_ERROR,
+                            ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                            create_info.alias);
+        my_ok(thd);
+        return false;
+      } else {
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_info.alias);
+        return false;
+      }
+    }
+
+    /*
+      Remove target table from main select and name resolution
+      context. This can't be done earlier as it will break view merging in
+      statements like "CREATE TABLE IF NOT EXISTS existing_view SELECT".
+    */
+    bool link_to_local;
+    lex->unlink_first_table(&link_to_local);
+
+    /* Updating any other table is prohibited in CTS statement */
+    for (Table_ref *table = lex->query_tables; table;
+         table = table->next_global) {
+      if (table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+        lex->link_first_table_back(create_table, link_to_local);
+
+        my_error(ER_CANT_UPDATE_TABLE_IN_CREATE_TABLE_SELECT, MYF(0),
+                 table->table_name, create_info.alias);
+        return true;
+      }
+    }
+
+    Query_result_create *result;
+    if (!query_expression->is_prepared()) {
+      const Prepare_error_tracker tracker(thd);
+      Prepared_stmt_arena_holder ps_arena_holder(thd);
+      result = new (thd->mem_root)
+          Query_result_create(create_table, &query_block->fields,
+                              lex->duplicates, query_expression_tables);
+      if (result == nullptr) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+
+      // Use the hypergraph optimizer for the SELECT statement, if enabled.
+      lex->set_using_hypergraph_optimizer(
+          thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
+
+      if (query_expression->prepare(thd, result, nullptr, SELECT_NO_UNLOCK,
+                                    0)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+      if (!thd->stmt_arena->is_regular() && lex->save_cmd_properties(thd)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+    } else {
+      result = down_cast<Query_result_create *>(
+          query_expression->query_result() != nullptr
+              ? query_expression->query_result()
+              : query_block->query_result());
+      // Restore prepared statement properties, bind table and field information
+      lex->restore_cmd_properties();
+      bind_fields(thd->stmt_arena->item_list());
+    }
+    if (validate_use_secondary_engine(lex)) return true;
+
+    result->set_two_fields(&create_info, &alter_info);
+
+    // For objects acquired during table creation.
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    Ignore_error_handler ignore_handler;
+    Strict_error_handler strict_handler;
+    if (lex->is_ignore())
+      thd->push_internal_handler(&ignore_handler);
+    else if (thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+
+    res = populate_table(thd, lex);
+
+    // Count the number of statements offloaded to a secondary storage engine.
+    if (using_secondary_storage_engine() && lex->unit->is_executed())
+      ++thd->status_var.secondary_engine_execution_count;
+
+    if (lex->is_ignore() || thd->is_strict_mode()) thd->pop_internal_handler();
+    lex->cleanup(false);
+    thd->clear_current_query_costs();
+    lex->clear_values_map();
+
+    // Abort the result set if execution ended in error
+    if (res) result->abort_result_set(thd);
+
+    result->cleanup();
+
+    lex->link_first_table_back(create_table, link_to_local);
+    THD_STAGE_INFO(thd, stage_end);
+  } else {
+    Strict_error_handler strict_handler;
+    /* Push Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+    /* regular create */
+    if (create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
+      /* CREATE TABLE ... LIKE ... */
+      res = mysql_create_like_table(thd, create_table, query_expression_tables,
+                                    &create_info);
+    } else {
+      /* Regular CREATE TABLE */
+      res = mysql_create_table(thd, create_table, &create_info, &alter_info);
+    }
+    /* Pop Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode()) thd->pop_internal_handler();
+    if (!res) {
+      /* in case of create temp tables if @@session_track_state_change is
+         ON then send session state notification in OK packet */
+      if (create_info.options & HA_LEX_CREATE_TMP_TABLE &&
+          thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, {});
+      my_ok(thd);
+    }
+  }
+  // The following code is required to make CREATE TABLE re-execution safe.
+  // @todo Consider refactoring this code.
+  if (part_info != nullptr) {
+    if (part_info->part_expr != nullptr &&
+        part_info->part_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->part_expr)->reset_field();
+
+    if (part_info->subpart_expr != nullptr &&
+        part_info->subpart_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->subpart_expr)->reset_field();
+  }
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_load.cc
+Function: Sql_cmd_load_table::execute
+bool Sql_cmd_load_table::execute(THD *thd) {
+  LEX *const lex = thd->lex;
+
+  uint privilege =
+      (lex->duplicates == DUP_REPLACE ? INSERT_ACL | DELETE_ACL : INSERT_ACL) |
+      (m_is_local_file ? 0 : FILE_ACL);
+
+  if (m_is_local_file) {
+    if (!thd->get_protocol()->has_client_capability(CLIENT_LOCAL_FILES) ||
+        !opt_local_infile) {
+      my_error(ER_CLIENT_LOCAL_FILES_DISABLED, MYF(0));
+      return true;
+    }
+  }
+
+  if (check_one_table_access(thd, privilege, lex->query_tables)) return true;
+
+  /* Push strict / ignore error handler */
+  Ignore_error_handler ignore_handler;
+  Strict_error_handler strict_handler;
+  if (thd->lex->is_ignore())
+    thd->push_internal_handler(&ignore_handler);
+  else if (thd->is_strict_mode())
+    thd->push_internal_handler(&strict_handler);
+
+  lex->set_using_hypergraph_optimizer(
+      thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
+
+  bool res = execute_inner(thd, lex->duplicates);
+
+  /* Pop ignore / strict error handler */
+  if (thd->lex->is_ignore() || thd->is_strict_mode())
+    thd->pop_internal_handler();
+
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_push.cc
+Function: ndb_pushed_builder_ctx::is_pushable_as_child
+bool ndb_pushed_builder_ctx::is_pushable_as_child(pushed_table *table) {
+  DBUG_TRACE;
+  const uint root_no = m_join_root->get_table_no();
+  const uint tab_no = table->get_table_no();
+  assert(tab_no > root_no);
+
+  if (!maybe_pushable(table, PUSHABLE_AS_CHILD)) {
+    return false;
+  }
+
+  const enum_access_type access_type = table->get_access_type();
+
+  if (ndbcluster_is_mrr_operation(access_type)) {
+    const char *type = table->get_other_access_reason();
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child, "
+        "access type '%s' not implemented",
+        table->get_table()->alias, type);
+    table->set_table_properties(table->get_table_properties() &
+                                ~PUSHABLE_AS_CHILD);
+    return false;
+  }
+
+  if (!(ndbcluster_is_lookup_operation(access_type) ||
+        access_type == AT_ORDERED_INDEX_SCAN)) {
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child, 'type' must be a 'ref' access",
+        table->get_table()->alias);
+    table->set_table_properties(table->get_table_properties() &
+                                ~PUSHABLE_AS_CHILD);
+    return false;
+  }
+
+  // There is a limitation in not allowing LOOKUP - (index)SCAN operations
+  if (access_type == AT_ORDERED_INDEX_SCAN &&
+      !m_scan_operations.contain(root_no)) {
+    EXPLAIN_NO_PUSH(
+        "Push of table '%s' as scan-child "
+        "with lookup-root '%s' not implemented",
+        table->get_table()->alias, m_join_root->get_table()->alias);
+    // 'table' may still be PUSHABLE_AS_CHILD with another parent
+    return false;
+  }
+
+  const uint no_of_key_fields = table->get_no_of_key_fields();
+  if (unlikely(no_of_key_fields > ndb_pushed_join::MAX_LINKED_KEYS)) {
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child, "
+        "too many ref'ed parent fields",
+        table->get_table()->alias);
+    table->set_table_properties(
+        table->get_table_properties() &
+        ~PUSHABLE_AS_CHILD);  // Permanently disable as child
+    return false;
+  }
+
+  if (table->use_order() && table->m_first_sj_inner != (int)tab_no) {
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child, can't provide rows in index order",
+        table->get_table()->alias);
+    table->set_table_properties(
+        table->get_table_properties() &
+        ~PUSHABLE_AS_CHILD);  // Permanently disable as child
+    return false;
+  }
+
+  const ndb_table_map query_scope = table->get_tables_in_this_query_scope();
+  if (!query_scope.contain(root_no)) {
+    const char *scope_type = m_join_root->get_scope_description();
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child of '%s', "
+        "it is in a %s-branch which can't be referred.",
+        table->get_table()->alias, m_join_root->get_table()->alias, scope_type);
+    return false;
+  }
+
+  // Check that we do not exceed the max number of pushable operations.
+  const uint internal_ops_needed = internal_operation_count(access_type);
+  if (unlikely(m_internal_op_count + internal_ops_needed >
+               NDB_SPJ_MAX_TREE_NODES)) {
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child of '%s'. Max number"
+        " of pushable tables exceeded.",
+        table->get_table()->alias, m_join_root->get_table()->alias);
+    return false;
+  }
+  m_internal_op_count += internal_ops_needed;
+
+  DBUG_PRINT("info",
+             ("Table:%d, Checking %d REF keys", tab_no, no_of_key_fields));
+
+  /**
+   * Calculate the set of all-possible-parents (all_parents)for each
+   * non-const_item KEY_PART from the table. In addition to the parent table
+   * directly referred by the KEY_PART, any tables in *same join nest*,
+   * available by usage of equality sets are also included as 'parents'
+   *
+   * The subset 'depend_parents' is also calculated as the set of upper most
+   * key_parents needed to be available as ancestors of this table.
+   *
+   * The set of 'key_parents[]' are saved for later usage by ::optimize_*(),
+   * which will select the actual parent to be used for each table.
+   *
+   * We also aggregate the set of 'all_parents' referred by the keys.
+   * This is used for checking whether table is pushable.
+   */
+  ndb_table_map all_parents;
+  ndb_table_map depend_parents;
+  ndb_table_map *key_parents =
+      new (m_thd->mem_root) ndb_table_map[no_of_key_fields];
+  table->m_key_parents = key_parents;
+
+  for (uint key_part_no = 0; key_part_no < no_of_key_fields; key_part_no++) {
+    const Item *const key_item = table->get_key_field(key_part_no);
+    const KEY_PART_INFO *key_part = table->get_key_part_info(key_part_no);
+
+    if (key_item->const_for_execution()) {
+      // REF is a literal or field from const-table
+      DBUG_PRINT("info", (" Item type:%d is 'const_item'", key_item->type()));
+      if (!is_const_item_pushable(key_item, key_part)) {
+        return false;
+      }
+    } else if (key_item->type() == Item::FIELD_ITEM) {
+      /**
+       * Calculate all parents FIELD_ITEM may refer - Including those
+       * available through usage of equality sets. All field_parents
+       * will be from within the same join_nest.
+       * Only parents within m_join_scope are considered.
+       */
+      ndb_table_map field_parents;
+      if (!is_field_item_pushable(table, key_item, key_part, field_parents)) {
+        return false;
+      }
+      // Save the found key_parents[], aggregate total set of parents referable.
+      key_parents[key_part_no] = field_parents;
+      all_parents.add(field_parents);
+
+      if (!field_parents.is_clear_all()) {  // Key refers a parent field
+#ifndef NDEBUG
+        // Verify requirement that all field_parents are from within same nest
+        {
+          const uint last = field_parents.last_table(tab_no);
+          ndb_table_map nest(m_tables[last].m_inner_nest);
+          nest.add(last);
+          assert(nest.contain(field_parents));
+        }
+#endif
+        const uint first = field_parents.first_table();
+        depend_parents.add(first);
+      }
+    } else {
+      EXPLAIN_NO_PUSH(
+          "Can't push table '%s' as child, "
+          "column '%s' does neither 'ref' a column nor a constant",
+          table->get_table()->alias, key_part->field->field_name);
+      table->set_table_properties(
+          table->get_table_properties() &
+          ~PUSHABLE_AS_CHILD);  // Permanently disable as child
+
+      return false;
+    }
+  }  // for (uint key_part_no= 0 ...
+
+  // If no parent candidates within current m_join_scope, table is unpushable.
+  if (all_parents.is_clear_all()) {
+    EXPLAIN_NO_PUSH(
+        "Can't push table '%s' as child of '%s', "
+        "no parent-child dependency exists between these tables",
+        table->get_table()->alias, m_join_root->get_table()->alias);
+    return false;
+  }
+
+  /**
+   * There are limitations on index scans which are depending on other scans
+   * which are skip-read as part of a semi-join. Due to the batch fetch
+   * mechanisms in SPJ, we might see repeated duplicates of previous fetched
+   * rows, when they are combined with new rows from later index-scans
+   * depending on these. As the semi-join iterators will skip duplicates,
+   * we might incorrrectly skip result rows iff:
+   *
+   *  1) This table is not part of a semi-join nest itself.
+   *     (Thus, not intended to be a subject to skip-read)
+   *  2) Table depends on other tables being skip-read.
+   *     (Is in a query tree branch with ancestors being skip-read)
+   */
+  // Pushed tables being subject to skip-read:
+  ndb_table_map pushed_skip_reads(m_skip_reads);
+  pushed_skip_reads.intersect(m_join_scope);
+
+  if (!table->m_sj_nest.contain(tab_no) &&                 // 1)
+      depend_parents.is_overlapping(pushed_skip_reads)) {  // 2)
+
+    // This table becomes an indirect subject to skip-read as well
+    m_skip_reads.add(tab_no);
+
+    // If both this table is a scan, and there are scans being skip read.
+    // -> We might skip result rows from this non-semi-joined table
+    if (m_scan_operations.contain(tab_no) &&
+        m_scan_operations.is_overlapping(pushed_skip_reads)) {
+      EXPLAIN_NO_PUSH(
+          "Can't push table '%s' as scan-child of '%s', "
+          "depends on tables being 'skip-read'",
+          table->get_table()->alias, m_join_root->get_table()->alias);
+      return false;
+    }
+  }
+
+  /**
+   * Try to push condition to 'table'. Whatever we could not push of the
+   * condition is a 'server side condition' which the server has to
+   * evaluate later. The existence of such conditions may effect the join
+   * pushability of tables, so we need to try to push conditions first.
+   */
+  const Item *pending_cond = table->get_condition();
+  if (pending_cond != nullptr &&
+      m_thd->optimizer_switch_flag(
+          OPTIMIZER_SWITCH_ENGINE_CONDITION_PUSHDOWN)) {
+    /**
+     * Calculate full set of possible ancestors for this table in
+     * the query tree. Note that they do not become mandatory ancestors
+     * before being added to the m_ancestors bitmap (Further below)
+     *
+     * 1) All possible key parents, previously calculated as 'all_parents',
+     *    as well as all nest-level required_ancestors() are initial parent
+     *    candidates. (Note that no table-level m_ancestors are set yet)
+     *
+     * 2) For all tables being a 'possible_ancestor' of this table:
+     *    a) Add the key_parents[] referred from such tables as well.
+     *    b) Add any enforced 'm_ancestors'.
+     *
+     * 3) Add tables requiring existing ancestors as its own ancestors:
+     *    For all preceeding table *not* yet being a 'possible_ancestor', if:
+     *    a) Table is a member of the ancestor nests (I.e. the set of nests
+     *       already being referred) ): Do not add new nest dependencies
+     *    AND
+     *    b) Table access is a 'single-row-lookup' ): Else we get a
+     *       multiplicative access-fanout on all tables getting it as an
+     *       ancestor.
+     *
+     *    Then we can add this table as a possible ancestor, if EITHER:
+     *    c) All referred key_parents[] are possible_ancestors.
+     *    d) All required_ancestors are possible_ancestors.
+     *    -> I.e. Table will always be joined with these ancestors, still
+     *       providing the existing possible_ancestor as grand-ancestors.
+     */
+
+    // 1) Start with all parent candidates for this 'table'
+    ndb_table_map possible_ancestors(all_parents);
+    possible_ancestors.add(required_ancestors(table));
+
+    // 2) For all possible_ancestor tables, add its ancestors as well:
+    for (uint i = tab_no - 1; i > root_no; i--) {
+      if (possible_ancestors.contain(i)) {
+        const ndb_table_map all_key_parents(get_all_key_parents(&m_tables[i]));
+        possible_ancestors.add(all_key_parents);          // 2a)
+        possible_ancestors.add(m_tables[i].m_ancestors);  // 2b)
+      }
+    }
+
+    // 3) Add tables requiring existing ancestors as its own ancestors:
+    const ndb_table_map ancestor_nests(table->ancestor_nests());
+    for (uint i = root_no + 1; i < tab_no; i++) {
+      if (m_join_scope.contain(i) &&         // Table is pushed
+          !possible_ancestors.contain(i) &&  // Not already an ancestor
+          ancestor_nests.contain(i) &&       // 3a) In ancestor-nests of table
+          !m_scan_operations.contain(i)) {   // 3b) Is a single-row access type
+
+        // 3c) All referred key_parents[] are possible_ancestors.
+        const ndb_table_map all_key_parents(get_all_key_parents(&m_tables[i]));
+        if (possible_ancestors.contain(all_key_parents)) {
+          possible_ancestors.add(i);
+        }
+        // 3d) All required_ancestors are possible_ancestors.
+        if (!m_tables[i].m_ancestors.is_clear_all() &&
+            possible_ancestors.contain(m_tables[i].m_ancestors)) {
+          possible_ancestors.add(i);
+        }
+      }
+    }
+    assert(m_join_scope.contain(possible_ancestors));
+
+    /**
+     * Calculate the set of tables where the referred Field values may be
+     * handled as either constant or parameter values from a pushed condition.
+     *
+     * 1) const_expr_tables:
+     *    Values from all tables in the 'm_const_scope' has been evalued prior
+     *    to the query being pushed. Thus, their Field values are known and can
+     *    be used to evaluated any expression they are part of into constants.
+     *
+     *    Note that we do not allow const_expr_tables if pushed join root is a
+     *    lookup, where its EQRefIterator::Read may detect equal keys and
+     *    optimize away the read of pushed join. (Note a similar limitation for
+     *    keys in ::is_field_item_pushable()).
+     *    TODO?: Integrate with setting of Index_lookup::disable_cache
+     *    and lift these limitations when 'cache' is disabled.
+     *
+     * 2) param_expr_tables:
+     *    The pushed join, including any pushed conditions embedded within it,
+     *    is generated when the root of the pushed join is sent for execution.
+     *    At this point in time the value of any Field from ancestor tables
+     *    within the pushed join is still not known. However, when the
+     *    SPJ block sends the REQuests to the LDMs, all ancestor tables in
+     *    the pushed join are  available. This allows us to a build
+     *    a parameter set containing the referred Field values, and supply
+     *    it to the LDM's together with a pushed condition referring the
+     *    parameters.
+     */
+    table_map const_expr_tables(0);
+    if (m_scan_operations.contain(root_no)) {
+      for (uint i = 0; i < root_no; i++) {
+        if (m_const_scope.contain(i)) {
+          const TABLE *table = m_tables[i].get_table();
+          if (table != nullptr && table->pos_in_table_list != nullptr) {
+            const_expr_tables |= table->pos_in_table_list->map();
+          }
+        }
+      }
+    }
+    const Ndb *ndb = get_thd_ndb(m_thd)->ndb;
+    table_map param_expr_tables(0);
+    if (ndbd_support_param_cmp(ndb->getMinDbNodeVersion())) {
+      for (uint i = root_no; i < tab_no; i++) {
+        if (possible_ancestors.contain(i)) {
+          const TABLE *table = m_tables[i].get_table();
+          param_expr_tables |= table->pos_in_table_list->map();
+        }
+      }
+    }
+    ha_ndbcluster *handler =
+        down_cast<ha_ndbcluster *>(table->get_table()->file);
+    handler->m_cond.prep_cond_push(pending_cond, const_expr_tables,
+                                   param_expr_tables);
+    pending_cond = handler->m_cond.m_remainder_cond;
+
+    if (handler->m_cond.m_pushed_cond != nullptr) {
+      const List<const Ndb_param> params =
+          handler->m_cond.get_interpreter_params();
+      if (unlikely(params.size() > ndb_pushed_join::MAX_LINKED_PARAMS)) {
+        DBUG_PRINT("info",
+                   ("Too many parameter Field refs ( >= MAX_LINKED_PARAMS) "
+                    "encountered"));
+        return false;
+      }
+      /* Force an ancestor dependency on tables referred as a parameter. */
+      table_map used_tables(handler->m_cond.m_pushed_cond->used_tables());
+      used_tables &= param_expr_tables;
+      const ndb_table_map parents_of_condition(get_table_map(used_tables));
+      table->m_ancestors.add(parents_of_condition);
+      all_parents.add(parents_of_condition);
+      depend_parents.add(parents_of_condition);
+    }
+  }
+  if (pending_cond != nullptr) {
+    m_has_pending_cond.add(tab_no);
+  }
+  if (m_scan_operations.contain(tab_no)) {
+    // Check extra limitations on when index scan is pushable,
+    if (!is_pushable_as_child_scan(table, all_parents)) {
+      return false;
+    }
+  }
+
+  /**
+   * Set up the join-nest ancestor dependencies required by the set of
+   * 'depend_tables' refered from this table. That is: the 'real'
+   * outer-join nest dependencies, represented in m_ancestor_nests.
+   */
+  if (!set_ancestor_nests(table, depend_parents)) {
+    return false;
+  }
+
+  /**
+   * Calculate contribution to the required_ancestors() dependencies,
+   * from this table. Each 'required_ancestor'-table need to be an
+   * ancestor table when constructing the SPJ query-tree.
+   * These ancestor dependencies are set as the required 'm_ancestors'
+   * on each table, and the nest-level ancestors are provided
+   * by required_ancestors(), and later used to enforce
+   * ::optimize_query_plan() to use these tables as (grand-)parents
+   */
+  const uint first_inner = table->m_first_inner;
+  // Only interested in the upper-nest-level dependencies:
+  depend_parents.intersect(m_tables[first_inner].ancestor_nests());
+  table->m_ancestors.add(depend_parents);
+
+  // Our ancestor_nests need to cover required parents and ancestors
+  assert(table->ancestor_nests().contain(depend_parents));
+  assert(table->ancestor_nests().contain(required_ancestors(table)));
+
+  // required_ancestors only cares about tables outside of inner_nest
+  assert(!required_ancestors(table).contain(first_inner));
+  assert(!required_ancestors(table).is_overlapping(table->m_inner_nest));
+
+  m_join_scope.add(tab_no);
+  return true;
+}  // ndb_pushed_builder_ctx::is_pushable_as_child
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc
+Function: Query_block::update_semijoin_strategies
+void Query_block::update_semijoin_strategies(THD *thd) {
+  uint sj_strategy_mask =
+      OPTIMIZER_SWITCH_FIRSTMATCH | OPTIMIZER_SWITCH_LOOSE_SCAN |
+      OPTIMIZER_SWITCH_MATERIALIZATION | OPTIMIZER_SWITCH_DUPSWEEDOUT;
+
+  uint opt_switches = thd->variables.optimizer_switch & sj_strategy_mask;
+
+  bool is_secondary_engine_optimization =
+      parent_lex->m_sql_cmd != nullptr &&
+      parent_lex->m_sql_cmd->using_secondary_storage_engine();
+
+  for (Table_ref *sj_nest : sj_nests) {
+    /*
+      After semi-join transformation, original Query_block with hints is lost.
+      Fetch hints from last table in semijoin nest, as join_list has the
+      convention to list join operators' arguments in reverse order.
+    */
+    Table_ref *table = sj_nest->nested_join->m_tables.back();
+    /*
+      Do not respect opt_hints_qb for secondary engine optimization.
+      Secondary storage engines may not support all strategies that are
+      supported by the MySQL executor. Secondary engines should set their
+      supported semi-join strategies in thd->variables.optimizer_switch and not
+      respect optimizer hints or optimizer switches specified by the user.
+    */
+    sj_nest->nested_join->sj_enabled_strategies =
+        (table->opt_hints_qb && !is_secondary_engine_optimization)
+            ? table->opt_hints_qb->sj_enabled_strategies(opt_switches)
+            : opt_switches;
+    if (sj_nest->is_aj_nest()) {
+      // only these are possible with NOT EXISTS/IN:
+      sj_nest->nested_join->sj_enabled_strategies &=
+          OPTIMIZER_SWITCH_FIRSTMATCH | OPTIMIZER_SWITCH_MATERIALIZATION |
+          OPTIMIZER_SWITCH_DUPSWEEDOUT;
+    }
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/thd_raii.h
+Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  explicit Enable_derived_merge_guard(THD *thd, bool enable_derived_merge)
+      : m_thd(thd), m_derived_merge(enable_derived_merge) {
+    if (m_derived_merge) {
+      m_save_optimizer_switch = m_thd->variables.optimizer_switch;
+      m_thd->variables.optimizer_switch |= OPTIMIZER_SWITCH_DERIVED_MERGE;
+    }
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/thd_raii.h
+Function: Enable_derived_merge_guard::
+    if (m_thd) {
+      /*
+        We can't disable auto-commit if there is ongoing transaction as this
+        might easily break statement/session transaction invariants.
+      */
+      assert(m_thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
+             m_thd->get_transaction()->is_empty(Transaction_ctx::SESSION));
+
+      m_thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
+      m_thd->variables.option_bits |= OPTION_NOT_AUTOCOMMIT;
+    }
+
+

@@ -1,0 +1,3493 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Session_sysvars_tracker::enable
+bool Session_sysvars_tracker::enable(THD *thd) {
+  LEX_STRING var_list;
+
+  if (!thd->variables.track_sysvars_ptr) return false;
+
+  var_list.str = thd->variables.track_sysvars_ptr;
+  var_list.length = strlen(thd->variables.track_sysvars_ptr);
+
+  if (tool_list->parse_var_list(thd, var_list, true, thd->charset(), false) ==
+      true)
+    return true;
+
+  m_enabled = orig_list->update(tool_list, thd);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Session_sysvars_tracker::check
+inline bool Session_sysvars_tracker::check(THD *thd, set_var *var) {
+  tool_list->reset();
+  return tool_list->parse_var_list(thd, var->save_result.string_value, true,
+                                   thd->charset(), true);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Session_sysvars_tracker::vars_list::update
+bool Session_sysvars_tracker::update(THD *thd) {
+  if (!thd->variables.track_sysvars_ptr) return false;
+  m_enabled = orig_list->update(tool_list, thd);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp_head.cc
+Function: sp_head::set_body_end
+void sp_head::set_body_end(THD *thd) {
+  Lex_input_stream *lip = &thd->m_parser_state->m_lip; /* shortcut */
+  const char *end_ptr = lip->get_cpp_ptr();            /* shortcut */
+
+  /* Make the string of parameters. */
+
+  {
+    const char *p_start = m_parser_data.get_parameter_start_ptr();
+    const char *p_end = m_parser_data.get_parameter_end_ptr();
+
+    if (p_start && p_end) {
+      m_params.length = p_end - p_start;
+      m_params.str = thd->strmake(p_start, m_params.length);
+    }
+  }
+
+  /* Remember end pointer for further dumping of whole statement. */
+
+  thd->lex->stmt_definition_end = end_ptr;
+
+  /* Make the string of body (in the original character set). */
+
+  LEX_STRING body;
+  body.length = end_ptr - m_parser_data.get_body_start_ptr();
+  body.str = thd->strmake(m_parser_data.get_body_start_ptr(), body.length);
+  trim_whitespace(thd->charset(), &body);
+  m_body = to_lex_cstring(body);
+
+  /* Make the string of UTF-body. */
+
+  lip->body_utf8_append(end_ptr);
+
+  LEX_STRING body_utf8;
+  body_utf8.length = lip->get_body_utf8_length();
+  body_utf8.str = thd->strmake(lip->get_body_utf8_str(), body_utf8.length);
+  trim_whitespace(thd->charset(), &body_utf8);
+  m_body_utf8 = to_lex_cstring(body_utf8);
+
+  /*
+    Make the string of whole stored-program-definition query (in the
+    original character set).
+  */
+
+  m_defstr.length = end_ptr - lip->get_cpp_buf();
+  m_defstr.str = thd->strmake(lip->get_cpp_buf(), m_defstr.length);
+  trim_whitespace(thd->charset(), &m_defstr);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp_head.cc
+Function: sp_head::execute
+bool sp_head::execute(THD *thd, bool merge_da_on_success) {
+  char saved_cur_db_name_buf[NAME_LEN + 1];
+  LEX_STRING saved_cur_db_name = {saved_cur_db_name_buf,
+                                  sizeof(saved_cur_db_name_buf)};
+  bool cur_db_changed = false;
+  bool err_status = false;
+  uint ip = 0;
+  sql_mode_t save_sql_mode;
+  Query_arena *old_arena;
+  /* per-instruction arena */
+  MEM_ROOT execute_mem_root(key_memory_sp_head_execute_root,
+                            MEM_ROOT_BLOCK_SIZE);
+  Query_arena execute_arena(&execute_mem_root,
+                            Query_arena::STMT_INITIALIZED_FOR_SP),
+      backup_arena;
+  query_id_t old_query_id;
+  LEX *old_lex;
+  Item_change_list old_change_list;
+  String old_packet;
+  Object_creation_ctx *saved_creation_ctx;
+  Diagnostics_area *caller_da = thd->get_stmt_da();
+  Diagnostics_area sp_da(false);
+
+  /*
+    Just reporting a stack overrun error
+    (@sa check_stack_overrun()) requires stack memory for error
+    message buffer. Thus, we have to put the below check
+    relatively close to the beginning of the execution stack,
+    where available stack margin is still big. As long as the check
+    has to be fairly high up the call stack, the amount of memory
+    we "book" for has to stay fairly high as well, and hence
+    not very accurate. The number below has been calculated
+    by trial and error, and reflects the amount of memory necessary
+    to execute a single stored procedure instruction, be it either
+    an SQL statement, or, heaviest of all, a CALL, which involves
+    parsing and loading of another stored procedure into the cache
+    (@sa db_load_routine() and Bug#10100).
+
+    TODO: that should be replaced by proper handling of stack overrun error.
+
+    Stack size depends on the platform:
+      - for most platforms (8 * STACK_MIN_SIZE) is enough;
+      - for Solaris SPARC 64 (10 * STACK_MIN_SIZE) is required.
+      - for clang and ASAN/UBSAN we need even more stack space.
+  */
+
+  {
+#if defined(__clang__) && defined(HAVE_ASAN)
+    const int sp_stack_size = 12 * STACK_MIN_SIZE;
+#elif defined(__clang__) && defined(HAVE_UBSAN)
+    const int sp_stack_size = 16 * STACK_MIN_SIZE;
+#else
+    const int sp_stack_size = 8 * STACK_MIN_SIZE;
+#endif
+
+    if (check_stack_overrun(thd, sp_stack_size, (uchar *)&old_packet))
+      return true;
+  }
+
+  opt_trace_disable_if_no_security_context_access(thd);
+
+  assert(!(m_flags & IS_INVOKED));
+  m_flags |= IS_INVOKED;
+  m_first_instance->m_first_free_instance = m_next_cached_sp;
+  if (m_next_cached_sp) {
+    DBUG_PRINT("info", ("first free for %p ++: %p->%p  level: %lu  flags %x",
+                        m_first_instance, this, m_next_cached_sp,
+                        m_next_cached_sp->m_recursion_level,
+                        m_next_cached_sp->m_flags));
+  }
+  /*
+    Check that if there are not any instances after this one then
+    pointer to the last instance points on this instance or if there are
+    some instances after this one then recursion level of next instance
+    greater then recursion level of current instance on 1
+  */
+  assert((m_next_cached_sp == nullptr &&
+          m_first_instance->m_last_cached_sp == this) ||
+         (m_recursion_level + 1 == m_next_cached_sp->m_recursion_level));
+
+  /*
+    NOTE: The SQL Standard does not specify the context that should be
+    preserved for stored routines. However, at SAP/Walldorf meeting it was
+    decided that current database should be preserved.
+  */
+  if (m_db.length && (err_status = mysql_opt_change_db(
+                          thd, to_lex_cstring(m_db), &saved_cur_db_name, false,
+                          &cur_db_changed))) {
+    goto done;
+  }
+
+  thd->is_slave_error = false;
+  old_arena = thd->stmt_arena;
+
+  /* Push a new Diagnostics Area. */
+  thd->push_diagnostics_area(&sp_da);
+
+  /*
+    Switch query context. This has to be done early as this is sometimes
+    allocated through sql_alloc
+  */
+  saved_creation_ctx = m_creation_ctx->set_n_backup(thd);
+
+  /*
+    We have to save/restore this info when we are changing call level to
+    be able properly do close_thread_tables() in instructions.
+  */
+  old_query_id = thd->query_id;
+  save_sql_mode = thd->variables.sql_mode;
+  thd->variables.sql_mode = m_sql_mode;
+  /**
+    When inside a substatement (a stored function or trigger
+    statement), clear the metadata observer in THD, if any.
+    Remember the value of the observer here, to be able
+    to restore it when leaving the substatement.
+
+    We reset the observer to suppress errors when a substatement
+    uses temporary tables. If a temporary table does not exist
+    at start of the main statement, it's not prelocked
+    and thus is not validated with other prelocked tables.
+
+    Later on, when the temporary table is opened, metadata
+    versions mismatch, expectedly.
+
+    The proper solution for the problem is to re-validate tables
+    of substatements (Bug#12257, Bug#27011, Bug#32868, Bug#33000),
+    but it's not implemented yet.
+  */
+  thd->push_reprepare_observer(nullptr);
+
+  /*
+    It is also more efficient to save/restore current thd->lex once when
+    do it in each instruction
+  */
+  old_lex = thd->lex;
+  /*
+    Save Item tree change list to avoid rollback something
+    too early in the calling query.
+  */
+  thd->change_list.move_elements_to(&old_change_list);
+
+  if (thd->is_classic_protocol()) {
+    /*
+      Cursors will use thd->packet, so they may corrupt data which was
+      prepared for sending by upper level. OTOH cursors in the same routine
+      can share this buffer safely so let use use routine-local packet
+      instead of having own packet buffer for each cursor.
+
+      It is probably safe to use same thd->convert_buff everywhere.
+    */
+    old_packet.swap(*thd->get_protocol_classic()->get_output_packet());
+  }
+
+  /*
+    Switch to per-instruction arena here. We can do it since we cleanup
+    arena after every instruction.
+  */
+  thd->swap_query_arena(execute_arena, &backup_arena);
+
+  /*
+    Save callers arena in order to store instruction results and out
+    parameters in it later during sp_eval_func_item()
+  */
+  thd->sp_runtime_ctx->callers_arena = &backup_arena;
+
+#if defined(ENABLED_PROFILING)
+  /* Discard the initial part of executing routines. */
+  thd->profiling->discard_current_query();
+#endif
+  do {
+    sp_instr *i;
+
+#if defined(ENABLED_PROFILING)
+    /*
+     Treat each "instr" of a routine as discrete unit that could be profiled.
+     Profiling only records information for segments of code that set the
+     source of the query, and almost all kinds of instructions in s-p do not.
+    */
+    thd->profiling->finish_current_query();
+    thd->profiling->start_new_query("continuing inside routine");
+#endif
+
+    /* get_instr returns NULL when we're done. */
+    i = get_instr(ip);
+    if (i == nullptr) {
+#if defined(ENABLED_PROFILING)
+      thd->profiling->discard_current_query();
+#endif
+      break;
+    }
+
+    DBUG_PRINT("execute", ("Instruction %u", ip));
+
+    /*
+      We need to reset start_time to allow for time to flow inside a stored
+      procedure. This is only done for SP since time is suppose to be constant
+      during execution of triggers and functions.
+    */
+    reset_start_time_for_sp(thd);
+
+    /*
+      We have to set thd->stmt_arena before executing the instruction
+      to store in the instruction item list all new items, created
+      during the first execution (for example expanding of '*' or the
+      items made during other permanent subquery transformations).
+    */
+    thd->stmt_arena = &i->m_arena;
+
+    /*
+      Will write this SP statement into binlog separately.
+      TODO: consider changing the condition to "not inside event union".
+    */
+    if (thd->locked_tables_mode <= LTM_LOCK_TABLES)
+      thd->user_var_events_alloc = thd->mem_root;
+
+    sql_digest_state digest_state;
+    sql_digest_state *parent_digest = thd->m_digest;
+    thd->m_digest = &digest_state;
+
+    mysql_thread_set_secondary_engine(false);
+
+#ifdef HAVE_PSI_STATEMENT_INTERFACE
+    PSI_statement_locker_state psi_state;
+    PSI_statement_info *psi_info = i->get_psi_info();
+    PSI_statement_locker *parent_locker;
+
+    parent_locker = thd->m_statement_psi;
+    thd->m_statement_psi = MYSQL_START_STATEMENT(
+        &psi_state, psi_info->m_key, thd->db().str, thd->db().length,
+        thd->charset(), this->m_sp_share);
+#endif
+
+    /*
+      For now, we're mostly concerned with sp_instr_stmt, but that's
+      likely to change in the future, so we'll do it right from the
+      start.
+    */
+    if (thd->rewritten_query().length()) thd->reset_rewritten_query();
+
+    err_status = i->execute(thd, &ip);
+
+#ifdef HAVE_PSI_STATEMENT_INTERFACE
+    MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+    thd->m_statement_psi = parent_locker;
+#endif
+
+    thd->m_digest = parent_digest;
+
+    cleanup_items(i->m_arena.item_list());
+
+    /*
+      If we've set thd->user_var_events_alloc to mem_root of this SP
+      statement, clean all the events allocated in it.
+    */
+    if (thd->locked_tables_mode <= LTM_LOCK_TABLES) {
+      thd->user_var_events.clear();
+      thd->user_var_events_alloc = nullptr;  // DEBUG
+    }
+
+    // Free items created when executing the instruction, etc.
+    thd->cleanup_after_query();
+
+    // Release memory allocated during execution of the instruction
+    execute_mem_root.ClearForReuse();
+
+    /*
+      Find and process SQL handlers unless it is a fatal error (fatal
+      errors are not catchable by SQL handlers) or the connection has been
+      killed during execution.
+    */
+#ifdef HAVE_PSI_ERROR_INTERFACE
+    uint error_num = 0;
+    if (thd->is_error()) error_num = thd->get_stmt_da()->mysql_errno();
+#endif
+    if (!thd->is_fatal_error() && !thd->killed &&
+        thd->sp_runtime_ctx->handle_sql_condition(thd, &ip, i)) {
+      err_status = false;
+#ifdef HAVE_PSI_ERROR_INTERFACE
+      if (error_num) MYSQL_LOG_ERROR(error_num, PSI_ERROR_OPERATION_HANDLED);
+#endif
+    }
+
+    /* Reset sp_rcontext::end_partial_result_set flag. */
+    thd->sp_runtime_ctx->end_partial_result_set = false;
+
+  } while (!err_status && !thd->killed && !thd->is_fatal_error());
+
+#if defined(ENABLED_PROFILING)
+  thd->profiling->finish_current_query();
+  thd->profiling->start_new_query("tail end of routine");
+#endif
+
+  // Restore query context.
+  m_creation_ctx->restore_env(thd, saved_creation_ctx);
+
+  // Restore arena.
+  thd->swap_query_arena(backup_arena, &execute_arena);
+
+  // Delete all cursors allocated during execution
+  thd->sp_runtime_ctx->pop_all_cursors();
+
+  if (thd->is_classic_protocol()) /* Restore all saved */
+    old_packet.swap(*thd->get_protocol_classic()->get_output_packet());
+  assert(thd->change_list.is_empty());
+  old_change_list.move_elements_to(&thd->change_list);
+  thd->lex = old_lex;
+  thd->set_query_id(old_query_id);
+  thd->variables.sql_mode = save_sql_mode;
+  thd->pop_reprepare_observer();
+
+  thd->stmt_arena = old_arena;
+
+  if (err_status && thd->is_error() && !caller_da->is_error()) {
+    /*
+      If the SP ended with an exception, transfer the exception condition
+      information to the Diagnostics Area of the caller.
+
+      Note that no error might be set yet in the case of kill.
+      It will be set later by mysql_execute_command() / execute_trigger().
+
+      In the case of multi update, it is possible that we can end up
+      executing a trigger after the update has failed. In this case,
+      keep the exception condition from the caller_da and don't transfer.
+    */
+    caller_da->set_error_status(thd->get_stmt_da()->mysql_errno(),
+                                thd->get_stmt_da()->message_text(),
+                                thd->get_stmt_da()->returned_sqlstate());
+  }
+
+  /*
+    - conditions generated during trigger execution should not be
+    propagated to the caller on success;   (merge_da_on_success)
+    - if there was an exception during execution, conditions should be
+    propagated to the caller in any case.  (err_status)
+  */
+  if (err_status || merge_da_on_success) {
+    /*
+      If a routine body is empty or if a routine did not generate any
+      conditions, do not duplicate our own contents by appending the contents
+      of the called routine. We know that the called routine did not change its
+      Diagnostics Area.
+
+      On the other hand, if the routine body is not empty and some statement
+      in the routine generates a condition, Diagnostics Area is guaranteed to
+      have changed. In this case we know that the routine Diagnostics Area
+      contains only new conditions, and thus we perform a copy.
+
+      We don't use push_warning() here as to avoid invocation of
+      condition handlers or escalation of warnings to errors.
+    */
+    if (!err_status && thd->get_stmt_da() != &sp_da) {
+      /*
+        If we are RETURNing directly from a handler and the handler has
+        executed successfully, only transfer the conditions that were
+        raised during handler execution. Conditions that were present
+        when the handler was activated, are considered handled.
+      */
+      caller_da->copy_new_sql_conditions(thd, thd->get_stmt_da());
+    } else  // err_status || thd->get_stmt_da() == sp_da
+    {
+      /*
+        If we ended with an exception, or the SP exited without any handler
+        active, transfer all conditions to the Diagnostics Area of the caller.
+      */
+      caller_da->copy_sql_conditions_from_da(thd, thd->get_stmt_da());
+    }
+  }
+
+  // Restore the caller's original Diagnostics Area.
+  while (thd->get_stmt_da() != &sp_da) thd->pop_diagnostics_area();
+  thd->pop_diagnostics_area();
+  assert(thd->get_stmt_da() == caller_da);
+
+done:
+  DBUG_PRINT(
+      "info",
+      ("err_status: %d  killed: %d  is_slave_error: %d  report_error: %d",
+       err_status, thd->killed.load(), thd->is_slave_error, thd->is_error()));
+
+  if (thd->killed) err_status = true;
+  /*
+    If the DB has changed, the pointer has changed too, but the
+    original thd->db will then have been freed
+  */
+  if (cur_db_changed && thd->killed != THD::KILL_CONNECTION) {
+    /*
+      Force switching back to the saved current database, because it may be
+      NULL. In this case, mysql_change_db() would generate an error.
+    */
+
+    err_status |= mysql_change_db(thd, to_lex_cstring(saved_cur_db_name), true);
+  }
+  m_flags &= ~IS_INVOKED;
+  DBUG_PRINT("info", ("first free for %p --: %p->%p, level: %lu, flags %x",
+                      m_first_instance, m_first_instance->m_first_free_instance,
+                      this, m_recursion_level, m_flags));
+  /*
+    Check that we have one of following:
+
+    1) there are not free instances which means that this instance is last
+    in the list of instances (pointer to the last instance point on it and
+    there are not other instances after this one in the list)
+
+    2) There are some free instances which mean that first free instance
+    should go just after this one and recursion level of that free instance
+    should be on 1 more then recursion level of this instance.
+  */
+  assert((m_first_instance->m_first_free_instance == nullptr &&
+          this == m_first_instance->m_last_cached_sp &&
+          m_next_cached_sp == nullptr) ||
+         (m_first_instance->m_first_free_instance != nullptr &&
+          m_first_instance->m_first_free_instance == m_next_cached_sp &&
+          m_first_instance->m_first_free_instance->m_recursion_level ==
+              m_recursion_level + 1));
+  m_first_instance->m_first_free_instance = this;
+
+  return err_status;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init
+void THD::init(void) {
+  plugin_thdvar_init(this, m_enable_plugins);
+  /*
+    variables= global_system_variables above has reset
+    variables.pseudo_thread_id to 0. We need to correct it here to
+    avoid temporary tables replication failure.
+  */
+  variables.pseudo_thread_id = m_thread_id;
+
+  /*
+    NOTE: reset_connection command will reset the THD to its default state.
+    All system variables whose scope is SESSION ONLY should be set to their
+    default values here.
+  */
+  reset_first_successful_insert_id();
+  user_time.tv_sec = user_time.tv_usec = 0;
+  start_time.tv_sec = start_time.tv_usec = 0;
+  set_time();
+  auto_inc_intervals_forced.clear();
+  {
+    ulong tmp;
+    tmp = sql_rnd_with_mutex();
+    randominit(&rand,
+               tmp + static_cast<ulong>(reinterpret_cast<uintptr_t>(&rand)),
+               tmp + (ulong)::atomic_global_query_id);
+  }
+
+  server_status = SERVER_STATUS_AUTOCOMMIT;
+  if (variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES)
+    server_status |= SERVER_STATUS_NO_BACKSLASH_ESCAPES;
+
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+  open_options = ha_open_options;
+  update_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY : TL_WRITE);
+  insert_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY
+                                      : TL_WRITE_CONCURRENT_INSERT);
+  tx_isolation = (enum_tx_isolation)variables.transaction_isolation;
+  tx_read_only = variables.transaction_read_only;
+  tx_priority = 0;
+  thd_tx_priority = 0;
+  update_charset();
+  reset_current_stmt_binlog_format_row();
+  reset_binlog_local_stmt_filter();
+  memset(&status_var, 0, sizeof(status_var));
+  binlog_row_event_extra_data = nullptr;
+
+  if (variables.sql_log_bin)
+    variables.option_bits |= OPTION_BIN_LOG;
+  else
+    variables.option_bits &= ~OPTION_BIN_LOG;
+
+#if defined(ENABLED_DEBUG_SYNC)
+  /* Initialize the Debug Sync Facility. See debug_sync.cc. */
+  debug_sync_init_thread(this);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
+
+  /* Initialize session_tracker and create all tracker objects */
+  session_tracker.init(this->charset());
+  session_tracker.enable(this);
+
+  owned_gtid.clear();
+  owned_sid.clear();
+  m_se_gtid_flags.reset();
+  owned_gtid.dbug_print(nullptr, "set owned_gtid (clear) in THD::init");
+
+  /*
+    This will clear the writeset session history and re-set delegate state to
+    INIT
+  */
+  rpl_thd_ctx.init();
+
+  /*
+    This variable is used to temporarily disable the password validation plugin
+    when a RANDOM PASSWORD is generated during SET PASSWORD,CREATE USER or
+    ALTER USER statements.
+  */
+  m_disable_password_validation = false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::update_charset
+void THD::update_charset() {
+  size_t not_used;
+  charset_is_system_charset = !String::needs_conversion(
+      0, variables.character_set_client, system_charset_info, &not_used);
+  charset_is_collation_connection =
+      !String::needs_conversion(0, variables.character_set_client,
+                                variables.collation_connection, &not_used);
+  charset_is_character_set_filesystem =
+      !String::needs_conversion(0, variables.character_set_client,
+                                variables.character_set_filesystem, &not_used);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::vsyntax_error_at
+  vsyntax_error_at(m_parser_state->m_lip.get_tok_start(),
+                   ER_THD_NONCONST(this, mysql_errno), args);
+  va_end(args);
+}
+
+/**
+  Push a syntax error message into MySQL diagnostic area with line
+  and position information.
+
+  This function provides semantic action implementers with a way
+  to push the famous "You have a syntax error near..." error
+  message into the diagnostic area, which is normally produced only if
+  a parse error is discovered internally by the Bison generated
+  parser.
+
+  @note Parse-time only function!
+
+  @param location       YYSTYPE object: error position.
+  @param format         Error format message. NULL means ER(ER_SYNTAX_ERROR).
+*/
+
+void THD::syntax_error_at(const YYLTYPE &location, const char *format, ...) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.cc
+Function: Hint_scanner::Hint_scanner not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.cc
+Function: Hint_scanner::Hint_scanner not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.cc
+Function: Hint_scanner::Hint_scanner not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.cc
+Function: Hint_scanner::syntax_warning
+void Hint_scanner::syntax_warning(const char *msg) const {
+  /* Push an error into the error stack */
+  ErrConvString err(raw_yytext, input_buf_end - raw_yytext,
+                    thd->variables.character_set_client);
+
+  push_warning_printf(thd, Sql_condition::SL_WARNING, ER_PARSE_ERROR,
+                      ER_THD(thd, ER_PARSE_ERROR), msg, err.ptr(),
+                      static_cast<int>(lineno));
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: void not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: int not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: int not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: int not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: int not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: int not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex_hints.h
+Function: int not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_show.cc
+Function: Fill_process_list::operator
+  bool operator()(const thread_info *p1, const thread_info *p2) {
+    return p1->thread_id < p2->thread_id;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_show.cc
+Function: List_process_list::operator
+  bool operator()(const thread_info *p1, const thread_info *p2) {
+    return p1->thread_id < p2->thread_id;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_show.cc
+Function: get_cs_converted_string_value
+    get_cs_converted_string_value()
+    thd                             Thread object
+    input_str                       Input string in cs character set
+    output_str                      Output string to be produced in utf8
+    cs                              Character set of input string
+    use_hex                         Use hex string unconditionally
+
+
+  RETURN VALUES
+    No return value
+*/
+
+static void get_cs_converted_string_value(THD *thd, String *input_str,
+                                          String *output_str,
+                                          const CHARSET_INFO *cs,
+                                          bool use_hex) {
+  output_str->length(0);
+  if (input_str->length() == 0) {
+    output_str->append("''");
+    return;
+  }
+  // Note that since the String charset conversion functions used below, are
+  // created to be used as (potentially unsafe) "casts" for user data, they
+  // perform conversion from binary to UTF-8 by simply copying bytes. By
+  // forcing a hex string when cs is binary, we avoid creating strings that are
+  // invalid. Such invalid strings looks strange and will cause asserts when
+  // they are stored in TEXT columns in the DD.
+  if (!use_hex && cs != &my_charset_bin) {
+    String try_val;
+    uint try_conv_error = 0;
+
+    try_val.copy(input_str->ptr(), input_str->length(), cs,
+                 thd->variables.character_set_client, &try_conv_error);
+    if (!try_conv_error) {
+      String val;
+      uint conv_error = 0;
+
+      val.copy(input_str->ptr(), input_str->length(), cs, system_charset_info,
+               &conv_error);
+      if (!conv_error) {
+        append_unescaped(output_str, val.ptr(), val.length());
+        return;
+      }
+    }
+    /* We had a conversion error, use hex encoded string for safety */
+  }
+  {
+    const uchar *ptr;
+    size_t i, len;
+    char buf[3];
+
+    output_str->append("_");
+    output_str->append(cs->csname);
+    output_str->append(" ");
+    output_str->append("0x");
+    len = input_str->length();
+    ptr = (uchar *)input_str->ptr();
+    for (i = 0; i < len; i++) {
+      uint high, low;
+
+      high = (*ptr) >> 4;
+      low = (*ptr) & 0x0F;
+      buf[0] = _dig_vec_upper[high];
+      buf[1] = _dig_vec_upper[low];
+      buf[2] = 0;
+      output_str->append((const char *)buf);
+      ptr++;
+    }
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc
+Function: thd_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc
+Function: thd_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc
+Function: thd_security_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc
+Function: thd_security_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc
+Function: thd_security_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc
+Function: thd_security_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/conn_handler/init_net_server_extension.cc
+Function: net_after_header_psi not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/conn_handler/init_net_server_extension.cc
+Function: net_after_header_psi not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_audit.cc
+Function: thd_get_audit_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_audit.cc
+Function: thd_get_audit_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_audit.cc
+Function: thd_get_audit_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_audit.cc
+Function: thd_get_audit_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_audit.cc
+Function: mysql_audit_notify
+int mysql_audit_notify(THD *thd, mysql_event_general_subclass_t subclass,
+                       const char *subclass_name, int error_code,
+                       const char *msg, size_t msg_len) {
+  mysql_event_general event;
+  char user_buff[MAX_USER_HOST_SIZE];
+
+  assert(thd);
+
+  if (mysql_audit_acquire_plugins(thd, MYSQL_AUDIT_GENERAL_CLASS,
+                                  static_cast<unsigned long>(subclass)))
+    return 0;
+
+  event.event_subclass = subclass;
+  event.general_error_code = error_code;
+  event.general_thread_id = thd->thread_id();
+
+  Security_context *sctx = thd->security_context();
+
+  event.general_user.str = user_buff;
+  event.general_user.length = make_user_name(sctx, user_buff);
+  event.general_ip = sctx->ip();
+  event.general_host = sctx->host();
+  event.general_external_user = sctx->external_user();
+  event.general_rows = thd->get_stmt_da()->current_row_for_condition();
+
+  if (msg != nullptr && thd->lex->sql_command == SQLCOM_END &&
+      thd->get_command() != COM_QUERY) {
+    event.general_sql_command = {STRING_WITH_LEN("")};
+  } else {
+    event.general_sql_command = sql_statement_names[thd->lex->sql_command];
+  }
+
+  event.general_charset = const_cast<CHARSET_INFO *>(
+      thd_get_audit_query(thd, &event.general_query));
+
+  event.general_time = thd->query_start_in_secs();
+
+  DBUG_EXECUTE_IF("audit_log_negative_general_error_code",
+                  event.general_error_code *= -1;);
+
+  event.general_command.str = msg;
+  event.general_command.length = msg_len;
+
+  if (subclass == MYSQL_AUDIT_GENERAL_ERROR ||
+      subclass == MYSQL_AUDIT_GENERAL_STATUS ||
+      subclass == MYSQL_AUDIT_GENERAL_RESULT) {
+    Ignore_event_error_handler handler(thd, subclass_name);
+
+    return handler.get_result(
+        event_class_dispatch(thd, MYSQL_AUDIT_GENERAL_CLASS, &event));
+  }
+
+  return event_class_dispatch_error(thd, MYSQL_AUDIT_GENERAL_CLASS,
+                                    subclass_name, &event);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/srv_session.cc
+Function: Srv_session::execute_command
+int Srv_session::execute_command(enum enum_server_command command,
+                                 const union COM_DATA *data,
+                                 const CHARSET_INFO *client_cs,
+                                 const struct st_command_service_cbs *callbacks,
+                                 enum cs_text_or_binary text_or_binary,
+                                 void *callbacks_context) {
+  DBUG_TRACE;
+
+  if (!srv_session_server_is_available()) {
+    if (m_err_protocol_ctx.handler)
+      m_err_protocol_ctx.handler(m_err_protocol_ctx.handler_context,
+                                 ER_SESSION_WAS_KILLED,
+                                 ER_DEFAULT(ER_SESSION_WAS_KILLED));
+    return 1;
+  }
+
+  if (m_thd->killed) {
+    if (m_err_protocol_ctx.handler)
+      m_err_protocol_ctx.handler(m_err_protocol_ctx.handler_context,
+                                 ER_SESSION_WAS_KILLED,
+                                 ER_DEFAULT(ER_SESSION_WAS_KILLED));
+    return 1;
+  }
+
+  assert(m_thd->get_protocol() == &m_protocol_error);
+
+  // RAII:the destructor restores the state
+  Srv_session::Session_backup_and_attach backup(this, false);
+
+  if (backup.attach_error) return 1;
+
+  if (client_cs && m_thd->variables.character_set_results != client_cs &&
+      thd_init_client_charset(m_thd, client_cs->number))
+    return 1;
+
+  /* Switch to different callbacks */
+  Protocol_callback client_proto(callbacks, text_or_binary, callbacks_context);
+
+  m_thd->push_protocol(&client_proto);
+
+  mysql_audit_release(m_thd);
+
+  /*
+    The server does it for COM_QUERY in dispatch_sql_command() but not for
+    COM_INIT_DB, for example
+  */
+  if (command != COM_QUERY) m_thd->reset_for_next_command();
+
+  /* For per-query performance counters with log_slow_statement */
+  struct System_status_var query_start_status;
+  m_thd->clear_copy_status_var();
+  if (opt_log_slow_extra) {
+    m_thd->copy_status_var(&query_start_status);
+  }
+
+  mysql_thread_set_secondary_engine(false);
+
+  if (m_state != SRV_SESSION_ASSOCIATED) {
+    assert(m_thd->m_statement_psi == nullptr);
+    m_thd->m_statement_psi = MYSQL_START_STATEMENT(
+        &m_thd->m_statement_state, stmt_info_new_packet.m_key, m_thd->db().str,
+        m_thd->db().length, m_thd->charset(), nullptr);
+  }
+  int ret = dispatch_command(m_thd, data, command);
+
+  m_thd->pop_protocol();
+  assert(m_thd->get_protocol() == &m_protocol_error);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_set_collation::itemize
+bool Item_func_aes_encrypt::itemize(Parse_context *pc, Item **res) {
+  if (skip_itemize(res)) return false;
+  if (super::itemize(pc, res)) return true;
+  /* Unsafe for SBR since result depends on a session variable */
+  pc->thd->lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION);
+  /* Not safe to cache either */
+  pc->thd->lex->set_uncacheable(pc->select, UNCACHEABLE_SIDEEFFECT);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/event_scheduler.cc
+Function: Event_worker_thread::run
+    Event_worker_thread::run()
+      thd    Thread context
+      event  The Event_queue_element_for_exec object to be processed
+*/
+
+void Event_worker_thread::run(THD *thd, Event_queue_element_for_exec *event) {
+  /* needs to be first for thread_stack */
+  char my_stack;
+  Event_job_data job_data;
+  bool res;
+
+  assert(thd->m_digest == nullptr);
+
+  thd->thread_stack = &my_stack;  // remember where our stack is
+  res = post_init_event_thread(thd);
+
+  DBUG_TRACE;
+  DBUG_PRINT("info", ("Time is %ld, THD: %p", (long)time(nullptr), thd));
+
+  if (res) {
+    delete event;
+    deinit_event_thread(thd);
+    return;
+  }
+
+  mysql_thread_set_secondary_engine(false);
+
+#ifdef HAVE_PSI_STATEMENT_INTERFACE
+  PSI_thread *thread = thd_get_psi(thd);
+  if (thread != nullptr) {
+    PSI_THREAD_CALL(detect_telemetry)(thread);
+  }
+
+  PSI_statement_locker_state state;
+  assert(thd->m_statement_psi == nullptr);
+  thd->m_statement_psi = MYSQL_START_STATEMENT(
+      &state, event->get_psi_info()->m_key, event->dbname.str,
+      event->dbname.length, thd->charset(), nullptr);
+#endif
+  /*
+    We must make sure the schema is released and unlocked in the right
+    order. Fail if we are unable to get a meta data lock on the schema
+    name. Separate scope so that the Schema_MDL_locker dtor is run before
+    thd is deleted.
+  */
+  {
+    dd::Schema_MDL_locker mdl_handler(thd);
+    if (mdl_handler.ensure_locked(event->dbname.str)) goto end;
+
+    MDL_key mdl_key;
+    dd::Event::create_mdl_key(event->dbname.str, event->name.str, &mdl_key);
+
+    MDL_request event_mdl_request;
+    MDL_REQUEST_INIT_BY_KEY(&event_mdl_request, &mdl_key, MDL_SHARED,
+                            MDL_EXPLICIT);
+    if (thd->mdl_context.acquire_lock(&event_mdl_request,
+                                      thd->variables.lock_wait_timeout)) {
+      DBUG_PRINT("error", ("Got error in getting MDL locks"));
+      goto end;
+    }
+
+    if ((res = Event_db_repository::load_named_event(thd, event->dbname,
+                                                     event->name, &job_data))) {
+      DBUG_PRINT("error", ("Got error from load_named_event"));
+      thd->mdl_context.release_lock(event_mdl_request.ticket);
+      goto end;
+    }
+    thd->mdl_context.release_lock(event_mdl_request.ticket);
+  }  // End scope so that schema metadata lock is released.
+
+  thd->enable_slow_log = true;
+
+  res = job_data.execute(thd, event->dropped);
+
+  print_warnings(thd, &job_data);
+
+  if (res)
+    LogErr(INFORMATION_LEVEL, ER_EVENT_EXECUTION_FAILED, job_data.m_definer.str,
+           job_data.m_schema_name.str, job_data.m_event_name.str);
+
+end:
+#ifdef HAVE_PSI_STATEMENT_INTERFACE
+  MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+  thd->m_statement_psi = nullptr;
+#endif
+
+  assert(thd->m_digest == nullptr);
+
+  DBUG_PRINT("info",
+             ("Done with Event %s.%s", event->dbname.str, event->name.str));
+
+  delete event;
+  deinit_event_thread(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_query_attributes_imp.cc
+Function: mysql_query_attributes::iterator::init
+  bool init(MYSQL_THD hthd, const char *name) {
+    thd = hthd ? dynamic_cast<THD *>(hthd) : current_thd;
+    if (!thd) return true;
+    if (!thd->bind_parameter_values_count || !thd->bind_parameter_values)
+      return true;
+    /* set to first element*/
+    ofs = 0;
+    current = thd->bind_parameter_values_count > 0 ? thd->bind_parameter_values
+                                                   : nullptr;
+
+    if (name && *name) {
+      uint error_ignore;
+      String name_str;
+      // convert the name supplied to thd->charset()
+      if (name_str.copy(name, strlen(name),
+                        get_charset_by_csname("utf8mb4", MY_CS_PRIMARY, MYF(0)),
+                        thd->charset(), &error_ignore))
+        return true;
+      // try to find the parameter name
+      for (/* already initialized */; ofs < thd->bind_parameter_values_count;
+           ofs++, current++)
+        if (current->name_length &&
+            !my_strnncoll(
+                thd->charset(), reinterpret_cast<uchar *>(name_str.c_ptr()),
+                name_str.length(), current->name, current->name_length))
+          break;
+    } else {
+      /** skip the unnamed parameters */
+      while (ofs < thd->bind_parameter_values_count &&
+             current->name_length == 0) {
+        ofs++;
+        current++;
+      }
+    }
+
+    // return false if found
+    return ofs >= thd->bind_parameter_values_count;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_query_attributes_imp.cc
+Function: mysql_query_attributes_imp::get_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_query_attributes_imp.cc
+Function: mysql_query_attributes_imp::get_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_query_attributes_imp.cc
+Function: mysql_query_attributes_imp::string_get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_query_attributes_imp.cc
+Function: mysql_query_attributes_imp::string_get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_command_backend.cc
+Function: cs::csi_advanced_command
+bool csi_advanced_command(MYSQL *mysql, enum enum_server_command command,
+                          const uchar *, size_t, const uchar *arg,
+                          size_t arg_length, bool, MYSQL_STMT *) {
+  COM_DATA data;
+  memset(&data, 0, sizeof(data));
+  data.com_query.query = (const char *)arg;
+  data.com_query.length = arg_length;
+  char err_msg[1][256];
+  SRV_CTX_H srv_ctx_h = nullptr;
+  Mysql_handle mysql_handle;
+  THD *thd = (THD *)mysql->thd;
+  auto mcs_extn = MYSQL_COMMAND_SERVICE_EXTN(mysql);
+  void *command_consumer_srv = nullptr;
+  bool ret = true;
+
+  /* mcs_extn->command_consumer_services will be set in connect api */
+  if (mcs_extn->command_consumer_services) {
+    command_consumer_srv = mcs_extn->command_consumer_services;
+  } else {
+    return ret;
+  }
+
+  mysql_handle.mysql = mysql;
+  if (mcs_extn->consumer_srv_data != nullptr)
+    srv_ctx_h = reinterpret_cast<SRV_CTX_H>(mcs_extn->consumer_srv_data);
+  else if (((class mysql_command_consumer_refs *)(command_consumer_srv))
+               ->factory_srv->start(&srv_ctx_h, (MYSQL_H *)&mysql_handle)) {
+    sprintf(*err_msg, "Could not create %s service",
+            "mysql_text_consumer_factory_v1");
+    goto error;
+  }
+
+  {
+    Callback_command_delegate callback_delegate(command_consumer_srv,
+                                                srv_ctx_h);
+    if (command_service_run_command(
+            mcs_extn->session_svc, command, &data, thd->charset(),
+            callback_delegate.callbacks(), callback_delegate.representation(),
+            &callback_delegate) ||
+        thd->is_error()) {
+      uint32_t err_num;
+      char **ch_ptr = reinterpret_cast<char **>(&err_msg[0]);
+      ((class mysql_command_consumer_refs *)(command_consumer_srv))
+          ->error_srv->error(srv_ctx_h, &err_num,
+                             const_cast<const char **>(ch_ptr));
+      strcpy(*err_msg, *ch_ptr);
+      goto error;
+    }
+  }
+  ret = false;
+error:
+  if (ret) my_error(ER_COMMAND_SERVICE_BACKEND_FAILED, MYF(0), err_msg);
+  return ret ? true : false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_start_statement not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_start_statement not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc
+Function: dd::fill_dd_routine_info
+  Method is called from the fill_dd_routine_info().
+
+  @param[in]  thd        Thread handle.
+  @param[in]  sp         Stored routine object.
+  @param[out] routine    dd::Routine object prepared from sp_head.
+
+  @retval false  ON SUCCESS
+  @retval true   ON FAILURE
+*/
+
+static bool fill_routine_parameters_info(THD *thd, sp_head *sp,
+                                         Routine *routine) {
+  DBUG_TRACE;
+
+  /*
+    The return type of the stored function is listed as first parameter from
+    the Information_schema.parameters. Storing return type as first parameter
+    for the stored functions.
+  */
+  if (sp->m_type == enum_sp_type::FUNCTION) {
+    // Add parameter.
+    dd::Parameter *param = routine->add_parameter();
+
+    // Fill return type information.
+    fill_parameter_info_from_field(thd, &sp->m_return_field_def, param);
+  }
+
+  // Fill parameter information of the stored routine.
+  sp_pcontext *sp_root_parsing_ctx = sp->get_root_parsing_context();
+  assert(sp_root_parsing_ctx != nullptr);
+  for (uint i = 0; i < sp_root_parsing_ctx->context_var_count(); i++) {
+    sp_variable *sp_var = sp_root_parsing_ctx->find_variable(i);
+    Create_field *field_def = &sp_var->field_def;
+
+    // Add parameter.
+    dd::Parameter *param = routine->add_parameter();
+
+    // Set parameter name.
+    param->set_name(sp_var->name.str);
+
+    // Set parameter mode.
+    Parameter::enum_parameter_mode mode;
+    switch (sp_var->mode) {
+      case sp_variable::MODE_IN:
+        mode = Parameter::PM_IN;
+        break;
+      case sp_variable::MODE_OUT:
+        mode = Parameter::PM_OUT;
+        break;
+      case sp_variable::MODE_INOUT:
+        mode = Parameter::PM_INOUT;
+        break;
+      default:
+        assert(false); /* purecov: deadcode */
+        return true;   /* purecov: deadcode */
+    }
+    param->set_mode(mode);
+
+    // Fill return type information.
+    fill_parameter_info_from_field(thd, field_def, param);
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_const_folding.cc
+Function: analyze_int_field_constant
+      return analyze_int_field_constant(thd, f, const_val, ft, left_has_field,
+                                        place, discount_equal);
+    case MYSQL_TYPE_NEWDECIMAL:
+      return analyze_decimal_field_constant(thd, f, const_val, ft, place,
+                                            negative);
+    case MYSQL_TYPE_FLOAT:
+    case MYSQL_TYPE_DOUBLE:
+      return analyze_real_field_constant(thd, f, const_val, place);
+    case MYSQL_TYPE_YEAR:
+      return analyze_year_field_constant(thd, const_val, place);
+    case MYSQL_TYPE_TIMESTAMP:
+    case MYSQL_TYPE_DATETIME:
+    case MYSQL_TYPE_DATE:
+      return analyze_timestamp_field_constant(thd, f, const_val, place);
+    case MYSQL_TYPE_TIME:
+      return analyze_time_field_constant(thd, const_val);
+    default:
+      break;
+  }
+  return false;
+}
+
+/**
+  We have found that the constant's value makes the predicate always true or
+  false (modulo field nullability), so simplify or remove the condition
+  according to this table:
+  <pre>
+  always_true == true
+
+                   !top_level_item        top_level_item
+                ------------------------------------------
+     nullable   |  IF(NULL, NULL, 1)  |   IS NOT NULL    |
+    !nullable   |  TRUE (1)           |   COND_TRUE      |
+                ------------------------------------------
+
+  always_true == false
+
+                   !top_level_item        top_level_item
+                ------------------------------------------
+     nullable   |  field <> field [*] |   COND_FALSE     |
+    !nullable   |  FALSE (0)          |   COND_FALSE     |
+                ------------------------------------------
+
+  [*] for the "<=>" operator, we fold to FALSE (0) in this case.
+  </pre>
+
+  @param      thd         current session context
+  @param      ref_or_field
+                          a field (that is being being compared to a constant)
+                          or a ref to such a field.
+  @param      ft          function type
+  @param      always_true true if the predicate is found to be always true
+  @param      manifest_result
+                          true if we should create an item to represent the
+                          truth value (and replace the condition with it)
+                          instead of returning nullptr in *cond_value and
+                          {Item::COND_TRUE, Item::COND_FALSE} in *cond_value
+  @param[out] retcond     a pointer to the condition altered by this method
+  @param[out] cond_value  the resulting condition value
+
+  @returns true on error
+*/
+static bool fold_or_simplify(THD *thd, Item *ref_or_field,
+                             Item_func::Functype ft, bool always_true,
+                             bool manifest_result, Item **retcond,
+                             Item::cond_result *cond_value) {
+  Item *i = nullptr;
+  const int is_top_level =
+      ft == Item_func::MULT_EQUAL_FUNC ||
+      down_cast<Item_bool_func2 *>(*retcond)->ignore_unknown();
+  if (always_true) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/set_var.cc
+Function: set_var_collation_client::update
+bool sys_var::update(THD *thd, set_var *var) {
+  /*
+    Invoke preparatory step for updating a system variable. Doing this action
+    before we have acquired any locks allows to invoke code which acquires other
+    locks without introducing deadlocks.
+  */
+  if (pre_update && pre_update(this, thd, var)) return true;
+
+  enum_var_type type = var->type;
+  if (type == OPT_GLOBAL || type == OPT_PERSIST || scope() == GLOBAL) {
+    /*
+      Yes, both locks need to be taken before an update, just as
+      both are taken to get a value. If we'll take only 'guard' here,
+      then value_ptr() for strings won't be safe in SHOW VARIABLES anymore,
+      to make it safe we'll need value_ptr_unlock().
+    */
+    AutoWLock lock1(&PLock_global_system_variables);
+    AutoWLock lock2(guard);
+    return global_update(thd, var) ||
+           (on_update && on_update(this, thd, OPT_GLOBAL));
+  } else {
+    /* Block reads from other threads. */
+    mysql_mutex_lock(&thd->LOCK_thd_sysvar);
+
+    bool ret = session_update(thd, var) ||
+               (on_update && on_update(this, thd, OPT_SESSION));
+
+    mysql_mutex_unlock(&thd->LOCK_thd_sysvar);
+
+    /*
+      Make sure we don't session-track variables that are not actually
+      part of the session. tx_isolation and and tx_read_only for example
+      exist as GLOBAL, SESSION, and one-shot ("for next transaction only").
+    */
+    if ((var->type == OPT_SESSION) || !is_trilevel()) {
+      if ((!ret) && thd->session_tracker.get_tracker(SESSION_SYSVARS_TRACKER)
+                        ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_SYSVARS_TRACKER)
+            ->mark_as_changed(thd, name);
+
+      if ((!ret) &&
+          thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, name);
+    }
+
+    return ret;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_connection_attributes_iterator_imp.cc
+Function: mysql_connection_attributes_iterator_imp::get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_connection_attributes_iterator_imp.cc
+Function: mysql_connection_attributes_iterator_imp::get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_connection_attributes_iterator_imp.cc
+Function: mysql_connection_attributes_iterator_imp::get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_connection_attributes_iterator_imp.cc
+Function: mysql_connection_attributes_iterator_imp::get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/mysql_connection_attributes_iterator_imp.cc
+Function: mysql_connection_attributes_iterator_imp::get not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp_instr.cc
+Function: sp_lex_instr::execute_expression
+bool sp_lex_instr::execute_expression(THD *thd, uint *nextp) {
+  auto execute_guard = create_scope_guard([&]() {
+    m_lex->cleanup(true);
+    if (thd->in_sub_stmt == 0) {
+      thd->get_stmt_da()->set_overwrite_status(true);
+      thd->is_error() ? trans_rollback_stmt(thd) : trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+    }
+    thd_proc_info(thd, "closing tables");
+    close_thread_tables(thd);
+    thd_proc_info(thd, nullptr);
+
+    if (thd->in_sub_stmt == 0) {
+      if (thd->transaction_rollback_request) {
+        trans_rollback_implicit(thd);
+        thd->mdl_context.release_transactional_locks();
+      } else if (!thd->in_multi_stmt_transaction_mode()) {
+        thd->mdl_context.release_transactional_locks();
+      } else {
+        thd->mdl_context.release_statement_locks();
+      }
+    }
+  });
+
+  /*
+    Check privileges for tables in expression, open and lock those tables,
+    bind data to expression so that it is ready for execution.
+
+    Notice that temporary tables must be opened before privilege checking.
+    This is because a session has all privileges for any temporary table that
+    it has created, however a table must be opened in order to identify it as
+    a temporary table.
+  */
+  if (m_lex->query_tables != nullptr) {
+    if (open_temporary_tables(thd, m_lex->query_tables)) {
+      return true;
+    }
+    if (check_table_access(thd, SELECT_ACL, m_lex->query_tables, false,
+                           UINT_MAX, false)) {
+      return true;
+    }
+  }
+  if (open_and_lock_tables(thd, m_lex->query_tables, 0)) {
+    return true;
+  }
+
+  if (m_arena.get_state() != Query_arena::STMT_INITIALIZED_FOR_SP) {
+    m_lex->restore_cmd_properties();
+    bind_fields(m_arena.item_list());
+  }
+  /*
+    Trace the expression. This is not an SQL statement, but pretend it is
+    a SELECT query expression.
+  */
+  Opt_trace_start ots(thd, m_lex->query_tables, SQLCOM_SELECT, &m_lex->var_list,
+                      nullptr, 0, this, thd->variables.character_set_client);
+  const Opt_trace_object trace_command(&thd->opt_trace);
+  const Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
+
+  if (exec_core(thd, nextp)) {
+    return true;
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: close_temporary_tables
+bool close_temporary_tables(THD *thd) {
+  DBUG_TRACE;
+  TABLE *table;
+  TABLE *next = nullptr;
+  TABLE *prev_table;
+  /* Assume thd->variables.option_bits has OPTION_QUOTE_SHOW_CREATE */
+  bool was_quote_show = true;
+  bool error = false;
+  int slave_closed_temp_tables = 0;
+
+  if (!thd->temporary_tables) return false;
+
+  assert(!thd->slave_thread ||
+         thd->system_thread != SYSTEM_THREAD_SLAVE_WORKER);
+
+  /*
+    Ensure we don't have open HANDLERs for tables we are about to close.
+    This is necessary when close_temporary_tables() is called as part
+    of execution of BINLOG statement (e.g. for format description event).
+  */
+  mysql_ha_rm_temporary_tables(thd);
+  if (!mysql_bin_log.is_open()) {
+    TABLE *tmp_next;
+    for (TABLE *t = thd->temporary_tables; t; t = tmp_next) {
+      tmp_next = t->next;
+      mysql_lock_remove(thd, thd->lock, t);
+      /*
+        We should not meet temporary tables created by ALTER TABLE here.
+        It is responsibility of ALTER statement to close them. Otherwise
+        it might be necessary to remove them from DD as well.
+      */
+      assert(t->s->tmp_table_def);
+      close_temporary(thd, t, true, true);
+      slave_closed_temp_tables++;
+    }
+
+    thd->temporary_tables = nullptr;
+    if (thd->slave_thread) {
+      atomic_replica_open_temp_tables -= slave_closed_temp_tables;
+      thd->rli_slave->get_c_rli()->atomic_channel_open_temp_tables -=
+          slave_closed_temp_tables;
+    }
+
+    return false;
+  }
+
+  /*
+    We are about to generate DROP TEMPORARY TABLE statements for all
+    the left out temporary tables. If GTID_NEXT is set (e.g. if user
+    did SET GTID_NEXT just before disconnecting the client), we must
+    ensure that it will be able to generate GTIDs for the statements
+    with this server's UUID. Therefore we set gtid_next to
+    AUTOMATIC_GTID.
+  */
+  gtid_state->update_on_rollback(thd);
+  thd->variables.gtid_next.set_automatic();
+
+  /*
+    We must separate transactional temp tables and
+    non-transactional temp tables in two distinct DROP statements
+    to avoid the splitting if a slave server reads from this binlog.
+  */
+
+  /* Better add "if exists", in case a RESET MASTER has been done */
+  const char stub[] = "DROP /*!40005 TEMPORARY */ TABLE IF EXISTS ";
+  uint stub_len = sizeof(stub) - 1;
+  char buf_trans[256], buf_non_trans[256];
+  String s_query_trans =
+      String(buf_trans, sizeof(buf_trans), system_charset_info);
+  String s_query_non_trans =
+      String(buf_non_trans, sizeof(buf_non_trans), system_charset_info);
+  bool found_user_tables = false;
+  bool found_trans_table = false;
+  bool found_non_trans_table = false;
+
+  memcpy(buf_trans, stub, stub_len);
+  memcpy(buf_non_trans, stub, stub_len);
+
+  /*
+    Insertion sort of temp tables by pseudo_thread_id to build ordered list
+    of sublists of equal pseudo_thread_id
+  */
+
+  for (prev_table = thd->temporary_tables, table = prev_table->next; table;
+       prev_table = table, table = table->next) {
+    TABLE *prev_sorted /* same as for prev_table */, *sorted;
+    /*
+      We should not meet temporary tables created by ALTER TABLE here.
+      It is responsibility of ALTER statement to close them. Otherwise
+      it might be necessary to remove them from DD as well.
+    */
+    assert(table->s->tmp_table_def);
+    if (is_user_table(table)) {
+      if (!found_user_tables) found_user_tables = true;
+      for (prev_sorted = nullptr, sorted = thd->temporary_tables;
+           sorted != table; prev_sorted = sorted, sorted = sorted->next) {
+        if (!is_user_table(sorted) || tmpkeyval(sorted) > tmpkeyval(table)) {
+          /* move into the sorted part of the list from the unsorted */
+          prev_table->next = table->next;
+          table->next = sorted;
+          if (prev_sorted) {
+            prev_sorted->next = table;
+          } else {
+            thd->temporary_tables = table;
+          }
+          table = prev_table;
+          break;
+        }
+      }
+    }
+  }
+
+  /* We always quote db,table names though it is slight overkill */
+  if (found_user_tables && !(was_quote_show = (thd->variables.option_bits &
+                                               OPTION_QUOTE_SHOW_CREATE))) {
+    thd->variables.option_bits |= OPTION_QUOTE_SHOW_CREATE;
+  }
+
+  /*
+    Make LEX consistent with DROP TEMPORARY TABLES statement which we
+    are going to log. This is important for the binary logging code.
+  */
+  LEX *lex = thd->lex;
+  enum_sql_command sav_sql_command = lex->sql_command;
+  bool sav_drop_temp = lex->drop_temporary;
+  lex->sql_command = SQLCOM_DROP_TABLE;
+  lex->drop_temporary = true;
+
+  /* scan sorted tmps to generate sequence of DROP */
+  for (table = thd->temporary_tables; table; table = next) {
+    if (is_user_table(table) && table->should_binlog_drop_if_temp()) {
+      bool save_thread_specific_used = thd->thread_specific_used;
+      my_thread_id save_pseudo_thread_id = thd->variables.pseudo_thread_id;
+      /* Set pseudo_thread_id to be that of the processed table */
+      thd->variables.pseudo_thread_id = tmpkeyval(table);
+      String db;
+      db.append(table->s->db.str);
+      /* Loop forward through all tables that belong to a common database
+         within the sublist of common pseudo_thread_id to create single
+         DROP query
+      */
+      for (s_query_trans.length(stub_len), s_query_non_trans.length(stub_len),
+           found_trans_table = false, found_non_trans_table = false;
+           table && is_user_table(table) &&
+           tmpkeyval(table) == thd->variables.pseudo_thread_id &&
+           table->s->db.length == db.length() &&
+           strcmp(table->s->db.str, db.ptr()) == 0;
+           table = next) {
+        /* Separate transactional from non-transactional temp tables */
+        if (table->should_binlog_drop_if_temp()) {
+          /* Separate transactional from non-transactional temp tables */
+          if (table->s->tmp_table == TRANSACTIONAL_TMP_TABLE) {
+            found_trans_table = true;
+            /*
+              We are going to add ` around the table names and possible more
+              due to special characters
+            */
+            append_identifier(thd, &s_query_trans, table->s->table_name.str,
+                              strlen(table->s->table_name.str));
+            s_query_trans.append(',');
+          } else if (table->s->tmp_table == NON_TRANSACTIONAL_TMP_TABLE) {
+            found_non_trans_table = true;
+            /*
+              We are going to add ` around the table names and possible more
+              due to special characters
+            */
+            append_identifier(thd, &s_query_non_trans, table->s->table_name.str,
+                              strlen(table->s->table_name.str));
+            s_query_non_trans.append(',');
+          }
+        }
+
+        next = table->next;
+        mysql_lock_remove(thd, thd->lock, table);
+        close_temporary(thd, table, true, true);
+        slave_closed_temp_tables++;
+      }
+      thd->clear_error();
+      const CHARSET_INFO *cs_save = thd->variables.character_set_client;
+      thd->variables.character_set_client = system_charset_info;
+      thd->thread_specific_used = true;
+
+      if (found_trans_table) {
+        Query_log_event qinfo(thd, s_query_trans.ptr(),
+                              s_query_trans.length() - 1, false, true, false,
+                              0);
+        qinfo.db = db.ptr();
+        qinfo.db_len = db.length();
+        thd->variables.character_set_client = cs_save;
+
+        thd->get_stmt_da()->set_overwrite_status(true);
+        if ((error = (mysql_bin_log.write_event(&qinfo) ||
+                      mysql_bin_log.commit(thd, true) || error))) {
+          /*
+            If we're here following THD::cleanup, thence the connection
+            has been closed already. So lets print a message to the
+            error log instead of pushing yet another error into the
+            Diagnostics_area.
+
+            Also, we keep the error flag so that we propagate the error
+            up in the stack. This way, if we're the SQL thread we notice
+            that close_temporary_tables failed. (Actually, the SQL
+            thread only calls close_temporary_tables while applying old
+            Start_log_event_v3 events.)
+          */
+          LogErr(ERROR_LEVEL, ER_BINLOG_FAILED_TO_WRITE_DROP_FOR_TEMP_TABLES);
+        }
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+
+      if (found_non_trans_table) {
+        Query_log_event qinfo(thd, s_query_non_trans.ptr(),
+                              s_query_non_trans.length() - 1, false, true,
+                              false, 0);
+        qinfo.db = db.ptr();
+        qinfo.db_len = db.length();
+        thd->variables.character_set_client = cs_save;
+
+        thd->get_stmt_da()->set_overwrite_status(true);
+        if ((error = (mysql_bin_log.write_event(&qinfo) ||
+                      mysql_bin_log.commit(thd, true) || error))) {
+          /*
+            If we're here following THD::cleanup, thence the connection
+            has been closed already. So lets print a message to the
+            error log instead of pushing yet another error into the
+            Diagnostics_area.
+
+            Also, we keep the error flag so that we propagate the error
+            up in the stack. This way, if we're the SQL thread we notice
+            that close_temporary_tables failed. (Actually, the SQL
+            thread only calls close_temporary_tables while applying old
+            Start_log_event_v3 events.)
+          */
+          LogErr(ERROR_LEVEL, ER_BINLOG_FAILED_TO_WRITE_DROP_FOR_TEMP_TABLES);
+        }
+        thd->get_stmt_da()->set_overwrite_status(false);
+      }
+
+      thd->variables.pseudo_thread_id = save_pseudo_thread_id;
+      thd->thread_specific_used = save_thread_specific_used;
+    } else {
+      next = table->next;
+      /*
+        This is for those cases when we have acquired lock but drop temporary
+        table will not be logged.
+      */
+      mysql_lock_remove(thd, thd->lock, table);
+      close_temporary(thd, table, true, true);
+      slave_closed_temp_tables++;
+    }
+  }
+  lex->drop_temporary = sav_drop_temp;
+  lex->sql_command = sav_sql_command;
+
+  if (!was_quote_show)
+    thd->variables.option_bits &=
+        ~OPTION_QUOTE_SHOW_CREATE; /* restore option */
+
+  thd->temporary_tables = nullptr;
+  if (thd->slave_thread) {
+    atomic_replica_open_temp_tables -= slave_closed_temp_tables;
+    thd->rli_slave->get_c_rli()->atomic_channel_open_temp_tables -=
+        slave_closed_temp_tables;
+  }
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc
+Function: thd_init_client_charset
+bool thd_init_client_charset(THD *thd, uint cs_number) {
+  CHARSET_INFO *cs;
+  /*
+   Use server character set and collation if
+   - opt_character_set_client_handshake is not set
+   - client has not specified a character set
+   - client character set is the same as the servers
+   - client character set doesn't exists in server
+  */
+  if (!opt_character_set_client_handshake ||
+      !(cs = get_charset(cs_number, MYF(0))) ||
+      !my_strcasecmp(&my_charset_latin1,
+                     global_system_variables.character_set_client->m_coll_name,
+                     cs->m_coll_name)) {
+    if (!is_supported_parser_charset(
+            global_system_variables.character_set_client)) {
+      /* Disallow non-supported parser character sets: UCS2, UTF16, UTF32 */
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "character_set_client",
+               global_system_variables.character_set_client->csname);
+      return true;
+    }
+    thd->variables.character_set_client =
+        global_system_variables.character_set_client;
+    thd->variables.collation_connection =
+        global_system_variables.collation_connection;
+    thd->variables.character_set_results =
+        global_system_variables.character_set_results;
+  } else {
+    if (!is_supported_parser_charset(cs)) {
+      /* Disallow non-supported parser character sets: UCS2, UTF16, UTF32 */
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "character_set_client",
+               cs->csname);
+      return true;
+    }
+    thd->variables.character_set_results = thd->variables.collation_connection =
+        thd->variables.character_set_client = cs;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc
+Function: Lex_input_stream::body_utf8_start
+void Lex_input_stream::body_utf8_start(THD *thd, const char *begin_ptr) {
+  assert(begin_ptr);
+  assert(m_cpp_buf <= begin_ptr && begin_ptr <= m_cpp_buf + m_buf_length);
+
+  size_t body_utf8_length =
+      (m_buf_length / thd->variables.character_set_client->mbminlen) *
+      my_charset_utf8mb3_bin.mbmaxlen;
+
+  m_body_utf8 = (char *)thd->alloc(body_utf8_length + 1);
+  m_body_utf8_ptr = m_body_utf8;
+  *m_body_utf8_ptr = 0;
+
+  m_cpp_utf8_processed_ptr = begin_ptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc
+Function: mysql_execute_command
+    KILL QUERY may come after cleanup in mysql_execute_command(). Next query
+    execution is interrupted due to this. So resetting THD::killed here.
+
+    THD::killed value can not be KILL_TIMEOUT here as timer used for statement
+    max execution time is disarmed in the cleanup stage of
+    mysql_execute_command. KILL CONNECTION should terminate the connection.
+    Hence resetting THD::killed only for KILL QUERY case here.
+  */
+  if (thd->killed == THD::KILL_QUERY) thd->killed = THD::NOT_KILLED;
+  thd->set_time();
+  if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == false) {
+    /*
+      If the time has gone past end of epoch we need to shutdown the server. But
+      there is possibility of getting invalid time value on some platforms.
+      For example, gettimeofday() might return incorrect value on solaris
+      platform. Hence validating the current time with 5 iterations before
+      initiating the normal server shutdown process because of time getting
+      past 2038.
+    */
+    const int max_tries = 5;
+    LogErr(WARNING_LEVEL, ER_CONFIRMING_THE_FUTURE, max_tries);
+
+    int tries = 0;
+    while (++tries <= max_tries) {
+      thd->set_time();
+      if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == true) {
+        LogErr(WARNING_LEVEL, ER_BACK_IN_TIME, tries);
+        break;
+      }
+      LogErr(WARNING_LEVEL, ER_FUTURE_DATE, tries);
+    }
+    if (tries > max_tries) {
+      /*
+        If the time has got past epoch, we need to shut this server down.
+        We do this by making sure every command is a shutdown and we
+        have enough privileges to shut the server down
+
+        TODO: remove this when we have full 64 bit my_time_t support
+      */
+      LogErr(ERROR_LEVEL, ER_UNSUPPORTED_DATE);
+      ulong master_access = thd->security_context()->master_access();
+      thd->security_context()->set_master_access(master_access | SHUTDOWN_ACL);
+      error = true;
+      kill_mysql();
+    }
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_partition.cc
+Function: mysql_unpack_partition
+     mysql_unpack_partition()
+     thd                           Thread object
+     part_buf                      Partition info from frm file
+     part_info_len                 Length of partition syntax
+     table                         Table object of partitioned table
+     create_table_ind              Is it called from CREATE TABLE
+     default_db_type               What is the default engine of the table
+     work_part_info_used           Flag is raised if we don't create new
+                                   part_info, but used thd->work_part_info
+
+   RETURN VALUE
+     true                          Error
+     false                         Success
+
+   DESCRIPTION
+     Read the partition syntax from the current position in the frm file.
+     Initiate a LEX object, save the list of item tree objects to free after
+     the query is done. Set-up partition info object such that parser knows
+     it is called from internally. Call parser to create data structures
+     (best possible recreation of item trees and so forth since there is no
+     serialisation of these objects other than in parseable text format).
+     We need to save the text of the partition functions since it is not
+     possible to retrace this given an item tree.
+*/
+
+bool mysql_unpack_partition(THD *thd, char *part_buf, uint part_info_len,
+                            TABLE *table, bool is_create_table_ind,
+                            handlerton *default_db_type,
+                            bool *work_part_info_used) {
+  bool result = true;
+  partition_info *part_info;
+  const CHARSET_INFO *old_character_set_client =
+      thd->variables.character_set_client;
+  LEX *old_lex = thd->lex;
+  LEX lex;
+  Query_expression unit(CTX_NONE);
+  Query_block select(thd->mem_root, nullptr, nullptr);
+  lex.new_static_query(&unit, &select);
+
+  sql_digest_state *parent_digest = thd->m_digest;
+  PSI_statement_locker *parent_locker = thd->m_statement_psi;
+  Partition_handler *part_handler;
+  DBUG_TRACE;
+
+  thd->variables.character_set_client = system_charset_info;
+  // This isn't strictly needed, but here for consistency.
+  Sql_mode_parse_guard parse_guard(thd);
+
+  Partition_expr_parser_state parser_state;
+  if (parser_state.init(thd, part_buf, part_info_len)) goto end;
+
+  if (init_lex_with_single_table(thd, table, &lex)) goto end;
+
+  /*
+    All Items created is put into a free list on the THD object. This list
+    is used to free all Item objects after completing a query. We don't
+    want that to happen with the Item tree created as part of the partition
+    info. This should be attached to the table object and remain so until
+    the table object is released.
+    Thus we move away the current list temporarily and start a new list that
+    we then save in the partition info structure.
+  */
+  *work_part_info_used = false;
+  DBUG_PRINT("info", ("Parse: %s", part_buf));
+
+  thd->m_digest = nullptr;
+  thd->m_statement_psi = nullptr;
+  if (parse_sql(thd, &parser_state, nullptr) ||
+      parser_state.result->fix_parser_data(thd)) {
+    thd->free_items();
+    thd->m_digest = parent_digest;
+    thd->m_statement_psi = parent_locker;
+    goto end;
+  }
+  part_info = parser_state.result;
+  thd->m_digest = parent_digest;
+  thd->m_statement_psi = parent_locker;
+  /*
+    The parsed syntax residing in the frm file can still contain defaults.
+    The reason is that the frm file is sometimes saved outside of this
+    MySQL Server and used in backup and restore of clusters or partitioned
+    tables. It is not certain that the restore will restore exactly the
+    same default partitioning.
+
+    The easiest manner of handling this is to simply continue using the
+    part_info we already built up during mysql_create_table if we are
+    in the process of creating a table. If the table already exists we
+    need to discover the number of partitions for the default parts. Since
+    the handler object hasn't been created here yet we need to postpone this
+    to the fix_partition_func method.
+  */
+
+  DBUG_PRINT("info", ("Successful parse"));
+  DBUG_PRINT("info",
+             ("default engine = %s, default_db_type = %s",
+              ha_resolve_storage_engine_name(part_info->default_engine_type),
+              ha_resolve_storage_engine_name(default_db_type)));
+  if (is_create_table_ind && old_lex->sql_command == SQLCOM_CREATE_TABLE) {
+    /*
+      When we come here we are doing a create table. In this case we
+      have already done some preparatory work on the old part_info
+      object. We don't really need this new partition_info object.
+      Thus we go back to the old partition info object.
+      We need to free any memory objects allocated on item_free_list
+      by the parser since we are keeping the old info from the first
+      parser call in CREATE TABLE.
+
+      This table object can not be used any more. However, since
+      this is CREATE TABLE, we know that it will be destroyed by the
+      caller, and rely on that.
+    */
+    thd->free_items();
+    part_info = thd->work_part_info;
+    *work_part_info_used = true;
+  }
+  table->part_info = part_info;
+  part_info->table = table;
+  part_handler = table->file->get_partition_handler();
+  assert(part_handler != nullptr);
+  part_handler->set_part_info(part_info, true);
+  if (!part_info->default_engine_type)
+    part_info->default_engine_type = default_db_type;
+  assert(part_info->default_engine_type == default_db_type);
+  assert(part_info->default_engine_type->db_type != DB_TYPE_UNKNOWN);
+
+  {
+    /*
+      This code part allocates memory for the serialised item information for
+      the partition functions. In most cases this is not needed but if the
+      table is used for SHOW CREATE TABLES or ALTER TABLE that modifies
+      partition information it is needed and the info is lost if we don't
+      save it here so unfortunately we have to do it here even if in most
+      cases it is not needed. This is a consequence of that item trees are
+      not serialisable.
+    */
+    size_t part_func_len = part_info->part_func_len;
+    size_t subpart_func_len = part_info->subpart_func_len;
+    char *part_func_string = nullptr;
+    char *subpart_func_string = nullptr;
+    /*
+      TODO: Verify that it really should be allocated on the thd?
+      Or simply remove it and use part_expr->print() instead?
+    */
+    if ((part_func_len &&
+         !((part_func_string = (char *)thd->alloc(part_func_len)))) ||
+        (subpart_func_len &&
+         !((subpart_func_string = (char *)thd->alloc(subpart_func_len))))) {
+      mem_alloc_error(part_func_len);
+      thd->free_items();
+      goto end;
+    }
+    if (part_func_len)
+      memcpy(part_func_string, part_info->part_func_string, part_func_len);
+    if (subpart_func_len)
+      memcpy(subpart_func_string, part_info->subpart_func_string,
+             subpart_func_len);
+    part_info->part_func_string = part_func_string;
+    part_info->subpart_func_string = subpart_func_string;
+  }
+
+  result = false;
+end:
+  end_lex_with_single_table(thd, table, old_lex);
+  thd->variables.character_set_client = old_character_set_client;
+  return result;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: Prepared_statement::insert_parameters
+bool Prepared_statement::insert_parameters(THD *thd, String *query,
+                                           bool has_new_types,
+                                           PS_PARAM *parameters) {
+  DBUG_TRACE;
+
+  Item_param **end = m_param_array + m_param_count;
+  size_t length = 0;
+
+  // Reserve an extra space of 32 bytes for each placeholder parameter.
+  if (m_with_log && query->reserve(m_query_string.length + 32 * m_param_count))
+    return true;
+
+  uint i = 0;
+  for (Item_param **it = m_param_array; it < end; ++it, i++) {
+    Item_param *const param = *it;
+
+    if (has_new_types) {
+      set_parameter_type(param, parameters[i].type, parameters[i].unsigned_type,
+                         thd->variables.character_set_client);
+      // Client may have provided invalid metadata:
+      if (param->data_type_source() == MYSQL_TYPE_INVALID) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+    }
+
+    if (param->param_state() == Item_param::LONG_DATA_VALUE) {
+      /*
+        A long data stream was supplied for this parameter marker.
+        This was done after prepare, prior to providing a placeholder
+        type (the types are supplied at execute). Check that the
+        supplied type of placeholder can accept a data stream.
+      */
+      if (!is_param_long_data_type(param)) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+      param->set_data_type_actual(MYSQL_TYPE_VARCHAR);
+      // see Item_param::set_str() for explanation
+      param->set_collation_actual(
+          param->collation_source() == &my_charset_bin
+              ? &my_charset_bin
+              : param->collation.collation != &my_charset_bin
+                    ? param->collation.collation
+                    : current_thd->variables.collation_connection);
+
+    } else if (parameters[i].null_bit) {
+      param->set_null();
+    } else {
+      if (set_parameter_value(param, &parameters[i].value,
+                              parameters[i].length)) {
+        return true;
+      }
+      // NO_VALUE probably means broken client, no metadata provided.
+      if (param->param_state() == Item_param::NO_VALUE) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+
+      // Pinning of data types only implemented for integers
+      assert(!param->is_type_pinned() || param->result_type() == INT_RESULT);
+
+      if (param->is_type_pinned()) {
+        // Accept string values from client
+        // @todo Validate string values, do not accept garbage in string
+        if (param->data_type_actual() == MYSQL_TYPE_VARCHAR) {
+          longlong val = param->val_int();
+          if (param->unsigned_flag)
+            param->set_int((ulonglong)val);
+          else
+            param->set_int(val);
+        } else if (param->data_type_actual() != MYSQL_TYPE_LONGLONG) {
+          my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+          return true;
+        }
+        if ((param->unsigned_flag && !param->is_unsigned_actual() &&
+             param->value.integer < 0) ||
+            (!param->unsigned_flag && param->is_unsigned_actual() &&
+             param->value.integer < 0)) {
+          my_error(ER_DATA_OUT_OF_RANGE, MYF(0), "signed integer",
+                   "mysqld_stmt_execute");
+          return true;
+        }
+      }
+    }
+    if (m_with_log) {
+      String str;
+      const String *val = param->query_val_str(thd, &str);
+      if (val == nullptr) return true;
+      if (param->convert_value()) return true; /* out of memory */
+
+      size_t num_bytes = param->pos_in_query - length;
+      if (query->length() + num_bytes + val->length() >
+          std::numeric_limits<uint32>::max()) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+      if (query->append(m_query_string.str + length, num_bytes) ||
+          query->append(*val))
+        return true;
+
+      length = param->pos_in_query + 1;
+    } else {
+      if (param->convert_value()) return true; /* out of memory */
+    }
+    param->sync_clones();
+  }
+
+  // Copy part of query string after last parameter marker
+  if (m_with_log && query->append(m_query_string.str + length,
+                                  m_query_string.length - length))
+    return true;
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: Prepared_statement::prepare_query
+bool Prepared_statement::prepare_query(THD *thd) {
+  DBUG_TRACE;
+  assert(m_lex == thd->lex);  // set_n_backup_active_arena() guarantees that
+  Query_block *query_block = m_lex->query_block;
+  enum enum_sql_command sql_command = m_lex->sql_command;
+  int res = 0;
+  DBUG_PRINT("enter",
+             ("command: %d  param_count: %u", sql_command, m_param_count));
+
+  m_lex->first_lists_tables_same();
+  Table_ref *const tables = m_lex->query_tables;
+
+  /* set context for commands which do not use setup_tables */
+  query_block->context.resolve_in_table_list_only(
+      query_block->get_table_list());
+
+  /*
+    For the optimizer trace, this is the symmetric, for statement preparation,
+    of what is done at statement execution (in mysql_execute_command()).
+  */
+  Opt_trace_start ots(thd, tables, sql_command, &m_lex->var_list,
+                      thd->query().str, thd->query().length, nullptr,
+                      thd->variables.character_set_client);
+
+  Opt_trace_object trace_command(&thd->opt_trace);
+  Opt_trace_array trace_command_steps(&thd->opt_trace, "steps");
+
+  if ((m_lex->keep_diagnostics == DA_KEEP_COUNTS) ||
+      (m_lex->keep_diagnostics == DA_KEEP_DIAGNOSTICS)) {
+    my_error(ER_UNSUPPORTED_PS, MYF(0));
+    return true;
+  }
+
+  if (sql_command_flags[sql_command] & CF_HA_CLOSE)
+    mysql_ha_rm_tables(thd, tables);
+
+  /*
+    Open temporary tables that are known now. Temporary tables added by
+    prelocking will be opened afterwards (during open_tables()).
+  */
+  if (sql_command_flags[sql_command] & CF_PREOPEN_TMP_TABLES) {
+    if (open_temporary_tables(thd, tables)) return true;
+  }
+
+  switch (sql_command) {
+    case SQLCOM_CREATE_VIEW:
+      if (m_lex->create_view_mode == enum_view_create_mode::VIEW_ALTER) {
+        my_error(ER_UNSUPPORTED_PS, MYF(0));
+        return true;
+      }
+      res = mysql_test_create_view(thd, this);
+      break;
+
+    case SQLCOM_SET_PASSWORD:
+    case SQLCOM_SET_OPTION:
+      res = mysql_test_set_fields(thd, this, tables, &m_lex->var_list);
+      break;
+
+      /*
+        Note that we don't need to have cases in this list if they are
+        marked with CF_STATUS_COMMAND in sql_command_flags
+      */
+    case SQLCOM_DROP_TABLE:
+    case SQLCOM_RENAME_TABLE:
+    case SQLCOM_ALTER_TABLE:
+    case SQLCOM_COMMIT:
+    case SQLCOM_CREATE_INDEX:
+    case SQLCOM_DROP_INDEX:
+    case SQLCOM_ROLLBACK:
+    case SQLCOM_TRUNCATE:
+    case SQLCOM_DROP_VIEW:
+    case SQLCOM_REPAIR:
+    case SQLCOM_ANALYZE:
+    case SQLCOM_OPTIMIZE:
+    case SQLCOM_CHANGE_MASTER:
+    case SQLCOM_CHANGE_REPLICATION_FILTER:
+    case SQLCOM_RESET:
+    case SQLCOM_FLUSH:
+    case SQLCOM_SLAVE_START:
+    case SQLCOM_SLAVE_STOP:
+    case SQLCOM_INSTALL_PLUGIN:
+    case SQLCOM_UNINSTALL_PLUGIN:
+    case SQLCOM_CREATE_DB:
+    case SQLCOM_DROP_DB:
+    case SQLCOM_CHECKSUM:
+    case SQLCOM_CREATE_USER:
+    case SQLCOM_RENAME_USER:
+    case SQLCOM_DROP_USER:
+    case SQLCOM_ALTER_USER:
+    case SQLCOM_ASSIGN_TO_KEYCACHE:
+    case SQLCOM_PRELOAD_KEYS:
+    case SQLCOM_GRANT:
+    case SQLCOM_GRANT_ROLE:
+    case SQLCOM_REVOKE:
+    case SQLCOM_REVOKE_ALL:
+    case SQLCOM_REVOKE_ROLE:
+    case SQLCOM_KILL:
+    case SQLCOM_ALTER_INSTANCE:
+    case SQLCOM_SET_ROLE:
+    case SQLCOM_ALTER_USER_DEFAULT_ROLE:
+      break;
+
+    case SQLCOM_CREATE_TABLE:
+      /*
+        CREATE TABLE ... START TRANSACTION is not supported with
+        prepared statements
+      */
+      if (m_lex->create_info->m_transactional_ddl) {
+        my_error(ER_UNSUPPORTED_PS, MYF(0));
+        return true;
+      }
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(fallthrough)
+      [[fallthrough]];
+#endif
+#endif
+    case SQLCOM_SELECT:
+    case SQLCOM_DO:
+    case SQLCOM_DELETE:
+    case SQLCOM_DELETE_MULTI:
+    case SQLCOM_UPDATE:
+    case SQLCOM_UPDATE_MULTI:
+    case SQLCOM_INSERT:
+    case SQLCOM_INSERT_SELECT:
+    case SQLCOM_REPLACE:
+    case SQLCOM_REPLACE_SELECT:
+    case SQLCOM_CALL:
+    case SQLCOM_SHOW_BINLOG_EVENTS:
+    case SQLCOM_SHOW_BINLOGS:
+    case SQLCOM_SHOW_CHARSETS:
+    case SQLCOM_SHOW_COLLATIONS:
+    case SQLCOM_SHOW_CREATE_DB:
+    case SQLCOM_SHOW_CREATE_EVENT:
+    case SQLCOM_SHOW_CREATE_FUNC:
+    case SQLCOM_SHOW_CREATE_PROC:
+    case SQLCOM_SHOW_CREATE:
+    case SQLCOM_SHOW_CREATE_TRIGGER:
+    case SQLCOM_SHOW_CREATE_USER:
+    case SQLCOM_SHOW_DATABASES:
+    case SQLCOM_SHOW_ENGINE_LOGS:
+    case SQLCOM_SHOW_ENGINE_MUTEX:
+    case SQLCOM_SHOW_ENGINE_STATUS:
+    case SQLCOM_SHOW_ERRORS:
+    case SQLCOM_SHOW_EVENTS:
+    case SQLCOM_SHOW_FIELDS:
+    case SQLCOM_SHOW_FUNC_CODE:
+    case SQLCOM_SHOW_GRANTS:
+    case SQLCOM_SHOW_KEYS:
+    case SQLCOM_SHOW_MASTER_STAT:
+    case SQLCOM_SHOW_OPEN_TABLES:
+    case SQLCOM_SHOW_PLUGINS:
+    case SQLCOM_SHOW_PRIVILEGES:
+    case SQLCOM_SHOW_PROC_CODE:
+    case SQLCOM_SHOW_PROCESSLIST:
+    case SQLCOM_SHOW_PROFILE:
+    case SQLCOM_SHOW_PROFILES:
+    case SQLCOM_SHOW_RELAYLOG_EVENTS:
+    case SQLCOM_SHOW_SLAVE_HOSTS:
+    case SQLCOM_SHOW_SLAVE_STAT:
+    case SQLCOM_SHOW_STATUS:
+    case SQLCOM_SHOW_STATUS_PROC:
+    case SQLCOM_SHOW_STATUS_FUNC:
+    case SQLCOM_SHOW_STORAGE_ENGINES:
+    case SQLCOM_SHOW_TABLE_STATUS:
+    case SQLCOM_SHOW_TABLES:
+    case SQLCOM_SHOW_TRIGGERS:
+    case SQLCOM_SHOW_VARIABLES:
+    case SQLCOM_SET_RESOURCE_GROUP:
+    case SQLCOM_SHOW_WARNS:
+      res = m_lex->m_sql_cmd->prepare(thd);
+      break;
+
+    case SQLCOM_PREPARE:
+    case SQLCOM_EXECUTE:
+    case SQLCOM_DEALLOCATE_PREPARE:
+    default:
+      /*
+        Trivial check of all status commands and diagnostic commands.
+        This is easier than having things in the above case list,
+        as it's less chance for mistakes.
+      */
+      if (!(sql_command_flags[sql_command] & CF_STATUS_COMMAND) ||
+          (sql_command_flags[sql_command] & CF_DIAGNOSTIC_STMT)) {
+        /* All other statements are not supported yet. */
+        my_error(ER_UNSUPPORTED_PS, MYF(0));
+        return true;
+      }
+      break;
+  }
+  if (res) return true;
+
+  trace_parameter_types(thd);
+
+  if (is_sql_prepare()) return false;
+
+  mem_root_deque<Item *> *types = nullptr;
+  Query_result *result = nullptr;
+  uint no_columns = 0;
+
+  if ((sql_command_flags[sql_command] & CF_HAS_RESULT_SET) &&
+      !m_lex->is_explain()) {
+    Query_expression *unit = m_lex->unit;
+    result = unit->query_result();
+    if (result == nullptr) result = unit->first_query_block()->query_result();
+    if (result == nullptr) result = m_lex->result;
+    types = unit->get_unit_column_types();
+    no_columns = result->field_count(*types);
+  }
+
+  return send_statement(thd, this, no_columns, result, types);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: Default_object_creation_ctx::change_env
+void Default_object_creation_ctx::change_env(THD *thd) const {
+  thd->variables.character_set_client = m_client_cs;
+  thd->variables.collation_connection = m_connection_cl;
+
+  thd->update_charset();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: Default_object_creation_ctx::Default_object_creation_ctx
+Default_object_creation_ctx::Default_object_creation_ctx(THD *thd)
+    : m_client_cs(thd->variables.character_set_client),
+      m_connection_cl(thd->variables.collation_connection) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: unpack_value_generator
+bool unpack_value_generator(THD *thd, TABLE *table,
+                            Value_generator **val_generator,
+                            Value_generator_source source,
+                            const char *source_name, Field *field,
+                            bool is_create_table, bool *error_reported) {
+  DBUG_TRACE;
+  assert(field == nullptr || field->table == table);
+
+  LEX_STRING *val_gen_expr = &(*val_generator)->expr_str;
+  // There is a val_generator in text format and it is not unpacked yet.
+  assert(val_gen_expr != nullptr && (*val_generator)->expr_item == nullptr);
+
+  LEX *const save_lex = thd->lex;
+  LEX new_lex;
+  thd->lex = &new_lex;
+  if (lex_start(thd)) {
+    thd->lex = save_lex;
+    return true;  // OOM
+  }
+
+  // Setup thd for parsing.
+  Query_arena *save_stmt_arena_ptr = thd->stmt_arena;
+  Query_arena save_arena;
+  Query_arena val_generator_arena(&table->mem_root,
+                                  Query_arena::STMT_REGULAR_EXECUTION);
+  thd->swap_query_arena(val_generator_arena, &save_arena);
+  thd->stmt_arena = &val_generator_arena;
+  ulong save_old_privilege = thd->want_privilege;
+  thd->want_privilege = 0;
+
+  const CHARSET_INFO *save_character_set_client =
+      thd->variables.character_set_client;
+  // Subquery is not allowed in generated expression
+  const bool save_allow_subselects = thd->lex->expr_allows_subselect;
+  thd->lex->expr_allows_subselect = false;
+  // allow_sum_func is also 0, banning group aggregates and window functions.
+  assert(thd->lex->allow_sum_func == 0);
+
+  // Construct a statement for the parser. The parsed string needs to take
+  // the following format: "PARSE_GCOL_EXPR (<expr_string_from_frm>)"
+  char *gcol_expr_str = static_cast<char *>(table->mem_root.Alloc(
+      val_gen_expr->length + PARSE_GCOL_KEYWORD.length + 3));
+  if (gcol_expr_str == nullptr) return true;  // OOM
+  int str_len = PARSE_GCOL_KEYWORD.length;
+  memcpy(gcol_expr_str, PARSE_GCOL_KEYWORD.str, PARSE_GCOL_KEYWORD.length);
+  memcpy(gcol_expr_str + str_len, "(", 1);
+  str_len++;
+  memcpy(gcol_expr_str + str_len, val_gen_expr->str, val_gen_expr->length);
+  str_len += val_gen_expr->length;
+  memcpy(gcol_expr_str + str_len, ")", 1);
+  str_len++;
+  memcpy(gcol_expr_str + str_len, "\0", 1);
+  str_len++;
+
+  bool disable_strict_mode = false;
+  Strict_error_handler strict_handler;
+
+  // Properties that need to be restored before leaving the scope.
+  auto cleanup = [&]() {
+    if (disable_strict_mode) {
+      thd->pop_internal_handler();
+      thd->variables.sql_mode &= ~MODE_STRICT_ALL_TABLES;
+    }
+    lex_end(thd->lex);
+    thd->lex = save_lex;
+    thd->stmt_arena = save_stmt_arena_ptr;
+    thd->swap_query_arena(save_arena, &val_generator_arena);
+    thd->variables.character_set_client = save_character_set_client;
+    thd->want_privilege = save_old_privilege;
+    thd->lex->expr_allows_subselect = save_allow_subselects;
+  };
+
+  // Properties that need to be restored before leaving the scope if an
+  // error occurs.
+  auto cleanup_guard = create_scope_guard([&]() {
+    // Any memory allocated to unpack the expression is freed next.
+    *val_generator = nullptr;
+    // Any created window is eliminated as not allowed:
+    thd->lex->current_query_block()->m_windows.clear();
+    // cleanup memory allocated
+    thd->free_items();
+    cleanup();
+  });
+
+  // Parse the expression and build an Item tree.
+  Gcol_expr_parser_state parser_state;
+  parser_state.init(thd, gcol_expr_str, str_len);
+  if (parse_sql(thd, &parser_state, nullptr)) return true;
+
+  // From now on use val_generator generated by the parser in expr_item
+  *val_generator = parser_state.result;
+  assert((*val_generator)->expr_item != nullptr &&
+         (*val_generator)->expr_str.str == nullptr);
+
+  thd->lex->expr_allows_subselect = save_allow_subselects;
+
+  // Set the stored_in_db attribute of the column it depends on (if any)
+  if (field != nullptr) (*val_generator)->set_field_stored(field->stored_in_db);
+
+  // Use strict mode regardless of strict mode setting when validating
+  if (!thd->is_strict_mode()) {
+    thd->variables.sql_mode |= MODE_STRICT_ALL_TABLES;
+    thd->push_internal_handler(&strict_handler);
+    disable_strict_mode = true;
+  }
+
+  // Fix and validate the Item tree
+  if (fix_value_generator_fields(thd, table, *val_generator, source,
+                                 source_name, field)) {
+    // During CREATE/ALTER TABLE it is ok to receive errors here.
+    // It is not ok if it happens during the opening of an frm
+    // file as part of a normal query.
+    if (is_create_table) *error_reported = true;
+    return true;
+  }
+
+  // calculate column dependencies for this expression in base_columns_map.
+  if ((*val_generator)->register_base_columns(table)) return true;
+
+  // Revert thd changes and clean up.
+  cleanup();
+  cleanup_guard.commit();
+
+  (*val_generator)->item_list = val_generator_arena.item_list();
+  (*val_generator)->backup_stmt_unsafe_flags(new_lex.get_stmt_unsafe_flags());
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::clone not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::clone not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::clone not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::load_from_db not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::load_from_db not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_get_item_value
+String *sp_get_item_value(THD *thd, Item *item, String *str) {
+  switch (item->result_type()) {
+    case REAL_RESULT:
+    case INT_RESULT:
+    case DECIMAL_RESULT:
+      if (item->data_type() != MYSQL_TYPE_BIT)
+        return item->val_str(str);
+      else { /* Bit type is handled as binary string */
+      }
+      [[fallthrough]];
+    case STRING_RESULT: {
+      String *result = item->val_str(str);
+
+      if (!result) return nullptr;
+
+      {
+        char buf_holder[STRING_BUFFER_USUAL_SIZE];
+        String buf(buf_holder, sizeof(buf_holder), result->charset());
+        const CHARSET_INFO *cs = thd->variables.character_set_client;
+
+        /* We must reset length of the buffer, because of String specificity. */
+        buf.length(0);
+
+        buf.append('_');
+        buf.append(result->charset()->csname);
+        if (cs->escape_with_backslash_is_dangerous) buf.append(' ');
+        append_query_string(thd, cs, result, &buf);
+        buf.append(" COLLATE '");
+        buf.append(item->collation.collation->m_coll_name);
+        buf.append('\'');
+        str->copy(buf);
+
+        return str;
+      }
+    }
+
+    case ROW_RESULT:
+    default:
+      return nullptr;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item_param::query_val_str not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item_param::query_val_str not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Arg_comparator::get_date_from_const
+bool Arg_comparator::get_date_from_const(Item *date_arg, Item *str_arg,
+                                         ulonglong *const_value) {
+  THD *thd = current_thd;
+  assert(str_arg->result_type() == STRING_RESULT);
+  /*
+    Don't use cache while in the context analysis mode only (i.e. for
+    EXPLAIN/CREATE VIEW and similar queries). Cache is useless in such
+    cases and can cause problems. For example evaluating subqueries can
+    confuse storage engines since in context analysis mode tables
+    aren't locked.
+  */
+  if (!(thd->lex->context_analysis_only & CONTEXT_ANALYSIS_ONLY_VIEW) &&
+      str_arg->may_evaluate_const(thd)) {
+    ulonglong value;
+    if (str_arg->data_type() == MYSQL_TYPE_TIME) {
+      // Convert from TIME to DATETIME numeric packed value
+      value = str_arg->val_date_temporal();
+      if (str_arg->null_value) return true;
+    } else {
+      // Convert from string to DATETIME numeric packed value
+      enum_field_types date_arg_type = date_arg->data_type();
+      enum_mysql_timestamp_type t_type =
+          (date_arg_type == MYSQL_TYPE_DATE ? MYSQL_TIMESTAMP_DATE
+                                            : MYSQL_TIMESTAMP_DATETIME);
+      String tmp;
+      String *str_val = str_arg->val_str(&tmp);
+      if (str_arg->null_value) return true;
+      bool error;
+      value = get_date_from_str(thd, str_val, t_type, date_arg->item_name.ptr(),
+                                &error);
+      if (error) {
+        const char *typestr = (date_arg_type == MYSQL_TYPE_DATE)
+                                  ? "DATE"
+                                  : (date_arg_type == MYSQL_TYPE_DATETIME)
+                                        ? "DATETIME"
+                                        : "TIMESTAMP";
+
+        ErrConvString err(str_val->ptr(), str_val->length(),
+                          thd->variables.character_set_client);
+        my_error(ER_WRONG_VALUE, MYF(0), typestr, err.ptr());
+
+        return true;
+      }
+    }
+    if (const_value) *const_value = value;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_create.cc
+Function: create_temporal_literal not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_create.cc
+Function: create_temporal_literal not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log.cc
+Function: Log_to_csv_event_handler::log_slow
+bool Log_to_csv_event_handler::log_slow(
+    THD *thd, ulonglong current_utime, ulonglong query_start_arg,
+    const char *user_host, size_t user_host_len, ulonglong query_utime,
+    ulonglong lock_utime, bool, const char *sql_text, size_t sql_text_len) {
+  TABLE *table = nullptr;
+  bool result = true;
+  bool need_close = false;
+  bool need_rnd_end = false;
+  const CHARSET_INFO *client_cs = thd->variables.character_set_client;
+  my_timeval tv;
+  const char *reason = "";
+
+  DBUG_TRACE;
+
+  /*
+    CSV uses TIME_to_timestamp() internally if table needs to be repaired
+    which will set thd->time_zone_used
+  */
+  bool save_time_zone_used = thd->time_zone_used;
+
+  Table_ref table_list(MYSQL_SCHEMA_NAME.str, MYSQL_SCHEMA_NAME.length,
+                       SLOW_LOG_NAME.str, SLOW_LOG_NAME.length,
+                       SLOW_LOG_NAME.str, TL_WRITE_CONCURRENT_INSERT);
+
+  Silence_log_table_errors error_handler;
+  thd->push_internal_handler(&error_handler);
+
+  Open_tables_backup open_tables_backup;
+  if (!(table = open_log_table(thd, &table_list, &open_tables_backup))) {
+    reason = "cannot open table for slow log";
+    goto err;
+  }
+
+  need_close = true;
+
+  if (log_table_intact.check(thd, table_list.table,
+                             &slow_query_log_table_def)) {
+    reason = "slow table intact check failed";
+    goto err;
+  }
+
+  if (table->file->ha_extra(HA_EXTRA_MARK_AS_LOG_TABLE) ||
+      table->file->ha_rnd_init(false)) {
+    reason = "mark log or init failed";
+    goto err;
+  }
+
+  need_rnd_end = true;
+
+  /* Honor next number columns if present */
+  table->next_number_field = table->found_next_number_field;
+
+  restore_record(table, s->default_values);  // Get empty record
+
+  /* store the time and user values */
+  assert(table->field[SQLT_FIELD_START_TIME]->type() == MYSQL_TYPE_TIMESTAMP);
+  ull2timeval(current_utime, &tv);
+  table->field[SQLT_FIELD_START_TIME]->store_timestamp(&tv);
+
+  table->field[SQLT_FIELD_USER_HOST]->store(user_host, user_host_len,
+                                            client_cs);
+
+  if (query_start_arg) {
+    ha_rows rows_examined;
+
+    /*
+      A TIME field can not hold the full longlong range; query_time or
+      lock_time may be truncated without warning here, if greater than
+      839 hours (~35 days)
+    */
+    MYSQL_TIME t;
+    t.neg = false;
+
+    // overflow TIME-max
+    DBUG_EXECUTE_IF("slow_log_table_max_rows_examined", {
+      query_utime = (longlong)1555826389LL * 1000000 + 1;
+      lock_utime = query_utime;
+    });
+
+    /* fill in query_time field */
+    query_utime = min((ulonglong)query_utime,
+                      (ulonglong)TIME_MAX_VALUE_SECONDS * 1000000LL);
+    calc_time_from_sec(&t, static_cast<long>(query_utime / 1000000LL),
+                       query_utime % 1000000);
+    table->field[SQLT_FIELD_QUERY_TIME]->store_time(&t);
+    /* lock_time */
+    lock_utime = min((ulonglong)lock_utime,
+                     (ulonglong)TIME_MAX_VALUE_SECONDS * 1000000LL);
+    calc_time_from_sec(&t, static_cast<long>(lock_utime / 1000000LL),
+                       lock_utime % 1000000);
+    table->field[SQLT_FIELD_LOCK_TIME]->store_time(&t);
+    /* rows_sent */
+    table->field[SQLT_FIELD_ROWS_SENT]->store(
+        (longlong)thd->get_sent_row_count(), true);
+    /* rows_examined */
+    rows_examined = thd->get_examined_row_count();
+    DBUG_EXECUTE_IF("slow_log_table_max_rows_examined",
+                    { rows_examined = 4294967294LL; });  // overflow 4-byte int
+    table->field[SQLT_FIELD_ROWS_EXAMINED]->store((longlong)rows_examined,
+                                                  true);
+  } else {
+    table->field[SQLT_FIELD_QUERY_TIME]->set_null();
+    table->field[SQLT_FIELD_LOCK_TIME]->set_null();
+    table->field[SQLT_FIELD_ROWS_SENT]->set_null();
+    table->field[SQLT_FIELD_ROWS_EXAMINED]->set_null();
+  }
+  /* fill database field */
+  if (thd->db().str) {
+    if (!table->field[SQLT_FIELD_DATABASE]->store(thd->db().str,
+                                                  thd->db().length, client_cs))
+      table->field[SQLT_FIELD_DATABASE]->set_notnull();
+  }
+
+  if (thd->stmt_depends_on_first_successful_insert_id_in_prev_stmt) {
+    if (!table->field[SQLT_FIELD_LAST_INSERT_ID]->store(
+            (longlong)thd->first_successful_insert_id_in_prev_stmt_for_binlog,
+            true))
+      table->field[SQLT_FIELD_LAST_INSERT_ID]->set_notnull();
+  }
+
+  /*
+    Set value if we do an insert on autoincrement column. Note that for
+    some engines (those for which get_auto_increment() does not leave a
+    table lock until the statement ends), this is just the first value and
+    the next ones used may not be contiguous to it.
+  */
+  if (thd->auto_inc_intervals_in_cur_stmt_for_binlog.nb_elements() > 0) {
+    if (!table->field[SQLT_FIELD_INSERT_ID]->store(
+            (longlong)thd->auto_inc_intervals_in_cur_stmt_for_binlog.minimum(),
+            true))
+      table->field[SQLT_FIELD_INSERT_ID]->set_notnull();
+  }
+
+  if (!table->field[SQLT_FIELD_SERVER_ID]->store((longlong)server_id, true))
+    table->field[SQLT_FIELD_SERVER_ID]->set_notnull();
+
+  /*
+    Column sql_text.
+    A positive return value in store() means truncation.
+    Still logging a message in the log in this case.
+  */
+  table->field[SQLT_FIELD_SQL_TEXT]->store(sql_text, sql_text_len, client_cs);
+
+  table->field[SQLT_FIELD_THREAD_ID]->store((longlong)thd->thread_id(), true);
+
+  /* log table entries are not replicated */
+  if (table->file->ha_write_row(table->record[0])) {
+    reason = "write slow table failed";
+    goto err;
+  }
+
+  result = false;
+
+err:
+  thd->pop_internal_handler();
+
+  if (result && !thd->killed) {
+    LogErr(ERROR_LEVEL, ER_LOG_CANNOT_WRITE_EXTENDED, "mysql.slow_log",
+           error_handler.message(), reason);
+  }
+
+  if (need_rnd_end) {
+    table->file->ha_rnd_end();
+    table->file->ha_release_auto_increment();
+  }
+
+  if (need_close) close_log_table(thd, &open_tables_backup);
+
+  thd->time_zone_used = save_time_zone_used;
+  return result;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log.cc
+Function: Query_logger::general_log_write
+bool Query_logger::general_log_write(THD *thd, enum_server_command command,
+                                     const char *query, size_t query_length) {
+  /* Send a general log message to the audit API. */
+  const std::string &cn = Command_names::str_global(command);
+  mysql_audit_general_log(thd, cn.c_str(), cn.length());
+
+  /*
+    Do we want to log this kind of command?
+    Is general log enabled?
+    Any active handlers?
+  */
+  if (!log_command(thd, command) || !opt_general_log ||
+      !(*general_log_handler_list))
+    return false;
+
+  char user_host_buff[MAX_USER_HOST_SIZE + 1];
+  size_t user_host_len =
+      make_user_name(thd->security_context(), user_host_buff);
+  ulonglong current_utime = my_micro_time();
+
+  mysql_rwlock_rdlock(&LOCK_logger);
+
+  bool error = false;
+  for (Log_event_handler **current_handler = general_log_handler_list;
+       *current_handler;) {
+    error |=
+        (*current_handler++)
+            ->log_general(thd, current_utime, user_host_buff, user_host_len,
+                          thd->thread_id(), cn.c_str(), cn.length(), query,
+                          query_length, thd->variables.character_set_client);
+  }
+  mysql_rwlock_unlock(&LOCK_logger);
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc
+Function: PTI_text_literal_text_string::itemize
+bool PTI_comp_op::itemize(Parse_context *pc, Item **res) {
+  if (super::itemize(pc, res) || left->itemize(pc, &left) ||
+      right->itemize(pc, &right))
+    return true;
+
+  *res = (*boolfunc2creator)(false)->create(left, right);
+  return *res == nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/parser_service.cc
+Function: mysql_parser_open_session
+MYSQL_THD mysql_parser_open_session() {
+  THD *old_thd = current_thd;
+
+  // See create_thd()
+  THD *thd = new (std::nothrow) THD;
+  if (thd == nullptr) return nullptr;
+
+  thd->security_context()->set_host_ptr(STRING_WITH_LEN(my_localhost));
+  thd->lex = new LEX;
+  thd->lex->set_current_query_block(nullptr);
+
+  thd->variables.character_set_client = old_thd->variables.character_set_client;
+
+  return thd;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/query_result.cc
+Function: Query_result_export::send_data
+bool Query_result_send::send_data(THD *thd,
+                                  const mem_root_deque<Item *> &items) {
+  Protocol *protocol = thd->get_protocol();
+  DBUG_TRACE;
+
+  protocol->start_row();
+  if (thd->send_result_set_row(items)) {
+    protocol->abort_row();
+    return true;
+  }
+
+  thd->inc_sent_row_count(1);
+  return protocol->end_row();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: set_slave_thread_default_charset
+void set_slave_thread_default_charset(THD *thd, Relay_log_info const *rli) {
+  DBUG_TRACE;
+
+  thd->variables.character_set_client =
+      global_system_variables.character_set_client;
+  thd->variables.collation_connection =
+      global_system_variables.collation_connection;
+  thd->variables.collation_server = global_system_variables.collation_server;
+  thd->update_charset();
+
+  /*
+    We use a const cast here since the conceptual (and externally
+    visible) behavior of the function is to set the default charset of
+    the thread.  That the cache has to be invalidated is a secondary
+    effect.
+   */
+  const_cast<Relay_log_info *>(rli)->cached_charset_invalidate();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc
+Function: dd::set_event_attributes
+  set_event_attributes(thd, schema, event.get(), event_name, event_body,
+                       event_body_utf8, definer, event_data, false);
+
+  return thd->dd_client()->store(event.get());
+}
+
+bool update_event(THD *thd, Event *event, const dd::Schema &schema,
+                  const dd::Schema *new_schema,
+                  const String_type &new_event_name,
+                  const String_type &new_event_body,
+                  const String_type &new_event_body_utf8,
+                  const LEX_USER *definer, Event_parse_data *event_data) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_trigger.cc
+Function: dd::load_triggers
+bool load_triggers(THD *thd, MEM_ROOT *mem_root, const char *schema_name,
+                   const char *table_name, const dd::Table &table,
+                   List<::Trigger> *triggers) {
+  DBUG_TRACE;
+
+  for (const auto &trigger : table.triggers()) {
+    LEX_CSTRING db_name_str = {schema_name, strlen(schema_name)};
+    LEX_CSTRING subject_table_name = {table_name, strlen(table_name)};
+    LEX_CSTRING definition, definition_utf8;
+
+    if (lex_string_strmake(mem_root, &definition,
+                           trigger->action_statement().c_str(),
+                           trigger->action_statement().length()))
+      return true;
+
+    if (lex_string_strmake(mem_root, &definition_utf8,
+                           trigger->action_statement_utf8().c_str(),
+                           trigger->action_statement_utf8().length()))
+      return true;
+
+    LEX_CSTRING definer_user;
+    if (lex_string_strmake(mem_root, &definer_user,
+                           trigger->definer_user().c_str(),
+                           trigger->definer_user().length()))
+      return true;
+
+    LEX_CSTRING definer_host;
+    if (lex_string_strmake(mem_root, &definer_host,
+                           trigger->definer_host().c_str(),
+                           trigger->definer_host().length()))
+      return true;
+
+    const CHARSET_INFO *client_cs =
+        dd_get_mysql_charset(trigger->client_collation_id());
+    if (client_cs == nullptr) client_cs = thd->variables.character_set_client;
+
+    const CHARSET_INFO *connection_cs =
+        dd_get_mysql_charset(trigger->connection_collation_id());
+    if (connection_cs == nullptr)
+      connection_cs = thd->variables.collation_connection;
+
+    const CHARSET_INFO *schema_cs =
+        dd_get_mysql_charset(trigger->schema_collation_id());
+    if (schema_cs == nullptr) schema_cs = thd->variables.collation_database;
+
+    LEX_CSTRING client_cs_name, connection_cl_name, db_cl_name, trigger_name;
+    const char *csname = client_cs->csname;
+    if (lex_string_strmake(mem_root, &client_cs_name, csname, strlen(csname)) ||
+        lex_string_strmake(mem_root, &connection_cl_name,
+                           connection_cs->m_coll_name,
+                           strlen(connection_cs->m_coll_name)) ||
+        lex_string_strmake(mem_root, &db_cl_name, schema_cs->m_coll_name,
+                           strlen(schema_cs->m_coll_name)) ||
+        lex_string_strmake(mem_root, &trigger_name, trigger->name().c_str(),
+                           trigger->name().length()))
+      return true;
+
+    ::Trigger *trigger_to_add = ::Trigger::create_from_dd(
+        mem_root, trigger_name, db_name_str, subject_table_name, definition,
+        definition_utf8, trigger->sql_mode(), definer_user, definer_host,
+        client_cs_name, connection_cl_name, db_cl_name,
+        convert_event_type_from_dd(trigger->event_type()),
+        convert_action_time_from_dd(trigger->action_timing()),
+        trigger->action_order(), trigger->created());
+
+    if (trigger_to_add == nullptr) return true;
+
+    if (triggers->push_back(trigger_to_add, mem_root)) {
+      destroy(trigger_to_add);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::Routine_event_context_guard::Routine_event_context_guard
+Routine_event_context_guard::Routine_event_context_guard(THD *thd)
+    : m_thd(thd) {
+  m_thd = thd;
+  m_sql_mode = m_thd->variables.sql_mode;
+  m_client_cs = m_thd->variables.character_set_client;
+  m_connection_cl = m_thd->variables.collation_connection;
+  m_saved_time_zone = m_thd->variables.time_zone;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::Routine_event_context_guard::
+  if (should_log_error(error))
+    LogEvent()
+        .type(LOG_TYPE_ERROR)
+        .subsys(LOG_SUBSYSTEM_TAG)
+        .prio(ERROR_LEVEL)
+        .errcode(ER_ERROR_INFO_FROM_DA)
+        .verbatim(str);
+}
+
+void Bootstrap_error_handler::set_abort_on_error(uint error) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::invalid_routine
+bool invalid_routine(THD *thd, const dd::Schema &schema,
+                     const dd::Routine &routine) {
+  Routine_event_context_guard guard(thd);
+  sp_head *sp = nullptr;
+  st_sp_chistics chistics;
+  prepare_sp_chistics_from_dd_routine(&routine, &chistics);
+
+  dd::String_type return_type_str;
+  prepare_return_type_string_from_dd_routine(thd, &routine, &return_type_str);
+
+  // Create SP creation context to be used in db_load_routine()
+  Stored_program_creation_ctx *creation_ctx =
+      Stored_routine_creation_ctx::create_routine_creation_ctx(&routine);
+
+  thd->variables.character_set_client = creation_ctx->get_client_cs();
+  thd->variables.collation_connection = creation_ctx->get_connection_cl();
+  thd->update_charset();
+
+  enum_sp_return_code error = db_load_routine(
+      thd,
+      routine.type() == dd::Routine::RT_FUNCTION ? enum_sp_type::FUNCTION
+                                                 : enum_sp_type::PROCEDURE,
+      schema.name().c_str(), schema.name().size(), routine.name().c_str(),
+      routine.name().size(), &sp, routine.sql_mode(),
+      routine.parameter_str().c_str(), return_type_str.c_str(),
+      routine.definition().c_str(), &chistics, routine.definer_user().c_str(),
+      routine.definer_host().c_str(), routine.created(true),
+      routine.last_altered(true), creation_ctx);
+
+  if (sp != nullptr)  // To be safe
+    sp_head::destroy(sp);
+
+  if (error) return (thd->get_stmt_da()->mysql_errno() == ER_PARSE_ERROR);
+  thd->clear_error();
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/routine.cc
+Function: dd::upgrade_57::migrate_routine_to_dd
+static bool migrate_routine_to_dd(THD *thd, TABLE *proc_table) {
+  const char *params, *returns, *body, *definer;
+  char *sp_db, *sp_name1;
+  sp_head *sp = nullptr;
+  enum_sp_type routine_type;
+  LEX_USER user_info;
+  bool dummy_is_sp_created = false;
+
+  // Fetch SP/SF name, database name, definer and type.
+  if ((sp_db = get_field(thd->mem_root,
+                         proc_table->field[MYSQL_PROC_FIELD_DB])) == nullptr)
+    return true;
+
+  if ((sp_name1 = get_field(
+           thd->mem_root, proc_table->field[MYSQL_PROC_FIELD_NAME])) == nullptr)
+    return true;
+
+  if ((definer = get_field(thd->mem_root,
+                           proc_table->field[MYSQL_PROC_FIELD_DEFINER])) ==
+      nullptr)
+    return true;
+
+  routine_type =
+      (enum_sp_type)proc_table->field[MYSQL_PROC_MYSQL_TYPE]->val_int();
+
+  // Fetch SP/SF parameters string
+  if ((params = get_field(thd->mem_root,
+                          proc_table->field[MYSQL_PROC_FIELD_PARAM_LIST])) ==
+      nullptr)
+    params = "";
+
+  // Create return type string for SF
+  if (routine_type == enum_sp_type::PROCEDURE)
+    returns = "";
+  else if ((returns = get_field(thd->mem_root,
+                                proc_table->field[MYSQL_PROC_FIELD_RETURNS])) ==
+           nullptr)
+    return true;
+
+  st_sp_chistics chistics;
+  if (set_st_sp_chistics(thd, proc_table, &chistics)) return true;
+
+  // Fetch SP/SF created and modified timestamp
+  longlong created = proc_table->field[MYSQL_PROC_FIELD_CREATED]->val_int();
+  longlong modified = proc_table->field[MYSQL_PROC_FIELD_MODIFIED]->val_int();
+
+  // Fetch SP/SF body
+  if ((body = get_field(thd->mem_root,
+                        proc_table->field[MYSQL_PROC_FIELD_BODY])) == nullptr)
+    return true;
+
+  dd::upgrade::Routine_event_context_guard routine_ctx_guard(thd);
+
+  thd->variables.sql_mode =
+      (sql_mode_t)(proc_table->field[MYSQL_PROC_FIELD_SQL_MODE]->val_int() &
+                   MODE_ALLOWED_MASK);
+
+  LEX_CSTRING sp_db_str;
+  LEX_STRING sp_name_str;
+
+  sp_db_str.str = sp_db;
+  sp_db_str.length = strlen(sp_db);
+  sp_name_str.str = sp_name1;
+  sp_name_str.length = strlen(sp_name1);
+
+  sp_name sp_name_obj = sp_name(sp_db_str, sp_name_str, true);
+  sp_name_obj.init_qname(thd);
+
+  // Create SP creation context to be used in db_load_routine()
+  Stored_program_creation_ctx *creation_ctx =
+      Stored_routine_creation_ctx::load_from_db(thd, &sp_name_obj, proc_table);
+
+  /*
+    Update character set info in thread variable.
+    Restore will be taken care by Routine_event_context_guard
+  */
+  thd->variables.character_set_client = creation_ctx->get_client_cs();
+  thd->variables.collation_connection = creation_ctx->get_connection_cl();
+  thd->update_charset();
+
+  // Holders for user name and host name used in parse user.
+  char definer_user_name_holder[USERNAME_LENGTH + 1];
+  char definer_host_name_holder[HOSTNAME_LENGTH + 1];
+  user_info.user = {definer_user_name_holder, USERNAME_LENGTH};
+  user_info.host = {definer_host_name_holder, HOSTNAME_LENGTH};
+
+  // Parse user string to separate user name and host
+  parse_user(definer, strlen(definer), definer_user_name_holder,
+             &user_info.user.length, definer_host_name_holder,
+             &user_info.host.length);
+
+  // Disable autocommit option in thd variable
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  // This function fixes sp_head to use in sp_create_routine()
+  enum_sp_return_code sp_ret_code = db_load_routine(
+      thd, routine_type, sp_db_str.str, sp_db_str.length, sp_name_str.str,
+      sp_name_str.length, &sp, thd->variables.sql_mode, params, returns, body,
+      &chistics, definer_user_name_holder, definer_host_name_holder, created,
+      modified, creation_ctx);
+
+  if (sp_ret_code != SP_OK) {
+    if (sp_ret_code == SP_NO_DB_ERROR) {
+      // Schema does not exist. Fail with an error indicating the presence of an
+      // orphan routine.
+      LogErr(ERROR_LEVEL, ER_UPGRADE_NONEXISTENT_SCHEMA, sp_db_str.str,
+             "routine", sp_name_str.str, "routines");
+      goto err;
+    }
+
+    /*
+      Parsing of routine body failed. Use empty routine body and report a
+      warning if the routine does not belong to sys schema. Sys schema routines
+      will get fixed when mysql_upgrade is executed.
+    */
+    if (strcmp(sp_db_str.str, "sys") != 0) {
+      if (dd::upgrade::Syntax_error_handler::is_parse_error) {
+        LogErr(ERROR_LEVEL, ER_UPGRADE_PARSE_ERROR, "Routine", sp_db_str.str,
+               sp_name_str.str,
+               dd::upgrade::Syntax_error_handler::error_message());
+        return false;
+      }
+      LogErr(WARNING_LEVEL, ER_CANT_PARSE_STORED_ROUTINE_BODY, sp_db_str.str,
+             sp_name_str.str, " Creating routine without parsing routine body");
+    }
+
+    LEX_CSTRING sr_body;
+    if (routine_type == enum_sp_type::FUNCTION)
+      sr_body = {STRING_WITH_LEN("RETURN NULL")};
+    else
+      sr_body = {STRING_WITH_LEN("BEGIN END")};
+
+    if (db_load_routine(
+            thd, routine_type, sp_db_str.str, sp_db_str.length, sp_name_str.str,
+            sp_name_str.length, &sp, thd->variables.sql_mode, params, returns,
+            sr_body.str, &chistics, definer_user_name_holder,
+            definer_host_name_holder, created, modified, creation_ctx))
+      goto err;
+
+    // Set actual routine body.
+    sp->m_body.str = body;
+    sp->m_body.length = strlen(body);
+  }
+
+  // Create entry for SP/SF in DD table.
+  if (sp_create_routine(thd, sp, &user_info, false, dummy_is_sp_created))
+    goto err;
+
+  if (sp != nullptr)  // To be safe
+    sp_head::destroy(sp);
+
+  return false;
+
+err:
+  LogErr(ERROR_LEVEL, ER_DD_CANT_CREATE_SP, sp_db_str.str, sp_name_str.str);
+  if (sp != nullptr)  // To be safe
+    sp_head::destroy(sp);
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::Trigger_loader::load_triggers
+  Module private variables to be used in Trigger_loader::load_triggers().
+*/
+
+static LEX_STRING default_client_cs_name = NULL_STR;
+static LEX_STRING default_connection_cl_name = NULL_STR;
+static LEX_STRING default_db_cl_name = NULL_STR;
+
+class Handle_old_incorrect_sql_modes_hook : public Unknown_key_hook {
+ private:
+  char *m_path;
+
+ public:
+  Handle_old_incorrect_sql_modes_hook(char *file_path) : m_path(file_path) {}
+  bool process_unknown_string(const char *&unknown_key, uchar *base,
+                              MEM_ROOT *mem_root, const char *end) override;
+};
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc
+Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+void Ndb_binlog_thread::fix_per_epoch_trans_settings(THD *thd) {
+  // No effect for self logging engine
+  // thd->variables.binlog_row_format
+
+  // With HTON_NO_BINLOG_ROW_OPT handlerton flag setting has no effect
+  // thd->variables.binlog_row_image
+
+  // Compression settings should take effect next binlog transaction
+  thd->variables.binlog_trx_compression = opt_ndb_log_trx_compression;
+  thd->variables.binlog_trx_compression_type = 0;  // zstd
+  thd->variables.binlog_trx_compression_level_zstd =
+      opt_ndb_log_trx_compression_level_zstd;
+
+  // Without HA_BLOB_PARTIAL_UPDATE setting has no effect
+  // thd->variables.binlog_row_value_options & PARTIAL_JSON
+
+  // Controls writing Rows_query_log events with the query to binlog, disable
+  // since query is not known for changes received from NDB
+  thd->variables.binlog_rows_query_log_events = false;
+
+  // No effect unless statement-based binary logging
+  // thd->variables.binlog_direct_non_trans_update
+
+  // Setup writeset extraction based on --ndb-log-transaction-dependency
+  thd->variables.transaction_write_set_extraction =
+      opt_ndb_log_trans_dependency ? HASH_ALGORITHM_XXHASH64
+                                   : HASH_ALGORITHM_OFF;
+
+  // Charset setting
+  thd->variables.character_set_client = &my_charset_latin1;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc
+Function: ndb_create_thd
+THD *ndb_create_thd(char *stackptr) {
+  DBUG_TRACE;
+  THD *thd = new THD; /* note that constructor of THD uses DBUG_ */
+  if (thd == nullptr) {
+    return nullptr;
+  }
+  THD_CHECK_SENTRY(thd);
+
+  thd->thread_stack = stackptr; /* remember where our stack is */
+  thd->store_globals();
+
+  thd->init_query_mem_roots();
+  thd->set_command(COM_DAEMON);
+  thd->system_thread = SYSTEM_THREAD_NDBCLUSTER_BINLOG;
+  thd->get_protocol_classic()->set_client_capabilities(0);
+  thd->lex->start_transaction_opt = 0;
+  thd->security_context()->skip_grants();
+
+  CHARSET_INFO *charset_connection =
+      get_charset_by_csname("utf8mb3", MY_CS_PRIMARY, MYF(MY_WME));
+  thd->variables.character_set_client = charset_connection;
+  thd->variables.character_set_results = charset_connection;
+  thd->variables.collation_connection = charset_connection;
+  thd->update_charset();
+  return thd;
+}
+
+

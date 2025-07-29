@@ -1,0 +1,59 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/myisam/ha_myisam.cc
+Function: ha_myisam::preload_keys
+int ha_myisam::preload_keys(THD *thd, HA_CHECK_OPT *) {
+  int error;
+  const char *errmsg;
+  ulonglong map;
+  Table_ref *table_list = table->pos_in_table_list;
+  bool ignore_leaves = table_list->ignore_leaves;
+  char buf[MYSQL_ERRMSG_SIZE];
+
+  DBUG_TRACE;
+
+  table->keys_in_use_for_query.clear_all();
+
+  if (table_list->process_index_hints(thd, table)) return HA_ADMIN_FAILED;
+
+  map = ~(ulonglong)0;
+  /* Check validity of the index references */
+  if (!table->keys_in_use_for_query.is_clear_all())
+    /* use all keys if there's no list specified by the user through hints */
+    map = table->keys_in_use_for_query.to_ulonglong();
+
+  mi_extra(file, HA_EXTRA_PRELOAD_BUFFER_SIZE,
+           (void *)&thd->variables.preload_buff_size);
+
+  if ((error = mi_preload(file, map, ignore_leaves))) {
+    switch (error) {
+      case HA_ERR_NON_UNIQUE_BLOCK_SIZE:
+        errmsg = "Indexes use different block sizes";
+        break;
+      case HA_ERR_OUT_OF_MEM:
+        errmsg = "Failed to allocate buffer";
+        break;
+      default:
+        snprintf(buf, sizeof(buf), "Failed to read from index file (errno: %d)",
+                 my_errno());
+        errmsg = buf;
+    }
+    error = HA_ADMIN_FAILED;
+    goto err;
+  }
+
+  return HA_ADMIN_OK;
+
+err : {
+  MI_CHECK param;
+  myisamchk_init(&param);
+  param.thd = thd;
+  param.op_name = "preload_keys";
+  param.db_name = table->s->db.str;
+  param.table_name = table->s->table_name.str;
+  param.testflag = 0;
+  mi_check_print_error(&param, "%s", errmsg);
+  return error;
+}
+}
+
+

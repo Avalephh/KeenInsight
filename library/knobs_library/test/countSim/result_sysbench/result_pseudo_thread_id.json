@@ -1,0 +1,17 @@
+[
+    {
+        "knob_name": "pseudo_thread_id",
+        "data_matched_functions": [
+            "open_temporary_table",
+            "find_temporary_table"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "MYSQL_BIN_LOG::commit",
+            "String::append",
+            "Query_log_event::Query_log_event"
+        ],
+        "control_matched_count": 3,
+        "matched_count": 5
+    }
+]

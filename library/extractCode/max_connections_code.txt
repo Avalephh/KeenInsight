@@ -1,0 +1,2012 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: init_common_variables
+int init_common_variables() {
+#if defined(HAVE_BUILD_ID_SUPPORT)
+  my_find_build_id(server_build_id);
+#endif
+
+  my_decimal_set_zero(&decimal_zero);  // set decimal_zero constant;
+  tzset();                             // Set tzname
+
+  max_system_variables.pseudo_thread_id = (my_thread_id)~0;
+  server_start_time = flush_status_time = time(nullptr);
+
+  binlog_filter = new Rpl_filter;
+  if (!binlog_filter) {
+    LogErr(ERROR_LEVEL, ER_RPL_BINLOG_FILTERS_OOM, strerror(errno));
+    return 1;
+  }
+
+  if (init_thread_environment() || mysql_init_variables()) return 1;
+
+  {
+#ifdef _WIN32
+    strmake(system_time_zone_dst_off, _tzname[0],
+            sizeof(system_time_zone_dst_off) - 1);
+    strmake(system_time_zone_dst_on, _tzname[1],
+            sizeof(system_time_zone_dst_on) - 1);
+#else
+    strmake(system_time_zone_dst_off, tzname[0],
+            sizeof(system_time_zone_dst_off) - 1);
+    strmake(system_time_zone_dst_on, tzname[1],
+            sizeof(system_time_zone_dst_on) - 1);
+#endif
+  }
+  /*
+    We set SYSTEM time zone as reasonable default and
+    also for failure of my_tz_init() and bootstrap mode.
+    If user explicitly set time zone with --default-time-zone
+    option we will change this value in my_tz_init().
+  */
+  global_system_variables.time_zone = my_tz_SYSTEM;
+
+#ifdef HAVE_PSI_INTERFACE
+  /*
+    Complete the mysql_bin_log initialization.
+    Instrumentation keys are known only after the performance schema
+    initialization, and can not be set in the MYSQL_BIN_LOG constructor (called
+    before main()).
+  */
+  mysql_bin_log.set_psi_keys(
+      key_BINLOG_LOCK_index, key_BINLOG_LOCK_commit,
+      key_BINLOG_LOCK_commit_queue, key_BINLOG_LOCK_after_commit,
+      key_BINLOG_LOCK_after_commit_queue, key_BINLOG_LOCK_done,
+      key_BINLOG_LOCK_flush_queue, key_BINLOG_LOCK_log,
+      key_BINLOG_LOCK_binlog_end_pos, key_BINLOG_LOCK_sync,
+      key_BINLOG_LOCK_sync_queue, key_BINLOG_LOCK_xids,
+      key_BINLOG_LOCK_log_info, key_BINLOG_LOCK_wait_for_group_turn,
+      key_BINLOG_COND_done, key_BINLOG_COND_flush_queue, key_BINLOG_update_cond,
+      key_BINLOG_prep_xids_cond, key_BINLOG_COND_wait_for_group_turn,
+      key_file_binlog, key_file_binlog_index, key_file_binlog_cache,
+      key_file_binlog_index_cache);
+#endif
+
+  /*
+    Init mutexes for the global MYSQL_BIN_LOG objects.
+    As safe_mutex depends on what MY_INIT() does, we can't init the mutexes of
+    global MYSQL_BIN_LOGs in their constructors, because then they would be
+    inited before MY_INIT(). So we do it here.
+  */
+  mysql_bin_log.init_pthread_objects();
+
+  /* TODO: remove this when my_time_t is 64 bit compatible */
+  if (!is_time_t_valid_for_timestamp(server_start_time)) {
+    LogErr(ERROR_LEVEL, ER_UNSUPPORTED_DATE);
+    return 1;
+  }
+
+  if (gethostname(glob_hostname, sizeof(glob_hostname)) < 0) {
+    strmake(glob_hostname, STRING_WITH_LEN("localhost"));
+    LogErr(WARNING_LEVEL, ER_CALL_ME_LOCALHOST, glob_hostname);
+    strmake(default_logfile_name, STRING_WITH_LEN("mysql"));
+  } else
+    strmake(default_logfile_name, glob_hostname,
+            sizeof(default_logfile_name) - 5);
+
+  strmake(default_binlogfile_name, STRING_WITH_LEN("binlog"));
+  if (opt_initialize || opt_initialize_insecure) {
+    /*
+      System tables initialization are not binary logged (regardless
+      --log-bin option).
+
+      Disable binary log while executing any user script sourced while
+      initializing system except if explicitly requested.
+    */
+    opt_bin_log = false;
+  }
+
+  strmake(pidfile_name, default_logfile_name, sizeof(pidfile_name) - 5);
+  my_stpcpy(fn_ext(pidfile_name), ".pid");  // Add proper extension
+
+  /*
+    The default-storage-engine entry in my_long_options should have a
+    non-null default value. It was earlier initialized as
+    (longlong)"MyISAM" in my_long_options but this triggered a
+    compiler error in the Sun Studio 12 compiler. As a work-around we
+    set the def_value member to 0 in my_long_options and initialize it
+    to the correct value here.
+
+    From MySQL 5.5 onwards, the default storage engine is InnoDB.
+  */
+  default_storage_engine = "InnoDB";
+  default_tmp_storage_engine = default_storage_engine;
+
+  /*
+    Add server status variables to the dynamic list of
+    status variables that is shown by SHOW STATUS.
+    Later, in plugin_register_builtin_and_init_core_se(),
+    plugin_register_dynamic_and_init_all() and
+    mysql_install_plugin(), new entries could be added
+    to that list.
+  */
+  if (add_status_vars(status_vars)) return 1;  // an error was already reported
+
+#ifndef NDEBUG
+  /*
+    We have few debug-only commands in com_status_vars, only visible in debug
+    builds. for simplicity we enable the assert only in debug builds
+
+    There are 8 Com_ variables which don't have corresponding SQLCOM_ values:
+    (TODO strictly speaking they shouldn't be here, should not have Com_ prefix
+    that is. Perhaps Stmt_ ? Comstmt_ ? Prepstmt_ ?)
+
+      Com_admin_commands       => com_other
+      Com_stmt_close           => com_stmt_close
+      Com_stmt_execute         => com_stmt_execute
+      Com_stmt_fetch           => com_stmt_fetch
+      Com_stmt_prepare         => com_stmt_prepare
+      Com_stmt_reprepare       => com_stmt_reprepare
+      Com_stmt_reset           => com_stmt_reset
+      Com_stmt_send_long_data  => com_stmt_send_long_data
+
+    We also have aliases for 5 com_status_vars:
+
+      Com_slave_start              => Com_replica_start
+      Com_slave_stop               => Com_replica_stop
+      Com_show_slave_status        => Com_show_replica_status
+      Com_show_slave_hosts         => Com_show_replicas
+      Com_change_master            => Com_change_replication_source
+
+    With this correction the number of Com_ variables (number of elements in
+    the array, excluding the last element - terminator) must match the number
+    of SQLCOM_ constants.
+  */
+  static_assert(sizeof(com_status_vars) / sizeof(com_status_vars[0]) - 1 ==
+                    SQLCOM_END + 12,
+                "");
+#endif
+
+  if (get_options(&remaining_argc, &remaining_argv)) return 1;
+
+  /*
+    The opt_bin_log can be false (binary log is disabled) only if
+    --skip-log-bin/--disable-log-bin is configured or while the
+    system is initializing.
+  */
+  if (!opt_bin_log) {
+    /*
+      The log-replica-updates should be disabled if binary log is disabled
+      and --log-replica-updates option is not set explicitly on command
+      line or configuration file.
+    */
+    if (!log_replica_updates_supplied) opt_log_replica_updates = false;
+  }
+
+  if (opt_protocol_compression_algorithms) {
+    if ((opt_protocol_compression_algorithms[0] == 0) ||
+        (validate_compression_attributes(
+            std::string(opt_protocol_compression_algorithms), std::string(),
+            true))) {
+      /*
+       --protocol-compression-algorithms is set to invalid value, resetting
+       its value to default "zlib,zstd,uncompressed"
+      */
+      opt_protocol_compression_algorithms =
+          const_cast<char *>(PROTOCOL_COMPRESSION_DEFAULT_VALUE);
+      LogErr(WARNING_LEVEL, ER_PROTOCOL_COMPRESSION_RESET_LOG);
+    }
+  }
+  update_parser_max_mem_size();
+  update_optimizer_switch();
+
+  if (set_default_auth_plugin(default_auth_plugin,
+                              strlen(default_auth_plugin))) {
+    LogErr(ERROR_LEVEL, ER_AUTH_CANT_SET_DEFAULT_PLUGIN);
+    return 1;
+  }
+  set_server_version();
+
+#if defined(HAVE_BUILD_ID_SUPPORT)
+  if (!is_help_or_validate_option()) {
+    LogErr(INFORMATION_LEVEL, ER_BUILD_ID, server_build_id);
+  }
+#endif
+  if (!is_help_or_validate_option()) {
+    LogErr(INFORMATION_LEVEL, ER_BASEDIR_SET_TO, mysql_home);
+  }
+  if (!opt_validate_config && (opt_initialize || opt_initialize_insecure)) {
+    LogErr(SYSTEM_LEVEL, ER_STARTING_INIT, my_progname, server_version,
+           (ulong)getpid());
+  } else if (!is_help_or_validate_option()) {
+    LogErr(SYSTEM_LEVEL, ER_STARTING_AS, my_progname, server_version,
+           (ulong)getpid());
+  }
+  if (opt_help && !opt_verbose) unireg_abort(MYSQLD_SUCCESS_EXIT);
+
+  DBUG_PRINT("info", ("%s  Ver %s for %s on %s\n", my_progname, server_version,
+                      SYSTEM_TYPE, MACHINE_TYPE));
+
+#ifdef HAVE_LINUX_LARGE_PAGES
+  /* Initialize large page size */
+  if (opt_large_pages && (opt_large_page_size = my_get_large_page_size())) {
+    DBUG_PRINT("info",
+               ("Large page set, large_page_size = %d", opt_large_page_size));
+  } else {
+    opt_large_pages = false;
+    /*
+       Either not configured to use large pages or Linux haven't
+       been compiled with large page support
+    */
+  }
+#endif /* HAVE_LINUX_LARGE_PAGES */
+#ifdef HAVE_SOLARIS_LARGE_PAGES
+#define LARGE_PAGESIZE (4 * 1024 * 1024)         /* 4MB */
+#define SUPER_LARGE_PAGESIZE (256 * 1024 * 1024) /* 256MB */
+  if (opt_large_pages) {
+    /*
+      tell the kernel that we want to use 4/256MB page for heap storage
+      and also for the stack. We use 4 MByte as default and if the
+      super-large-page is set we increase it to 256 MByte. 256 MByte
+      is for server installations with GBytes of RAM memory where
+      the MySQL Server will have page caches and other memory regions
+      measured in a number of GBytes.
+      We use as big pages as possible which isn't bigger than the above
+      desired page sizes.
+    */
+    int nelem;
+    size_t max_desired_page_size;
+    if (opt_super_large_pages)
+      max_desired_page_size = SUPER_LARGE_PAGESIZE;
+    else
+      max_desired_page_size = LARGE_PAGESIZE;
+    nelem = getpagesizes(NULL, 0);
+    if (nelem > 0) {
+      size_t *pagesize = (size_t *)malloc(sizeof(size_t) * nelem);
+      if (pagesize != NULL && getpagesizes(pagesize, nelem) > 0) {
+        size_t max_page_size = 0;
+        for (int i = 0; i < nelem; i++) {
+          if (pagesize[i] > max_page_size &&
+              pagesize[i] <= max_desired_page_size)
+            max_page_size = pagesize[i];
+        }
+        free(pagesize);
+        if (max_page_size > 0) {
+          struct memcntl_mha mpss;
+
+          mpss.mha_cmd = MHA_MAPSIZE_BSSBRK;
+          mpss.mha_pagesize = max_page_size;
+          mpss.mha_flags = 0;
+          memcntl(NULL, 0, MC_HAT_ADVISE, (caddr_t)&mpss, 0, 0);
+          mpss.mha_cmd = MHA_MAPSIZE_STACK;
+          memcntl(NULL, 0, MC_HAT_ADVISE, (caddr_t)&mpss, 0, 0);
+        }
+      }
+    }
+  }
+#endif /* HAVE_SOLARIS_LARGE_PAGES */
+
+  longlong default_value;
+  sys_var *var;
+  /* Calculate and update default value for thread_cache_size. */
+  if ((default_value = 8 + max_connections / 100) > 100) default_value = 100;
+  var = find_static_system_variable("thread_cache_size");
+  var->update_default(default_value);
+
+  /* Calculate and update default value for host_cache_size. */
+  if ((default_value = 128 + max_connections) > 628 &&
+      (default_value = 628 + ((max_connections - 500) / 20)) > 2000)
+    default_value = 2000;
+  var = find_static_system_variable("host_cache_size");
+  var->update_default(default_value);
+
+  /* Fix thread_cache_size. */
+  if (!thread_cache_size_specified &&
+      (Per_thread_connection_handler::max_blocked_pthreads =
+           8 + max_connections / 100) > 100)
+    Per_thread_connection_handler::max_blocked_pthreads = 100;
+
+  /* Fix host_cache_size. */
+  if (!host_cache_size_specified &&
+      (host_cache_size = 128 + max_connections) > 628 &&
+      (host_cache_size = 628 + ((max_connections - 500) / 20)) > 2000)
+    host_cache_size = 2000;
+
+  /* Fix back_log */
+  if (back_log == 0 && (back_log = max_connections) > 65535) back_log = 65535;
+
+  unireg_init(opt_specialflag); /* Set up extern variables */
+  while (!(my_default_lc_messages =
+               my_locale_by_name(nullptr, lc_messages, strlen(lc_messages)))) {
+    LogErr(ERROR_LEVEL, ER_FAILED_TO_FIND_LOCALE_NAME, lc_messages);
+    if (!my_strcasecmp(&my_charset_latin1, lc_messages,
+                       mysqld_default_locale_name))
+      return 1;
+    lc_messages = mysqld_default_locale_name;
+  }
+  global_system_variables.lc_messages = my_default_lc_messages;
+  if (init_errmessage()) /* Read error messages from file */
+    return 1;
+  init_client_errs();
+
+  mysql_client_plugin_init();
+  if (item_create_init()) return 1;
+  item_init();
+  range_optimizer_init();
+  my_string_stack_guard = check_enough_stack_size;
+  /*
+    Process a comma-separated character set list and choose
+    the first available character set. This is mostly for
+    test purposes, to be able to start "mysqld" even if
+    the requested character set is not available (see bug#18743).
+  */
+  for (;;) {
+    char *next_character_set_name =
+        strchr(const_cast<char *>(default_character_set_name), ',');
+    if (next_character_set_name) *next_character_set_name++ = '\0';
+    if (!(default_charset_info = get_charset_by_csname(
+              default_character_set_name, MY_CS_PRIMARY, MYF(MY_WME)))) {
+      if (next_character_set_name) {
+        default_character_set_name = next_character_set_name;
+        default_collation_name = nullptr;  // Ignore collation
+      } else
+        return 1;  // Eof of the list
+    } else {
+      warn_on_deprecated_charset(nullptr, default_charset_info,
+                                 default_character_set_name,
+                                 "--character-set-server");
+      break;
+    }
+  }
+
+  if (default_collation_name) {
+    CHARSET_INFO *default_collation;
+    default_collation = get_charset_by_name(default_collation_name, MYF(0));
+    if (!default_collation) {
+      LogErr(ERROR_LEVEL, ER_FAILED_TO_FIND_COLLATION_NAME,
+             default_collation_name);
+      return 1;
+    }
+    if (!my_charset_same(default_charset_info, default_collation)) {
+      LogErr(ERROR_LEVEL, ER_INVALID_COLLATION_FOR_CHARSET,
+             default_collation_name, default_charset_info->csname);
+      return 1;
+    }
+    warn_on_deprecated_collation(nullptr, default_collation,
+                                 "--collation-server");
+    default_charset_info = default_collation;
+  }
+  /* Set collactions that depends on the default collation */
+  global_system_variables.collation_server = default_charset_info;
+  global_system_variables.collation_database = default_charset_info;
+  global_system_variables.default_collation_for_utf8mb4 =
+      &my_charset_utf8mb4_0900_ai_ci;
+
+  if (is_supported_parser_charset(default_charset_info)) {
+    global_system_variables.collation_connection = default_charset_info;
+    global_system_variables.character_set_results = default_charset_info;
+    global_system_variables.character_set_client = default_charset_info;
+  } else {
+    LogErr(INFORMATION_LEVEL, ER_FIXING_CLIENT_CHARSET,
+           default_charset_info->csname, my_charset_latin1.csname);
+    global_system_variables.collation_connection = &my_charset_latin1;
+    global_system_variables.character_set_results = &my_charset_latin1;
+    global_system_variables.character_set_client = &my_charset_latin1;
+  }
+
+  if (!(character_set_filesystem = get_charset_by_csname(
+            character_set_filesystem_name, MY_CS_PRIMARY, MYF(MY_WME))))
+    return 1;
+  else
+    warn_on_deprecated_charset(nullptr, character_set_filesystem,
+                               character_set_filesystem_name,
+                               "--character-set-filesystem");
+  global_system_variables.character_set_filesystem = character_set_filesystem;
+
+  if (lex_init()) {
+    LogErr(ERROR_LEVEL, ER_OOM);
+    return 1;
+  }
+
+  while (!(my_default_lc_time_names = my_locale_by_name(
+               nullptr, lc_time_names_name, strlen(lc_time_names_name)))) {
+    LogErr(ERROR_LEVEL, ER_FAILED_TO_FIND_LOCALE_NAME, lc_time_names_name);
+    if (!my_strcasecmp(&my_charset_latin1, lc_time_names_name,
+                       mysqld_default_locale_name))
+      return 1;
+    lc_time_names_name = mysqld_default_locale_name;
+  }
+  global_system_variables.lc_time_names = my_default_lc_time_names;
+
+  /* check log options and issue warnings if needed */
+  if (opt_general_log && opt_general_logname &&
+      !(log_output_options & LOG_FILE) && !(log_output_options & LOG_NONE))
+    LogErr(WARNING_LEVEL, ER_LOG_FILES_GIVEN_LOG_OUTPUT_IS_TABLE,
+           "--general-log-file option");
+
+  if (opt_slow_log && opt_slow_logname && !(log_output_options & LOG_FILE) &&
+      !(log_output_options & LOG_NONE))
+    LogErr(WARNING_LEVEL, ER_LOG_FILES_GIVEN_LOG_OUTPUT_IS_TABLE,
+           "--slow-query-log-file option");
+
+  if (opt_general_logname &&
+      !is_valid_log_name(opt_general_logname, strlen(opt_general_logname))) {
+    LogErr(ERROR_LEVEL, ER_LOG_FILE_INVALID, "--general_log_file",
+           opt_general_logname);
+    return 1;
+  }
+
+  if (opt_slow_logname &&
+      !is_valid_log_name(opt_slow_logname, strlen(opt_slow_logname))) {
+    LogErr(ERROR_LEVEL, ER_LOG_FILE_INVALID, "--slow_query_log_file",
+           opt_slow_logname);
+    return 1;
+  }
+
+  if (global_system_variables.transaction_write_set_extraction ==
+          HASH_ALGORITHM_OFF &&
+      mysql_bin_log.m_dependency_tracker.m_opt_tracking_mode !=
+          DEPENDENCY_TRACKING_COMMIT_ORDER) {
+    LogErr(ERROR_LEVEL,
+           ER_TX_EXTRACTION_ALGORITHM_FOR_BINLOG_TX_DEPEDENCY_TRACKING,
+           "XXHASH64 or MURMUR32", "WRITESET or WRITESET_SESSION");
+    return 1;
+  } else
+    mysql_bin_log.m_dependency_tracker.tracking_mode_changed();
+
+#define FIX_LOG_VAR(VAR, ALT) \
+  if (!VAR || !*VAR) VAR = ALT;
+
+  FIX_LOG_VAR(opt_general_logname,
+              make_query_log_name(logname_path, QUERY_LOG_GENERAL));
+  FIX_LOG_VAR(opt_slow_logname,
+              make_query_log_name(slow_logname_path, QUERY_LOG_SLOW));
+
+#if defined(ENABLED_DEBUG_SYNC)
+  /* Initialize the debug sync facility. See debug_sync.cc. */
+  if (debug_sync_init()) return 1; /* purecov: tested */
+#endif                             /* defined(ENABLED_DEBUG_SYNC) */
+
+  if (opt_validate_config) return 0;
+
+  /* create the data directory if requested */
+  if (unlikely(opt_initialize) &&
+      initialize_create_data_directory(mysql_real_data_home))
+    return 1;
+
+  /*
+    Ensure that lower_case_table_names is set on system where we have case
+    insensitive names.  If this is not done the users MyISAM tables will
+    get corrupted if accesses with names of different case.
+  */
+  DBUG_PRINT("info", ("lower_case_table_names: %d", lower_case_table_names));
+  lower_case_file_system = test_if_case_insensitive(mysql_real_data_home);
+  if (!lower_case_table_names && lower_case_file_system == 1) {
+    if (lower_case_table_names_used) {
+      LogErr(ERROR_LEVEL, ER_LOWER_CASE_TABLE_NAMES_CS_DD_ON_CI_FS_UNSUPPORTED);
+      return 1;
+    } else {
+      LogErr(WARNING_LEVEL, ER_LOWER_CASE_TABLE_NAMES_USING_2,
+             mysql_real_data_home);
+      lower_case_table_names = 2;
+    }
+  } else if (lower_case_table_names == 2 &&
+             !(lower_case_file_system =
+                   (test_if_case_insensitive(mysql_real_data_home) == 1))) {
+    LogErr(WARNING_LEVEL, ER_LOWER_CASE_TABLE_NAMES_USING_0,
+           mysql_real_data_home);
+    lower_case_table_names = 0;
+  } else {
+    lower_case_file_system =
+        (test_if_case_insensitive(mysql_real_data_home) == 1);
+  }
+
+  /* Reset table_alias_charset, now that lower_case_table_names is set. */
+  table_alias_charset = (lower_case_table_names ? &my_charset_utf8mb3_tolower_ci
+                                                : &my_charset_bin);
+
+  /*
+    Build do_table and ignore_table rules to hashes
+    after the resetting of table_alias_charset.
+  */
+  if (rpl_global_filter.build_do_table_hash() ||
+      rpl_global_filter.build_ignore_table_hash()) {
+    LogErr(ERROR_LEVEL, ER_CANT_HASH_DO_AND_IGNORE_RULES);
+    return 1;
+  }
+
+  /*
+    Reset the P_S view for global replication filter at
+    the end of server startup.
+  */
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  rpl_global_filter.wrlock();
+  rpl_global_filter.reset_pfs_view();
+  rpl_global_filter.unlock();
+#endif /* WITH_PERFSCHEMA_STORAGE_ENGINE */
+
+  if (rpl_channel_filters.build_do_and_ignore_table_hashes()) return 1;
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: init_server_components
+static int init_server_components() {
+  DBUG_TRACE;
+  /*
+    We need to call each of these following functions to ensure that
+    all things are initialized so that unireg_abort() doesn't fail
+  */
+  mdl_init();
+  partitioning_init();
+  if (table_def_init() || hostname_cache_init(host_cache_size))
+    unireg_abort(MYSQLD_ABORT_EXIT);
+
+  /*
+    This load function has to be called after the opt_plugin_dir variable
+    is initialized else it will fail to load.
+    The unload of these components will be done by minimal_chassis_deinit().
+    So, no need to call unload of these components.
+    Since, it is an optional component required for GR, audit log etc. The
+    error check of the service availability has to be done by those
+    plugins/components.
+  */
+  if (!is_help_or_validate_option() && !opt_initialize)
+    dynamic_loader_srv->load(component_urns, NUMBER_OF_COMPONENTS);
+
+  /*
+    Timers not needed if only starting with --help.
+  */
+  if (!is_help_or_validate_option()) {
+    if (my_timer_initialize())
+      LogErr(ERROR_LEVEL, ER_CANT_INIT_TIMER, errno);
+    else
+      have_statement_timeout = SHOW_OPTION_YES;
+  }
+
+  randominit(&sql_rand, (ulong)server_start_time, (ulong)server_start_time / 2);
+  setup_fpu();
+
+  setup_error_log();  // opens the log if needed
+
+  enter_cond_hook = thd_enter_cond;
+  exit_cond_hook = thd_exit_cond;
+  enter_stage_hook = thd_enter_stage;
+  set_waiting_for_disk_space_hook = thd_set_waiting_for_disk_space;
+  is_killed_hook = thd_killed;
+
+  xa::Transaction_cache::initialize();
+
+  /*
+    Try to read the previous run's error log and make it available in
+    performance_schema.error_log. Activate all error logging services
+    requested by the user in @@global.log_error_services (now that the
+    component infrastructure is available), flush the buffered error
+    messages to performance schema and to configured services, and end
+    error log buffering.
+
+    Pre-requisites:
+    We depend on component_infrastructure_init() and setup_error_log()
+    above. init_common_variables() additionally gives us a correctly
+    set up umask etc., and keyring-migration may modify the log-target,
+    so we wait that out as well. It should be safe to go before the
+    component-autoload above ("component_urns") for the time being,
+    but that may not be the case in the future, so we're playing it
+    safe. Altogether by the time we get here, we're usually within
+    a second of start-up, with a half-dozen or less messages buffered
+    if no issues were encountered.
+  */
+  if (setup_error_log_components()) unireg_abort(MYSQLD_ABORT_EXIT);
+
+  if (MDL_context_backup_manager::init()) {
+    LogErr(ERROR_LEVEL, ER_OOM);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /*
+    initialize delegates for extension observers, errors have already
+    been reported in the function
+  */
+  if (delegates_init()) unireg_abort(MYSQLD_ABORT_EXIT);
+
+  /* need to configure logging before initializing storage engines */
+  if (opt_log_replica_updates && !opt_bin_log) {
+    LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--log-replica-updates");
+  }
+  if (binlog_format_used && !opt_bin_log)
+    LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-format");
+
+  /* Check that we have not let the format to unspecified at this point */
+  assert((uint)global_system_variables.binlog_format <=
+         array_elements(binlog_format_names) - 1);
+
+  opt_server_id_mask =
+      (opt_server_id_bits == 32) ? ~ulong(0) : (1 << opt_server_id_bits) - 1;
+  if (server_id != (server_id & opt_server_id_mask)) {
+    LogErr(ERROR_LEVEL, ER_SERVERID_TOO_LARGE);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (opt_bin_log) {
+    /* Reports an error and aborts, if the --log-bin's path
+       is a directory.*/
+    if (opt_bin_logname &&
+        opt_bin_logname[strlen(opt_bin_logname) - 1] == FN_LIBCHAR) {
+      LogErr(ERROR_LEVEL, ER_NEED_FILE_INSTEAD_OF_DIR, "--log-bin",
+             opt_bin_logname);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+
+    /* Reports an error and aborts, if the --log-bin-index's path
+       is a directory.*/
+    if (opt_binlog_index_name &&
+        opt_binlog_index_name[strlen(opt_binlog_index_name) - 1] ==
+            FN_LIBCHAR) {
+      LogErr(ERROR_LEVEL, ER_NEED_FILE_INSTEAD_OF_DIR, "--log-bin-index",
+             opt_binlog_index_name);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+
+    char buf[FN_REFLEN];
+    const char *ln;
+    if (log_bin_supplied) {
+      /*
+        Binary log basename defaults to "`hostname`-bin" name prefix
+        if --log-bin is used without argument.
+      */
+      ln = mysql_bin_log.generate_name(opt_bin_logname, "-bin", buf);
+    } else {
+      /*
+        Binary log basename defaults to "binlog" name prefix
+        if --log-bin is not used.
+      */
+      ln = mysql_bin_log.generate_name(opt_bin_logname, "", buf);
+    }
+
+    if (!opt_bin_logname && !opt_binlog_index_name && log_bin_supplied) {
+      /*
+        User didn't give us info to name the binlog index file.
+        Picking `hostname`-bin.index like did in 4.x, causes replication to
+        fail if the hostname is changed later. So, we would like to instead
+        require a name. But as we don't want to break many existing setups, we
+        only give warning, not error.
+      */
+      LogErr(INFORMATION_LEVEL, ER_LOG_BIN_BETTER_WITH_NAME, ln);
+    }
+    if (ln == buf) {
+      my_free(opt_bin_logname);
+      opt_bin_logname = my_strdup(key_memory_opt_bin_logname, buf, MYF(0));
+    }
+
+    /*
+      Skip opening the index file if we start with --help. This is necessary
+      to avoid creating the file in an otherwise empty datadir, which will
+      cause a succeeding 'mysqld --initialize' to fail.
+    */
+    if (!is_help_or_validate_option() &&
+        mysql_bin_log.open_index_file(opt_binlog_index_name, ln, true)) {
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  }
+
+  if (opt_bin_log) {
+    /*
+      opt_bin_logname[0] needs to be checked to make sure opt binlog name is
+      not an empty string, in case it is an empty string default file
+      extension will be passed
+     */
+    if (log_bin_supplied) {
+      log_bin_basename = rpl_make_log_name(
+          key_memory_MYSQL_BIN_LOG_basename, opt_bin_logname,
+          default_logfile_name,
+          (opt_bin_logname && opt_bin_logname[0]) ? "" : "-bin");
+    } else {
+      log_bin_basename =
+          rpl_make_log_name(key_memory_MYSQL_BIN_LOG_basename, opt_bin_logname,
+                            default_binlogfile_name, "");
+    }
+
+    log_bin_index =
+        rpl_make_log_name(key_memory_MYSQL_BIN_LOG_index, opt_binlog_index_name,
+                          log_bin_basename, ".index");
+
+    if ((!opt_binlog_index_name || !opt_binlog_index_name[0]) &&
+        log_bin_index) {
+      strmake(default_binlog_index_name,
+              log_bin_index + dirname_length(log_bin_index),
+              FN_REFLEN + index_ext_length - 1);
+      opt_binlog_index_name = default_binlog_index_name;
+    }
+
+    if (log_bin_basename == nullptr || log_bin_index == nullptr) {
+      LogErr(ERROR_LEVEL, ER_RPL_CANT_MAKE_PATHS, (int)FN_REFLEN, (int)FN_LEN);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  }
+
+  DBUG_PRINT("debug",
+             ("opt_bin_logname: %s, opt_relay_logname: %s, pidfile_name: %s",
+              opt_bin_logname, opt_relay_logname, pidfile_name));
+
+  /*
+    opt_relay_logname[0] needs to be checked to make sure opt relaylog name is
+    not an empty string, in case it is an empty string default file
+    extension will be passed
+   */
+  relay_log_basename = rpl_make_log_name(
+      key_memory_MYSQL_RELAY_LOG_basename, opt_relay_logname,
+      default_logfile_name,
+      (opt_relay_logname && opt_relay_logname[0]) ? "" : relay_ext);
+
+  if (!opt_relay_logname || !opt_relay_logname[0]) {
+    if (relay_log_basename) {
+      strmake(default_relaylogfile_name,
+              relay_log_basename + dirname_length(relay_log_basename),
+              FN_REFLEN + relay_ext_length - 1);
+      opt_relay_logname = default_relaylogfile_name;
+    }
+  } else
+    opt_relay_logname_supplied = true;
+
+  if (relay_log_basename != nullptr)
+    relay_log_index = rpl_make_log_name(key_memory_MYSQL_RELAY_LOG_index,
+                                        opt_relaylog_index_name,
+                                        relay_log_basename, ".index");
+
+  if (!opt_relaylog_index_name || !opt_relaylog_index_name[0]) {
+    if (relay_log_index) {
+      strmake(default_relaylog_index_name,
+              relay_log_index + dirname_length(relay_log_index),
+              FN_REFLEN + relay_ext_length + index_ext_length - 1);
+      opt_relaylog_index_name = default_relaylog_index_name;
+    }
+  } else
+    opt_relaylog_index_name_supplied = true;
+
+  if (relay_log_basename == nullptr || relay_log_index == nullptr) {
+    LogErr(ERROR_LEVEL, ER_RPL_CANT_MAKE_PATHS, (int)FN_REFLEN, (int)FN_LEN);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (log_bin_basename != nullptr &&
+      !strcmp(log_bin_basename, relay_log_basename)) {
+    const int bin_ext_length = 4;
+    char default_binlogfile_name_from_hostname[FN_REFLEN + bin_ext_length];
+    /* Generate default bin log file name. */
+    strmake(default_binlogfile_name_from_hostname, default_logfile_name,
+            FN_REFLEN - 1);
+    strcat(default_binlogfile_name_from_hostname, "-bin");
+
+    if (!default_relaylogfile_name[0]) {
+      /* Generate default relay log file name. */
+      strmake(default_relaylogfile_name, default_logfile_name, FN_REFLEN - 1);
+      strcat(default_relaylogfile_name, relay_ext);
+    }
+    /*
+      Reports an error and aborts, if the same base name is specified
+      for both binary and relay logs.
+    */
+    LogErr(ERROR_LEVEL, ER_RPL_CANT_HAVE_SAME_BASENAME, log_bin_basename,
+           "--log-bin", default_binlogfile_name,
+           default_binlogfile_name_from_hostname, "--relay-log",
+           default_relaylogfile_name);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (global_system_variables.binlog_row_value_options != 0) {
+    const char *msg = nullptr;
+    longlong err = ER_BINLOG_ROW_VALUE_OPTION_IGNORED;
+    if (!opt_bin_log)
+      msg = "the binary log is disabled";
+    else if (global_system_variables.binlog_format == BINLOG_FORMAT_STMT)
+      msg = "binlog_format=STATEMENT";
+    else if (log_bin_use_v1_row_events) {
+      msg = "binlog_row_value_options=PARTIAL_JSON";
+      err = ER_BINLOG_USE_V1_ROW_EVENTS_IGNORED;
+    } else if (global_system_variables.binlog_row_image ==
+               BINLOG_ROW_IMAGE_FULL) {
+      msg = "binlog_row_image=FULL";
+      err = ER_BINLOG_ROW_VALUE_OPTION_USED_ONLY_FOR_AFTER_IMAGES;
+    }
+    if (msg) {
+      switch (err) {
+        case ER_BINLOG_ROW_VALUE_OPTION_IGNORED:
+        case ER_BINLOG_ROW_VALUE_OPTION_USED_ONLY_FOR_AFTER_IMAGES:
+          LogErr(WARNING_LEVEL, err, msg, "PARTIAL_JSON");
+          break;
+        case ER_BINLOG_USE_V1_ROW_EVENTS_IGNORED:
+          LogErr(WARNING_LEVEL, err, msg);
+          break;
+        default:
+          assert(0); /* purecov: deadcode */
+      }
+    }
+  }
+
+  /* call ha_init_key_cache() on all key caches to init them */
+  process_key_caches(&ha_init_key_cache);
+
+  /* Allow storage engine to give real error messages */
+  if (ha_init_errors()) return 1;
+
+  if (gtid_server_init()) {
+    LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_GTID);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (opt_log_replica_updates && replicate_same_server_id) {
+    if (opt_bin_log && global_gtid_mode.get() != Gtid_mode::ON) {
+      LogErr(ERROR_LEVEL, ER_RPL_INFINITY_DENIED);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    } else
+      LogErr(WARNING_LEVEL, ER_RPL_INFINITY_IGNORED);
+  }
+
+  {
+    /*
+      We have to call a function in log_resource.cc, or its references
+      won't be visible to plugins.
+    */
+#ifndef NDEBUG
+    int dummy =
+#endif
+        Log_resource::dummy_function_to_ensure_we_are_linked_into_the_server();
+    assert(dummy == 1);
+  }
+
+  /*
+    We need to initialize the UDF globals early before reading the proc table
+    and before the server component initialization to allow other components
+    to register their UDFs at init time and de-register them at deinit time.
+  */
+  udf_init_globals();
+
+  /*
+    Set tc_log to point to TC_LOG_DUMMY early in order to allow plugin_init()
+    to commit attachable transaction after reading from mysql.plugin table.
+    If necessary tc_log will be adjusted to point to correct TC_LOG instance
+    later.
+  */
+  tc_log = &tc_log_dummy;
+
+  /*
+   Each server should have one UUID. We will create it automatically, if it
+   does not exist. It should be initialized before opening binlog file. Because
+   server's uuid will be stored into the new binlog file.
+  */
+  if (!is_help_or_validate_option() && init_server_auto_options()) {
+    LogErr(ERROR_LEVEL, ER_CANT_CREATE_UUID);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /*Load early plugins */
+  if (plugin_register_early_plugins(&remaining_argc, remaining_argv,
+                                    (is_help_or_validate_option())
+                                        ? PLUGIN_INIT_SKIP_INITIALIZATION
+                                        : 0)) {
+    LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_EARLY_PLUGINS);
+    unireg_abort(1);
+  }
+
+  /* Load builtin plugins, initialize MyISAM, CSV and InnoDB */
+  if (plugin_register_builtin_and_init_core_se(&remaining_argc,
+                                               remaining_argv)) {
+    if (!opt_validate_config)
+      LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_BUILTIN_PLUGINS);
+    unireg_abort(1);
+  }
+
+  /*
+    Needs to be done before dd::init() which runs DDL commands (for real)
+    during instance initialization.
+  */
+  init_sql_command_flags();
+
+  /*
+    plugin_register_dynamic_and_init_all() needs DD initialized.
+    Initialize DD to create data directory using current server.
+  */
+  if (opt_initialize) {
+    if (!is_help_or_validate_option()) {
+      if (dd::init(dd::enum_dd_init_type::DD_INITIALIZE)) {
+        LogErr(ERROR_LEVEL, ER_DD_INIT_FAILED);
+        unireg_abort(1);
+      }
+
+      if (dd::init(dd::enum_dd_init_type::DD_INITIALIZE_SYSTEM_VIEWS)) {
+        LogErr(ERROR_LEVEL, ER_SYSTEM_VIEW_INIT_FAILED);
+        unireg_abort(1);
+      }
+    }
+  } else {
+    /*
+      Initialize DD in case of upgrade and normal normal server restart.
+      It is detected if we are starting on old data directory or current
+      data directory. If it is old data directory, DD tables are created.
+      If server is starting on data directory with DD tables, DD is initialized.
+    */
+    if (!is_help_or_validate_option() &&
+        dd::init(dd::enum_dd_init_type::DD_RESTART_OR_UPGRADE)) {
+      LogErr(ERROR_LEVEL, ER_DD_INIT_FAILED);
+
+      /* If clone recovery fails, we rollback the files to previous
+      dataset and attempt to restart server. */
+      int exit_code =
+          clone_recovery_error ? MYSQLD_RESTART_EXIT : MYSQLD_ABORT_EXIT;
+      unireg_abort(exit_code);
+    }
+  }
+
+  /*
+   During plugin initialization, a plugin may expect (depending on what the
+   plugin actually does) to find a functional server, including:
+   - mysql system tables
+   - information schema tables
+   - performance schema tables
+   - data dictionary
+   - components / services, including the registry service
+   During the server installation, all these parts are not available yet, as
+   they are created during the installation process with mysqld --initialize.
+
+   As a result, plugins are not loaded during mysqld --initialize, so that
+   the server install can proceed and complete before any plugin is loaded
+   through any config file or pre-programmed command line.
+  */
+  int flags = 0;
+
+  if (opt_noacl) flags |= PLUGIN_INIT_SKIP_PLUGIN_TABLE;
+  if (is_help_or_validate_option())
+    flags |= PLUGIN_INIT_SKIP_INITIALIZATION | PLUGIN_INIT_SKIP_PLUGIN_TABLE;
+  if (opt_initialize) flags |= PLUGIN_INIT_SKIP_DYNAMIC_LOADING;
+
+  /*
+    In the case of upgrade, we need to delay initialization of plugins that
+    depend on e.g. mysql tables that will be changed during upgrade.
+  */
+  if (!is_help_or_validate_option() && !opt_initialize &&
+      !dd::upgrade::no_server_upgrade_required() &&
+      opt_upgrade_mode != UPGRADE_MINIMAL)
+    flags |= PLUGIN_INIT_DELAY_UNTIL_AFTER_UPGRADE;
+
+  /*
+    Initialize the cost model, but delete it after the plugins are initialized.
+    Cost model is needed while dropping and creating pfs tables to
+    update metadata of referencing views (if there are any).
+   */
+  init_optimizer_cost_module(true);
+  {  // New scope in which the error handler hook is modified.
+    ErrorHandlerFunctionPointer ehh_val = error_handler_hook;
+    auto restore_ehh = create_scope_guard([ehh_val]() {
+      assert(ehh_val == my_message_stderr);
+      error_handler_hook = ehh_val;
+    });
+    error_handler_hook = +[](uint c, const char *s, myf f) {
+      if (c != ER_NO_SUCH_TABLE || strstr(s, "mysql.server_cost") == nullptr) {
+        my_message_stderr(c, s, f);
+      }
+    };
+    if (plugin_register_dynamic_and_init_all(&remaining_argc, remaining_argv,
+                                             flags)) {
+      delete_optimizer_cost_module();
+      // Delete all DD tables in case of error in initializing plugins.
+      if (dd::upgrade_57::in_progress())
+        (void)dd::init(dd::enum_dd_init_type::DD_DELETE);
+
+      if (!opt_validate_config)
+        LogErr(ERROR_LEVEL, ER_CANT_INITIALIZE_DYNAMIC_PLUGINS);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  }  // End of extra scope where missing server_cost errors are not logged
+  assert(error_handler_hook == my_message_stderr);
+  dynamic_plugins_are_initialized =
+      true; /* Don't separate from init function */
+  delete_optimizer_cost_module();
+
+  LEX_CSTRING plugin_name = {STRING_WITH_LEN("thread_pool")};
+  if (Connection_handler_manager::thread_handling !=
+          Connection_handler_manager::SCHEDULER_ONE_THREAD_PER_CONNECTION ||
+      plugin_is_ready(plugin_name, MYSQL_DAEMON_PLUGIN)) {
+    auto res_grp_mgr = resourcegroups::Resource_group_mgr::instance();
+    res_grp_mgr->disable_resource_group();
+    res_grp_mgr->set_unsupport_reason("Thread pool plugin enabled");
+  }
+
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  /*
+    A value of the variable dd_upgrade_flag is reset after
+    dd::init(dd::enum_dd_init_type::DD_POPULATE_UPGRADE) returned.
+    So make its copy to call init_pfs_tables() with right argument value later.
+  */
+  bool dd_upgrade_was_initiated = dd::upgrade_57::in_progress();
+#endif
+
+  if (!is_help_or_validate_option() && dd::upgrade_57::in_progress()) {
+    // Populate DD tables with meta data from 5.7
+    if (dd::init(dd::enum_dd_init_type::DD_POPULATE_UPGRADE)) {
+      LogErr(ERROR_LEVEL, ER_DD_POPULATING_TABLES_FAILED);
+      unireg_abort(1);
+    }
+    // Run after_dd_upgrade hook
+    if (RUN_HOOK(server_state, after_dd_upgrade_from_57, (nullptr)))
+      unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /*
+    Store server and plugin IS tables metadata into new DD.
+    This is done after all the plugins are registered.
+  */
+  if (!is_help_or_validate_option() && !opt_initialize &&
+      !dd::upgrade_57::in_progress() &&
+      dd::init(dd::enum_dd_init_type::DD_UPDATE_I_S_METADATA)) {
+    LogErr(ERROR_LEVEL, ER_DD_UPDATING_PLUGIN_MD_FAILED);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+  if (!is_help_or_validate_option()) {
+    /*
+      Initialize the cost model, but delete it after the pfs is initialized.
+      Cost model is needed while dropping and creating pfs tables to
+      update metadata of referencing views (if there are any).
+    */
+    init_optimizer_cost_module(true);
+
+    bool st;
+    if (opt_initialize || dd_upgrade_was_initiated)
+      st = dd::performance_schema::init_pfs_tables(
+          dd::enum_dd_init_type::DD_INITIALIZE);
+    else
+      st = dd::performance_schema::init_pfs_tables(
+          dd::enum_dd_init_type::DD_RESTART_OR_UPGRADE);
+
+    /* Now that the pfs is initialized, delete the cost model. */
+    delete_optimizer_cost_module();
+
+    if (st) {
+      LogErr(ERROR_LEVEL, ER_PERFSCHEMA_TABLES_INIT_FAILED);
+      unireg_abort(1);
+    }
+  }
+#endif
+
+  bool recreate_non_dd_based_system_view = dd::upgrade::I_S_upgrade_required();
+  if (!is_help_or_validate_option() && !opt_initialize &&
+      !dd::upgrade::no_server_upgrade_required()) {
+    if (opt_upgrade_mode == UPGRADE_MINIMAL)
+      LogErr(WARNING_LEVEL, ER_SERVER_UPGRADE_SKIP);
+    else {
+      init_optimizer_cost_module(true);
+      if (bootstrap::run_bootstrap_thread(nullptr, nullptr,
+                                          &dd::upgrade::upgrade_system_schemas,
+                                          SYSTEM_THREAD_SERVER_UPGRADE)) {
+        LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_FAILED);
+        unireg_abort(MYSQLD_ABORT_EXIT);
+      }
+      delete_optimizer_cost_module();
+      recreate_non_dd_based_system_view = true;
+
+      /*
+        When upgrade is finished, we need to initialize the plugins that
+        had their initialization delayed due to dependencies on the
+        environment.
+
+        TODO: Provide a better long term solution by re-ordering startup
+              sequence and rewriting the way we create and upgrade server
+              resources needed by plugins.
+      */
+      if (dd::upgrade::plugin_initialize_delayed_after_upgrade()) {
+        unireg_abort(MYSQLD_ABORT_EXIT);
+      }
+    }
+  }
+
+  /*
+    Re-create non DD based system views after a) if we upgraded system
+    schemas b) I_S system view version is changed and server system views
+    were recreated. c) If the database was upgraded. We do not update this
+    in upgrade-minimal mode.
+   */
+  if (!is_help_or_validate_option() && !opt_initialize &&
+      opt_upgrade_mode != UPGRADE_MINIMAL &&
+      recreate_non_dd_based_system_view) {
+    if (dd::init(
+            dd::enum_dd_init_type::DD_INITIALIZE_NON_DD_BASED_SYSTEM_VIEWS)) {
+      LogErr(ERROR_LEVEL, ER_SYSTEM_VIEW_INIT_FAILED);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  }
+
+  auto res_grp_mgr = resourcegroups::Resource_group_mgr::instance();
+  // Initialize the Resource group subsystem.
+  if (!is_help_or_validate_option() && !opt_initialize) {
+    if (res_grp_mgr->post_init()) {
+      LogErr(ERROR_LEVEL, ER_RESOURCE_GROUP_POST_INIT_FAILED);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+  }
+
+  Session_tracker session_track_system_variables_check;
+  LEX_STRING var_list;
+  char *tmp_str;
+  size_t len = strlen(global_system_variables.track_sysvars_ptr);
+  tmp_str = (char *)my_malloc(PSI_NOT_INSTRUMENTED, len * sizeof(char) + 2,
+                              MYF(MY_WME));
+  strcpy(tmp_str, global_system_variables.track_sysvars_ptr);
+  var_list.length = len;
+  var_list.str = tmp_str;
+  if (session_track_system_variables_check.server_boot_verify(
+          system_charset_info, var_list)) {
+    LogErr(ERROR_LEVEL, ER_TRACK_VARIABLES_BOGUS);
+    if (tmp_str) my_free(tmp_str);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+  if (tmp_str) my_free(tmp_str);
+
+  // Validate the configuration if --validate-config was specified.
+  if (opt_validate_config && (remaining_argc > 1)) {
+    bool saved_getopt_skip_unknown = my_getopt_skip_unknown;
+    struct my_option no_opts[] = {{nullptr, 0, nullptr, nullptr, nullptr,
+                                   nullptr, GET_NO_ARG, NO_ARG, 0, 0, 0,
+                                   nullptr, 0, nullptr}};
+
+    my_getopt_skip_unknown = false;
+
+    if (handle_options(&remaining_argc, &remaining_argv, no_opts,
+                       mysqld_get_one_option))
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    my_getopt_skip_unknown = saved_getopt_skip_unknown;
+  }
+
+  if (is_help_or_validate_option()) unireg_abort(MYSQLD_SUCCESS_EXIT);
+
+  /* if the errmsg.sys is not loaded, terminate to maintain behaviour */
+  if (!my_default_lc_messages->errmsgs->is_loaded()) {
+    LogErr(ERROR_LEVEL, ER_CANT_READ_ERRMSGS);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /* We have to initialize the storage engines before CSV logging */
+  if (ha_init()) {
+    LogErr(ERROR_LEVEL, ER_CANT_INIT_DBS);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  /* Initialize ndbinfo tables in DD */
+  if (dd::ndbinfo::init_schema_and_tables(opt_upgrade_mode)) {
+    LogErr(ERROR_LEVEL, ER_NDBINFO_UPGRADING_SCHEMA_FAIL);
+    unireg_abort(1);
+  }
+
+  if (opt_initialize) log_output_options = LOG_FILE;
+
+  /*
+    Issue a warning if there were specified additional options to the
+    log-output along with NONE. Probably this wasn't what user wanted.
+  */
+  if ((log_output_options & LOG_NONE) && (log_output_options & ~LOG_NONE))
+    LogErr(WARNING_LEVEL, ER_LOG_OUTPUT_CONTRADICTORY);
+
+  if (log_output_options & LOG_TABLE) {
+    /* Fall back to log files if the csv engine is not loaded. */
+    LEX_CSTRING csv_name = {STRING_WITH_LEN("csv")};
+    if (!plugin_is_ready(csv_name, MYSQL_STORAGE_ENGINE_PLUGIN)) {
+      LogErr(ERROR_LEVEL, ER_NO_CSV_NO_LOG_TABLES);
+      log_output_options = (log_output_options & ~LOG_TABLE) | LOG_FILE;
+    }
+  }
+
+  query_logger.set_handlers(log_output_options);
+
+  // Open slow log file if enabled.
+  query_logger.set_log_file(QUERY_LOG_SLOW);
+  if (opt_slow_log && query_logger.reopen_log_file(QUERY_LOG_SLOW))
+    opt_slow_log = false;
+
+  // Open general log file if enabled.
+  query_logger.set_log_file(QUERY_LOG_GENERAL);
+  if (opt_general_log && query_logger.reopen_log_file(QUERY_LOG_GENERAL))
+    opt_general_log = false;
+
+  /*
+    Set the default storage engines
+  */
+  if (initialize_storage_engine(default_storage_engine, "",
+                                &global_system_variables.table_plugin))
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  if (initialize_storage_engine(default_tmp_storage_engine, " temp",
+                                &global_system_variables.temp_table_plugin))
+    unireg_abort(MYSQLD_ABORT_EXIT);
+
+  if (!opt_initialize && !opt_noacl) {
+    set_externally_disabled_storage_engine_names(opt_disabled_storage_engines);
+
+    // Log warning if default_storage_engine is a disabled storage engine.
+    handlerton *default_se_handle =
+        plugin_data<handlerton *>(global_system_variables.table_plugin);
+    if (ha_is_storage_engine_disabled(default_se_handle))
+      LogErr(WARNING_LEVEL, ER_DISABLED_STORAGE_ENGINE_AS_DEFAULT,
+             "default_storage_engine", default_storage_engine);
+
+    // Log warning if default_tmp_storage_engine is a disabled storage engine.
+    handlerton *default_tmp_se_handle =
+        plugin_data<handlerton *>(global_system_variables.temp_table_plugin);
+    if (ha_is_storage_engine_disabled(default_tmp_se_handle))
+      LogErr(WARNING_LEVEL, ER_DISABLED_STORAGE_ENGINE_AS_DEFAULT,
+             "default_tmp_storage_engine", default_tmp_storage_engine);
+  }
+
+  DBUG_EXECUTE_IF("total_ha_2pc_equals_2", total_ha_2pc = 2;);
+  if (total_ha_2pc > 1 || (1 == total_ha_2pc && opt_bin_log)) {
+    if (opt_bin_log)
+      tc_log = &mysql_bin_log;
+    else
+      tc_log = &tc_log_mmap;
+  }
+
+  if (Recovered_xa_transactions::init()) {
+    LogErr(ERROR_LEVEL, ER_OOM);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  RUN_HOOK(server_state, before_recovery, (nullptr));
+  if (tc_log->open(opt_bin_log ? opt_bin_logname : opt_tc_log_file)) {
+    LogErr(ERROR_LEVEL, ER_CANT_INIT_TC_LOG);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (dd::reset_tables_and_tablespaces()) {
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+  ha_post_recover();
+
+  /*
+    Add prepared XA transactions into the cache of XA transactions and acquire
+    mdl lock for every table involved in any of these prepared XA transactions.
+    This step moved away from the function ha_recover() in order to avoid
+    possible suspending on acquiring EXCLUSIVE mdl lock on tables inside the
+    function dd::reset_tables_and_tablespaces() when table cache being reset.
+  */
+  if (Recovered_xa_transactions::instance()
+          .recover_prepared_xa_transactions()) {
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (global_gtid_mode.get() == Gtid_mode::ON &&
+      _gtid_consistency_mode != GTID_CONSISTENCY_MODE_ON) {
+    LogErr(ERROR_LEVEL, ER_RPL_GTID_MODE_REQUIRES_ENFORCE_GTID_CONSISTENCY_ON);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (rpl_encryption.initialize()) {
+    LogErr(ERROR_LEVEL, ER_SERVER_RPL_ENCRYPTION_UNABLE_TO_INITIALIZE);
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+
+  if (opt_bin_log) {
+    /*
+      Configures what object is used by the current log to store processed
+      gtid(s). This is necessary in the MYSQL_BIN_LOG::MYSQL_BIN_LOG to
+      correctly compute the set of previous gtids.
+    */
+    assert(!mysql_bin_log.is_relay_log);
+    mysql_mutex_t *log_lock = mysql_bin_log.get_log_lock();
+    mysql_mutex_lock(log_lock);
+
+    if (mysql_bin_log.open_binlog(opt_bin_logname, nullptr, max_binlog_size,
+                                  false, true /*need_lock_index=true*/,
+                                  true /*need_sid_lock=true*/, nullptr)) {
+      mysql_mutex_unlock(log_lock);
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+    mysql_mutex_unlock(log_lock);
+  }
+
+  /*
+    When we pass non-zero values for both expire_logs_days and
+    binlog_expire_logs_seconds at the server start-up, the value of
+    expire_logs_days will be ignored and only binlog_expire_logs_seconds
+    will be used.
+  */
+  if (binlog_expire_logs_seconds_supplied && expire_logs_days_supplied) {
+    if (binlog_expire_logs_seconds != 0 && expire_logs_days != 0) {
+      LogErr(WARNING_LEVEL, ER_EXPIRE_LOGS_DAYS_IGNORED);
+      expire_logs_days = 0;
+    }
+  } else if (expire_logs_days_supplied)
+    binlog_expire_logs_seconds = 0;
+  assert(expire_logs_days == 0 || binlog_expire_logs_seconds == 0);
+
+  if (!opt_bin_log) {
+    if (binlog_expire_logs_seconds_supplied)
+      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--binlog-expire-logs-seconds");
+    if (expire_logs_days_supplied)
+      LogErr(WARNING_LEVEL, ER_NEED_LOG_BIN, "--expire_logs_days");
+  }
+
+  if (opt_myisam_log) (void)mi_log(1);
+
+#if defined(HAVE_MLOCKALL) && defined(MCL_CURRENT)
+  if (locked_in_memory && !getuid()) {
+    if (setreuid((uid_t)-1, 0) == -1) {  // this should never happen
+      LogErr(ERROR_LEVEL, ER_FAIL_SETREUID, strerror(errno));
+      unireg_abort(MYSQLD_ABORT_EXIT);
+    }
+    if (mlockall(MCL_CURRENT)) {
+      LogErr(WARNING_LEVEL, ER_FAILED_TO_LOCK_MEM,
+             errno); /* purecov: inspected */
+      locked_in_memory = false;
+    }
+#ifndef _WIN32
+    if (!user_info.IsVoid()) set_user(mysqld_user, user_info);
+#endif
+  } else
+#endif
+    locked_in_memory = false;
+
+  rpl_acf_configuration_handler = new Rpl_acf_configuration_handler();
+  if (rpl_acf_configuration_handler->init()) {
+    unireg_abort(MYSQLD_ABORT_EXIT);
+  }
+  rpl_source_io_monitor = new Source_IO_monitor();
+  udf_load_service.init();
+
+  /* Initialize the optimizer cost module */
+  init_optimizer_cost_module(true);
+  ft_init_stopwords();
+
+  init_max_user_conn();
+
+#if defined(MYSQL_ICU_DATADIR)
+  init_icu_data_directory();
+#endif  // MYSQL_ICU_DATADIR
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: network_init
+static bool network_init(void) {
+  if (opt_initialize) return false;
+
+#ifdef HAVE_SYS_UN_H
+  std::string const unix_sock_name(mysqld_unix_port ? mysqld_unix_port : "");
+#else
+  std::string const unix_sock_name("");
+#endif
+
+  std::list<Bind_address_info> bind_addresses_info;
+
+  if (!opt_disable_networking || unix_sock_name != "") {
+    if (my_bind_addr_str != nullptr &&
+        check_bind_address_has_valid_value(my_bind_addr_str,
+                                           &bind_addresses_info)) {
+      LogErr(ERROR_LEVEL, ER_INVALID_VALUE_OF_BIND_ADDRESSES, my_bind_addr_str);
+      return true;
+    }
+
+    Bind_address_info admin_address_info;
+    if (!opt_disable_networking) {
+      if (my_admin_bind_addr_str != nullptr &&
+          check_admin_address_has_valid_value(my_admin_bind_addr_str,
+                                              &admin_address_info)) {
+        LogErr(ERROR_LEVEL, ER_INVALID_ADMIN_ADDRESS, my_admin_bind_addr_str);
+        return true;
+      }
+      /*
+        Port 0 is interpreted by implementations of TCP protocol
+        as a hint to find a first free port value to use and bind to it.
+        On the other hand, the option mysqld_admin_port can be assigned
+        the value 0 if a user specified a value that is out of allowable
+        range of values. Therefore, to avoid a case when an operating
+        system binds admin interface to am arbitrary selected port value,
+        set it explicitly to the value MYSQL_ADMIN_PORT in case it has value 0.
+      */
+      if (mysqld_admin_port == 0) mysqld_admin_port = MYSQL_ADMIN_PORT;
+    }
+    Mysqld_socket_listener *mysqld_socket_listener = new (std::nothrow)
+        Mysqld_socket_listener(bind_addresses_info, mysqld_port,
+                               admin_address_info, mysqld_admin_port,
+                               admin_address_info.address.empty()
+                                   ? false
+                                   : listen_admin_interface_in_separate_thread,
+                               back_log, mysqld_port_timeout, unix_sock_name);
+    if (mysqld_socket_listener == nullptr) return true;
+
+    mysqld_socket_acceptor = new (std::nothrow)
+        Connection_acceptor<Mysqld_socket_listener>(mysqld_socket_listener);
+    if (mysqld_socket_acceptor == nullptr) {
+      delete mysqld_socket_listener;
+      mysqld_socket_listener = nullptr;
+      return true;
+    }
+
+    if (mysqld_socket_acceptor->init_connection_acceptor())
+      return true;  // mysqld_socket_acceptor would be freed in unireg_abort.
+
+    if (report_port == 0) report_port = mysqld_port;
+
+    if (!opt_disable_networking) assert(report_port != 0);
+  }
+#ifdef _WIN32
+  // Create named pipe
+  if (opt_enable_named_pipe) {
+    std::string pipe_name = mysqld_unix_port ? mysqld_unix_port : "";
+
+    named_pipe_listener = new (std::nothrow) Named_pipe_listener(&pipe_name);
+    if (named_pipe_listener == NULL) return true;
+
+    named_pipe_acceptor = new (std::nothrow)
+        Connection_acceptor<Named_pipe_listener>(named_pipe_listener);
+    if (named_pipe_acceptor == NULL) {
+      delete named_pipe_listener;
+      named_pipe_listener = NULL;
+      return true;
+    }
+
+    if (named_pipe_acceptor->init_connection_acceptor())
+      return true;  // named_pipe_acceptor would be freed in unireg_abort.
+  }
+
+  // Setup shared_memory acceptor
+  if (opt_enable_shared_memory) {
+    std::string shared_mem_base_name =
+        shared_memory_base_name ? shared_memory_base_name : "";
+
+    Shared_mem_listener *shared_mem_listener =
+        new (std::nothrow) Shared_mem_listener(&shared_mem_base_name);
+    if (shared_mem_listener == NULL) return true;
+
+    shared_mem_acceptor = new (std::nothrow)
+        Connection_acceptor<Shared_mem_listener>(shared_mem_listener);
+    if (shared_mem_acceptor == NULL) {
+      delete shared_mem_listener;
+      shared_mem_listener = NULL;
+      return true;
+    }
+
+    if (shared_mem_acceptor->init_connection_acceptor())
+      return true;  // shared_mem_acceptor would be freed in unireg_abort.
+  }
+#endif  // _WIN32
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: mysqld_main
+int mysqld_main(int argc, char **argv) {
+  bool mysqld_monitor = false;
+  mysqld_early_option = is_early_option(argc, argv);
+
+  if (!mysqld_early_option) {
+    initialize_mysqld_monitor();
+    mysqld_monitor = is_mysqld_monitor();
+  }
+
+  if (mysqld_early_option || !mysqld_monitor) {
+    /*
+      When several instances are running on the same machine, we
+      need to have an  unique  named  hEventShudown  through the
+      application PID e.g.: MySQLShutdown1890; MySQLShutdown2342
+    */
+
+    longlong10_to_str(GetCurrentProcessId(),
+                      my_stpcpy(shutdown_event_name, "MYSQLShutdown"), 10);
+    longlong10_to_str(GetCurrentProcessId(),
+                      my_stpcpy(restart_event_name, "MYSQLRestart"), 10);
+  }
+
+  /* Must be initialized early for comparison of service name */
+  system_charset_info = &my_charset_utf8mb3_general_ci;
+
+  if (mysqld_early_option || !mysqld_monitor) {
+#ifdef WITH_PERFSCHEMA_STORAGE_ENGINE
+    pre_initialize_performance_schema();
+#endif /*WITH_PERFSCHEMA_STORAGE_ENGINE */
+
+    if (my_init()) {
+      LogErr(ERROR_LEVEL, ER_MYINIT_FAILED);
+      flush_error_log_messages();
+      return 1;
+    }
+  }
+
+  if (mysqld_monitor) /* true NT family */
+  {
+    char file_path[FN_REFLEN];
+    my_path(file_path, argv[0], ""); /* Find name in path */
+    fn_format(file_path, argv[0], file_path, "",
+              MY_REPLACE_DIR | MY_UNPACK_FILENAME | MY_RESOLVE_SYMLINKS);
+
+    if (argc == 2) {
+      if (!default_service_handling(argv, MYSQL_SERVICENAME, MYSQL_SERVICENAME,
+                                    file_path, "", NULL))
+        return 0;
+      if (Service.IsService(argv[1])) /* Start an optional service */
+      {
+        /*
+          Only add the service name to the groups read from the config file
+          if it's not "MySQL". (The default service name should be 'mysqld'
+          but we started a bad tradition by calling it MySQL from the start
+          and we are now stuck with it.
+        */
+        if (my_strcasecmp(system_charset_info, argv[1], "mysql"))
+          load_default_groups[load_default_groups_sz - 2] = argv[1];
+        windows_service = true;
+
+        Service.Init(argv[1], mysql_service);
+        return 0;
+      }
+    } else if (argc == 3) /* install or remove any optional service */
+    {
+      if (!default_service_handling(argv, argv[2], argv[2], file_path, "",
+                                    NULL))
+        return 0;
+      if (Service.IsService(argv[2])) {
+        /*
+          mysqld was started as
+          mysqld --defaults-file=my_path\my.ini service-name
+        */
+        use_opt_args = 1;
+        opt_argc = 2;  // Skip service-name
+        opt_argv = argv;
+        windows_service = true;
+        if (my_strcasecmp(system_charset_info, argv[2], "mysql"))
+          load_default_groups[load_default_groups_sz - 2] = argv[2];
+        Service.Init(argv[2], mysql_service);
+        return 0;
+      }
+    } else if (argc == 4 || argc == 5) {
+      /*
+        This may seem strange, because we handle --local-service while
+        preserving 4.1's behavior of allowing any one other argument that is
+        passed to the service on startup. (The assumption is that this is
+        --defaults-file=file, but that was not enforced in 4.1, so we don't
+        enforce it here.)
+      */
+      const char *extra_opt = NullS;
+      const char *account_name = NullS;
+      int index;
+      for (index = 3; index < argc; index++) {
+        if (!strcmp(argv[index], "--local-service"))
+          account_name = "NT AUTHORITY\\LocalService";
+        else
+          extra_opt = argv[index];
+      }
+
+      if (argc == 4 || account_name)
+        if (!default_service_handling(argv, argv[2], argv[2], file_path,
+                                      extra_opt, account_name))
+          return 0;
+    } else if (argc == 1 && Service.IsService(MYSQL_SERVICENAME)) {
+      /* start the default service */
+      windows_service = true;
+      Service.Init(MYSQL_SERVICENAME, mysql_service);
+      return 0;
+    }
+  }
+
+  // Set windows_service value in mysqld
+  if (!mysqld_monitor) {
+    windows_service = is_monitor_win_service();
+
+    if (windows_service) {
+      if (argc == 2 && Service.IsService(argv[1])) {
+        if (my_strcasecmp(system_charset_info, argv[1], "mysql"))
+          load_default_groups[load_default_groups_sz - 2] = argv[1];
+        argc--;
+
+      } else if (argc == 3 && Service.IsService(argv[2])) {
+        /*
+        mysqld was started as
+        mysqld --defaults-file=my_path\my.ini service-name
+        */
+        if (my_strcasecmp(system_charset_info, argv[2], "mysql"))
+          load_default_groups[load_default_groups_sz - 2] = argv[2];
+        argc--;
+      }
+    }
+
+    my_global_argc = argc;
+    my_global_argv = argv;
+  } else {
+    Service.my_argc = argc;
+    Service.my_argv = argv;
+  }
+
+  return mysql_service(NULL);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: adjust_table_cache_size
+static void adjust_table_cache_size(ulong requested_open_files) {
+  ulong limit;
+
+  limit = max<ulong>((requested_open_files - 10 - max_connections) / 2,
+                     TABLE_OPEN_CACHE_MIN);
+
+  if (limit < table_cache_size) {
+    LogErr(WARNING_LEVEL, ER_CHANGED_TABLE_OPEN_CACHE, limit, table_cache_size);
+
+    table_cache_size = limit;
+  }
+
+  table_cache_size_per_instance = table_cache_size / table_cache_instances;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: adjust_max_connections
+static void adjust_max_connections(ulong requested_open_files) {
+  ulong limit;
+
+  limit = requested_open_files - 10 - TABLE_OPEN_CACHE_MIN * 2;
+
+  if (limit < max_connections) {
+    LogErr(WARNING_LEVEL, ER_CHANGED_MAX_CONNECTIONS, limit, max_connections);
+
+    // This can be done unprotected since it is only called on startup.
+    max_connections = limit;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: adjust_open_files_limit
+static void adjust_open_files_limit(ulong *requested_open_files) {
+  ulong limit_1;
+  ulong limit_2;
+  ulong limit_3;
+  ulong request_open_files;
+  ulong effective_open_files;
+
+  /* MyISAM requires two file handles per table. */
+  limit_1 = 10 + max_connections + table_cache_size * 2;
+
+  /*
+    We are trying to allocate no less than max_connections*5 file
+    handles (i.e. we are trying to set the limit so that they will
+    be available).
+  */
+  limit_2 = max_connections * 5;
+
+  /* Try to allocate no less than 5000 by default. */
+  limit_3 = open_files_limit ? open_files_limit : 5000;
+
+  request_open_files = max<ulong>(max<ulong>(limit_1, limit_2), limit_3);
+
+  /* Notice: my_set_max_open_files() may return more than requested. */
+  effective_open_files = my_set_max_open_files(request_open_files);
+
+  if (effective_open_files < request_open_files) {
+    if (open_files_limit == 0) {
+      LogErr(WARNING_LEVEL, ER_CHANGED_MAX_OPEN_FILES, effective_open_files,
+             request_open_files);
+    } else {
+      LogErr(WARNING_LEVEL, ER_CANT_INCREASE_MAX_OPEN_FILES,
+             effective_open_files, request_open_files);
+    }
+  }
+
+  open_files_limit = effective_open_files;
+  if (requested_open_files)
+    *requested_open_files =
+        min<ulong>(effective_open_files, request_open_files);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: modify_thread_cache_size
+static inline bool modify_thread_cache_size(sys_var *, THD *, enum_var_type) {
+  if (Connection_handler_manager::thread_handling ==
+      Connection_handler_manager::SCHEDULER_ONE_THREAD_PER_CONNECTION) {
+    Per_thread_connection_handler::modify_thread_cache_size(
+        Per_thread_connection_handler::max_blocked_pthreads);
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_host_cache_size
+static bool fix_host_cache_size(sys_var *, THD *, enum_var_type) {
+  hostname_cache_resize(host_cache_size);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc
+Function: Per_thread_connection_handler::block_until_new_connection
+Channel_info *Per_thread_connection_handler::block_until_new_connection() {
+  Channel_info *new_conn = nullptr;
+  mysql_mutex_lock(&LOCK_thread_cache);
+  if (blocked_pthread_count < max_blocked_pthreads && !shrink_cache) {
+    /* Don't kill the pthread, just block it for reuse */
+    DBUG_PRINT("info", ("Blocking pthread for reuse"));
+
+    /*
+      mysys_var is bound to the physical thread,
+      so make sure mysys_var->dbug is reset to a clean state
+      before picking another session in the thread cache.
+    */
+    DBUG_POP();
+    assert(!_db_is_pushed_());
+
+    // Block pthread
+    blocked_pthread_count++;
+    while (!connection_events_loop_aborted() && !wake_pthread && !shrink_cache)
+      mysql_cond_wait(&COND_thread_cache, &LOCK_thread_cache);
+    blocked_pthread_count--;
+
+    if (shrink_cache && blocked_pthread_count <= max_blocked_pthreads) {
+      mysql_cond_signal(&COND_flush_thread_cache);
+    }
+
+    if (wake_pthread) {
+      wake_pthread--;
+      if (!waiting_channel_info_list->empty()) {
+        new_conn = waiting_channel_info_list->front();
+        waiting_channel_info_list->pop_front();
+        DBUG_PRINT("info", ("waiting_channel_info_list->pop %p", new_conn));
+      } else {
+        assert(0);  // We should not get here.
+      }
+    }
+  }
+  mysql_mutex_unlock(&LOCK_thread_cache);
+  return new_conn;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc
+Function: Per_thread_connection_handler::get_max_threads
+uint Per_thread_connection_handler::get_max_threads() const {
+  return max_connections;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc
+Function: get_max_connections
+ulong get_max_connections() { return max_connections; }
+
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc
+Function: Connection_handler_manager::valid_connection_count
+bool Connection_handler_manager::valid_connection_count() {
+  bool connection_accepted = true;
+  mysql_mutex_lock(&LOCK_connection_count);
+  if (connection_count > max_connections) {
+    connection_accepted = false;
+    m_connection_errors_max_connection++;
+  }
+  mysql_mutex_unlock(&LOCK_connection_count);
+  return connection_accepted;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc
+Function: Connection_handler_manager::check_and_incr_conn_count
+bool Connection_handler_manager::check_and_incr_conn_count(
+    bool is_admin_connection) {
+  bool connection_accepted = true;
+  mysql_mutex_lock(&LOCK_connection_count);
+  /*
+    Here we allow max_connections + 1 clients to connect
+    (by checking before we increment by 1).
+
+    The last connection is reserved for SUPER users. This is
+    checked later during authentication where valid_connection_count()
+    is called for non-SUPER users only.
+  */
+  if (connection_count > max_connections && !is_admin_connection) {
+    connection_accepted = false;
+    m_connection_errors_max_connection++;
+  } else {
+    ++connection_count;
+
+    if (connection_count > max_used_connections) {
+      max_used_connections = connection_count;
+      max_used_connections_time = time(nullptr);
+    }
+  }
+  mysql_mutex_unlock(&LOCK_connection_count);
+  return connection_accepted;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h
+Function:  pool_capacity_exceeded
+bool pool_capacity_exceeded() const {
+    mysql_mutex_assert_owner(&m_lock);
+    return m_element_pool.size() > max_connections;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc
+Function: Shared_multi_map<T>::remove(Cache_element<T> *element, Autolocker *lock)
+template <typename T>
+void Shared_multi_map<T>::remove(Cache_element<T> *element, Autolocker *lock) {
+  mysql_mutex_assert_owner(&m_lock);
+
+#ifndef NDEBUG
+  Cache_element<T> *e = nullptr;
+  m_map<const T *>()->get(element->object(), &e);
+
+  // The element must be present, and its usage must be 1 (this thread).
+  assert(e == element);
+  assert(e->usage() == 1);
+
+  // Get all keys that were created within the element.
+  const typename T::Id_key *id_key = element->id_key();
+  const typename T::Name_key *name_key = element->name_key();
+  const typename T::Aux_key *aux_key = element->aux_key();
+
+  // None of the non-null keys may be missed.
+  assert((!id_key || !m_map<typename T::Id_key>()->is_missed(*id_key)) &&
+         (!name_key || !m_map<typename T::Name_key>()->is_missed(*name_key)) &&
+         (!aux_key || !m_map<typename T::Aux_key>()->is_missed(*aux_key)));
+
+  // All non-null keys must exist.
+  assert((!id_key || m_map<typename T::Id_key>()->is_present(*id_key)) &&
+         (!name_key || m_map<typename T::Name_key>()->is_present(*name_key)) &&
+         (!aux_key || m_map<typename T::Aux_key>()->is_present(*aux_key)));
+#endif
+
+  // Remove the keys and the element from the shared map and the registry.
+  Multi_map_base<T>::remove_single_element(element);
+
+  // Sign up the object for being deleted.
+  lock->auto_delete(element->object());
+
+  // Reuse the element if there is room for it.
+  if (!pool_capacity_exceeded())
+    m_element_pool.push_back(element);
+  else
+    lock->auto_delete(element);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc
+Function: Shared_multi_map<T>::put(const K *key, const T *object,
+                              Cache_element<T> **element)
+template <typename K>
+void Shared_multi_map<T>::put(const K *key, const T *object,
+                              Cache_element<T> **element) {
+  assert(element);
+  Autolocker lock(this);
+  if (!object) {
+    assert(key);
+    // For a NULL object, we only need to signal that the miss is handled.
+    if (m_map<K>()->is_missed(*key)) {
+      m_map<K>()->set_miss_handled(*key);
+      mysql_cond_broadcast(&m_miss_handled);
+    }
+    assert(*element == nullptr);
+    return;
+  }
+
+#ifndef NDEBUG
+  // The new object instance may not be present in the map.
+  m_map<const T *>()->get(object, element);
+  assert(*element == nullptr);
+#endif
+
+  // Get a new element, either from the pool, or by allocating a new one.
+  if (!m_element_pool.empty()) {
+    *element = m_element_pool.back();
+    m_element_pool.pop_back();
+    (*element)->init();
+  } else
+    *element = new (std::nothrow) Cache_element<T>();
+
+  // Prepare the element. Assign the object and create keys.
+  (*element)->set_object(object);
+  (*element)->recreate_keys();
+
+  // Get all keys that were created within the element.
+  const typename T::Id_key *id_key = (*element)->id_key();
+  const typename T::Name_key *name_key = (*element)->name_key();
+  const typename T::Aux_key *aux_key = (*element)->aux_key();
+
+  // There must be at least one key.
+  assert(id_key || name_key || aux_key);
+
+  // For the non-null keys being missed, set that the miss is handled.
+  bool key_missed = false;
+  if (id_key && m_map<typename T::Id_key>()->is_missed(*id_key)) {
+    key_missed = true;
+    m_map<typename T::Id_key>()->set_miss_handled(*id_key);
+  }
+  if (name_key && m_map<typename T::Name_key>()->is_missed(*name_key)) {
+    key_missed = true;
+    m_map<typename T::Name_key>()->set_miss_handled(*name_key);
+  }
+  if (aux_key && m_map<typename T::Aux_key>()->is_missed(*aux_key)) {
+    key_missed = true;
+    m_map<typename T::Aux_key>()->set_miss_handled(*aux_key);
+  }
+
+  // All non-null keys must exist, or none.
+  bool all_keys_present =
+      (!id_key || m_map<typename T::Id_key>()->is_present(*id_key)) &&
+      (!name_key || m_map<typename T::Name_key>()->is_present(*name_key)) &&
+      (!aux_key || m_map<typename T::Aux_key>()->is_present(*aux_key));
+  bool no_keys_present =
+      (!id_key || !m_map<typename T::Id_key>()->is_present(*id_key)) &&
+      (!name_key || !m_map<typename T::Name_key>()->is_present(*name_key)) &&
+      (!aux_key || !m_map<typename T::Aux_key>()->is_present(*aux_key));
+
+  // If no keys are present, we must add the element.
+  if (no_keys_present) {
+    // Remove least recently used object(s).
+    rectify_free_list(&lock);
+
+    // Mark the element as in use, and register it in all key maps.
+    (*element)->use();
+    Multi_map_base<T>::add_single_element(*element);
+
+    // In this case, one or more keys may be missed, so we must broadcast.
+    if (key_missed) mysql_cond_broadcast(&m_miss_handled);
+
+    // The element and the object is now owned by the cache.
+    return;
+  }
+
+  // If all keys are already present, we discard the new element.
+  if (all_keys_present) {
+    assert(key);
+
+    // If all keys are present, we sign up the object for being deleted.
+    lock.auto_delete(object);
+
+    // The element is added to the pool if room, or signed up for
+    // auto delete.
+    if (!pool_capacity_exceeded())
+      m_element_pool.push_back(*element);
+    else
+      lock.auto_delete(*element);
+
+    // Then we return the existing element.
+    *element = use_if_present(*key);
+    assert(*element);
+
+    // In this case, no key may be missed, so there is no need to broadcast.
+    assert(!key_missed);
+    return;
+  }
+
+  // Must have all_keys_present ^ no_keys_present
+  assert(false); /* purecov: inspected */
+}
+
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_dictionary_cache.cc
+Function: dd::cache::Shared_dictionary_cache::init
+void Shared_dictionary_cache::init() {
+  instance()->m_map<Collation>()->set_capacity(collation_capacity);
+  instance()->m_map<Charset>()->set_capacity(charset_capacity);
+
+  // Set capacity to have room for all connections to leave an element
+  // unused in the cache to avoid frequent cache misses while e.g.
+  // opening a table.
+  instance()->m_map<Abstract_table>()->set_capacity(max_connections);
+  instance()->m_map<Event>()->set_capacity(event_capacity);
+  instance()->m_map<Routine>()->set_capacity(stored_program_def_size);
+  instance()->m_map<Schema>()->set_capacity(schema_def_size);
+  instance()->m_map<Column_statistics>()->set_capacity(
+      column_statistics_capacity);
+  instance()->m_map<Spatial_reference_system>()->set_capacity(
+      spatial_reference_system_capacity);
+  instance()->m_map<Tablespace>()->set_capacity(tablespace_def_size);
+  instance()->m_map<Resource_group>()->set_capacity(resource_group_capacity);
+}
+

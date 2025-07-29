@@ -1,0 +1,18 @@
+[
+    {
+        "knob_name": "completion_type",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "Session_tracker::get_tracker",
+            "MDL_context::release_statement_locks",
+            "stmt_causes_implicit_commit",
+            "MDL_context::release_transactional_locks",
+            "is_explainable_query"
+        ],
+        "control_matched_count": 5,
+        "matched_count": 6
+    }
+]

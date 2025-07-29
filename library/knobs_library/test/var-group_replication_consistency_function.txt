@@ -1,0 +1,102 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: Trans_delegate::before_commit
+int Trans_delegate::before_commit(THD *thd, bool all,
+                                  Binlog_cache_storage *trx_cache_log,
+                                  Binlog_cache_storage *stmt_cache_log,
+                                  ulonglong cache_log_max_size,
+                                  bool is_atomic_ddl_arg) {
+  DBUG_TRACE;
+  Trans_param param;
+  TRANS_PARAM_ZERO(param);
+  param.server_id = thd->server_id;
+  param.server_uuid = server_uuid;
+  param.thread_id = thd->thread_id();
+  param.gtid_info.type = thd->variables.gtid_next.type;
+  param.gtid_info.sidno = thd->variables.gtid_next.gtid.sidno;
+  param.gtid_info.gno = thd->variables.gtid_next.gtid.gno;
+  param.trx_cache_log = trx_cache_log;
+  param.stmt_cache_log = stmt_cache_log;
+  param.cache_log_max_size = cache_log_max_size;
+  param.original_commit_timestamp = &thd->variables.original_commit_timestamp;
+  param.is_atomic_ddl = is_atomic_ddl_arg;
+  param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
+  param.group_replication_consistency =
+      thd->variables.group_replication_consistency;
+  param.original_server_version = &(thd->variables.original_server_version);
+  param.immediate_server_version = &(thd->variables.immediate_server_version);
+  param.is_create_table_as_query_block =
+      (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+       !thd->lex->query_block->field_list_is_empty());
+
+  bool is_real_trans =
+      (all || !thd->get_transaction()->is_active(Transaction_ctx::SESSION));
+  if (is_real_trans) param.flags |= TRANS_IS_REAL_TRANS;
+
+  int ret = 0;
+
+  /* After this debug point we mark the transaction as committing in THD. */
+  DBUG_EXECUTE_IF("trans_delegate_before_commit_before_before_call_observers", {
+    const char act[] =
+        "now signal "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "reached "
+        "wait_for "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "waiting";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
+  thd->rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_BEFORE_COMMIT);
+
+  /**
+    If thread is killed or commits are blocked do not commit the transaction.
+    Post this thread cannot be killed.
+  */
+  if (thd->is_killed() || m_rollback_transaction_not_reached_before_commit) {
+    /**
+      Disconnect the client connection if not already done.
+      Do not KILL connection if the transaction is going to be rolledback.
+    */
+    if (!thd->is_killed()) {
+      mysql_mutex_lock(&thd->LOCK_thd_data);
+      thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&thd->LOCK_thd_data);
+    }
+    return 1;
+  }
+  FOREACH_OBSERVER(ret, before_commit, (&param));
+  plugin_foreach(thd, se_before_commit, MYSQL_STORAGE_ENGINE_PLUGIN, &param);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: Trans_delegate::trans_begin
+int Trans_delegate::trans_begin(THD *thd, int &out) {
+  DBUG_TRACE;
+  if (m_rollback_transaction_on_begin) {
+    out = ER_OPERATION_NOT_ALLOWED_WHILE_PRIMARY_CHANGE_IS_RUNNING;
+    return 0;
+  }
+
+  Trans_param param;
+  TRANS_PARAM_ZERO(param);
+  param.server_uuid = server_uuid;
+  param.thread_id = thd->thread_id();
+  param.group_replication_consistency =
+      thd->variables.group_replication_consistency;
+  param.hold_timeout = thd->variables.net_wait_timeout;
+  param.server_id = thd->server_id;
+  param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
+
+  int ret = 0;
+  thd->rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_BEGIN);
+  FOREACH_OBSERVER_ERROR_OUT(ret, begin, &param, out);
+  return ret;
+}
+
+

@@ -1,0 +1,98 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_view.cc
+Function: check_key_in_view
+bool check_key_in_view(THD *thd, Table_ref *view, const Table_ref *table_ref) {
+  DBUG_TRACE;
+
+  /*
+    we do not support updatable UNIONs in VIEW, so we can check just limit of
+    LEX::query_block.
+    But why call this function from INSERT when we explicitly ignore it?
+  */
+  if ((!view->is_view() && !view->belong_to_view) ||
+      thd->lex->sql_command == SQLCOM_INSERT ||
+      thd->lex->query_block->select_limit == nullptr)
+    return false; /* it is normal table or query without LIMIT */
+
+  TABLE *const table = table_ref->table;
+  view = view->top_table();
+  Field_translator *const trans = view->field_translation;
+  Field_translator *const end_of_trans = view->field_translation_end;
+  KEY *key_info = table->key_info;
+  KEY *const key_info_end = key_info + table->s->keys;
+
+  {
+    /*
+      Make sure that all fields are ready to get keys from them, but
+      this operation need not mark fields as used, and privilege checks are
+      performed elsewhere.
+      @todo
+      This fix_fields() call is necessary for execution of prepared statements.
+      When repeated preparation is eliminated the call can be deleted.
+    */
+    enum_mark_columns save_mark_used_columns = thd->mark_used_columns;
+    thd->mark_used_columns = MARK_COLUMNS_NONE;
+    ulong want_privilege_saved = thd->want_privilege;
+    thd->want_privilege = 0;
+    for (Field_translator *fld = trans; fld < end_of_trans; fld++) {
+      if (!fld->item->fixed && fld->item->fix_fields(thd, &fld->item))
+        return true; /* purecov: inspected */
+    }
+    thd->mark_used_columns = save_mark_used_columns;
+    thd->want_privilege = want_privilege_saved;
+  }
+  /* Loop over all keys to see if a unique-not-null key is used */
+  for (; key_info != key_info_end; key_info++) {
+    if ((key_info->flags & (HA_NOSAME | HA_NULL_PART_KEY)) == HA_NOSAME) {
+      KEY_PART_INFO *key_part = key_info->key_part;
+      KEY_PART_INFO *key_part_end = key_part + key_info->user_defined_key_parts;
+
+      /* check that all key parts are used */
+      for (;;) {
+        Field_translator *k;
+        for (k = trans; k < end_of_trans; k++) {
+          Item_field *field;
+          if ((field = k->item->field_for_view_update()) &&
+              field->field == key_part->field)
+            break;
+        }
+        if (k == end_of_trans) break;                  // Key is not possible
+        if (++key_part == key_part_end) return false;  // Found usable key
+      }
+    }
+  }
+
+  DBUG_PRINT("info", ("checking if all fields of table are used"));
+  /* check all fields presence */
+  {
+    Field **field_ptr;
+    Field_translator *fld;
+    for (field_ptr = table->field; *field_ptr; field_ptr++) {
+      for (fld = trans; fld < end_of_trans; fld++) {
+        Item_field *field;
+        if ((field = fld->item->field_for_view_update()) &&
+            field->field == *field_ptr)
+          break;
+      }
+      if (fld == end_of_trans)  // If field didn't exists
+      {
+        /*
+          Keys or all fields of underlying tables are not found => we have
+          to check variable updatable_views_with_limit to decide should we
+          issue an error or just a warning
+        */
+        if (thd->variables.updatable_views_with_limit) {
+          /* update allowed, but issue warning */
+          push_warning(thd, Sql_condition::SL_NOTE, ER_WARN_VIEW_WITHOUT_KEY,
+                       ER_THD(thd, ER_WARN_VIEW_WITHOUT_KEY));
+          return false;
+        }
+        /* prohibit update */
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+

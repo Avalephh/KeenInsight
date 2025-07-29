@@ -1,0 +1,17 @@
+[
+    {
+        "knob_name": "xa_detach_on_prepare",
+        "data_matched_functions": [
+            "open_temporary_table"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "XID_STATE::check_in_xa",
+            "TABLE::init",
+            "MDL_context::release_transactional_locks",
+            "TABLE::reset"
+        ],
+        "control_matched_count": 4,
+        "matched_count": 5
+    }
+]

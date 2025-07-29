@@ -1,0 +1,14 @@
+Global Variable: System_variables.36
+Explicit Data Flow (3):
+  Instruction: %8 = load i64, i64* %net_interactive_timeout, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc:3608:54 | Function: server_mpvio_update_thd
+  Instruction: store i64 %8, i64* %net_wait_timeout, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc:3608:37 | Function: server_mpvio_update_thd
+  Instruction: %net_wait_timeout = getelementptr inbounds %struct.System_variables.48070, %struct.System_variables.48070* %variables2, i32 0, i32 39, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc:3608:20 | Function: server_mpvio_update_thd
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

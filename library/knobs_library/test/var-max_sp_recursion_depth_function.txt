@@ -1,0 +1,37 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_setup_routine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_setup_routine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_setup_routine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_setup_routine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_setup_routine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_setup_routine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: recursion_level_error
+static void recursion_level_error(THD *thd, sp_head *sp) {
+  if (sp->m_type == enum_sp_type::PROCEDURE) {
+    my_error(ER_SP_RECURSION_LIMIT, MYF(0),
+             static_cast<int>(thd->variables.max_sp_recursion_depth),
+             sp->m_name.str);
+  } else
+    my_error(ER_SP_NO_RECURSION, MYF(0));
+}
+
+

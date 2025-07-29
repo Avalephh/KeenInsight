@@ -1,0 +1,67 @@
+Global Variable: System_variables.79
+Explicit Data Flow (52):
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255611 | Location: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc:303:40 | Function: resourcegroups::Resource_group_mgr::post_init
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255610 | Location: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc:303:18 | Function: resourcegroups::Resource_group_mgr::post_init
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0pfs.cc:333:18 | Function: log_pfs_create_tables
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0pfs.cc:333:40 | Function: log_pfs_create_tables
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/dd/performance_schema/init.cc:262:18 | Function: 
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/performance_schema/init.cc:262:40 | Function: 
+  Instruction: %13 = load i8, i8* %transaction_read_only, align 4, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1088:28 | Function: THD::init
+  Instruction: %tobool22 = trunc i8 %13 to i1, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1088:28 | Function: THD::init
+  Instruction: %frombool = zext i1 %tobool22 to i8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1088:16 | Function: THD::init
+  Instruction: store i8 %frombool, i8* %tx_read_only, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1088:16 | Function: THD::init
+  Instruction: %tx_read_only = getelementptr inbounds %class.THD, %class.THD* %this1, i32 0, i32 144, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1088:3 | Function: THD::init
+  Instruction: %tx_read_only = getelementptr inbounds %class.THD, %class.THD* %4, i32 0, i32 144, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0pfs.cc:334:8 | Function: log_pfs_create_tables
+  Instruction: store i8 0, i8* %tx_read_only, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0pfs.cc:334:21 | Function: log_pfs_create_tables
+  Instruction: %tx_read_only = getelementptr inbounds %class.THD, %class.THD* %1, i32 0, i32 144, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/performance_schema/init.cc:263:8 | Function: 
+  Instruction: store i8 0, i8* %tx_read_only, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/performance_schema/init.cc:263:21 | Function: 
+  Instruction: %12 = load i8, i8* %transaction_read_only, align 4, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:79:38 | Function: trans_reset_one_shot_chistics
+  Instruction: %tobool = trunc i8 %12 to i1, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:79:38 | Function: trans_reset_one_shot_chistics
+  Instruction: %frombool = zext i1 %tobool to i8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:79:21 | Function: trans_reset_one_shot_chistics
+  Instruction: store i8 %frombool, i8* %tx_read_only, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:79:21 | Function: trans_reset_one_shot_chistics
+  Instruction: %tx_read_only = getelementptr inbounds %class.THD.35342, %class.THD.35342* %13, i32 0, i32 144, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:79:8 | Function: trans_reset_one_shot_chistics
+  Instruction: %tx_read_only112 = getelementptr inbounds %class.THD.35342, %class.THD.35342* %66, i32 0, i32 144, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: %67 = load i8, i8* %tx_read_only112, align 8, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: %tobool113 = trunc i8 %67 to i1, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: %call115 = invoke %struct.PSI_transaction_locker* @_ZL30inline_mysql_start_transactionP31PSI_transaction_locker_state_v1PKvPKyibbPKci(%struct.PSI_transaction_locker_state_v1* %m_transaction_state, i8* null, i64* null, i32 %65, i1 zeroext %tobool113, i1 zeroext false, i8* getelementptr inbounds ([43 x i8], [43 x i8]* @.str.20545, i64 0, i64 0), i32 209)
+          to label %invoke.cont114 unwind label %lpad, !dbg !1255450 | Location: /root/LLVM/mysql-8.0.36/sql/transaction.cc:208:9 | Function: trans_begin
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:318:42 | Function: bootstrap::handle_bootstrap
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:318:20 | Function: bootstrap::handle_bootstrap
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/event_scheduler.cc:514:44 | Function: Event_scheduler::start
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/event_scheduler.cc:514:22 | Function: Event_scheduler::start
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:892:40 | Function: dd::bootstrap::initialize
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:892:18 | Function: dd::bootstrap::initialize
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:925:40 | Function: dd::bootstrap::restart
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:925:18 | Function: dd::bootstrap::restart
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:997:40 | Function: dd::bootstrap::setup_dd_objects_and_collations
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:997:18 | Function: dd::bootstrap::setup_dd_objects_and_collations
+  Instruction: %2 = load i8, i8* %transaction_read_only, align 4, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:98:49 | Function: 
+  Instruction: %tobool = trunc i8 %2 to i1, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:98:49 | Function: 
+  Instruction: %frombool2 = zext i1 %tobool to i8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:98:9 | Function: 
+  Instruction: store i8 %frombool2, i8* %m_saved_var_tx_read_only, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:98:9 | Function: 
+  Instruction: %m_saved_var_tx_read_only = getelementptr inbounds %"class.(anonymous namespace)::Update_context", %"class.(anonymous namespace)::Update_context"* %this1, i32 0, i32 1, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:98:9 | Function: 
+  Instruction: %m_saved_var_tx_read_only = getelementptr inbounds %"class.(anonymous namespace)::Update_context", %"class.(anonymous namespace)::Update_context"* %this1, i32 0, i32 1, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:121:46 | Function: 
+  Instruction: %0 = load i8, i8* %m_saved_var_tx_read_only, align 8, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:121:46 | Function: 
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:121:46 | Function: 
+  Instruction: %frombool = zext i1 %tobool to i8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:121:44 | Function: 
+  Instruction: store i8 %frombool, i8* %transaction_read_only, align 4, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:121:44 | Function: 
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:121:22 | Function: 
+  Instruction: store i8 0, i8* %transaction_read_only11, align 4, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:109:44 | Function: 
+  Instruction: %transaction_read_only11 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables10, i32 0, i32 79, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:109:22 | Function: 
+  Instruction: store i8 0, i8* %transaction_read_only, align 4, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:580:40 | Function: 
+  Instruction: %transaction_read_only = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 79, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:580:18 | Function: 
+  Instruction: %7 = load i8, i8* %transaction_read_only, align 4, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:76:27 | Function: 
+  Instruction: %tobool3 = trunc i8 %7 to i1, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:76:27 | Function: 
+  Instruction: br i1 %tobool3, label %land.end, label %land.lhs.true4, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:76:49 | Function: 
+
+Implicit Data Flow (1):
+  Instruction: %15 = phi i1 [ false, %land.lhs.true12 ], [ false, %land.lhs.true10 ], [ false, %land.lhs.true8 ], [ false, %land.lhs.true6 ], [ false, %land.lhs.true4 ], [ false, %land.lhs.true ], [ false, %if.end ], [ %cmp15, %land.rhs ], !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:0:0
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: strcmp
+
+Implicit Control Flow:
+
+----------------------------------------

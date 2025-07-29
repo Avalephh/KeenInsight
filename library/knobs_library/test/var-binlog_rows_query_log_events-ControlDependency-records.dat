@@ -1,0 +1,26 @@
+Global Variable: System_variables.98
+Explicit Data Flow (14):
+  Instruction: %30 = load i8, i8* %binlog_rows_query_log_events, align 2, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7737:52 | Function: write_locked_table_maps
+  Instruction: %tobool31 = trunc i8 %30 to i1, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7737:52 | Function: write_locked_table_maps
+  Instruction: %frombool = zext i1 %tobool31 to i8, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7737:12 | Function: write_locked_table_maps
+  Instruction: store i8 %frombool, i8* %need_binlog_rows_query, align 1, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7737:12 | Function: write_locked_table_maps
+  Instruction: %59 = load i8, i8* %need_binlog_rows_query, align 1, !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7760:57 | Function: write_locked_table_maps
+  Instruction: %tobool58 = trunc i8 %59 to i1, !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7760:57 | Function: write_locked_table_maps
+  Instruction: %call60 = invoke i32 @_ZN3THD22binlog_write_table_mapEP5TABLEbb(%class.THD* %56, %struct.TABLE* %57, i1 zeroext %tobool57, i1 zeroext %tobool58)
+          to label %invoke.cont59 unwind label %lpad, !dbg !1255425 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7759:34 | Function: write_locked_table_maps
+  Instruction: %60 = load i8, i8* %need_binlog_rows_query, align 1, !dbg !1255426 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7763:15 | Function: write_locked_table_maps
+  Instruction: %tobool61 = trunc i8 %60 to i1, !dbg !1255426 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7763:15 | Function: write_locked_table_maps
+  Instruction: br i1 %tobool61, label %if.then62, label %if.end63, !dbg !1255428 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7763:15 | Function: write_locked_table_maps
+  Instruction: store i8 0, i8* %need_binlog_rows_query, align 1, !dbg !1255429 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7763:62 | Function: write_locked_table_maps
+  Instruction: store i8 0, i8* %binlog_rows_query_log_events, align 2, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6739:47 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_rows_query_log_events = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables4, i32 0, i32 98, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6739:18 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_rows_query_log_events = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 98, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7737:52 | Function: write_locked_table_maps
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

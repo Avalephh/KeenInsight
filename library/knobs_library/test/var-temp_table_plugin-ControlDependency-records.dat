@@ -1,0 +1,1067 @@
+Global Variable: System_variables.86
+Explicit Data Flow (185):
+  Instruction: %3 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %temp_table_plugin, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3059:39 | Function: unlock_variables
+  Instruction: call void @_Z20intern_plugin_unlockP3LEXPP13st_plugin_int(%struct.LEX* null, %struct.st_plugin_int** %3), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3059:3 | Function: unlock_variables
+  Instruction: store %struct.st_plugin_int** null, %struct.st_plugin_int*** %temp_table_plugin2, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3061:27 | Function: unlock_variables
+  Instruction: %temp_table_plugin2 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %5, i32 0, i32 86, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3061:9 | Function: unlock_variables
+  Instruction: %temp_table_plugin2 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables1, i32 0, i32 86, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:355:63 | Function: ha_default_temp_plugin
+  Instruction: %3 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %temp_table_plugin2, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:355:63 | Function: ha_default_temp_plugin
+  Instruction: store %struct.st_plugin_int** %3, %struct.st_plugin_int*** %retval, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:355:41 | Function: ha_default_temp_plugin
+  Instruction: %5 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %retval, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:357:1 | Function: ha_default_temp_plugin
+  Instruction: ret %struct.st_plugin_int** %5, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:357:1 | Function: ha_default_temp_plugin
+  Instruction: %call = call %struct.st_plugin_int** @_ZL22ha_default_temp_pluginP3THD(%class.THD* %0), !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:371:23 | Function: ha_default_temp_handlerton
+  Instruction: store %struct.st_plugin_int** %call, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:371:14 | Function: ha_default_temp_handlerton
+  Instruction: %1 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:372:3 | Function: ha_default_temp_handlerton
+  Instruction: %tobool = icmp ne %struct.st_plugin_int** %1, null, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:372:3 | Function: ha_default_temp_handlerton
+  Instruction: br i1 %tobool, label %cond.true, label %cond.false, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:372:3 | Function: ha_default_temp_handlerton
+  Instruction: %3 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:373:48 | Function: ha_default_temp_handlerton
+  Instruction: %call1 = call %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %3), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:373:22 | Function: ha_default_temp_handlerton
+  Instruction: store %struct.handlerton* %call1, %struct.handlerton** %hton, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:373:15 | Function: ha_default_temp_handlerton
+  Instruction: %4 = load %struct.handlerton*, %struct.handlerton** %hton, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:374:3 | Function: ha_default_temp_handlerton
+  Instruction: %tobool2 = icmp ne %struct.handlerton* %4, null, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:374:3 | Function: ha_default_temp_handlerton
+  Instruction: br i1 %tobool2, label %cond.true3, label %cond.false4, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:374:3 | Function: ha_default_temp_handlerton
+  Instruction: %6 = load %struct.handlerton*, %struct.handlerton** %hton, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:375:10 | Function: ha_default_temp_handlerton
+  Instruction: ret %struct.handlerton* %6, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:375:3 | Function: ha_default_temp_handlerton
+  Instruction: %call63 = invoke %struct.handlerton* @_Z26ha_default_temp_handlertonP3THD(%class.THD* %71)
+          to label %invoke.cont62 unwind label %lpad, !dbg !1255451 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:227:34 | Function: EstimateMaterializeCost
+  Instruction: store %struct.handlerton* %call63, %struct.handlerton** %handlerton, align 8, !dbg !1255449 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:227:21 | Function: EstimateMaterializeCost
+  Instruction: %72 = load %struct.handlerton*, %struct.handlerton** %handlerton, align 8, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:229:13 | Function: EstimateMaterializeCost
+  Instruction: %create = getelementptr inbounds %struct.handlerton, %struct.handlerton* %72, i32 0, i32 20, !dbg !1255453 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:229:25 | Function: EstimateMaterializeCost
+  Instruction: %73 = load %class.handler* (%struct.handlerton*, %struct.TABLE_SHARE*, i1, %struct.MEM_ROOT*)*, %class.handler* (%struct.handlerton*, %struct.TABLE_SHARE*, i1, %struct.MEM_ROOT*)** %create, align 8, !dbg !1255453 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:229:25 | Function: EstimateMaterializeCost
+  Instruction: %call65 = invoke %class.handler* %73(%struct.handlerton* %74, %struct.TABLE_SHARE* null, i1 zeroext false, %struct.MEM_ROOT* %78)
+          to label %invoke.cont64 unwind label %lpad, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:229:13 | Function: EstimateMaterializeCost
+  Instruction: %74 = load %struct.handlerton*, %struct.handlerton** %handlerton, align 8, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc:229:32 | Function: EstimateMaterializeCost
+  Instruction: %call32 = invoke %struct.handlerton* @_Z26ha_default_temp_handlertonP3THD(%class.THD* %40)
+          to label %invoke.cont31 unwind label %lpad, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:176:33 | Function: Sql_cmd_create_table::execute
+  Instruction: %cond = phi %struct.handlerton* [ %call32, %invoke.cont31 ], [ %call34, %invoke.cont33 ], !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:175:27 | Function: Sql_cmd_create_table::execute
+  Instruction: store %struct.handlerton* %cond, %struct.handlerton** %db_type, align 8, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:175:25 | Function: Sql_cmd_create_table::execute
+  Instruction: %db_type = getelementptr inbounds %struct.HA_CREATE_INFO, %struct.HA_CREATE_INFO* %create_info, i32 0, i32 27, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:175:17 | Function: Sql_cmd_create_table::execute
+  Instruction: %db_type = getelementptr inbounds %struct.HA_CREATE_INFO, %struct.HA_CREATE_INFO* %2, i32 0, i32 27, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc:140:16 | Function: dd::ndb_upgrade::fill_create_info_for_upgrade
+  Instruction: store %struct.handlerton* %call, %struct.handlerton** %db_type, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc:140:24 | Function: dd::ndb_upgrade::fill_create_info_for_upgrade
+  Instruction: %db_type = getelementptr inbounds %struct.HA_CREATE_INFO, %struct.HA_CREATE_INFO* %2, i32 0, i32 27, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:693:16 | Function: dd::upgrade_57::fill_create_info_for_upgrade
+  Instruction: store %struct.handlerton* %call, %struct.handlerton** %db_type, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:693:24 | Function: dd::upgrade_57::fill_create_info_for_upgrade
+  Instruction: %call4 = call %struct.st_plugin_int** @_ZL22ha_default_temp_pluginP3THD(%class.THD* %5), !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:406:53 | Function: ha_resolve_by_name
+  Instruction: %cond = phi %struct.st_plugin_int** [ %call3, %cond.true ], [ %call4, %cond.false ], !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:406:12 | Function: ha_resolve_by_name
+  Instruction: store %struct.st_plugin_int** %cond, %struct.st_plugin_int*** %retval, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:406:5 | Function: ha_resolve_by_name
+  Instruction: %22 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %retval, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:435:1 | Function: ha_resolve_by_name
+  Instruction: ret %struct.st_plugin_int** %22, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:435:1 | Function: ha_resolve_by_name
+  Instruction: %call = call %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* %0, %class.Simple_cstring* %1, i1 zeroext false), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:318:29 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: store %struct.st_plugin_int** %call, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:318:20 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %2 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:319:8 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %tobool = icmp ne %struct.st_plugin_int** %2, null, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:319:8 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: br i1 %tobool, label %if.end, label %if.then, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:319:7 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %3 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:322:46 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %call2 = call %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %3), !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:322:20 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: store %struct.handlerton* %call2, %struct.handlerton** %ht, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:322:15 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %4 = load %struct.handlerton*, %struct.handlerton** %ht, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:323:3 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %cmp = icmp ne %struct.handlerton* %4, null, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:323:3 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: br i1 %cmp, label %cond.true, label %cond.false, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:323:3 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %6 = load %struct.handlerton*, %struct.handlerton** %ht, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:324:8 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %tobool3 = icmp ne %struct.handlerton* %6, null, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:324:8 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: br i1 %tobool3, label %if.end5, label %if.then4, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:324:7 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %7 = load %struct.handlerton*, %struct.handlerton** %ht, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:329:10 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %slot = getelementptr inbounds %struct.handlerton, %struct.handlerton* %7, i32 0, i32 2, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:329:14 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %8 = load i32, i32* %slot, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:329:14 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: store i32 %8, i32* %retval, align 4, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:329:3 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %9 = load i32, i32* %retval, align 4, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:330:1 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: ret i32 %9, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc:330:1 | Function: Cost_model_constants::find_handler_slot_from_name
+  Instruction: %call21 = invoke %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* null, %class.Simple_cstring* %se_name, i1 zeroext false)
+          to label %invoke.cont20 unwind label %lpad, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1819:19 | Function: check_storage_engine
+  Instruction: store %struct.st_plugin_int** %call21, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1819:17 | Function: check_storage_engine
+  Instruction: %25 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1820:52 | Function: check_storage_engine
+  Instruction: %call25 = invoke %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %25)
+          to label %invoke.cont24 unwind label %lpad, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1820:26 | Function: check_storage_engine
+  Instruction: store %struct.handlerton* %call25, %struct.handlerton** %hton, align 8, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1820:19 | Function: check_storage_engine
+  Instruction: %26 = load %struct.handlerton*, %struct.handlerton** %hton, align 8, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1821:41 | Function: check_storage_engine
+  Instruction: %call27 = invoke zeroext i1 @_Z29ha_is_storage_engine_disabledP10handlerton(%struct.handlerton* %26)
+          to label %invoke.cont26 unwind label %lpad, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1821:11 | Function: check_storage_engine
+  Instruction: %33 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1824:30 | Function: check_storage_engine
+  Instruction: invoke void @_Z13plugin_unlockP3THDPP13st_plugin_int(%class.THD* null, %struct.st_plugin_int** %33)
+          to label %invoke.cont56 unwind label %lpad, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1824:7 | Function: check_storage_engine
+  Instruction: %tobool22 = icmp ne %struct.st_plugin_int** %call21, null, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1819:9 | Function: check_storage_engine
+  Instruction: br i1 %tobool22, label %if.then23, label %if.end57, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1819:9 | Function: check_storage_engine
+  Instruction: %call6 = invoke %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* %15, %class.Simple_cstring* %pname_cstr, i1 zeroext false)
+          to label %invoke.cont5 unwind label %lpad, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1754:16 | Function: Sys_var_plugin::do_check
+  Instruction: store %struct.st_plugin_int** %call6, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1754:14 | Function: Sys_var_plugin::do_check
+  Instruction: %18 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1759:10 | Function: Sys_var_plugin::do_check
+  Instruction: %tobool11 = icmp ne %struct.st_plugin_int** %18, null, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1759:10 | Function: Sys_var_plugin::do_check
+  Instruction: br i1 %tobool11, label %if.end21, label %if.then12, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1759:9 | Function: Sys_var_plugin::do_check
+  Instruction: %21 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1767:31 | Function: Sys_var_plugin::do_check
+  Instruction: store %struct.st_plugin_int** %21, %struct.st_plugin_int*** %plugin22, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1767:29 | Function: Sys_var_plugin::do_check
+  Instruction: %call3 = call %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* %7, %class.Simple_cstring* %pname, i1 zeroext false), !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1797:16 | Function: Sys_var_plugin::global_save_default
+  Instruction: store %struct.st_plugin_int** %call3, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1797:14 | Function: Sys_var_plugin::global_save_default
+  Instruction: %10 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1801:5 | Function: Sys_var_plugin::global_save_default
+  Instruction: %tobool = icmp ne %struct.st_plugin_int** %10, null, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1801:5 | Function: Sys_var_plugin::global_save_default
+  Instruction: br i1 %tobool, label %cond.true, label %cond.false, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1801:5 | Function: Sys_var_plugin::global_save_default
+  Instruction: %call6 = call %struct.st_plugin_int** @_Z11plugin_lockP3THDPPP13st_plugin_int(%class.THD* %12, %struct.st_plugin_int*** %plugin), !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1803:31 | Function: Sys_var_plugin::global_save_default
+  Instruction: %call17 = call %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* %19, %class.Simple_cstring* %20, i1 zeroext false), !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6655:13 | Function: open_secondary_engine_tables
+  Instruction: %cond = phi %struct.st_plugin_int** [ null, %cond.true15 ], [ %call17, %cond.false16 ], !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6653:7 | Function: open_secondary_engine_tables
+  Instruction: store %struct.st_plugin_int** %cond, %struct.st_plugin_int*** %secondary_engine_plugin, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6652:20 | Function: open_secondary_engine_tables
+  Instruction: %21 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %secondary_engine_plugin, align 8, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6657:8 | Function: open_secondary_engine_tables
+  Instruction: %cmp19 = icmp eq %struct.st_plugin_int** %21, null, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6657:32 | Function: open_secondary_engine_tables
+  Instruction: br i1 %cmp19, label %if.then22, label %lor.lhs.false20, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6657:44 | Function: open_secondary_engine_tables
+  Instruction: %call1 = call %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* null, %class.Simple_cstring* %name, i1 zeroext false), !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5666:17 | Function: initialize_storage_engine
+  Instruction: store %struct.st_plugin_int** %call1, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5666:15 | Function: initialize_storage_engine
+  Instruction: %2 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5667:38 | Function: initialize_storage_engine
+  Instruction: %call2 = call %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %2), !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5667:12 | Function: initialize_storage_engine
+  Instruction: store %struct.handlerton* %call2, %struct.handlerton** %hton, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5667:10 | Function: initialize_storage_engine
+  Instruction: %7 = load %struct.handlerton*, %struct.handlerton** %hton, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5672:37 | Function: initialize_storage_engine
+  Instruction: %call18 = call zeroext i1 @_Z28ha_storage_engine_is_enabledPK10handlerton(%struct.handlerton* %7), !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5672:8 | Function: initialize_storage_engine
+  Instruction: br i1 %call18, label %if.else44, label %if.then19, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5672:7 | Function: initialize_storage_engine
+  Instruction: %19 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %plugin, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5684:20 | Function: initialize_storage_engine
+  Instruction: store %struct.st_plugin_int** %19, %struct.st_plugin_int*** %20, align 8, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5684:18 | Function: initialize_storage_engine
+  Instruction: %call1387 = invoke zeroext i1 @_ZL25initialize_storage_enginePKcS0_PPP13st_plugin_int(i8* %312, i8* getelementptr inbounds ([1 x i8], [1 x i8]* @.str.264, i64 0, i64 0), %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85))
+          to label %invoke.cont1386 unwind label %lpad, !dbg !1256171 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6843:7 | Function: init_server_components
+  Instruction: %77 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85), align 8, !dbg !1255515 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1661:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %tobool111 = icmp ne %struct.st_plugin_int** %77, null, !dbg !1255515 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1661:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %lnot112 = xor i1 %tobool111, true, !dbg !1255515 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1661:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: br i1 %lnot112, label %cond.true113, label %cond.false114, !dbg !1255515 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1661:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: store %struct.st_plugin_int** %call122, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85), align 8, !dbg !1255519 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1663:46 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %317 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85), align 8, !dbg !1256189 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6855:59 | Function: init_server_components
+  Instruction: %call1402 = invoke %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %317)
+          to label %invoke.cont1401 unwind label %lpad, !dbg !1256190 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6855:9 | Function: init_server_components
+  Instruction: store %struct.handlerton* %call1402, %struct.handlerton** %default_se_handle, align 8, !dbg !1256188 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6854:17 | Function: init_server_components
+  Instruction: %318 = load %struct.handlerton*, %struct.handlerton** %default_se_handle, align 8, !dbg !1256191 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6856:39 | Function: init_server_components
+  Instruction: %call1404 = invoke zeroext i1 @_Z29ha_is_storage_engine_disabledP10handlerton(%struct.handlerton* %318)
+          to label %invoke.cont1403 unwind label %lpad, !dbg !1256193 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6856:9 | Function: init_server_components
+  Instruction: %16 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85), align 8, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3039:9 | Function: plugin_thdvar_init
+  Instruction: %call19 = invoke %struct.st_plugin_int** @_Z18intern_plugin_lockP3LEXPP13st_plugin_int(%struct.LEX* null, %struct.st_plugin_int** %16)
+          to label %invoke.cont18 unwind label %lpad, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3039:9 | Function: plugin_thdvar_init
+  Instruction: %call = call %struct.st_plugin_int** @_Z11plugin_lockP3THDPPP13st_plugin_int(%class.THD* %4, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85)), !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:332:10 | Function: ha_default_plugin
+  Instruction: %86 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 85), align 8, !dbg !1255534 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1673:3 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %tobool133 = icmp ne %struct.st_plugin_int** %86, null, !dbg !1255534 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1673:3 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: br i1 %tobool133, label %cond.true134, label %cond.false135, !dbg !1255534 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1673:3 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %call1392 = invoke zeroext i1 @_ZL25initialize_storage_enginePKcS0_PPP13st_plugin_int(i8* %313, i8* getelementptr inbounds ([6 x i8], [6 x i8]* @.str.857, i64 0, i64 0), %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86))
+          to label %invoke.cont1391 unwind label %lpad, !dbg !1256176 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6846:7 | Function: init_server_components
+  Instruction: %79 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86), align 8, !dbg !1255517 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1662:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %tobool116 = icmp ne %struct.st_plugin_int** %79, null, !dbg !1255517 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1662:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %lnot117 = xor i1 %tobool116, true, !dbg !1255517 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1662:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: br i1 %lnot117, label %cond.true118, label %cond.false119, !dbg !1255517 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1662:9 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: store %struct.st_plugin_int** %call124, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86), align 8, !dbg !1255521 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1665:51 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %323 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86), align 8, !dbg !1256199 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6862:59 | Function: init_server_components
+  Instruction: %call1430 = invoke %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %323)
+          to label %invoke.cont1429 unwind label %lpad, !dbg !1256200 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6862:9 | Function: init_server_components
+  Instruction: store %struct.handlerton* %call1430, %struct.handlerton** %default_tmp_se_handle, align 8, !dbg !1256198 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6861:17 | Function: init_server_components
+  Instruction: %324 = load %struct.handlerton*, %struct.handlerton** %default_tmp_se_handle, align 8, !dbg !1256201 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6863:39 | Function: init_server_components
+  Instruction: %call1432 = invoke zeroext i1 @_Z29ha_is_storage_engine_disabledP10handlerton(%struct.handlerton* %324)
+          to label %invoke.cont1431 unwind label %lpad, !dbg !1256203 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6863:9 | Function: init_server_components
+  Instruction: %19 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86), align 8, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3041:40 | Function: plugin_thdvar_init
+  Instruction: %call24 = invoke %struct.st_plugin_int** @_Z18intern_plugin_lockP3LEXPP13st_plugin_int(%struct.LEX* null, %struct.st_plugin_int** %19)
+          to label %invoke.cont23 unwind label %lpad, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3041:40 | Function: plugin_thdvar_init
+  Instruction: %call = call %struct.st_plugin_int** @_Z11plugin_lockP3THDPPP13st_plugin_int(%class.THD* %4, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86)), !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:356:10 | Function: ha_default_temp_plugin
+  Instruction: %88 = load %struct.st_plugin_int**, %struct.st_plugin_int*** getelementptr inbounds (%struct.System_variables, %struct.System_variables* @global_system_variables, i32 0, i32 86), align 8, !dbg !1255535 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1674:3 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %tobool137 = icmp ne %struct.st_plugin_int** %88, null, !dbg !1255535 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1674:3 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: br i1 %tobool137, label %cond.true138, label %cond.false139, !dbg !1255535 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:1674:3 | Function: plugin_register_builtin_and_init_core_se
+  Instruction: %tobool = icmp ne %struct.st_plugin_int** %call1, null, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5666:7 | Function: initialize_storage_engine
+  Instruction: br i1 %tobool, label %if.then, label %if.else, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5666:7 | Function: initialize_storage_engine
+  Instruction: %call = call %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* %0, %class.Simple_cstring* %1, i1 zeroext false), !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:305:19 | Function: 
+  Instruction: store %struct.st_plugin_int** %call, %struct.st_plugin_int*** %pr, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:305:14 | Function: 
+  Instruction: %2 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %pr, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:23 | Function: 
+  Instruction: %cmp = icmp ne %struct.st_plugin_int** %2, null, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:26 | Function: 
+  Instruction: br i1 %cmp, label %cond.true, label %cond.false, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:23 | Function: 
+  Instruction: %3 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %pr, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:65 | Function: 
+  Instruction: %call1 = call %struct.handlerton* @_Z11plugin_dataIP10handlertonET_PP13st_plugin_int(%struct.st_plugin_int** %3), !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:39 | Function: 
+  Instruction: %cond = phi %struct.handlerton* [ %call1, %cond.true ], [ null, %cond.false ], !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:23 | Function: 
+  Instruction: store %struct.handlerton* %cond, %struct.handlerton** %hton, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:15 | Function: 
+  Instruction: %4 = load %struct.handlerton*, %struct.handlerton** %hton, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:307:10 | Function: 
+  Instruction: %cmp2 = icmp ne %struct.handlerton* %4, null, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:307:15 | Function: 
+  Instruction: br i1 %cmp2, label %cond.true3, label %cond.false5, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:307:10 | Function: 
+  Instruction: %5 = load %struct.handlerton*, %struct.handlerton** %hton, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:307:59 | Function: 
+  Instruction: %call4 = call i8* @_Z30ha_resolve_storage_engine_namePK10handlerton(%struct.handlerton* %5), !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:307:28 | Function: 
+  Instruction: %call474 = invoke %struct.st_plugin_int** @_Z18ha_resolve_by_nameP3THDPK17MYSQL_LEX_CSTRINGb(%class.THD* %289, %class.Simple_cstring* %name, i1 zeroext false)
+          to label %invoke.cont473 unwind label %lpad, !dbg !1256096 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1668:31 | Function: open_binary_frm
+  Instruction: store %struct.st_plugin_int** %call474, %struct.st_plugin_int*** %tmp_plugin, align 8, !dbg !1256094 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1668:18 | Function: open_binary_frm
+  Instruction: %290 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %tmp_plugin, align 8, !dbg !1256097 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1669:11 | Function: open_binary_frm
+  Instruction: %cmp475 = icmp ne %struct.st_plugin_int** %290, null, !dbg !1256099 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1669:22 | Function: open_binary_frm
+  Instruction: br i1 %cmp475, label %land.lhs.true476, label %if.else512, !dbg !1256100 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1669:33 | Function: open_binary_frm
+  Instruction: %291 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %tmp_plugin, align 8, !dbg !1256101 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1670:26 | Function: open_binary_frm
+  Instruction: %call479 = invoke zeroext i1 @_Z13plugin_equalsPP13st_plugin_intS1_(%struct.st_plugin_int** %291, %struct.st_plugin_int** %293)
+          to label %invoke.cont478 unwind label %lpad, !dbg !1256104 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1670:12 | Function: open_binary_frm
+  Instruction: br i1 %call479, label %if.else512, label %if.then480, !dbg !1256105 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1669:11 | Function: open_binary_frm
+  Instruction: %304 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %tmp_plugin, align 8, !dbg !1256137 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1687:19 | Function: open_binary_frm
+  Instruction: %tobool513 = icmp ne %struct.st_plugin_int** %304, null, !dbg !1256137 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1687:19 | Function: open_binary_frm
+  Instruction: br i1 %tobool513, label %if.else526, label %land.lhs.true514, !dbg !1256139 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1687:30 | Function: open_binary_frm
+  Instruction: %312 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %tmp_plugin, align 8, !dbg !1256157 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1707:19 | Function: open_binary_frm
+  Instruction: %tobool527 = icmp ne %struct.st_plugin_int** %312, null, !dbg !1256157 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1707:19 | Function: open_binary_frm
+  Instruction: br i1 %tobool527, label %if.else551, label %land.lhs.true528, !dbg !1256159 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1707:30 | Function: open_binary_frm
+  Instruction: %320 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %tmp_plugin, align 8, !dbg !1256177 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1722:19 | Function: open_binary_frm
+  Instruction: %tobool552 = icmp ne %struct.st_plugin_int** %320, null, !dbg !1256177 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1722:19 | Function: open_binary_frm
+  Instruction: br i1 %tobool552, label %if.end559, label %if.then553, !dbg !1256179 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:1722:18 | Function: open_binary_frm
+  Instruction: %9 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %temp_table_plugin, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3081:3 | Function: cleanup_variables
+  Instruction: %cmp2 = icmp eq %struct.st_plugin_int** %9, null, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3081:3 | Function: cleanup_variables
+  Instruction: br i1 %cmp2, label %cond.true3, label %cond.false4, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3081:3 | Function: cleanup_variables
+  Instruction: %3 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %temp_table_plugin, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3020:53 | Function: plugin_thdvar_init
+  Instruction: store %struct.st_plugin_int** %3, %struct.st_plugin_int*** %old_temp_table_plugin, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3020:14 | Function: plugin_thdvar_init
+  Instruction: %21 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %old_temp_table_plugin, align 8, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3043:35 | Function: plugin_thdvar_init
+  Instruction: invoke void @_Z20intern_plugin_unlockP3LEXPP13st_plugin_int(%struct.LEX* null, %struct.st_plugin_int** %21)
+          to label %invoke.cont27 unwind label %lpad, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3043:5 | Function: plugin_thdvar_init
+  Instruction: store %struct.st_plugin_int** null, %struct.st_plugin_int*** %temp_table_plugin5, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3024:36 | Function: plugin_thdvar_init
+  Instruction: %temp_table_plugin5 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables4, i32 0, i32 86, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3024:18 | Function: plugin_thdvar_init
+  Instruction: store %struct.st_plugin_int** null, %struct.st_plugin_int*** %temp_table_plugin12, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3030:36 | Function: plugin_thdvar_init
+  Instruction: %temp_table_plugin12 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables11, i32 0, i32 86, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3030:18 | Function: plugin_thdvar_init
+  Instruction: store %struct.st_plugin_int** %call24, %struct.st_plugin_int*** %temp_table_plugin26, align 8, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3041:38 | Function: plugin_thdvar_init
+  Instruction: %temp_table_plugin26 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables25, i32 0, i32 86, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3041:20 | Function: plugin_thdvar_init
+  Instruction: %1 = load %struct.st_plugin_int**, %struct.st_plugin_int*** %temp_table_plugin, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:355:22 | Function: ha_default_temp_plugin
+  Instruction: %tobool = icmp ne %struct.st_plugin_int** %1, null, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:355:7 | Function: ha_default_temp_plugin
+  Instruction: br i1 %tobool, label %if.then, label %if.end, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:355:7 | Function: ha_default_temp_plugin
+
+Implicit Data Flow (2):
+  Instruction: %cond = phi %struct.handlerton* [ %call1, %cond.true ], [ null, %cond.false ], !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:306:23
+  Instruction: %cond7 = phi i8* [ %call4, %cond.true3 ], [ getelementptr inbounds ([1 x i8], [1 x i8]* @.str.31.17595, i64 0, i64 0), %cond.false5 ], !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tablespace.cc:307:10
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: String::~String
+  Controlled Function: ha_is_storage_engine_disabled
+  Controlled Function: String::~String
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: plugin_unlock
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: String::~String
+  Controlled Function: ErrConvString::ErrConvString
+  Controlled Function: ErrConvString::ptr
+  Controlled Function: String::~String
+  Controlled Function: my_error
+  Controlled Function: __assert_fail
+  Controlled Function: plugin_lock
+  Controlled Function: Sql_cmd::disable_secondary_storage_engine
+  Controlled Function: plugin_is_ready
+  Controlled Function: THD::is_secondary_storage_engine_eligible
+  Controlled Function: handlerton const* plugin_data
+  Controlled Function: Sql_cmd::use_secondary_storage_engine
+  Controlled Function: Table_ref::is_placeholder
+  Controlled Function: open_table
+  Controlled Function: THD::is_error
+  Controlled Function: TABLE_SHARE::is_secondary_engine
+  Controlled Function: my_error
+  Controlled Function: __assert_fail
+  Controlled Function: handler::ha_set_primary_handler
+  Controlled Function: plugin_unlock
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: intern_plugin_lock
+  Controlled Function: intern_plugin_lock
+  Controlled Function: st_plugin_int::~st_plugin_int
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: st_plugin_int::~st_plugin_int
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_rwlock_unlock
+  Controlled Function: st_plugin_int::st_plugin_int
+  Controlled Function: MEM_ROOT::Clear
+  Controlled Function: strlen
+  Controlled Function: std::optional
+  Controlled Function: std::optional
+  Controlled Function: std::optional
+  Controlled Function: std::optional
+  Controlled Function: MEM_ROOT::ClearForReuse
+  Controlled Function: __assert_fail
+  Controlled Function: test_plugin_options
+  Controlled Function: __assert_fail
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: register_builtin
+  Controlled Function: inline_mysql_rwlock_unlock
+  Controlled Function: MEM_ROOT::Clear
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: plugin_initialize
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: update_persisted_plugin_sysvars
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_rwlock_unlock
+  Controlled Function: MEM_ROOT::Clear
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: intern_plugin_lock
+  Controlled Function: intern_plugin_lock
+  Controlled Function: st_plugin_int::~st_plugin_int
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: st_plugin_int::~st_plugin_int
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_rwlock_unlock
+  Controlled Function: st_plugin_int::st_plugin_int
+  Controlled Function: MEM_ROOT::Clear
+  Controlled Function: strlen
+  Controlled Function: std::optional
+  Controlled Function: std::optional
+  Controlled Function: std::optional
+  Controlled Function: std::optional
+  Controlled Function: MEM_ROOT::ClearForReuse
+  Controlled Function: __assert_fail
+  Controlled Function: test_plugin_options
+  Controlled Function: __assert_fail
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: register_builtin
+  Controlled Function: inline_mysql_rwlock_unlock
+  Controlled Function: MEM_ROOT::Clear
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: plugin_initialize
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: update_persisted_plugin_sysvars
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_rwlock_unlock
+  Controlled Function: MEM_ROOT::Clear
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MEM_ROOT::~MEM_ROOT
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: ha_storage_engine_is_enabled
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: plugin_unlock
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::source_line
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::function
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: ha_resolve_storage_engine_name
+  Controlled Function: ha_resolve_storage_engine_name
+  Controlled Function: plugin_equals
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strncmp
+  Controlled Function: plugin_unlock
+  Controlled Function: my_error
+  Controlled Function: strncmp
+  Controlled Function: my_error
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: plugin_lock
+  Controlled Function: ha_legacy_type
+  Controlled Function: my_free
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: my_free
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: void destroy
+  Controlled Function: uint4korr
+  Controlled Function: my_errno
+  Controlled Function: _db_doprnt_
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: open_table_error
+  Controlled Function: ha_legacy_type
+  Controlled Function: memdup_root
+  Controlled Function: _db_doprnt_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: plugin_lock_by_name
+  Controlled Function: uint2korr
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: uint2korr
+  Controlled Function: uint4korr
+  Controlled Function: inline_mysql_file_pread
+  Controlled Function: inline_mysql_file_seek
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: strlen
+  Controlled Function: uint2korr
+  Controlled Function: Tablespace_name_error_handler::Tablespace_name_error_handler
+  Controlled Function: uint2korr
+  Controlled Function: THD::push_internal_handler
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: validate_tablespace_name_length
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: THD::pop_internal_handler
+  Controlled Function: strmake_root
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: read_string
+  Controlled Function: fix_type_pointers
+  Controlled Function: fix_type_pointers
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: fix_type_pointers
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: get_new_handler
+  Controlled Function: strlen
+  Controlled Function: make_field_from_frm
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: find_type
+  Controlled Function: make_field_from_frm
+  Controlled Function: my_free
+  Controlled Function: uint2korr
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: find_ref_key
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Field::set_flag
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Bitmap
+  Controlled Function: bitmap_init
+  Controlled Function: Field::is_flag_set
+  Controlled Function: bitmap_set_all
+  Controlled Function: void destroy
+  Controlled Function: find_field
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: my_free
+  Controlled Function: __assert_fail
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: Field::is_nullable
+  Controlled Function: add_pk_parts_to_sk
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: Field::is_nullable
+  Controlled Function: Field::null_offset
+  Controlled Function: Field::is_nullable
+  Controlled Function: KEY_PART_INFO::init_flags
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: setup_key_part_field
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Bitmap
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: push_warning_printf
+  Controlled Function: plugin_unlock
+  Controlled Function: strncmp
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: plugin_lock
+  Controlled Function: my_error
+  Controlled Function: strncmp
+  Controlled Function: my_error
+  Controlled Function: ha_legacy_type
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: my_free
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: my_free
+  Controlled Function: _db_enabled_
+  Controlled Function: void destroy
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: uint4korr
+  Controlled Function: my_errno
+  Controlled Function: _db_doprnt_
+  Controlled Function: ha_legacy_type
+  Controlled Function: open_table_error
+  Controlled Function: _db_doprnt_
+  Controlled Function: memdup_root
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: plugin_lock_by_name
+  Controlled Function: uint2korr
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: uint2korr
+  Controlled Function: uint4korr
+  Controlled Function: inline_mysql_file_pread
+  Controlled Function: inline_mysql_file_seek
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: strlen
+  Controlled Function: uint2korr
+  Controlled Function: Tablespace_name_error_handler::Tablespace_name_error_handler
+  Controlled Function: uint2korr
+  Controlled Function: THD::push_internal_handler
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: validate_tablespace_name_length
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: THD::pop_internal_handler
+  Controlled Function: strmake_root
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: read_string
+  Controlled Function: fix_type_pointers
+  Controlled Function: fix_type_pointers
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: fix_type_pointers
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: get_new_handler
+  Controlled Function: strlen
+  Controlled Function: make_field_from_frm
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: find_type
+  Controlled Function: make_field_from_frm
+  Controlled Function: my_free
+  Controlled Function: uint2korr
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: find_ref_key
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Field::set_flag
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Bitmap
+  Controlled Function: bitmap_init
+  Controlled Function: Field::is_flag_set
+  Controlled Function: bitmap_set_all
+  Controlled Function: void destroy
+  Controlled Function: find_field
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: my_free
+  Controlled Function: __assert_fail
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: Field::is_nullable
+  Controlled Function: add_pk_parts_to_sk
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: Field::is_nullable
+  Controlled Function: Field::null_offset
+  Controlled Function: Field::is_nullable
+  Controlled Function: KEY_PART_INFO::init_flags
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: setup_key_part_field
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Bitmap
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: push_warning_printf
+  Controlled Function: strncmp
+  Controlled Function: my_error
+  Controlled Function: strncmp
+  Controlled Function: my_error
+  Controlled Function: my_free
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: my_free
+  Controlled Function: _db_enabled_
+  Controlled Function: void destroy
+  Controlled Function: uint4korr
+  Controlled Function: my_errno
+  Controlled Function: _db_doprnt_
+  Controlled Function: open_table_error
+  Controlled Function: memdup_root
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: plugin_lock_by_name
+  Controlled Function: uint2korr
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: uint2korr
+  Controlled Function: uint4korr
+  Controlled Function: inline_mysql_file_pread
+  Controlled Function: inline_mysql_file_seek
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: strlen
+  Controlled Function: uint2korr
+  Controlled Function: Tablespace_name_error_handler::Tablespace_name_error_handler
+  Controlled Function: uint2korr
+  Controlled Function: THD::push_internal_handler
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: validate_tablespace_name_length
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: THD::pop_internal_handler
+  Controlled Function: strmake_root
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: read_string
+  Controlled Function: fix_type_pointers
+  Controlled Function: fix_type_pointers
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: fix_type_pointers
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: get_new_handler
+  Controlled Function: strlen
+  Controlled Function: make_field_from_frm
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: find_type
+  Controlled Function: make_field_from_frm
+  Controlled Function: my_free
+  Controlled Function: uint2korr
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: find_ref_key
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Field::set_flag
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Bitmap
+  Controlled Function: bitmap_init
+  Controlled Function: Field::is_flag_set
+  Controlled Function: bitmap_set_all
+  Controlled Function: void destroy
+  Controlled Function: find_field
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: my_free
+  Controlled Function: __assert_fail
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: Field::is_nullable
+  Controlled Function: add_pk_parts_to_sk
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: Field::is_nullable
+  Controlled Function: Field::null_offset
+  Controlled Function: Field::is_nullable
+  Controlled Function: KEY_PART_INFO::init_flags
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: setup_key_part_field
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Bitmap
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: push_warning_printf
+  Controlled Function: my_error
+  Controlled Function: strncmp
+  Controlled Function: my_free
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: my_free
+  Controlled Function: _db_enabled_
+  Controlled Function: void destroy
+  Controlled Function: uint4korr
+  Controlled Function: my_errno
+  Controlled Function: _db_doprnt_
+  Controlled Function: open_table_error
+  Controlled Function: memdup_root
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: plugin_lock_by_name
+  Controlled Function: uint2korr
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: uint2korr
+  Controlled Function: uint4korr
+  Controlled Function: inline_mysql_file_pread
+  Controlled Function: inline_mysql_file_seek
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: strlen
+  Controlled Function: uint2korr
+  Controlled Function: Tablespace_name_error_handler::Tablespace_name_error_handler
+  Controlled Function: uint2korr
+  Controlled Function: THD::push_internal_handler
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: validate_tablespace_name_length
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: THD::pop_internal_handler
+  Controlled Function: strmake_root
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: read_string
+  Controlled Function: fix_type_pointers
+  Controlled Function: fix_type_pointers
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: fix_type_pointers
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: get_new_handler
+  Controlled Function: strlen
+  Controlled Function: make_field_from_frm
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: find_type
+  Controlled Function: make_field_from_frm
+  Controlled Function: my_free
+  Controlled Function: uint2korr
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: find_ref_key
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Field::set_flag
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Bitmap
+  Controlled Function: bitmap_init
+  Controlled Function: Field::is_flag_set
+  Controlled Function: bitmap_set_all
+  Controlled Function: void destroy
+  Controlled Function: find_field
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: my_free
+  Controlled Function: __assert_fail
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: Field::is_nullable
+  Controlled Function: add_pk_parts_to_sk
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: Field::is_nullable
+  Controlled Function: Field::null_offset
+  Controlled Function: Field::is_nullable
+  Controlled Function: KEY_PART_INFO::init_flags
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: setup_key_part_field
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Bitmap
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: push_warning_printf
+  Controlled Function: my_error
+  Controlled Function: my_free
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_free
+  Controlled Function: void destroy
+  Controlled Function: uint4korr
+  Controlled Function: my_errno
+  Controlled Function: open_table_error
+  Controlled Function: memdup_root
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: plugin_lock_by_name
+  Controlled Function: uint2korr
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: strmake_root
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: uint2korr
+  Controlled Function: uint4korr
+  Controlled Function: inline_mysql_file_pread
+  Controlled Function: inline_mysql_file_seek
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: strlen
+  Controlled Function: uint2korr
+  Controlled Function: Tablespace_name_error_handler::Tablespace_name_error_handler
+  Controlled Function: uint2korr
+  Controlled Function: THD::push_internal_handler
+  Controlled Function: _db_pargs_
+  Controlled Function: uint2korr
+  Controlled Function: validate_tablespace_name_length
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_enabled_
+  Controlled Function: uint2korr
+  Controlled Function: THD::pop_internal_handler
+  Controlled Function: strmake_root
+  Controlled Function: strmake_root
+  Controlled Function: _db_pargs_
+  Controlled Function: Tablespace_name_error_handler::~Tablespace_name_error_handler
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: read_string
+  Controlled Function: fix_type_pointers
+  Controlled Function: fix_type_pointers
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: fix_type_pointers
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: get_new_handler
+  Controlled Function: strlen
+  Controlled Function: make_field_from_frm
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: uint2korr
+  Controlled Function: __assert_fail
+  Controlled Function: uint2korr
+  Controlled Function: find_type
+  Controlled Function: make_field_from_frm
+  Controlled Function: my_free
+  Controlled Function: uint2korr
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: find_ref_key
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Field::set_flag
+  Controlled Function: MEM_ROOT::Alloc
+  Controlled Function: Bitmap
+  Controlled Function: bitmap_init
+  Controlled Function: Field::is_flag_set
+  Controlled Function: bitmap_set_all
+  Controlled Function: void destroy
+  Controlled Function: find_field
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: my_free
+  Controlled Function: __assert_fail
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: Field::is_nullable
+  Controlled Function: add_pk_parts_to_sk
+  Controlled Function: unsigned int const& std::max
+  Controlled Function: Field::is_nullable
+  Controlled Function: Field::null_offset
+  Controlled Function: Field::is_nullable
+  Controlled Function: KEY_PART_INFO::init_flags
+  Controlled Function: Field::is_virtual_gcol
+  Controlled Function: setup_key_part_field
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::set_flag
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Bitmap
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: push_warning_printf
+  Controlled Function: __assert_fail
+  Controlled Function: my_free
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: plugin_lock
+
+Implicit Control Flow:
+
+----------------------------------------

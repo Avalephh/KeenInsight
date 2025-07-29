@@ -1,0 +1,381 @@
+Global Variable: srv_fast_shutdown
+Explicit Data Flow (126):
+  Instruction: %1 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2733:5 | Function: srv_master_shutdown_loop
+  Instruction: %cmp8 = icmp ult i64 %1, 2, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2733:5 | Function: srv_master_shutdown_loop
+  Instruction: %conv9 = zext i1 %cmp8 to i32, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2733:5 | Function: srv_master_shutdown_loop
+  Instruction: %cmp10 = icmp eq i32 0, %conv9, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2733:5 | Function: srv_master_shutdown_loop
+  Instruction: %call11 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp10), !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2733:5 | Function: srv_master_shutdown_loop
+  Instruction: br i1 %call11, label %if.then12, label %if.end13, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2733:5 | Function: srv_master_shutdown_loop
+  Instruction: %2 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2491:7 | Function: srv_master_do_shutdown_tasks
+  Instruction: %cmp9 = icmp uge i64 %2, 1, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2491:25 | Function: srv_master_do_shutdown_tasks
+  Instruction: br i1 %cmp9, label %if.then10, label %if.end11, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2491:7 | Function: srv_master_do_shutdown_tasks
+  Instruction: %6 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2033:10 | Function: srv_shutdown_print_master_pending
+  Instruction: %tobool12 = icmp ne i64 %6, 0, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2033:10 | Function: srv_shutdown_print_master_pending
+  Instruction: br i1 %tobool12, label %if.end17, label %land.lhs.true, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2033:28 | Function: srv_shutdown_print_master_pending
+  Instruction: %1 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2719:5 | Function: srv_master_pre_dd_shutdown_loop
+  Instruction: %cmp8 = icmp ult i64 %1, 2, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2719:5 | Function: srv_master_pre_dd_shutdown_loop
+  Instruction: %conv9 = zext i1 %cmp8 to i32, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2719:5 | Function: srv_master_pre_dd_shutdown_loop
+  Instruction: %cmp10 = icmp eq i32 0, %conv9, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2719:5 | Function: srv_master_pre_dd_shutdown_loop
+  Instruction: %call11 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp10), !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2719:5 | Function: srv_master_pre_dd_shutdown_loop
+  Instruction: br i1 %call11, label %if.then12, label %if.end13, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2719:5 | Function: srv_master_pre_dd_shutdown_loop
+  Instruction: %2 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2450:7 | Function: srv_master_do_pre_dd_shutdown_tasks
+  Instruction: %cmp9 = icmp eq i64 %2, 2, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2450:25 | Function: srv_master_do_pre_dd_shutdown_tasks
+  Instruction: br i1 %cmp9, label %if.then10, label %if.end11, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2450:7 | Function: srv_master_do_pre_dd_shutdown_tasks
+  Instruction: %26 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255386 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3143:10 | Function: srv_purge_coordinator_thread
+  Instruction: %cmp64 = icmp eq i64 %26, 0, !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3143:28 | Function: srv_purge_coordinator_thread
+  Instruction: br i1 %cmp64, label %land.rhs, label %land.end, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3143:33 | Function: srv_purge_coordinator_thread
+  Instruction: %33 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3160:3 | Function: srv_purge_coordinator_thread
+  Instruction: %cmp71 = icmp ne i64 %33, 0, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3160:3 | Function: srv_purge_coordinator_thread
+  Instruction: %34 = phi i1 [ true, %do.body69 ], [ %cmp71, %lor.rhs ] | Location: :0:0 | Function: srv_purge_coordinator_thread
+  Instruction: %conv72 = zext i1 %34 to i32, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3160:3 | Function: srv_purge_coordinator_thread
+  Instruction: %cmp73 = icmp eq i32 0, %conv72, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3160:3 | Function: srv_purge_coordinator_thread
+  Instruction: %call74 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp73), !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3160:3 | Function: srv_purge_coordinator_thread
+  Instruction: br i1 %call74, label %if.then75, label %if.end76, !dbg !1255409 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3160:3 | Function: srv_purge_coordinator_thread
+  Instruction: %0 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2787:15 | Function: srv_purge_should_exit
+  Instruction: %cmp = icmp ne i64 %0, 0, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2787:33 | Function: srv_purge_should_exit
+  Instruction: br i1 %cmp, label %lor.end, label %lor.rhs, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2787:38 | Function: srv_purge_should_exit
+  Instruction: %63 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3034:7 | Function: srv_purge_coordinator_suspend
+  Instruction: %cmp68 = icmp ne i64 %63, 0, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3034:7 | Function: srv_purge_coordinator_suspend
+  Instruction: br i1 %cmp68, label %if.then69, label %if.end70, !dbg !1255416 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3034:7 | Function: srv_purge_coordinator_suspend
+  Instruction: %1 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2596:57 | Function: srv_shutdown_waits_for_rollback_of_recovered_transactions
+  Instruction: %cmp1 = icmp eq i64 %1, 0, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2596:75 | Function: srv_shutdown_waits_for_rollback_of_recovered_transactions
+  Instruction: %2 = phi i1 [ false, %entry ], [ %cmp1, %land.rhs ], !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:0:0 | Function: srv_shutdown_waits_for_rollback_of_recovered_transactions
+  Instruction: ret i1 %2, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2596:3 | Function: srv_shutdown_waits_for_rollback_of_recovered_transactions
+  Instruction: %call97 = call zeroext i1 @_Z57srv_shutdown_waits_for_rollback_of_recovered_transactionsv(), !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2663:7 | Function: srv_pre_dd_shutdown
+  Instruction: br i1 %call97, label %if.then98, label %if.end116, !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2663:7 | Function: srv_pre_dd_shutdown
+  Instruction: %call10 = call zeroext i1 @_Z57srv_shutdown_waits_for_rollback_of_recovered_transactionsv(), !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0sys.cc:705:7 | Function: trx_sys_after_pre_dd_shutdown_validate
+  Instruction: br i1 %call10, label %land.lhs.true, label %if.end21, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0sys.cc:705:67 | Function: trx_sys_after_pre_dd_shutdown_validate
+  Instruction: %3 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2624:41 | Function: srv_pre_dd_shutdown
+  Instruction: %cmp27 = icmp eq i64 %3, 2, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2624:59 | Function: srv_pre_dd_shutdown
+  Instruction: br i1 %cmp27, label %if.then28, label %if.end30, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2624:7 | Function: srv_pre_dd_shutdown
+  Instruction: %0 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2856:7 | Function: srv_shutdown_log
+  Instruction: %cmp29 = icmp eq i64 %0, 2, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2856:25 | Function: srv_shutdown_log
+  Instruction: br i1 %cmp29, label %if.then30, label %if.end34, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2856:7 | Function: srv_shutdown_log
+  Instruction: %14 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1428:28 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: %cmp17 = icmp ne i64 %14, 0, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1428:46 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: %15 = phi i1 [ false, %do.end ], [ %cmp17, %land.rhs ], !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:0:0 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: %frombool = zext i1 %15 to i8, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1427:8 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: store i8 %frombool, i8* %in_fast_shutdown, align 1, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1427:8 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: store i8 1, i8* %in_fast_shutdown, align 1, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1433:22 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: %21 = load i8, i8* %in_fast_shutdown, align 1, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1437:7 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: %tobool28 = trunc i8 %21 to i1, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1437:7 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: br i1 %tobool28, label %if.then29, label %if.end30, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1437:7 | Function: trx_purge_truncate_marked_undo_low
+  Instruction: %2 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1220:49 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: %cmp5 = icmp ugt i64 %2, 0, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1220:67 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: %3 = phi i1 [ false, %do.end ], [ %cmp5, %land.rhs ], !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:0:0 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: %frombool6 = zext i1 %3 to i8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1220:8 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: store i8 %frombool6, i8* %in_fast_shutdown, align 1, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1220:8 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: %4 = load i8, i8* %in_fast_shutdown, align 1, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1225:7 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: %tobool7 = trunc i8 %4 to i1, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1225:7 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: br i1 %tobool7, label %if.then8, label %if.end9, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:1225:7 | Function: trx_purge_mark_undo_for_truncate
+  Instruction: %14 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0roll.cc:747:11 | Function: trx_rollback_or_clean_recovered
+  Instruction: %cmp32 = icmp ne i64 %14, 0, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0roll.cc:747:29 | Function: trx_rollback_or_clean_recovered
+  Instruction: br i1 %cmp32, label %if.then33, label %if.end46, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0roll.cc:746:11 | Function: trx_rollback_or_clean_recovered
+  Instruction: %18 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:1389:7 | Function: buf_pool_free_instance
+  Instruction: %cmp18 = icmp eq i64 %18, 2, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:1389:7 | Function: buf_pool_free_instance
+  Instruction: %19 = phi i1 [ true, %do.body15 ], [ %cmp18, %lor.rhs ] | Location: :0:0 | Function: buf_pool_free_instance
+  Instruction: %conv19 = zext i1 %19 to i32, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:1389:7 | Function: buf_pool_free_instance
+  Instruction: %cmp20 = icmp eq i32 0, %conv19, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:1389:7 | Function: buf_pool_free_instance
+  Instruction: %call21 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp20), !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:1389:7 | Function: buf_pool_free_instance
+  Instruction: br i1 %call21, label %if.then22, label %if.end23, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:1389:7 | Function: buf_pool_free_instance
+  Instruction: %7 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dump.cc:701:43 | Function: buf_dump_thread
+  Instruction: %cmp14 = icmp ne i64 %7, 2, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dump.cc:701:61 | Function: buf_dump_thread
+  Instruction: br i1 %cmp14, label %if.then15, label %if.end16, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dump.cc:701:7 | Function: buf_dump_thread
+  Instruction: %115 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255764 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:3466:7 | Function: buf_flush_page_coordinator_thread
+  Instruction: %cmp290 = icmp eq i64 %115, 2, !dbg !1255766 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:3466:25 | Function: buf_flush_page_coordinator_thread
+  Instruction: br i1 %cmp290, label %if.then294, label %lor.lhs.false291, !dbg !1255767 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:3466:30 | Function: buf_flush_page_coordinator_thread
+  Instruction: %16 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0repl.cc:615:36 | Function: Clone_persist_gtid::periodic_write
+  Instruction: %cmp12 = icmp ult i64 %16, 2, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0repl.cc:615:54 | Function: Clone_persist_gtid::periodic_write
+  Instruction: br i1 %cmp12, label %if.then13, label %if.end19, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0repl.cc:615:7 | Function: Clone_persist_gtid::periodic_write
+  Instruction: %0 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:1815:10 | Function: is_fast_shutdown
+  Instruction: %cmp1 = icmp uge i64 %0, 2, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:1815:28 | Function: is_fast_shutdown
+  Instruction: %1 = phi i1 [ false, %entry ], [ %cmp1, %land.rhs ], !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:0:0 | Function: is_fast_shutdown
+  Instruction: ret i1 %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:1814:3 | Function: is_fast_shutdown
+  Instruction: %call11 = call zeroext i1 @_ZL16is_fast_shutdownv(), !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:1835:7 | Function: fil_node_t::can_be_closed
+  Instruction: br i1 %call11, label %if.then12, label %if.end13, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:1835:7 | Function: fil_node_t::can_be_closed
+  Instruction: %call87 = call zeroext i1 @_ZL16is_fast_shutdownv(), !dbg !1255453 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8074:23 | Function: Fil_shard::space_flush
+  Instruction: %frombool88 = zext i1 %call87 to i8, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8074:10 | Function: Fil_shard::space_flush
+  Instruction: store i8 %frombool88, i8* %skip_flush, align 1, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8074:10 | Function: Fil_shard::space_flush
+  Instruction: %58 = load i8, i8* %skip_flush, align 1, !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8081:43 | Function: Fil_shard::space_flush
+  Instruction: %tobool91 = trunc i8 %58 to i1, !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8081:43 | Function: Fil_shard::space_flush
+  Instruction: %lnot92 = xor i1 %tobool91, true, !dbg !1255460 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8081:42 | Function: Fil_shard::space_flush
+  Instruction: %59 = phi i1 [ false, %while.cond ], [ %lnot92, %land.rhs ], !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:0:0 | Function: Fil_shard::space_flush
+  Instruction: br i1 %59, label %while.body, label %while.end, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8081:5 | Function: Fil_shard::space_flush
+  Instruction: %68 = load i8, i8* %skip_flush, align 1, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: %tobool98 = trunc i8 %68 to i1, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: %conv99 = zext i1 %tobool98 to i32, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: %or = or i32 %conv99, 1, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: %tobool100 = icmp ne i32 %or, 0, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: %frombool101 = zext i1 %tobool100 to i8, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: store i8 %frombool101, i8* %skip_flush, align 1, !dbg !1255480 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8096:20 | Function: Fil_shard::space_flush
+  Instruction: %69 = load i8, i8* %skip_flush, align 1, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: %tobool105 = trunc i8 %69 to i1, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: %conv106 = zext i1 %tobool105 to i32, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: %or107 = or i32 %conv106, %conv104, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: %tobool108 = icmp ne i32 %or107, 0, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: %frombool109 = zext i1 %tobool108 to i8, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: store i8 %frombool109, i8* %skip_flush, align 1, !dbg !1255484 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:18 | Function: Fil_shard::space_flush
+  Instruction: %call103 = call zeroext i1 @_ZL16is_fast_shutdownv(), !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:21 | Function: Fil_shard::space_flush
+  Instruction: %conv104 = zext i1 %call103 to i32, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:8098:21 | Function: Fil_shard::space_flush
+  Instruction: %call18 = invoke dereferenceable(392) %"class.ib::logger"* @_ZN2ib6loggerlsImEERS0_RKT_(%"class.ib::logger"* %call16, i64* dereferenceable(8) @srv_fast_shutdown)
+          to label %invoke.cont17 unwind label %lpad, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3759:17 | Function: fil_validate_space_reference_count
+  Instruction: %0 = load i64, i64* @srv_fast_shutdown, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3856:48 | Function: Fil_system::close_all_files
+  Instruction: %cmp = icmp eq i64 %0, 0, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3856:66 | Function: Fil_system::close_all_files
+  Instruction: %frombool = zext i1 %cmp to i8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3856:8 | Function: Fil_system::close_all_files
+  Instruction: store i8 %frombool, i8* %should_validate_space_reference_count, align 1, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3856:8 | Function: Fil_system::close_all_files
+  Instruction: store i8 0, i8* %should_validate_space_reference_count, align 1, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3857:3 | Function: Fil_system::close_all_files
+  Instruction: %1 = load i8, i8* %should_validate_space_reference_count, align 1, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3860:7 | Function: Fil_system::close_all_files
+  Instruction: %tobool2 = trunc i8 %1 to i1, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3860:7 | Function: Fil_system::close_all_files
+  Instruction: br i1 %tobool2, label %if.then3, label %if.end10, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:3860:7 | Function: Fil_system::close_all_files
+
+Implicit Data Flow (2):
+  Instruction: %28 = phi i1 [ false, %while.cond ], [ %cmp65, %land.rhs ], !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:0:0srv_purge_coordinator_thread
+  Instruction: %2 = phi i1 [ true, %sw.bb1 ], [ %cmp2, %lor.rhs ] | Location: :0:0srv_purge_should_exit
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::atomic
+  Controlled Function: srv_master_do_shutdown_tasks
+  Controlled Function: unlikely
+  Controlled Function: ibuf_merge_in_background
+  Controlled Function: srv_shutdown_print_master_pending
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::atomic
+  Controlled Function: srv_master_do_pre_dd_shutdown_tasks
+  Controlled Function: unlikely
+  Controlled Function: row_drop_tables_for_mysql_in_background
+  Controlled Function: srv_shutdown_print_master_pending
+  Controlled Function: trx_purge
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: srv_get_task_queue_length
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: srv_free_slot
+  Controlled Function: rw_lock_x_lock
+  Controlled Function: undo::Truncate::reset
+  Controlled Function: rw_lock_x_unlock
+  Controlled Function: srv_release_threads
+  Controlled Function: srv_thread_delay_cleanup_if_needed
+  Controlled Function: srv_thread_is_active
+  Controlled Function: trx_sys_recovered_active_trxs_count
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: srv_thread_is_stopped
+  Controlled Function: trx_sys_mutex_enter
+  Controlled Function: ut_list_base
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: trx_sys_mutex_exit
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: log_background_threads_inactive_validate
+  Controlled Function: srv_shutdown_set_state
+  Controlled Function: log_get_lsn
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: log_stop_background_threads
+  Controlled Function: log_background_threads_inactive_validate
+  Controlled Function: buf_must_be_all_freed
+  Controlled Function: log_get_lsn
+  Controlled Function: log_make_empty_and_stop_background_threads
+  Controlled Function: srv_shutdown_set_state
+  Controlled Function: fil_flush_file_spaces
+  Controlled Function: log_is_data_lsn
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_get_lsn
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_must_be_all_freed
+  Controlled Function: log_get_lsn
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: fil_write_flushed_lsn
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: undo::Tablespace::id
+  Controlled Function: Clone_notify::failed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: ib::info::info
+  Controlled Function: trx_undo_truncate_tablespace
+  Controlled Function: ib::info::~info
+  Controlled Function: undo::inject_crash
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: ib::warn::warn
+  Controlled Function: undo::Tablespace::id
+  Controlled Function: ib::warn::~warn
+  Controlled Function: undo::Tablespaces::s_lock
+  Controlled Function: undo::Tablespace::rsegs
+  Controlled Function: Rsegs::x_lock
+  Controlled Function: Rsegs::set_empty
+  Controlled Function: undo::Tablespace::file_name
+  Controlled Function: Rsegs::is_inactive_implicit
+  Controlled Function: ib::info::info
+  Controlled Function: unlikely
+  Controlled Function: ib::info::~info
+  Controlled Function: Rsegs::x_unlock
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: undo::Truncate::reset
+  Controlled Function: Rsegs::set_active
+  Controlled Function: undo::inject_crash
+  Controlled Function: undo::Tablespace::file_name
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: dd_tablespace_set_id_and_state
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: undo::Truncate::is_marked
+  Controlled Function: undo::Tablespaces::s_lock
+  Controlled Function: undo::Truncate::mark
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: undo::Tablespaces::s_lock
+  Controlled Function: undo::Truncate::get_scan_space_num
+  Controlled Function: undo::Tablespaces::find
+  Controlled Function: undo::Tablespace::needs_truncation
+  Controlled Function: undo::Truncate::check_timer
+  Controlled Function: undo::Truncate::increment_scan
+  Controlled Function: undo::Truncate::mark
+  Controlled Function: undo::Truncate::increment_scan
+  Controlled Function: undo::Truncate::reset_timer
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: undo::Truncate::is_marked
+  Controlled Function: undo::Truncate::get_marked_space_num
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: trx_rollback_or_clean_resurrected
+  Controlled Function: bool srv_shutdown_state_matches
+  Controlled Function: unlikely
+  Controlled Function: trx_sys_mutex_enter
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_list_base
+  Controlled Function: trx_sys_mutex_exit
+  Controlled Function: ut_list_base
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: ut_list_base
+  Controlled Function: ut_list_base
+  Controlled Function: trx_sys_mutex_exit
+  Controlled Function: ut_list_base
+  Controlled Function: assert_trx_in_rw_list
+  Controlled Function: std::atomic
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_page_free_descriptor
+  Controlled Function: buf_page_get_state
+  Controlled Function: ut::free
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: buf_page_in_file
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: void mutex_destroy
+  Controlled Function: rw_lock_free
+  Controlled Function: rw_lock_free
+  Controlled Function: buf_pool_t::deallocate_chunk
+  Controlled Function: os_event_destroy
+  Controlled Function: ut::free
+  Controlled Function: PolicyMutex
+  Controlled Function: void mutex_destroy
+  Controlled Function: void ut::delete_
+  Controlled Function: void ut::delete_
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: buf_dump
+  Controlled Function: std::atomic
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: os_event_set
+  Controlled Function: buf_flush_page_cleaner_close
+  Controlled Function: pc_request
+  Controlled Function: pc_flush_slot
+  Controlled Function: pc_wait_finished
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: std::atomic
+  Controlled Function: std::atomic
+  Controlled Function: buf_flush_wait_batch_end
+  Controlled Function: buf_flush_wait_LRU_batch_end
+  Controlled Function: unlikely
+  Controlled Function: buf_get_n_pending_read_ios
+  Controlled Function: pc_request
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: pc_flush_slot
+  Controlled Function: pc_wait_finished
+  Controlled Function: buf_flush_wait_batch_end
+  Controlled Function: buf_flush_wait_LRU_batch_end
+  Controlled Function: std::atomic
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: srv_master_thread_is_active
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_pool_from_array
+  Controlled Function: mtr_t::Logging::is_disabled
+  Controlled Function: unlikely
+  Controlled Function: log_crash_safe_validate
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_persist_crash_safe
+  Controlled Function: srv_purge_threads_active
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: srv_thread_is_active
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: srv_thread_is_active
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Clone_persist_gtid::flush_gtids
+  Controlled Function: std::operator&
+  Controlled Function: std::atomic
+  Controlled Function: std::atomic
+  Controlled Function: __clang_call_terminate
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fil_node_t::is_flushed
+  Controlled Function: os_event_reset
+  Controlled Function: Fil_shard::mutex_release
+  Controlled Function: os_event_wait_low
+  Controlled Function: Fil_shard::acquire
+  Controlled Function: is_fast_shutdown
+  Controlled Function: buf_LRU_count_space_references
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: Fil_shard::validate_space_reference_count
+  Controlled Function: std::map
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: Fil_shard::acquire
+  Controlled Function: Fil_shard::close_all_files
+  Controlled Function: Fil_shard::mutex_release
+  Controlled Function: std::map
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: Fil_system::rename_partition_files
+  Controlled Function: Fil_system::clear_old_files
+  Controlled Function: __gnu_cxx::__normal_iterator
+
+Implicit Control Flow:
+
+----------------------------------------

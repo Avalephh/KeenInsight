@@ -1,0 +1,20 @@
+[
+    {
+        "knob_name": "optimizer_switch",
+        "data_matched_functions": [
+            "TABLE_SHARE::usable_indexes",
+            "DsMrr_impl::choose_mrr_impl",
+            "Table_ref::process_index_hints",
+            "test_quick_select"
+        ],
+        "data_matched_count": 4,
+        "control_matched_functions": [
+            "get_mm_tree",
+            "ER_THD",
+            "get_best_ror_intersect",
+            "get_key_scans_params"
+        ],
+        "control_matched_count": 4,
+        "matched_count": 8
+    }
+]

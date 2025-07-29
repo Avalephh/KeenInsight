@@ -1,0 +1,260 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc
+Function: buf_read_ahead_linear 
+ulint buf_read_ahead_linear(const page_id_t &page_id,
+                            const page_size_t &page_size, bool inside_ibuf) {
+  buf_pool_t *buf_pool = buf_pool_get(page_id);
+  buf_page_t *bpage;
+  buf_frame_t *frame;
+  buf_page_t *pred_bpage = nullptr;
+  std::chrono::steady_clock::time_point pred_bpage_is_accessed;
+  page_no_t pred_offset;
+  page_no_t succ_offset;
+  int asc_or_desc;
+  page_no_t new_offset;
+  ulint fail_count;
+  page_no_t low, high;
+  dberr_t err;
+  page_no_t i;
+  const page_no_t buf_read_ahead_linear_area = buf_pool->read_ahead_area;
+  page_no_t threshold;
+
+  /* check if readahead is disabled */
+  if (!srv_read_ahead_threshold) {
+    return (0);
+  }
+
+  if (srv_startup_is_before_trx_rollback_phase) {
+    /* No read-ahead to avoid thread deadlocks */
+    return (0);
+  }
+
+  low = (page_id.page_no() / buf_read_ahead_linear_area) *
+        buf_read_ahead_linear_area;
+  high = (page_id.page_no() / buf_read_ahead_linear_area + 1) *
+         buf_read_ahead_linear_area;
+
+  if ((page_id.page_no() != low) && (page_id.page_no() != high - 1)) {
+    /* This is not a border page of the area: return */
+
+    return (0);
+  }
+
+  if (ibuf_bitmap_page(page_id, page_size) || trx_sys_hdr_page(page_id)) {
+    /* If it is an ibuf bitmap page or trx sys hdr, we do
+    no read-ahead, as that could break the ibuf page access
+    order */
+
+    return (0);
+  }
+
+  /* Remember the tablespace version before we ask the tablespace size
+  below: if DISCARD + IMPORT changes the actual .ibd file meanwhile, we
+  do not try to read outside the bounds of the tablespace! */
+  ulint space_size;
+
+  if (fil_space_t *space = fil_space_acquire_silent(page_id.space())) {
+    space_size = space->size;
+
+    fil_space_release(space);
+
+    if (high > space_size) {
+      /* The area is not whole */
+      return (0);
+    }
+  } else {
+    return (0);
+  }
+
+  /* Read memory barrier */
+
+  os_rmb;
+
+  if (buf_pool->n_pend_reads >
+      buf_pool->curr_size / BUF_READ_AHEAD_PEND_LIMIT) {
+    return (0);
+  }
+
+  /* Check that almost all pages in the area have been accessed; if
+  offset == low, the accesses must be in a descending order, otherwise,
+  in an ascending order. */
+
+  asc_or_desc = 1;
+
+  if (page_id.page_no() == low) {
+    asc_or_desc = -1;
+  }
+
+  /* How many out of order accessed pages can we ignore
+  when working out the access pattern for linear readahead */
+  threshold = std::min(static_cast<page_no_t>(64 - srv_read_ahead_threshold),
+                       buf_pool->read_ahead_area);
+
+  fail_count = 0;
+
+  rw_lock_t *hash_lock;
+
+  for (i = low; i < high; i++) {
+    bpage = buf_page_hash_get_s_locked(buf_pool, page_id_t(page_id.space(), i),
+                                       &hash_lock);
+
+    if (bpage == nullptr || buf_page_is_accessed(bpage) ==
+                                std::chrono::steady_clock::time_point{}) {
+      /* Not accessed */
+      fail_count++;
+
+    } else if (pred_bpage) {
+      /* Note that buf_page_is_accessed() returns
+      the time of the first access.  If some blocks
+      of the extent existed in the buffer pool at
+      the time of a linear access pattern, the first
+      access times may be nonmonotonic, even though
+      the latest access times were linear.  The
+      threshold (srv_read_ahead_factor) should help
+      a little against this. */
+      int res = 0;
+      if (buf_page_is_accessed(bpage) == pred_bpage_is_accessed) {
+        res = 0;
+      } else if (buf_page_is_accessed(bpage) < pred_bpage_is_accessed) {
+        res = -1;
+      } else {
+        res = 1;
+      }
+      /* Accesses not in the right order */
+      if (res != 0 && res != asc_or_desc) {
+        fail_count++;
+      }
+    }
+
+    if (fail_count > threshold) {
+      /* Too many failures: return */
+      if (bpage) {
+        rw_lock_s_unlock(hash_lock);
+      }
+      return (0);
+    }
+
+    if (bpage) {
+      if (buf_page_is_accessed(bpage) !=
+          std::chrono::steady_clock::time_point{}) {
+        pred_bpage = bpage;
+        pred_bpage_is_accessed = buf_page_is_accessed(bpage);
+      }
+
+      rw_lock_s_unlock(hash_lock);
+    }
+  }
+
+  /* If we got this far, we know that enough pages in the area have
+  been accessed in the right order: linear read-ahead can be sensible */
+
+  bpage = buf_page_hash_get_s_locked(buf_pool, page_id, &hash_lock);
+
+  if (bpage == nullptr) {
+    return (0);
+  }
+
+  switch (buf_page_get_state(bpage)) {
+    case BUF_BLOCK_ZIP_PAGE:
+      frame = bpage->zip.data;
+      break;
+    case BUF_BLOCK_FILE_PAGE:
+      frame = ((buf_block_t *)bpage)->frame;
+      break;
+    default:
+      ut_error;
+      break;
+  }
+
+  /* Read the natural predecessor and successor page addresses from
+  the page; NOTE that because the calling thread may have an x-latch
+  on the page, we do not acquire an s-latch on the page, this is to
+  prevent deadlocks. Even if we read values which are nonsense, the
+  algorithm will work. */
+
+  pred_offset = fil_page_get_prev(frame);
+  succ_offset = fil_page_get_next(frame);
+
+  rw_lock_s_unlock(hash_lock);
+
+  if ((page_id.page_no() == low) && (succ_offset == page_id.page_no() + 1)) {
+    /* This is ok, we can continue */
+    new_offset = pred_offset;
+
+  } else if ((page_id.page_no() == high - 1) &&
+             (pred_offset == page_id.page_no() - 1)) {
+    /* This is ok, we can continue */
+    new_offset = succ_offset;
+  } else {
+    /* Successor or predecessor not in the right order */
+
+    return (0);
+  }
+
+  low = (new_offset / buf_read_ahead_linear_area) * buf_read_ahead_linear_area;
+  high = (new_offset / buf_read_ahead_linear_area + 1) *
+         buf_read_ahead_linear_area;
+
+  if ((new_offset != low) && (new_offset != high - 1)) {
+    /* This is not a border page of the area: return */
+
+    return (0);
+  }
+
+  if (high > space_size) {
+    /* The area is not whole, return */
+
+    return (0);
+  }
+
+  ulint count = 0;
+
+  /* If we got this far, read-ahead can be sensible: do it */
+
+  ulint ibuf_mode;
+
+  ibuf_mode = inside_ibuf ? BUF_READ_IBUF_PAGES_ONLY : BUF_READ_ANY_PAGE;
+
+  /* Since Windows XP seems to schedule the i/o handler thread
+  very eagerly, and consequently it does not wait for the
+  full read batch to be posted, we use special heuristics here */
+
+  os_aio_simulated_put_read_threads_to_sleep();
+
+  for (i = low; i < high; i++) {
+    /* It is only sensible to do read-ahead in the non-sync
+    aio mode: hence false as the first parameter */
+
+    const page_id_t cur_page_id(page_id.space(), i);
+
+    if (!ibuf_bitmap_page(cur_page_id, page_size)) {
+      count += buf_read_page_low(&err, false, IORequest::DO_NOT_WAKE, ibuf_mode,
+                                 cur_page_id, page_size, false);
+
+      if (err == DB_TABLESPACE_DELETED) {
+        ib::warn(ER_IB_MSG_142) << "linear readahead trying to"
+                                   " access page "
+                                << page_id_t(page_id.space(), i)
+                                << " in nonexisting or being-dropped"
+                                   " tablespace";
+      }
+    }
+  }
+
+  /* In simulated aio we wake the aio handler threads only after
+  queuing all aio requests. */
+
+  os_aio_simulated_wake_handler_threads();
+
+  if (count) {
+    DBUG_PRINT("ib_buf", ("linear read-ahead %lu pages, " UINT32PF ":" UINT32PF,
+                          count, page_id.space(), page_id.page_no()));
+  }
+
+  /* Read ahead is considered one I/O operation for the purpose of
+  LRU policy decision. */
+  buf_LRU_stat_inc_io();
+
+  buf_pool->stat.n_ra_pages_read += count;
+  return (count);
+}

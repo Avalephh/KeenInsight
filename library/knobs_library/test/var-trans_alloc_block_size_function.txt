@@ -1,0 +1,22 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init_query_mem_roots
+void THD::init_query_mem_roots() {
+  mem_root->set_block_size(variables.query_alloc_block_size);
+  get_transaction()->init_mem_root_defaults(variables.trans_alloc_block_size,
+                                            variables.trans_prealloc_size);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_trans_mem_root
+static bool fix_trans_mem_root(sys_var *self, THD *thd, enum_var_type type) {
+  if (!self->is_global_persist(type))
+    thd->get_transaction()->init_mem_root_defaults(
+        thd->variables.trans_alloc_block_size,
+        thd->variables.trans_prealloc_size);
+  return false;
+}
+
+

@@ -1,0 +1,15 @@
+[
+    {
+        "knob_name": "binlog_direct_non_trans_update",
+        "data_matched_functions": [
+            "Query_log_event::Query_log_event",
+            "THD::decide_logging_format"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "trans_has_updated_trans_table"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 3
+    }
+]

@@ -1,0 +1,71 @@
+Global Variable: System_variables.60
+Explicit Data Flow (28):
+  Instruction: %20 = load i64, i64* %group_concat_max_len, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:7092:48 | Function: Field_blob::store
+  Instruction: %call13 = call i32 @_ZN10Field_blob12store_to_memEPKcmPK12CHARSET_INFOmP16Blob_mem_storage(%class.Field_blob.33267* %this1, i8* %15, i64 %16, %struct.CHARSET_INFO* %17, i64 %20, %class.Blob_mem_storage* %23), !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:7091:12 | Function: Field_blob::store
+  Instruction: %45 = load i64, i64* %group_concat_max_len, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4443:41 | Function: Item_func_group_concat::fix_fields
+  Instruction: %conv = trunc i64 %45 to i32, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4443:26 | Function: Item_func_group_concat::fix_fields
+  Instruction: store i32 %conv, i32* %group_concat_max_len34, align 4, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4443:24 | Function: Item_func_group_concat::fix_fields
+  Instruction: %group_concat_max_len34 = getelementptr inbounds %class.Item_func_group_concat.71830, %class.Item_func_group_concat.71830* %this1, i32 0, i32 14, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4443:3 | Function: Item_func_group_concat::fix_fields
+  Instruction: %group_concat_max_len = getelementptr inbounds %class.Item_func_group_concat.71830, %class.Item_func_group_concat.71830* %this1, i32 0, i32 14, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.h:2134:8 | Function: Item_func_group_concat::Item_func_group_concat
+  Instruction: store i32 0, i32* %group_concat_max_len, align 4, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.h:2134:8 | Function: Item_func_group_concat::Item_func_group_concat
+  Instruction: %group_concat_max_len16 = getelementptr inbounds %class.Item_func_group_concat.71830, %class.Item_func_group_concat.71830* %29, i32 0, i32 14, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4251:34 | Function: Item_func_group_concat::Item_func_group_concat
+  Instruction: %30 = load i32, i32* %group_concat_max_len16, align 4, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4251:34 | Function: Item_func_group_concat::Item_func_group_concat
+  Instruction: store i32 %30, i32* %group_concat_max_len, align 4, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4251:7 | Function: Item_func_group_concat::Item_func_group_concat
+  Instruction: %group_concat_max_len = getelementptr inbounds %class.Item_func_group_concat.71830, %class.Item_func_group_concat.71830* %this1, i32 0, i32 14, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4251:7 | Function: Item_func_group_concat::Item_func_group_concat
+  Instruction: %47 = load i64, i64* %group_concat_max_len36, align 8, !dbg !1255371 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4444:22 | Function: Item_func_group_concat::fix_fields
+  Instruction: %cmp37 = icmp ugt i64 %47, 4294967295, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4444:43 | Function: Item_func_group_concat::fix_fields
+  Instruction: br i1 %cmp37, label %if.then38, label %if.else, !dbg !1255373 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4444:7 | Function: Item_func_group_concat::fix_fields
+  Instruction: %49 = load i64, i64* %group_concat_max_len41, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4448:42 | Function: Item_func_group_concat::fix_fields
+  Instruction: %conv42 = trunc i64 %49 to i32, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4448:27 | Function: Item_func_group_concat::fix_fields
+  Instruction: store i32 %conv42, i32* %group_concat_max_len43, align 4, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4447:26 | Function: Item_func_group_concat::fix_fields
+  Instruction: %group_concat_max_len43 = getelementptr inbounds %class.Item_func_group_concat.71830, %class.Item_func_group_concat.71830* %this1, i32 0, i32 14, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4447:5 | Function: Item_func_group_concat::fix_fields
+  Instruction: %16 = load i64, i64* %group_concat_max_len, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4526:22 | Function: Item_func_group_concat::setup
+  Instruction: %cmp8 = icmp ugt i64 %16, 4294967295, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4526:43 | Function: Item_func_group_concat::setup
+  Instruction: br i1 %cmp8, label %if.then9, label %if.else, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4526:7 | Function: Item_func_group_concat::setup
+  Instruction: %18 = load i64, i64* %group_concat_max_len11, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4529:52 | Function: Item_func_group_concat::setup
+  Instruction: %conv = trunc i64 %18 to i32, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4529:37 | Function: Item_func_group_concat::setup
+  Instruction: store i32 %conv, i32* %new_max_len, align 4, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4529:17 | Function: Item_func_group_concat::setup
+  Instruction: %20 = load i32, i32* %new_max_len, align 4, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4530:30 | Function: Item_func_group_concat::setup
+  Instruction: %cmp14 = icmp ult i32 %19, %20, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4530:28 | Function: Item_func_group_concat::setup
+  Instruction: br i1 %cmp14, label %if.then15, label %if.end20, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:4530:7 | Function: Item_func_group_concat::setup
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: operator new
+  Controlled Function: TLS wrapper function for THR_MALLOC
+  Controlled Function: mem_root_deque
+  Controlled Function: operator delete
+  Controlled Function: mem_root_deque
+  Controlled Function: Item::const_for_execution
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: __assert_fail
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: operator new
+  Controlled Function: init_tree
+  Controlled Function: mem_root_deque
+  Controlled Function: operator new
+  Controlled Function: Item_sum::ram_limitation
+  Controlled Function: operator delete
+  Controlled Function: operator delete
+
+Implicit Control Flow:
+
+----------------------------------------

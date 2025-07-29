@@ -1,0 +1,32 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init_query_mem_roots
+void THD::init_query_mem_roots() {
+  mem_root->set_block_size(variables.query_alloc_block_size);
+  get_transaction()->init_mem_root_defaults(variables.trans_alloc_block_size,
+                                            variables.trans_prealloc_size);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: Prepared_statement::Prepared_statement
+Prepared_statement::Prepared_statement(THD *thd_arg)
+    : m_arena(&m_mem_root, Query_arena::STMT_INITIALIZED),
+      m_id(++thd_arg->statement_id_counter),
+      m_mem_root(key_memory_prepared_statement_main_mem_root,
+                 thd_arg->variables.query_alloc_block_size) {
+  *m_last_error = '\0';
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_thd_mem_root
+static bool fix_thd_mem_root(sys_var *self, THD *thd, enum_var_type type) {
+  if (!self->is_global_persist(type))
+    thd->mem_root->set_block_size(thd->variables.query_alloc_block_size);
+  return false;
+}
+
+

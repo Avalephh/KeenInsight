@@ -1,0 +1,22 @@
+[
+    {
+        "knob_name": "transaction_isolation",
+        "data_matched_functions": [
+            "trans_reset_one_shot_chistics",
+            "trans_begin"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "log_slow_statement",
+            "Diagnostics_area::reset_diagnostics_area",
+            "gtid_pre_statement_checks",
+            "ER_THD",
+            "String::append",
+            "THD::update_slow_query_status",
+            "Query_logger::general_log_write",
+            "MEM_ROOT::ClearForReuse"
+        ],
+        "control_matched_count": 8,
+        "matched_count": 10
+    }
+]

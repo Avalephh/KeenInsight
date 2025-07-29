@@ -1,0 +1,50 @@
+Global Variable: System_variables.62
+Explicit Data Flow (25):
+  Instruction: %350 = load i64, i64* %rbr_exec_mode_options, align 8, !dbg !1255938 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:10048:44 | Function: Rows_log_event::do_apply_event
+  Instruction: store i64 %350, i64* %rbr_exec_mode538, align 8, !dbg !1255940 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:10048:27 | Function: Rows_log_event::do_apply_event
+  Instruction: %rbr_exec_mode538 = getelementptr inbounds %class.Log_event, %class.Log_event* %351, i32 0, i32 5, !dbg !1255939 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:10048:13 | Function: Rows_log_event::do_apply_event
+  Instruction: %rbr_exec_mode = getelementptr inbounds %class.Log_event, %class.Log_event* %8, i32 0, i32 5, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8807:31 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %9 = load i64, i64* %rbr_exec_mode, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8807:31 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %cmp = icmp eq i64 %9, 1, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8807:45 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %10 = phi i1 [ false, %if.then ], [ %cmp, %land.rhs ], !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:0:0 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %frombool = zext i1 %10 to i8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8806:10 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: store i8 %frombool, i8* %idempotent_error, align 1, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8806:10 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %11 = load i8, i8* %idempotent_error, align 1, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8809:10 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %tobool4 = trunc i8 %11 to i1, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8809:10 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %conv = zext i1 %tobool4 to i32, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8809:10 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %cmp5 = icmp eq i32 %conv, 0, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8809:27 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: br i1 %cmp5, label %cond.true, label %cond.false, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8809:10 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %13 = load i8, i8* %idempotent_error, align 1, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8811:9 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %tobool9 = trunc i8 %13 to i1, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8811:9 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: br i1 %tobool9, label %if.then11, label %lor.lhs.false, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8811:26 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %15 = load i8, i8* %idempotent_error, align 1, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8813:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %tobool12 = trunc i8 %15 to i1, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8813:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: br i1 %tobool12, label %if.then13, label %if.else, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8813:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %35 = load i8, i8* %idempotent_error, align 1, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8824:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %tobool22 = trunc i8 %35 to i1, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8824:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %conv23 = zext i1 %tobool22 to i32, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8824:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: %cmp24 = icmp eq i32 %conv23, 0, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8824:28 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+  Instruction: br i1 %cmp24, label %if.then25, label %if.end28, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8824:11 | Function: Rows_log_event::handle_idempotent_and_ignored_errors
+
+Implicit Data Flow (1):
+  Instruction: %cond = phi i32 [ %call6, %cond.true ], [ 0, %cond.false ], !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:8809:10Rows_log_event::handle_idempotent_and_ignored_errors
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ignored_error_code
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: Relay_log_info::get_rpl_log_name
+  Controlled Function: slave_rows_error_report
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::reset_condition_info
+  Controlled Function: clear_all_errors
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: Relay_log_info::get_rpl_log_name
+  Controlled Function: slave_rows_error_report
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::reset_condition_info
+  Controlled Function: clear_all_errors
+
+Implicit Control Flow:
+
+----------------------------------------

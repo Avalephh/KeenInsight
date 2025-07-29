@@ -1,0 +1,139 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc
+Function: check_quick_select
+ha_rows check_quick_select(THD *thd, RANGE_OPT_PARAM *param, uint idx,
+                           bool index_only, SEL_ROOT *tree,
+                           bool update_tbl_stats, enum_order order_direction,
+                           bool skip_records_in_range, uint *mrr_flags,
+                           uint *bufsize, Cost_estimate *cost,
+                           bool *is_ror_scan, bool *is_imerge_scan) {
+  uchar min_key[MAX_KEY_LENGTH + MAX_FIELD_WIDTH];
+  uchar max_key[MAX_KEY_LENGTH + MAX_FIELD_WIDTH];
+
+  Sel_arg_range_sequence seq(param, is_ror_scan, min_key, max_key,
+                             skip_records_in_range);
+  RANGE_SEQ_IF seq_if = {sel_arg_range_seq_init, sel_arg_range_seq_next,
+                         nullptr};
+  handler *file = param->table->file;
+  ha_rows rows;
+  uint keynr = param->real_keynr[idx];
+  DBUG_TRACE;
+
+  /* Handle cases when we don't have a valid non-empty list of range */
+  if (!tree) return HA_POS_ERROR;
+  if (tree->type == SEL_ROOT::Type::IMPOSSIBLE) return 0L;
+  if (tree->type != SEL_ROOT::Type::KEY_RANGE || tree->root->part != 0)
+    return HA_POS_ERROR;  // Don't use tree
+
+  seq.keyno = idx;
+  seq.real_keyno = keynr;
+  seq.start = tree->root;
+  seq.range_count = 0;
+  seq.max_key_part = 0;
+
+  /*
+    If there are more equality ranges than specified by the
+    eq_range_index_dive_limit variable we switches from using index
+    dives to use statistics.
+  */
+  uint range_count = 0;
+  param->use_index_statistics = eq_ranges_exceeds_limit(
+      tree, &range_count, thd->variables.eq_range_index_dive_limit);
+  *is_imerge_scan = true;
+  *is_ror_scan = !(file->index_flags(keynr, 0, true) & HA_KEY_SCAN_NOT_ROR);
+
+  *mrr_flags = (order_direction == ORDER_DESC) ? HA_MRR_USE_DEFAULT_IMPL : 0;
+  *mrr_flags |= HA_MRR_NO_ASSOCIATION;
+  /*
+    Pass HA_MRR_SORTED to see if MRR implementation can handle sorting.
+  */
+  if (order_direction != ORDER_NOT_RELEVANT) *mrr_flags |= HA_MRR_SORTED;
+
+  bool pk_is_clustered = file->primary_key_is_clustered();
+  if (index_only &&
+      (file->index_flags(keynr, seq.max_key_part, true) & HA_KEYREAD_ONLY) &&
+      !(pk_is_clustered && keynr == param->table->s->primary_key))
+    *mrr_flags |= HA_MRR_INDEX_ONLY;
+
+  if (thd->lex->sql_command != SQLCOM_SELECT)
+    *mrr_flags |= HA_MRR_SORTED;  // Assumed to give faster ins/upd/del
+
+  *bufsize = thd->variables.read_rnd_buff_size;
+  // Sets is_ror_scan to false for some queries, e.g. multi-ranges
+  rows = file->multi_range_read_info_const(keynr, &seq_if, (void *)&seq, 0,
+                                           bufsize, mrr_flags, cost);
+  if (rows != HA_POS_ERROR) {
+    param->table->quick_rows[keynr] = rows;
+    if (update_tbl_stats) {
+      param->table->quick_keys.set_bit(keynr);
+      param->table->quick_key_parts[keynr] = seq.max_key_part + 1;
+      param->table->quick_n_ranges[keynr] = seq.range_count;
+      param->table->quick_condition_rows =
+          min(param->table->quick_condition_rows, rows);
+    }
+    param->table->possible_quick_keys.set_bit(keynr);
+  }
+  /*
+    Check whether ROR scan could be used. It cannot be used if
+    1. Index algo is not HA_KEY_ALG_BTREE or HA_KEY_ALG_SE_SPECIFIC
+       (this mostly covers engines like Archive/Federated.)
+       TODO: Don't have this logic here, make table engines return
+       appropriate flags instead.
+    2. Any of the keyparts in the index chosen is descending. Desc
+       indexes do not work well for ROR scans, except for clustered PK.
+    3. SE states the index can't be used for ROR. We need 2nd check
+       here to avoid enabling it for a non-ROR PK.
+    4. Index contains virtual columns. RowIDIntersectionIterator
+       and RowIDUnionIterator do read_set manipulations in reset(),
+       which breaks virtual generated column's computation logic, which
+       is used when reading index values. So, disable index merge
+       intersection/union for any index on such column.
+       @todo lift this implementation restriction
+  */
+  // Get the index key algorithm
+  enum ha_key_alg key_alg = param->table->key_info[seq.real_keyno].algorithm;
+
+  // Check if index has desc keypart
+  KEY_PART_INFO *key_part = param->table->key_info[keynr].key_part;
+  KEY_PART_INFO *key_part_end =
+      key_part + param->table->key_info[keynr].user_defined_key_parts;
+  for (; key_part != key_part_end; ++key_part) {
+    if (key_part->key_part_flag & HA_REVERSE_SORT) {
+      // ROR will be enabled again for clustered PK, see 'else if' below.
+      *is_ror_scan = false;  // 2
+      *is_imerge_scan = false;
+      break;
+    }
+  }
+  if (((key_alg != HA_KEY_ALG_BTREE) &&
+       (key_alg != HA_KEY_ALG_SE_SPECIFIC)) ||                      // 1
+      (file->index_flags(keynr, 0, true) & HA_KEY_SCAN_NOT_ROR) ||  // 3
+      param->table->index_contains_some_virtual_gcol(keynr))        // 4
+  {
+    *is_ror_scan = false;
+  } else if (param->table->s->primary_key == keynr && pk_is_clustered) {
+    /*
+      Clustered PK scan is always a ROR scan (TODO: same as above).
+      This can enable ROR back if it was disabled by multi_range_read_info_const
+      call.
+    */
+    *is_ror_scan = true;
+  }
+
+  DBUG_PRINT("exit", ("Records: %lu", (ulong)rows));
+  return rows;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc
+Function: get_key_scans_params not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc
+Function: get_key_scans_params not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc
+Function: get_key_scans_params not found.
+

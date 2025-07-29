@@ -1,0 +1,19 @@
+Global Variable: System_variables.66
+Explicit Data Flow (8):
+  Instruction: %2 = load i64, i64* %binlog_trx_compression_type, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:214:35 | Function: Transaction_compression_ctx::get_compressor
+  Instruction: %conv = trunc i64 %2 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:213:16 | Function: Transaction_compression_ctx::get_compressor
+  Instruction: store i32 %conv, i32* %ctype, align 4, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:213:8 | Function: Transaction_compression_ctx::get_compressor
+  Instruction: %5 = load i32, i32* %ctype, align 4, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:217:65 | Function: Transaction_compression_ctx::get_compressor
+  Instruction: call void @_ZN10binary_log11transaction11compression7Factory16build_compressorENS1_4typeE(%"class.std::unique_ptr.512"* sret %ref.tmp5, i32 %5), !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:217:37 | Function: Transaction_compression_ctx::get_compressor
+  Instruction: store i64 0, i64* %binlog_trx_compression_type, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6730:46 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_trx_compression_type = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables2, i32 0, i32 66, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6730:18 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_trx_compression_type = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 66, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc:214:35 | Function: Transaction_compression_ctx::get_compressor
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

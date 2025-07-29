@@ -1,0 +1,43 @@
+Global Variable: System_variables.87
+Explicit Data Flow (26):
+  Instruction: %2 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_filesystem, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:589:41 | Function: sys_var::charset
+  Instruction: %cond = phi %struct.CHARSET_INFO* [ %2, %cond.true ], [ %3, %cond.false ], !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:589:10 | Function: sys_var::charset
+  Instruction: ret %struct.CHARSET_INFO* %cond, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:589:3 | Function: sys_var::charset
+  Instruction: %call4 = call %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %14, %class.THD* %15), !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:3559:26 | Function: get_one_variable_ext
+  Instruction: store %struct.CHARSET_INFO* %call4, %struct.CHARSET_INFO** %value_charset, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:3559:19 | Function: get_one_variable_ext
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %0, %class.THD* %1), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1035:36 | Function: Sys_var_charptr::do_check
+  Instruction: call void @_ZN6StringC2EPcmPK12CHARSET_INFO(%class.String* %str, i8* %arraydecay, i64 80, %struct.CHARSET_INFO* %call), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1035:12 | Function: Sys_var_charptr::do_check
+  Instruction: %call3 = invoke %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %2, %class.THD* %3)
+          to label %invoke.cont unwind label %lpad, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1036:39 | Function: Sys_var_charptr::do_check
+  Instruction: invoke void @_ZN6StringC2EPcmPK12CHARSET_INFO(%class.String* %str2, i8* %arraydecay2, i64 80, %struct.CHARSET_INFO* %call3)
+          to label %invoke.cont4 unwind label %lpad, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1036:12 | Function: Sys_var_charptr::do_check
+  Instruction: %call14 = invoke %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %17, %class.THD* %18)
+          to label %invoke.cont13 unwind label %lpad5, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1042:67 | Function: Sys_var_charptr::do_check
+  Instruction: %call16 = invoke zeroext i1 @_ZN6String16needs_conversionEmPK12CHARSET_INFOS2_Pm(i64 %call10, %struct.CHARSET_INFO* %call12, %struct.CHARSET_INFO* %call14, i64* %unused)
+          to label %invoke.cont15 unwind label %lpad5, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1042:11 | Function: Sys_var_charptr::do_check
+  Instruction: %call25 = invoke %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %22, %class.THD* %23)
+          to label %invoke.cont24 unwind label %lpad5, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1045:62 | Function: Sys_var_charptr::do_check
+  Instruction: %call27 = invoke zeroext i1 @_ZN6String4copyEPKcmPK12CHARSET_INFOS4_Pj(%class.String* %str2, i8* %call19, i64 %call21, %struct.CHARSET_INFO* %call23, %struct.CHARSET_INFO* %call25, i32* %errors)
+          to label %invoke.cont26 unwind label %lpad5, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.h:1045:14 | Function: Sys_var_charptr::do_check
+  Instruction: %call15 = call %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %20, %class.THD* %21), !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc:710:27 | Function: System_variable::init
+  Instruction: store %struct.CHARSET_INFO* %call15, %struct.CHARSET_INFO** %m_charset, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc:710:13 | Function: System_variable::init
+  Instruction: %m_charset = getelementptr inbounds %class.System_variable, %class.System_variable* %this1, i32 0, i32 7, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc:710:3 | Function: System_variable::init
+  Instruction: %m_charset = getelementptr inbounds %class.System_variable, %class.System_variable* %0, i32 0, i32 7, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/table_helper.cc:1446:24 | Function: PFS_variable_value_row::make_row
+  Instruction: %1 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %m_charset, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/table_helper.cc:1446:24 | Function: PFS_variable_value_row::make_row
+  Instruction: %call = call i32 @_ZN22PFS_variable_value_row8make_rowEPK12CHARSET_INFOPKcm(%struct.PFS_variable_value_row* %this1, %struct.CHARSET_INFO* %1, i8* %arraydecay, i64 %4), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/table_helper.cc:1446:10 | Function: PFS_variable_value_row::make_row
+  Instruction: %call11 = call %struct.CHARSET_INFO* @_ZN7sys_var7charsetEP3THD(%class.sys_var* %16, %class.THD* %17), !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc:758:27 | Function: System_variable::init
+  Instruction: store %struct.CHARSET_INFO* %call11, %struct.CHARSET_INFO** %m_charset, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc:758:13 | Function: System_variable::init
+  Instruction: %m_charset = getelementptr inbounds %class.System_variable, %class.System_variable* %this1, i32 0, i32 7, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc:758:3 | Function: System_variable::init
+  Instruction: %5 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_filesystem, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1882:43 | Function: THD::update_charset
+  Instruction: %call11 = call zeroext i1 @_ZN6String16needs_conversionEmPK12CHARSET_INFOS2_Pm(i64 0, %struct.CHARSET_INFO* %4, %struct.CHARSET_INFO* %5, i64* %not_used), !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1881:8 | Function: THD::update_charset
+  Instruction: %18582 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %character_set_filesystem, align 8, !dbg !1281506 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14997:54 | Function: MYSQLparse
+  Instruction: %call27218 = call zeroext i1 bitcast (i1 (%class.THD*, %class.Simple_cstring*, %struct.CHARSET_INFO*, i8*, i64, %struct.CHARSET_INFO*, i1)* @_ZN3THD14convert_stringEP16MYSQL_LEX_STRINGPK12CHARSET_INFOPKcmS4_b to i1 (%class.THD.45743*, %class.Simple_cstring*, %struct.CHARSET_INFO*, i8*, i64, %struct.CHARSET_INFO*, i1)*)(%class.THD.45743* %18580, %class.Simple_cstring* %lex_str27207, %struct.CHARSET_INFO* %18582, i8* %18584, i64 %18586, %struct.CHARSET_INFO* %call27217, i1 zeroext false), !dbg !1281517 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14996:24 | Function: MYSQLparse
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

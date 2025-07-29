@@ -1,0 +1,528 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::write_transaction
+bool MYSQL_BIN_LOG::write_transaction(THD *thd, binlog_cache_data *cache_data,
+                                      Binlog_event_writer *writer) {
+  DBUG_TRACE;
+
+  /*
+    The GTID for the THD was assigned at
+    assign_automatic_gtids_to_flush_group()
+  */
+  assert(thd->owned_gtid.sidno == THD::OWNED_SIDNO_ANONYMOUS ||
+         thd->owned_gtid.sidno > 0);
+
+  int64 sequence_number, last_committed;
+  /* Generate logical timestamps for MTS */
+  m_dependency_tracker.get_dependency(thd, sequence_number, last_committed);
+
+  /*
+    In case both the transaction cache and the statement cache are
+    non-empty, both will be flushed in sequence and logged as
+    different transactions. Then the second transaction must only
+    be executed after the first one has committed. Therefore, we
+    need to set last_committed for the second transaction equal to
+    last_committed for the first transaction. This is done in
+    binlog_cache_data::flush. binlog_cache_data::flush uses the
+    condition trn_ctx->last_committed==SEQ_UNINIT to detect this
+    situation, hence the need to set it here.
+  */
+  thd->get_transaction()->last_committed = SEQ_UNINIT;
+
+  /*
+    For delayed replication and also for the purpose of lag monitoring,
+    we assume that the commit timestamp of the transaction is the time of
+    executing this code (the time of writing the Gtid_log_event to the binary
+    log).
+  */
+  ulonglong immediate_commit_timestamp = my_micro_time();
+
+  /*
+    When the original_commit_timestamp session variable is set to a value
+    other than UNDEFINED_COMMIT_TIMESTAMP, it means that either the timestamp
+    is known ( > 0 ) or the timestamp is not known ( == 0 ).
+  */
+  ulonglong original_commit_timestamp =
+      thd->variables.original_commit_timestamp;
+  /*
+    When original_commit_timestamp == UNDEFINED_COMMIT_TIMESTAMP, we assume
+    that:
+    a) it is not known if this thread is a slave applier ( = 0 );
+    b) this is a new transaction ( = immediate_commit_timestamp);
+  */
+  if (original_commit_timestamp == UNDEFINED_COMMIT_TIMESTAMP) {
+    /*
+      When applying a transaction using replication, assume that the
+      original commit timestamp is not known (the transaction wasn't
+      originated on the current server).
+    */
+    if (thd->slave_thread || thd->is_binlog_applier()) {
+      original_commit_timestamp = 0;
+    } else
+    /* Assume that this transaction is original from this server */
+    {
+      DBUG_EXECUTE_IF("rpl_invalid_gtid_timestamp",
+                      // add one our to the commit timestamps
+                      immediate_commit_timestamp += 3600000000;);
+      original_commit_timestamp = immediate_commit_timestamp;
+    }
+  } else {
+    // Clear the session variable to have cleared states for next transaction.
+    thd->variables.original_commit_timestamp = UNDEFINED_COMMIT_TIMESTAMP;
+  }
+
+  uint32_t trx_immediate_server_version =
+      do_server_version_int(::server_version);
+  // Clear the session variable to have cleared states for next transaction.
+  thd->variables.immediate_server_version = UNDEFINED_SERVER_VERSION;
+  DBUG_EXECUTE_IF("fixed_server_version",
+                  trx_immediate_server_version = 888888;);
+  DBUG_EXECUTE_IF("gr_fixed_server_version",
+                  trx_immediate_server_version = 777777;);
+
+  /*
+    When the original_server_version session variable is set to a value
+    other than UNDEFINED_SERVER_VERSION, it means that either the
+    server version is known or the server_version is not known
+    (UNKNOWN_SERVER_VERSION).
+  */
+  uint32_t trx_original_server_version = thd->variables.original_server_version;
+
+  /*
+    When original_server_version == UNDEFINED_SERVER_VERSION, we assume
+    that:
+    a) it is not known if this thread is a slave applier ( = 0 );
+    b) this is a new transaction ( = ::server_version);
+  */
+  if (trx_original_server_version == UNDEFINED_SERVER_VERSION) {
+    /*
+      When applying a transaction using replication, assume that the
+      original server version is not known (the transaction wasn't
+      originated on the current server).
+    */
+    if (thd->slave_thread || thd->is_binlog_applier()) {
+      trx_original_server_version = UNKNOWN_SERVER_VERSION;
+    } else
+    /* Assume that this transaction is original from this server */
+    {
+      trx_original_server_version = trx_immediate_server_version;
+    }
+  } else {
+    // Clear the session variable to have cleared states for next transaction.
+    thd->variables.original_server_version = UNDEFINED_SERVER_VERSION;
+  }
+  Gtid_log_event gtid_event(
+      thd, cache_data->is_trx_cache(), last_committed, sequence_number,
+      cache_data->may_have_sbr_stmts(), original_commit_timestamp,
+      immediate_commit_timestamp, trx_original_server_version,
+      trx_immediate_server_version);
+
+  // Set the transaction length, based on cache info
+  gtid_event.set_trx_length_by_cache_size(cache_data->get_byte_position(),
+                                          writer->is_checksum_enabled(),
+                                          cache_data->get_event_counter());
+
+  DBUG_PRINT("debug", ("cache_data->get_byte_position()= %llu",
+                       cache_data->get_byte_position()));
+  DBUG_PRINT("debug", ("cache_data->get_event_counter()= %lu",
+                       static_cast<ulong>(cache_data->get_event_counter())));
+  DBUG_PRINT("debug", ("writer->is_checksum_enabled()= %s",
+                       YESNO(writer->is_checksum_enabled())));
+  DBUG_PRINT("debug", ("gtid_event.get_event_length()= %lu",
+                       static_cast<ulong>(gtid_event.get_event_length())));
+  DBUG_PRINT("info",
+             ("transaction_length= %llu", gtid_event.transaction_length));
+
+  bool ret = gtid_event.write(writer);
+  if (ret) goto end;
+
+  /*
+    finally write the transaction data, if it was not compressed
+    and written as part of the gtid event already
+  */
+  ret = mysql_bin_log.write_cache(thd, cache_data, writer);
+
+  if (!ret) {
+    // update stats if monitoring is active
+    binlog::global_context.monitoring_context()
+        .transaction_compression()
+        .update(binlog::monitoring::log_type::BINARY,
+                cache_data->get_compression_type(), thd->owned_gtid,
+                gtid_event.immediate_commit_timestamp,
+                cache_data->get_compressed_size(),
+                cache_data->get_decompressed_size());
+  }
+
+end:
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: Trans_delegate::before_commit
+int Trans_delegate::before_commit(THD *thd, bool all,
+                                  Binlog_cache_storage *trx_cache_log,
+                                  Binlog_cache_storage *stmt_cache_log,
+                                  ulonglong cache_log_max_size,
+                                  bool is_atomic_ddl_arg) {
+  DBUG_TRACE;
+  Trans_param param;
+  TRANS_PARAM_ZERO(param);
+  param.server_id = thd->server_id;
+  param.server_uuid = server_uuid;
+  param.thread_id = thd->thread_id();
+  param.gtid_info.type = thd->variables.gtid_next.type;
+  param.gtid_info.sidno = thd->variables.gtid_next.gtid.sidno;
+  param.gtid_info.gno = thd->variables.gtid_next.gtid.gno;
+  param.trx_cache_log = trx_cache_log;
+  param.stmt_cache_log = stmt_cache_log;
+  param.cache_log_max_size = cache_log_max_size;
+  param.original_commit_timestamp = &thd->variables.original_commit_timestamp;
+  param.is_atomic_ddl = is_atomic_ddl_arg;
+  param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
+  param.group_replication_consistency =
+      thd->variables.group_replication_consistency;
+  param.original_server_version = &(thd->variables.original_server_version);
+  param.immediate_server_version = &(thd->variables.immediate_server_version);
+  param.is_create_table_as_query_block =
+      (thd->lex->sql_command == SQLCOM_CREATE_TABLE &&
+       !thd->lex->query_block->field_list_is_empty());
+
+  bool is_real_trans =
+      (all || !thd->get_transaction()->is_active(Transaction_ctx::SESSION));
+  if (is_real_trans) param.flags |= TRANS_IS_REAL_TRANS;
+
+  int ret = 0;
+
+  /* After this debug point we mark the transaction as committing in THD. */
+  DBUG_EXECUTE_IF("trans_delegate_before_commit_before_before_call_observers", {
+    const char act[] =
+        "now signal "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "reached "
+        "wait_for "
+        "signal.trans_delegate_before_commit_before_before_call_observers_"
+        "waiting";
+    assert(!debug_sync_set_action(thd, STRING_WITH_LEN(act)));
+  });
+
+  thd->rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_BEFORE_COMMIT);
+
+  /**
+    If thread is killed or commits are blocked do not commit the transaction.
+    Post this thread cannot be killed.
+  */
+  if (thd->is_killed() || m_rollback_transaction_not_reached_before_commit) {
+    /**
+      Disconnect the client connection if not already done.
+      Do not KILL connection if the transaction is going to be rolledback.
+    */
+    if (!thd->is_killed()) {
+      mysql_mutex_lock(&thd->LOCK_thd_data);
+      thd->awake(THD::KILL_CONNECTION);
+      mysql_mutex_unlock(&thd->LOCK_thd_data);
+    }
+    return 1;
+  }
+  FOREACH_OBSERVER(ret, before_commit, (&param));
+  plugin_foreach(thd, se_before_commit, MYSQL_STORAGE_ENGINE_PLUGIN, &param);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
+Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
+Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
+Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
+Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
+Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc
+Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_factory.h
+Function: cs::util::ColumnFilterFactory::is_filter_needed
+        return ColumnFilterOutboundFunctionalIndexes::is_filter_needed(
+            thd, table, tabledef);
+      case ColumnFilterType::inbound_func_index:
+        return ColumnFilterInboundFunctionalIndexes::is_filter_needed(
+            thd, table, tabledef);
+      case ColumnFilterType::inbound_gipk:
+        return ColumnFilterInboundGipk::is_filter_needed(thd, table, tabledef);
+      default:
+        /* This shall never happen. */
+        assert(0); /* purecov: inspected */
+        break;
+    }
+    return false;
+  }
+};
+}  // namespace util
+}  // namespace cs
+#endif  // CS_COLUMN_FILTER_FACTORY_H
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/replicated_columns_view.cc
+Function: cs::util::ReplicatedColumnsView::add_filter_if_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/replicated_columns_view.cc
+Function: cs::util::ReplicatedColumnsView::add_filter_if_needed not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Gtid_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc
+Function: table_def::compatible_with
+bool table_def::compatible_with(THD *thd, Relay_log_info *rli, TABLE *table,
+                                TABLE **conv_table_var) {
+  /*
+    Prohibit replication into dictionary internal tables. We know this is
+    not DDL (which will be replicated as statements, and rejected by the
+    corresponding check for SQL statements), thus 'false' in the call below.
+    Also sserting that this is not a DD system thread.
+  */
+  assert(!thd->is_dd_system_thread());
+  const dd::Dictionary *dictionary = dd::get_dictionary();
+  if (dictionary && !dictionary->is_dd_table_access_allowed(
+                        false, false, table->s->db.str, table->s->db.length,
+                        table->s->table_name.str)) {
+    DBUG_PRINT("debug", ("Access to dictionary table %s.%s is prohibited",
+                         table->s->db.str, table->s->table_name.str));
+    rli->report(
+        ERROR_LEVEL, ER_SERVER_NO_SYSTEM_TABLE_ACCESS,
+        ER_THD(thd, ER_SERVER_NO_SYSTEM_TABLE_ACCESS),
+        ER_THD_NONCONST(thd, dictionary->table_type_error_code(
+                                 table->s->db.str, table->s->table_name.str)),
+        table->s->db.str, table->s->table_name.str);
+    return false;
+  }
+
+  if (compute_source_table_gipk_info(*thd, table)) {
+    rli->report(ERROR_LEVEL, ER_REPLICATION_INCOMPATIBLE_TABLE_WITH_GIPK,
+                ER_THD(thd, ER_REPLICATION_INCOMPATIBLE_TABLE_WITH_GIPK),
+                static_cast<int>(size()),
+                decimal_numeric_version_to_string(
+                    thd->variables.immediate_server_version)
+                    .c_str(),
+                table->s->db.str, table->s->table_name.str, table->s->fields);
+    thd->is_slave_error = true;
+    return false;
+  }
+
+  bool replica_has_gipk = table_has_generated_invisible_primary_key(table);
+  std::unique_ptr<cs::util::ReplicatedColumnsView> fields =
+      cs::util::ReplicatedColumnsViewFactory::
+          get_columns_view_with_inbound_filters(rli->info_thd, table, this);
+
+  /*
+    We only count columns which exist both in the table and in the event. The
+    computation depends on the following possible differences in table columns
+    and event columns:
+     1. If the table has generated columns, there are extra columns at the right
+        end of the table, which are excluded in the event from 8.0.18 and up.
+     2. It is possible for the replica-side table to have an extra GIPK, when
+        the source has no GIPK.
+     3. It is possible for the source-side table to have an extra GIPK, when the
+        replica has no GIPK.
+
+     4. For the remaining columns, not counting generated columns or differences
+        in GIPK columns, it is allowed that either the source or the replica has
+        less columns at the right of the table.
+
+    To account for cases 1 and 2, we use fields->filtered_size(), which
+    retrieves the number of columns on the replica, not counting generated
+    columns or extra GIPK columns. To account for case 3, we use
+    filtered_size(replica_has_gipk), which retrieves the number of columns in
+    the event, not counting any extra GIPK column in the event. To account for
+    case 4, we compute the minimum of these two numbers.
+  */
+
+  uint const cols_to_check =
+      min<ulong>(fields->filtered_size(), filtered_size(replica_has_gipk));
+  TABLE *tmp_table = nullptr;
+
+  for (auto it = fields->begin(); it.filtered_pos() < cols_to_check; ++it) {
+    Field *const field = *it;
+    size_t col = it.translated_pos();
+    size_t absolute_col_pos = it.absolute_pos();
+    int order;
+    if (can_convert_field_to(field, type(col), field_metadata(col),
+                             is_array(col), rli, m_flags, &order)) {
+      DBUG_PRINT("debug", ("Checking column %lu -"
+                           " field '%s' can be converted - order: %d",
+                           static_cast<long unsigned int>(col),
+                           field->field_name, order));
+      assert(order >= -1 && order <= 1);
+
+      /*
+        If order is not 0, a conversion is required, so we need to set
+        up the conversion table.
+       */
+      if (order != 0 && tmp_table == nullptr) {
+        /*
+          This will create the full table with all fields. This is
+          necessary to ge the correct field lengths for the record.
+        */
+        tmp_table = create_conversion_table(thd, rli, table, replica_has_gipk);
+        if (tmp_table == nullptr) return false;
+        /*
+          Clear all fields up to, but not including, this column.
+        */
+        for (unsigned int i = 0; i < absolute_col_pos; ++i)
+          tmp_table->field[i] = nullptr;
+      }
+
+      if (order == 0 && tmp_table != nullptr)
+        tmp_table->field[absolute_col_pos] = nullptr;
+    } else {
+      DBUG_PRINT("debug",
+                 ("Checking column %lu -"
+                  " field '%s' can not be converted",
+                  static_cast<long unsigned int>(col), field->field_name));
+      assert(col < size() && col < table->s->fields);
+      assert(table->s->db.str && table->s->table_name.str);
+      const char *db_name = table->s->db.str;
+      const char *tbl_name = table->s->table_name.str;
+      char source_buf[MAX_FIELD_WIDTH];
+      char target_buf[MAX_FIELD_WIDTH];
+      String field_sql_type;
+      enum loglevel report_level = INFORMATION_LEVEL;
+      String source_type(source_buf, sizeof(source_buf), &my_charset_latin1);
+      String target_type(target_buf, sizeof(target_buf), &my_charset_latin1);
+      show_sql_type(type(col), is_array(col), field_metadata(col),
+                    &source_type);
+      field->sql_type(target_type);
+      if (!ignored_error_code(ER_SERVER_REPLICA_CONVERSION_FAILED)) {
+        report_level = ERROR_LEVEL;
+        thd->is_slave_error = true;
+      } else if (log_error_verbosity >= 2)
+        report_level = WARNING_LEVEL;
+
+      if (field->has_charset() && (field->type() == MYSQL_TYPE_VARCHAR ||
+                                   field->type() == MYSQL_TYPE_STRING)) {
+        field_sql_type.append((field->type() == MYSQL_TYPE_VARCHAR) ? "varchar"
+                                                                    : "char");
+        const CHARSET_INFO *cs = field->charset();
+        size_t length = cs->cset->snprintf(
+            cs, target_type.ptr(), target_type.alloced_length(),
+            "%s(%u(bytes) %s)", field_sql_type.c_ptr_safe(),
+            field->field_length, field->charset()->csname);
+        target_type.length(length);
+      } else
+        field->sql_type(target_type);
+
+      if (report_level != INFORMATION_LEVEL)
+        rli->report(report_level, ER_SERVER_REPLICA_CONVERSION_FAILED,
+                    ER_THD(thd, ER_SERVER_REPLICA_CONVERSION_FAILED),
+                    static_cast<int>(col), db_name, tbl_name,
+                    source_type.c_ptr_safe(), target_type.c_ptr_safe());
+      return false;
+    }
+  }
+
+#ifndef NDEBUG
+  if (tmp_table) {
+    for (unsigned int col = 0; col < tmp_table->s->fields; ++col)
+      if (tmp_table->field[col]) {
+        char source_buf[MAX_FIELD_WIDTH];
+        char target_buf[MAX_FIELD_WIDTH];
+        String source_type(source_buf, sizeof(source_buf), &my_charset_latin1);
+        String target_type(target_buf, sizeof(target_buf), &my_charset_latin1);
+        tmp_table->field[col]->sql_type(source_type);
+        table->field[col]->sql_type(target_type);
+        DBUG_PRINT("debug",
+                   ("Field %s - conversion required."
+                    " Source type: '%s', Target type: '%s'",
+                    tmp_table->field[col]->field_name, source_type.c_ptr_safe(),
+                    target_type.c_ptr_safe()));
+      }
+  }
+#endif
+
+  *conv_table_var = tmp_table;
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc
+Function: is_immediate_server_gipk_ready
+bool is_immediate_server_gipk_ready(THD &thd) {
+  return thd.variables.immediate_server_version != UNDEFINED_SERVER_VERSION &&
+         thd.variables.immediate_server_version >= 80030;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc
+Function: table_def::compute_source_table_gipk_info
+bool table_def::compute_source_table_gipk_info(THD &thd, TABLE *table) {
+  m_is_gipk_set = true;
+
+  // Check if source signals the use of GIPKs on tables
+  if (is_immediate_server_gipk_ready(thd)) {
+    m_is_gipk_on_table =
+        (m_flags & Table_map_log_event::TM_GENERATED_INVISIBLE_PK_F);
+    return false;
+  }
+
+  // If the replica has no GIPK assume the source doesn't also
+  if (!table_has_generated_invisible_primary_key(table)) {
+    m_is_gipk_on_table = false;
+    return false;
+  }
+
+  // column difference = number of columns in source - replica
+  longlong column_difference =
+      static_cast<longlong>(size()) - static_cast<longlong>(table->s->fields);
+
+  // if there is no difference assume the source has a GIPK
+  if (0 == column_difference) {
+    m_is_gipk_on_table = true;
+    return false;
+  }
+  /*
+    Here it is known the replica has a GIPK.
+    - If the replica has exactly 1 column more than the source,
+      then assume the source does not contain a GIPK
+    - If the replica has less columns than the source
+      or the replica has 2 or more columns extra in relation to the source,
+      we consider that an error
+  */
+  if (-1 == column_difference) {
+    m_is_gipk_on_table = false;
+    return false;
+  }
+
+  m_is_gipk_on_table = false;
+  m_is_gipk_set = false;
+  return true;
+}
+
+

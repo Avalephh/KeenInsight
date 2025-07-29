@@ -1,0 +1,161 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::send_result_metadata
+bool THD::send_result_metadata(const mem_root_deque<Item *> &list, uint flags) {
+  DBUG_TRACE;
+  uchar buff[MAX_FIELD_WIDTH];
+  String tmp((char *)buff, sizeof(buff), &my_charset_bin);
+
+  if (m_protocol->start_result_metadata(CountVisibleFields(list), flags,
+                                        variables.character_set_results))
+    goto err;
+  switch (variables.resultset_metadata) {
+    case RESULTSET_METADATA_FULL:
+      /* Send metadata. */
+      for (Item *item : VisibleFields(list)) {
+        Send_field field;
+        item->make_field(&field);
+        m_protocol->start_row();
+        if (m_protocol->send_field_metadata(&field,
+                                            item->charset_for_protocol()))
+          goto err;
+        if (flags & Protocol::SEND_DEFAULTS) item->send(m_protocol, &tmp);
+        if (m_protocol->end_row()) return true;
+      }
+      break;
+
+    case RESULTSET_METADATA_NONE:
+      /* Skip metadata. */
+      break;
+
+    default:
+      /* Unknown @@resultset_metadata value. */
+      return true;
+  }
+
+  return m_protocol->end_result_metadata();
+
+err:
+  my_error(ER_OUT_OF_RESOURCES, MYF(0)); /* purecov: inspected */
+  return true;                           /* purecov: inspected */
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc
+Function: Protocol_classic::start_result_metadata
+bool Protocol_classic::start_result_metadata(uint num_cols_arg, uint flags,
+                                             const CHARSET_INFO *cs) {
+  DBUG_TRACE;
+  DBUG_PRINT("info", ("num_cols %u, flags %u", num_cols_arg, flags));
+  uint num_cols = num_cols_arg;
+  result_cs = cs;
+  send_metadata = true;
+  field_count = num_cols;
+  sending_flags = flags;
+
+  DBUG_EXECUTE_IF("send_large_column_count_in_metadata", num_cols = 50397184;);
+  /*
+    We don't send number of column for PS, as it's sent in a preceding packet.
+  */
+  if (flags & Protocol::SEND_NUM_ROWS) {
+    uchar tmp[sizeof(ulonglong) + 1];
+    uchar *pos = net_store_length((uchar *)&tmp, num_cols);
+
+    if (has_client_capability(CLIENT_OPTIONAL_RESULTSET_METADATA)) {
+      /* Store resultset metadata flag. */
+      *pos = static_cast<uchar>(m_thd->variables.resultset_metadata);
+      pos++;
+    }
+
+    my_net_write(&m_thd->net, (uchar *)&tmp, (size_t)(pos - (uchar *)&tmp));
+  }
+  DBUG_EXECUTE_IF("send_large_column_count_in_metadata",
+                  num_cols = num_cols_arg;);
+#ifndef NDEBUG
+  /*
+    field_types will be filled only if we send metadata.
+    Set it to NULL if we skip resultset metadata to avoid
+    ::storeXXX() method's asserts failures.
+  */
+  if (m_thd->variables.resultset_metadata == RESULTSET_METADATA_FULL)
+    field_types =
+        (enum_field_types *)m_thd->alloc(sizeof(field_types) * num_cols);
+  else
+    field_types = nullptr;
+  count = 0;
+#endif
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc
+Function: Protocol_classic::store_ps_status
+bool Protocol_classic::store_ps_status(ulong stmt_id, uint column_count,
+                                       uint param_count, ulong cond_count) {
+  DBUG_TRACE;
+
+  uchar buff[13];
+  buff[0] = 0; /* OK packet indicator */
+  int4store(buff + 1, stmt_id);
+  int2store(buff + 5, column_count);
+  int2store(buff + 7, param_count);
+  buff[9] = 0;  // Guard against a 4.1 client
+  uint16 tmp =
+      min(static_cast<uint16>(cond_count), std::numeric_limits<uint16>::max());
+  int2store(buff + 10, tmp);
+  if (has_client_capability(CLIENT_OPTIONAL_RESULTSET_METADATA)) {
+    /* Store resultset metadata flag. */
+    buff[12] = static_cast<uchar>(m_thd->variables.resultset_metadata);
+
+    return my_net_write(&m_thd->net, buff, sizeof(buff));
+  }
+  return my_net_write(&m_thd->net, buff, sizeof(buff) - 1);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_initialize.cc
+Function: Compiled_in_command_iterator::begin
+bool Compiled_in_command_iterator::begin(void) {
+  m_cmds_ofs = m_cmd_ofs = 0;
+
+  LogErr(INFORMATION_LEVEL, ER_SERVER_INIT_COMPILED_IN_COMMANDS,
+         cmd_descs[m_cmds_ofs]);
+  if (opt_initialize_insecure) {
+    strcpy(insert_user_buffer, INSERT_USER_CMD_INSECURE);
+    LogErr(WARNING_LEVEL, ER_INIT_ROOT_WITHOUT_PASSWORD);
+  } else {
+    char password[GENERATED_PASSWORD_LENGTH + 1];
+    char escaped_password[GENERATED_PASSWORD_LENGTH * 2 + 1];
+    ulong saved_verbosity = log_error_verbosity;
+
+    if (generate_password(password, GENERATED_PASSWORD_LENGTH)) {
+      LogErr(ERROR_LEVEL, ER_INIT_FAILED_TO_GENERATE_ROOT_PASSWORD);
+      return true;
+    }
+    password[GENERATED_PASSWORD_LENGTH] = 0;
+
+    /*
+      Temporarily bump verbosity to print the password.
+      It's safe to do it since we're the sole process running.
+    */
+    log_builtins_filter_update_verbosity((log_error_verbosity = 3));
+    LogErr(INFORMATION_LEVEL, ER_INIT_GENERATING_TEMP_PASSWORD_FOR_ROOT,
+           password);
+    log_builtins_filter_update_verbosity(
+        (log_error_verbosity = saved_verbosity));
+
+    escape_string_for_mysql(&my_charset_bin, escaped_password,
+                            sizeof(escaped_password), password,
+                            GENERATED_PASSWORD_LENGTH);
+
+    sprintf(insert_user_buffer, INSERT_USER_CMD, escaped_password);
+  }
+
+  return false;
+}
+
+

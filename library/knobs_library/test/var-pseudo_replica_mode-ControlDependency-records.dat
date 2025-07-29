@@ -1,0 +1,123 @@
+Global Variable: System_variables.100
+Explicit Data Flow (26):
+  Instruction: %1 = load i8, i8* %pseudo_replica_mode, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1062:34 | Function: THD::is_binlog_applier
+  Instruction: %tobool2 = trunc i8 %1 to i1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1062:34 | Function: THD::is_binlog_applier
+  Instruction: %2 = phi i1 [ false, %entry ], [ %tobool2, %land.rhs ], !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:0:0 | Function: THD::is_binlog_applier
+  Instruction: ret i1 %2, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1062:5 | Function: THD::is_binlog_applier
+  Instruction: %call = call zeroext i1 @_ZNK3THD17is_binlog_applierEv(%class.THD* %this1), !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2948:7 | Function: THD::rpl_detach_engine_ha_data
+  Instruction: br i1 %call, label %cond.true, label %cond.false, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2948:7 | Function: THD::rpl_detach_engine_ha_data
+  Instruction: %call = call zeroext i1 @_ZNK3THD17is_binlog_applierEv(%class.THD* %this1), !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2958:7 | Function: THD::rpl_reattach_engine_ha_data
+  Instruction: br i1 %call, label %cond.true, label %cond.false, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2958:7 | Function: THD::rpl_reattach_engine_ha_data
+  Instruction: %call = call zeroext i1 @_ZNK3THD17is_binlog_applierEv(%class.THD* %this1), !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2968:7 | Function: THD::is_engine_ha_data_detached
+  Instruction: br i1 %call, label %cond.true, label %cond.false, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2968:7 | Function: THD::is_engine_ha_data_detached
+  Instruction: %call24 = invoke zeroext i1 @_ZNK3THD17is_binlog_applierEv(%class.THD* %20)
+          to label %invoke.cont23 unwind label %lpad, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:1308:5 | Function: trans_register_ha
+  Instruction: br i1 %call24, label %lor.end27, label %lor.rhs25, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:1308:5 | Function: trans_register_ha
+  Instruction: %call12 = invoke zeroext i1 @_ZNK3THD17is_binlog_applierEv(%class.THD* %13)
+          to label %invoke.cont11 unwind label %lpad, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1672:35 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: br i1 %call12, label %if.then13, label %if.else, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1672:9 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %call49 = invoke zeroext i1 @_ZNK3THD17is_binlog_applierEv(%class.THD* %26)
+          to label %invoke.cont48 unwind label %lpad, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1716:35 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: br i1 %call49, label %if.then50, label %if.else51, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1716:9 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %7 = load i8, i8* %pseudo_replica_mode, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6584:42 | Function: check_pseudo_replica_mode
+  Instruction: %tobool = trunc i8 %7 to i1, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6584:42 | Function: check_pseudo_replica_mode
+  Instruction: %conv = zext i1 %tobool to i64, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6584:27 | Function: check_pseudo_replica_mode
+  Instruction: store i64 %conv, i64* %previous_val, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6584:12 | Function: check_pseudo_replica_mode
+  Instruction: %22 = load i64, i64* %previous_val, align 8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6595:16 | Function: check_pseudo_replica_mode
+  Instruction: %tobool13 = icmp ne i64 %22, 0, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6595:16 | Function: check_pseudo_replica_mode
+  Instruction: br i1 %tobool13, label %land.lhs.true, label %if.else16, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6595:29 | Function: check_pseudo_replica_mode
+  Instruction: %8 = load i8, i8* %pseudo_replica_mode, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:4921:24 | Function: check_sql_mode
+  Instruction: %tobool5 = trunc i8 %8 to i1, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:4921:24 | Function: check_sql_mode
+  Instruction: br i1 %tobool5, label %land.lhs.true, label %if.else, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:4921:44 | Function: check_sql_mode
+
+Implicit Data Flow (5):
+  Instruction: %cond5 = phi %class.Relay_log_info* [ %0, %cond.true ], [ %cond, %cond.end ], !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2948:7THD::rpl_detach_engine_ha_data
+  Instruction: %cond5 = phi %class.Relay_log_info* [ %0, %cond.true ], [ %cond, %cond.end ], !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2958:7THD::rpl_reattach_engine_ha_data
+  Instruction: %cond5 = phi %class.Relay_log_info* [ %0, %cond.true ], [ %cond, %cond.end ], !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2968:7THD::is_engine_ha_data_detached
+  Instruction: %23 = phi i1 [ true, %invoke.cont23 ], [ %tobool26, %lor.rhs25 ] | Location: :0:0trans_register_ha
+  Instruction: %24 = phi i1 [ true, %invoke.cont18 ], [ %23, %lor.end27 ] | Location: :0:0trans_register_ha
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Relay_log_info::is_engine_ha_data_detached
+  Controlled Function: __assert_fail
+  Controlled Function: Relay_log_info::is_engine_ha_data_detached
+  Controlled Function: __assert_fail
+  Controlled Function: Relay_log_info::is_engine_ha_data_detached
+  Controlled Function: __assert_fail
+  Controlled Function: Relay_log_info::is_engine_ha_data_detached
+  Controlled Function: __assert_fail
+  Controlled Function: Relay_log_info::is_engine_ha_data_detached
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_doprnt_
+  Controlled Function: THD::get_ha_data
+  Controlled Function: Transaction_ctx::set_ha_trx_info
+  Controlled Function: __assert_fail
+  Controlled Function: Transaction_ctx::set_no_2pc
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::set_query_id
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::is_attachable_transaction_active
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: inline_mysql_start_transaction
+  Controlled Function: unlikely
+  Controlled Function: debug_sync
+  Controlled Function: gtid_set_performance_schema_values
+  Controlled Function: _db_keyword_
+  Controlled Function: do_server_version_int
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_keyword_
+  Controlled Function: _db_keyword_
+  Controlled Function: THD::is_binlog_applier
+  Controlled Function: binlog_cache_data::is_trx_cache
+  Controlled Function: binlog_cache_data::may_have_sbr_stmts
+  Controlled Function: binlog_cache_data::get_byte_position
+  Controlled Function: Binlog_event_writer::is_checksum_enabled
+  Controlled Function: Gtid_log_event::~Gtid_log_event
+  Controlled Function: binlog_cache_data::get_event_counter
+  Controlled Function: Gtid_log_event::set_trx_length_by_cache_size
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::get_byte_position
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::get_event_counter
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Binlog_event_writer::is_checksum_enabled
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Gtid_log_event::get_event_length
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Log_event::write
+  Controlled Function: MYSQL_BIN_LOG::write_cache
+  Controlled Function: Gtid_log_event::~Gtid_log_event
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: binlog::Context::monitoring_context
+  Controlled Function: binlog::monitoring::Context::transaction_compression
+  Controlled Function: binlog_cache_data::get_compression_type
+  Controlled Function: binlog_cache_data::get_compressed_size
+  Controlled Function: binlog_cache_data::get_decompressed_size
+  Controlled Function: binlog::monitoring::Transaction_compression::update
+  Controlled Function: push_warning
+  Controlled Function: push_warning
+  Controlled Function: my_error
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+
+Implicit Control Flow:
+
+----------------------------------------

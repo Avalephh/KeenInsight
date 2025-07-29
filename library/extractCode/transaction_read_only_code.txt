@@ -1,0 +1,551 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::Resource_group_mgr::post_init
+bool Resource_group_mgr::post_init() {
+  DBUG_TRACE;
+
+  if (!m_resource_group_support) return false;
+
+  if (!m_thread_priority_available)
+    LogErr(INFORMATION_LEVEL, ER_THREAD_PRIORITY_IGNORED);
+
+  // Create temporary THD to read Resource groups from disk.
+  std::unique_ptr<THD> thd(new (std::nothrow) THD());
+  if (thd.get() == nullptr) return true;
+
+  thd->thread_stack = reinterpret_cast<char *>(&thd);
+  thd->store_globals();
+
+  thd->security_context()->set_master_access(SUPER_ACL);
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
+
+  bool res = deserialize_resource_groups(thd.get());
+
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0pfs.cc
+Function: log_pfs_create_tables
+bool log_pfs_create_tables() {
+  if (!log_pfs_should_create_tables()) {
+    return true;
+  }
+  if (!pfs_initialized) {
+    return false;
+  }
+
+  ut_a(pfs_table != nullptr);
+
+  Auto_THD auto_thd;
+  auto thd = auto_thd.thd;
+
+  /*
+    Set tx_read_only to false to allow installing PFS tables even
+    if the server is started with --transaction-read-only=true.
+  */
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
+
+  pfs_sdi_disable();
+
+  {
+    Disable_autocommit_guard autocommit_guard{thd};
+    Disable_binlog_guard disable_binlog(thd);
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    if (drop_native_table_for_pfs(
+            PERFORMANCE_SCHEMA_DB_NAME.str,
+            Log_files_pfs_table_share_proxy::TABLE_NAME)) {
+      end_transaction(thd, true);
+      pfs_sdi_enable();
+      return false;
+    }
+
+    end_transaction(thd, false);
+  }
+
+  {
+    Disable_autocommit_guard autocommit_guard{thd};
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    PFS_engine_table_share_proxy *pfs_proxy_tables = &pfs_table_share_proxy;
+
+    if (pfs_table->add_tables(&pfs_proxy_tables, 1) != 0) {
+      end_transaction(thd, true);
+      pfs_sdi_enable();
+      return false;
+    }
+
+    end_transaction(thd, false);
+  }
+
+  pfs_sdi_enable();
+
+  pfs_tables_created = true;
+
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init
+void THD::init(void) {
+  plugin_thdvar_init(this, m_enable_plugins);
+  /*
+    variables= global_system_variables above has reset
+    variables.pseudo_thread_id to 0. We need to correct it here to
+    avoid temporary tables replication failure.
+  */
+  variables.pseudo_thread_id = m_thread_id;
+
+  /*
+    NOTE: reset_connection command will reset the THD to its default state.
+    All system variables whose scope is SESSION ONLY should be set to their
+    default values here.
+  */
+  reset_first_successful_insert_id();
+  user_time.tv_sec = user_time.tv_usec = 0;
+  start_time.tv_sec = start_time.tv_usec = 0;
+  set_time();
+  auto_inc_intervals_forced.clear();
+  {
+    ulong tmp;
+    tmp = sql_rnd_with_mutex();
+    randominit(&rand,
+               tmp + static_cast<ulong>(reinterpret_cast<uintptr_t>(&rand)),
+               tmp + (ulong)::atomic_global_query_id);
+  }
+
+  server_status = SERVER_STATUS_AUTOCOMMIT;
+  if (variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES)
+    server_status |= SERVER_STATUS_NO_BACKSLASH_ESCAPES;
+
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+  open_options = ha_open_options;
+  update_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY : TL_WRITE);
+  insert_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY
+                                      : TL_WRITE_CONCURRENT_INSERT);
+  tx_isolation = (enum_tx_isolation)variables.transaction_isolation;
+  tx_read_only = variables.transaction_read_only;
+  tx_priority = 0;
+  thd_tx_priority = 0;
+  update_charset();
+  reset_current_stmt_binlog_format_row();
+  reset_binlog_local_stmt_filter();
+  memset(&status_var, 0, sizeof(status_var));
+  binlog_row_event_extra_data = nullptr;
+
+  if (variables.sql_log_bin)
+    variables.option_bits |= OPTION_BIN_LOG;
+  else
+    variables.option_bits &= ~OPTION_BIN_LOG;
+
+#if defined(ENABLED_DEBUG_SYNC)
+  /* Initialize the Debug Sync Facility. See debug_sync.cc. */
+  debug_sync_init_thread(this);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
+
+  /* Initialize session_tracker and create all tracker objects */
+  session_tracker.init(this->charset());
+  session_tracker.enable(this);
+
+  owned_gtid.clear();
+  owned_sid.clear();
+  m_se_gtid_flags.reset();
+  owned_gtid.dbug_print(nullptr, "set owned_gtid (clear) in THD::init");
+
+  /*
+    This will clear the writeset session history and re-set delegate state to
+    INIT
+  */
+  rpl_thd_ctx.init();
+
+  /*
+    This variable is used to temporarily disable the password validation plugin
+    when a RANDOM PASSWORD is generated during SET PASSWORD,CREATE USER or
+    ALTER USER statements.
+  */
+  m_disable_password_validation = false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/transaction.cc
+Function: trans_reset_one_shot_chistics
+void trans_reset_one_shot_chistics(THD *thd) {
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+    TX_TRACKER_GET(tst);
+    tst->set_read_flags(thd, TX_READ_INHERIT);
+    tst->set_isol_level(thd, TX_ISOL_INHERIT);
+  }
+
+  thd->tx_isolation = (enum_tx_isolation)thd->variables.transaction_isolation;
+  thd->tx_read_only = thd->variables.transaction_read_only;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/transaction.cc
+Function: trans_begin
+bool trans_begin(THD *thd, uint flags) {
+  bool res = false;
+  DBUG_TRACE;
+
+  if (trans_check_state(thd)) return true;
+
+  TX_TRACKER_GET(tst);
+
+  thd->locked_tables_list.unlock_locked_tables(thd);
+
+  assert(!thd->locked_tables_mode);
+
+  if (thd->in_multi_stmt_transaction_mode() ||
+      (thd->variables.option_bits & OPTION_TABLE_LOCK)) {
+    thd->variables.option_bits &= ~OPTION_TABLE_LOCK;
+    thd->server_status &=
+        ~(SERVER_STATUS_IN_TRANS | SERVER_STATUS_IN_TRANS_READONLY);
+    DBUG_PRINT("info", ("clearing SERVER_STATUS_IN_TRANS"));
+    res = ha_commit_trans(thd, true);
+  }
+
+  thd->variables.option_bits &= ~OPTION_BEGIN;
+  thd->get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+
+  if (res) return true;
+
+  /*
+    Release transactional metadata locks only after the
+    transaction has been committed.
+  */
+  thd->mdl_context.release_transactional_locks();
+
+  // The RO/RW options are mutually exclusive.
+  assert(!((flags & MYSQL_START_TRANS_OPT_READ_ONLY) &&
+           (flags & MYSQL_START_TRANS_OPT_READ_WRITE)));
+  if (flags & MYSQL_START_TRANS_OPT_READ_ONLY) {
+    thd->tx_read_only = true;
+    if (tst) tst->set_read_flags(thd, TX_READ_ONLY);
+  } else if (flags & MYSQL_START_TRANS_OPT_READ_WRITE) {
+    /*
+      Explicitly starting a RW transaction when the server is in
+      read-only mode, is not allowed unless the user has SUPER priv.
+      Implicitly starting a RW transaction is allowed for backward
+      compatibility.
+    */
+    if (check_readonly(thd, true)) return true;
+    thd->tx_read_only = false;
+    /*
+      This flags that tx_read_only was set explicitly, rather than
+      just from the session's default.
+    */
+    if (tst) tst->set_read_flags(thd, TX_READ_WRITE);
+  }
+
+  DBUG_EXECUTE_IF("dbug_set_high_prio_trx", {
+    assert(thd->tx_priority == 0);
+    thd->tx_priority = 1;
+  });
+
+  thd->variables.option_bits |= OPTION_BEGIN;
+  thd->server_status |= SERVER_STATUS_IN_TRANS;
+  if (thd->tx_read_only) thd->server_status |= SERVER_STATUS_IN_TRANS_READONLY;
+  DBUG_PRINT("info", ("setting SERVER_STATUS_IN_TRANS"));
+
+  if (tst) tst->add_trx_state(thd, TX_EXPLICIT);
+
+  /* ha_start_consistent_snapshot() relies on OPTION_BEGIN flag set. */
+  if (flags & MYSQL_START_TRANS_OPT_WITH_CONS_SNAPSHOT) {
+    if (tst) tst->add_trx_state(thd, TX_WITH_SNAPSHOT);
+    res = ha_start_consistent_snapshot(thd);
+  }
+
+  /*
+    Register transaction start in performance schema if not done already.
+    We handle explicitly started transactions here, implicitly started
+    transactions (and single-statement transactions in autocommit=1 mode)
+    are handled in trans_register_ha().
+    We can't handle explicit transactions in the same way as implicit
+    because we want to correctly attribute statements which follow
+    BEGIN but do not touch any transactional tables.
+  */
+#ifdef HAVE_PSI_TRANSACTION_INTERFACE
+  if (thd->m_transaction_psi == nullptr) {
+    thd->m_transaction_psi =
+        MYSQL_START_TRANSACTION(&thd->m_transaction_state, nullptr, nullptr,
+                                thd->tx_isolation, thd->tx_read_only, false);
+    DEBUG_SYNC(thd, "after_set_transaction_psi_before_set_transaction_gtid");
+    gtid_set_performance_schema_values(thd);
+  }
+#endif
+
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::handle_bootstrap
+static void *handle_bootstrap(void *arg) {
+  handle_bootstrap_args *args;
+  args = reinterpret_cast<handle_bootstrap_args *>(arg);
+  THD *thd = args->m_thd;
+
+  mysql_thread_set_psi_id(thd->thread_id());
+
+  /* The following must be called before DBUG_TRACE */
+  thd->thread_stack = (char *)&thd;
+  if (my_thread_init()) {
+    close_connection(thd, ER_OUT_OF_RESOURCES);
+    args->m_bootstrap_error = true;
+    thd->get_protocol_classic()->end_net();
+    thd->release_resources();
+  } else {
+    thd->store_globals();
+    Global_THD_manager *thd_manager = Global_THD_manager::get_instance();
+    thd_manager->add_thd(thd);
+
+    // Set tx_read_only to false to allow installing DD tables even
+    // if the server is started with --transaction-read-only=true.
+    thd->variables.transaction_read_only = false;
+    thd->tx_read_only = false;
+    ErrorHandlerFunctionPointer existing_hook = error_handler_hook;
+    auto grd =
+        create_scope_guard([&]() { error_handler_hook = existing_hook; });
+    if (opt_initialize) error_handler_hook = my_message_sql;
+
+    bootstrap_functor handler = args->m_bootstrap_handler;
+    if (handler) {
+      args->m_bootstrap_error = (*handler)(thd);
+    } else {
+      args->m_bootstrap_error = handle_bootstrap_impl(args);
+    }
+
+    thd->get_protocol_classic()->end_net();
+    thd->release_resources();
+    thd_manager->remove_thd(thd);
+  }
+  my_thread_end();
+  return nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/event_scheduler.cc
+Function: Event_scheduler::start
+bool Event_scheduler::start(int *err_no) {
+  THD *new_thd = nullptr;
+  bool ret = false;
+  my_thread_handle th;
+  struct scheduler_param *scheduler_param_value;
+  DBUG_TRACE;
+
+  LOCK_DATA();
+  DBUG_PRINT("info",
+             ("state before action %s", scheduler_states_names[state].str));
+  if (state > INITIALIZED) goto end;
+
+  DBUG_EXECUTE_IF("event_scheduler_thread_create_failure", {
+    *err_no = 11;
+    Events::opt_event_scheduler = Events::EVENTS_OFF;
+    ret = true;
+    goto end;
+  });
+
+  if (!(new_thd = new THD)) {
+    LogErr(ERROR_LEVEL, ER_CANT_INIT_SCHEDULER_THREAD);
+    ret = true;
+    goto end;
+  }
+  pre_init_event_thread(new_thd);
+  new_thd->system_thread = SYSTEM_THREAD_EVENT_SCHEDULER;
+  new_thd->set_command(COM_DAEMON);
+
+  /*
+    We should run the event scheduler thread under the super-user privileges.
+    In particular, this is needed to be able to lock the mysql.events table
+    for writing when the server is running in the read-only mode.
+    Same goes for transaction access mode. Set it to read-write for this thd.
+
+    In case the definer has SYSTEM_USER privileges then event scheduler thread
+    can drop the event only if the same privilege is granted to it.
+    Therefore, assign all privileges to this thread.
+  */
+  new_thd->security_context()->skip_grants();
+  new_thd->security_context()->set_host_or_ip_ptr(my_localhost,
+                                                  strlen(my_localhost));
+  new_thd->variables.transaction_read_only = false;
+  new_thd->tx_read_only = false;
+
+  scheduler_param_value = (struct scheduler_param *)my_malloc(
+      key_memory_Event_scheduler_scheduler_param,
+      sizeof(struct scheduler_param), MYF(0));
+  scheduler_param_value->thd = new_thd;
+  scheduler_param_value->scheduler = this;
+
+  scheduler_thd = new_thd;
+  DBUG_PRINT("info", ("Setting state go RUNNING"));
+  state = RUNNING;
+  DBUG_PRINT("info", ("Forking new thread for scheduler. THD: %p", new_thd));
+
+  /*
+    Transfer memory ownership to the child scheduler thread.
+  */
+  my_claim(scheduler_param_value, false);
+  new_thd->claim_memory_ownership(false);
+
+  if ((*err_no = mysql_thread_create(key_thread_event_scheduler, &th,
+                                     &connection_attrib, event_scheduler_thread,
+                                     (void *)scheduler_param_value))) {
+    DBUG_PRINT("error", ("cannot create a new thread"));
+    LogErr(ERROR_LEVEL, ER_CANT_CREATE_SCHEDULER_THREAD, *err_no)
+        .os_errno(*err_no);
+
+    new_thd->set_proc_info("Clearing");
+    new_thd->get_protocol_classic()->end_net();
+
+    state = INITIALIZED;
+    scheduler_thd = nullptr;
+    delete new_thd;
+
+    my_free(scheduler_param_value);
+    ret = true;
+  }
+
+end:
+  UNLOCK_DATA();
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc
+Function: dd::bootstrap::initialize
+bool initialize(THD *thd) {
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::STARTED);
+
+  /*
+    Set tx_read_only to false to allow installing DD tables even
+    if the server is started with --transaction-read-only=true.
+  */
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
+
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  Dictionary_impl *d = dd::Dictionary_impl::instance();
+  assert(d);
+  cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  /*
+    Each step in the install process below is committed independently,
+    either implicitly (for e.g. "CREATE TABLE") or explicitly (for the
+    operations in the "populate()" methods). Thus, there is no need to
+    commit explicitly here.
+  */
+  if (DDSE_dict_init(thd, DICT_INIT_CREATE_FILES, d->get_target_dd_version()) ||
+      initialize_dictionary(thd, false, d))
+    return true;
+
+  assert(d->get_target_dd_version() == d->get_actual_dd_version(thd));
+  LogErr(INFORMATION_LEVEL, ER_DD_VERSION_INSTALLED,
+         d->get_target_dd_version());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc
+Function: dd::bootstrap::restart
+bool restart(THD *thd) {
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::STARTED);
+
+  /*
+    Set tx_read_only to false to allow installing DD tables even
+    if the server is started with --transaction-read-only=true.
+  */
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
+
+  // Set explicit_defaults_for_timestamp variable for dictionary creation
+  thd->variables.explicit_defaults_for_timestamp = true;
+
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  Dictionary_impl *d = dd::Dictionary_impl::instance();
+  assert(d);
+  cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+  store_predefined_tablespace_metadata(thd);
+
+  if (create_dd_schema(thd) || initialize_dd_properties(thd) ||
+      create_tables(thd, nullptr) || sync_meta_data(thd) ||
+      DDSE_dict_recover(thd, DICT_RECOVERY_RESTART_SERVER,
+                        d->get_actual_dd_version(thd)) ||
+      upgrade::do_server_upgrade_checks(thd) || upgrade::upgrade_tables(thd) ||
+      repopulate_charsets_and_collations(thd) || verify_contents(thd) ||
+      update_versions(thd, false)) {
+    return true;
+  }
+
+  DBUG_EXECUTE_IF(
+      "schema_read_only",
+      if (dd::execute_query(thd, "CREATE SCHEMA schema_read_only") ||
+          dd::execute_query(thd, "ALTER SCHEMA schema_read_only READ ONLY=1") ||
+          dd::execute_query(thd, "CREATE TABLE schema_read_only.t(i INT)") ||
+          dd::execute_query(thd, "DROP SCHEMA schema_read_only") ||
+          dd::execute_query(thd, "CREATE TABLE IF NOT EXISTS S.restart(i INT)"))
+          assert(false););
+
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::FINISHED);
+  LogErr(INFORMATION_LEVEL, ER_DD_VERSION_FOUND, d->get_actual_dd_version(thd));
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc
+Function: dd::bootstrap::setup_dd_objects_and_collations
+bool setup_dd_objects_and_collations(THD *thd) {
+  // Continue with server startup.
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(
+      bootstrap::Stage::CREATED_TABLES);
+
+  /*
+    Set tx_read_only to false to allow installing DD tables even
+    if the server is started with --transaction-read-only=true.
+  */
+  thd->variables.transaction_read_only = false;
+  thd->tx_read_only = false;
+
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  Dictionary_impl *d = dd::Dictionary_impl::instance();
+  assert(d);
+
+  assert(d->get_target_dd_version() == d->get_actual_dd_version(thd));
+
+  /*
+    In this context, we initialize the target tables directly since this
+    is a restart based on a pre-transactional-DD server, so ordinary
+    upgrade does not need to be considered.
+  */
+  if (sync_meta_data(thd) || repopulate_charsets_and_collations(thd) ||
+      verify_contents(thd) || update_versions(thd, false)) {
+    return true;
+  }
+
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::FINISHED);
+  LogErr(INFORMATION_LEVEL, ER_DD_VERSION_FOUND, d->get_actual_dd_version(thd));
+
+  return false;
+}
+
+

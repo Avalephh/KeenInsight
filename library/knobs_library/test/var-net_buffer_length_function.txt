@@ -1,0 +1,453 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc
+Function: check_connection
+    check_connection()
+    thd  thread handle
+
+  RETURN
+     0  success, thd is updated.
+     1  error
+*/
+
+static int check_connection(THD *thd) {
+  uint connect_errors = 0;
+  int auth_rc;
+  NET *net = thd->get_protocol_classic()->get_net();
+#ifndef NDEBUG
+  char desc[VIO_DESCRIPTION_SIZE];
+  vio_description(net->vio, desc);
+  DBUG_PRINT("info", ("New connection received on %s", desc));
+#endif  // NDEBUG
+
+  thd->set_active_vio(net->vio);
+
+  if (!thd->m_main_security_ctx.host().length)  // If TCP/IP connection
+  {
+    bool peer_rc;
+    char ip[NI_MAXHOST];
+    LEX_CSTRING main_sctx_ip;
+
+    /* Set the remote (peer) port for this THD. */
+    peer_rc = vio_peer_addr(net->vio, ip, &thd->peer_port, NI_MAXHOST);
+    mysql_thread_set_peer_port(thd->peer_port);
+
+    /*
+    ===========================================================================
+    DEBUG code only (begin)
+    Simulate various output from vio_peer_addr().
+    ===========================================================================
+    */
+
+    DBUG_EXECUTE_IF("vio_peer_addr_error", { peer_rc = 1; });
+    DBUG_EXECUTE_IF("vio_peer_addr_fake_ipv4", {
+      struct sockaddr *sa = (sockaddr *)&net->vio->remote;
+      sa->sa_family = AF_INET;
+      struct in_addr *ip4 = &((struct sockaddr_in *)sa)->sin_addr;
+      /* See RFC 5737, 192.0.2.0/24 is reserved. */
+      const char *fake = "192.0.2.4";
+      ip4->s_addr = inet_addr(fake);
+      strcpy(ip, fake);
+      peer_rc = 0;
+    });
+
+    DBUG_EXECUTE_IF("vio_peer_addr_fake_ipv6", {
+      struct sockaddr_in6 *sa = (sockaddr_in6 *)&net->vio->remote;
+      sa->sin6_family = AF_INET6;
+      struct in6_addr *ip6 = &sa->sin6_addr;
+      /* See RFC 3849, ipv6 2001:DB8::/32 is reserved. */
+      const char *fake = "2001:db8::6:6";
+      /* inet_pton(AF_INET6, fake, ip6); not available on Windows XP. */
+      ip6->s6_addr[0] = 0x20;
+      ip6->s6_addr[1] = 0x01;
+      ip6->s6_addr[2] = 0x0d;
+      ip6->s6_addr[3] = 0xb8;
+      ip6->s6_addr[4] = 0x00;
+      ip6->s6_addr[5] = 0x00;
+      ip6->s6_addr[6] = 0x00;
+      ip6->s6_addr[7] = 0x00;
+      ip6->s6_addr[8] = 0x00;
+      ip6->s6_addr[9] = 0x00;
+      ip6->s6_addr[10] = 0x00;
+      ip6->s6_addr[11] = 0x00;
+      ip6->s6_addr[12] = 0x00;
+      ip6->s6_addr[13] = 0x06;
+      ip6->s6_addr[14] = 0x00;
+      ip6->s6_addr[15] = 0x06;
+      strcpy(ip, fake);
+      peer_rc = 0;
+    });
+
+    /*
+    ===========================================================================
+    DEBUG code only (end)
+    ===========================================================================
+    */
+
+    if (peer_rc) {
+      /*
+        Since we can not even get the peer IP address,
+        there is nothing to show in the host_cache,
+        so increment the global status variable for peer address errors.
+      */
+      connection_errors_peer_addr++;
+      my_error(ER_BAD_HOST_ERROR, MYF(0));
+      return 1;
+    }
+    thd->m_main_security_ctx.assign_ip(ip, strlen(ip));
+    main_sctx_ip = thd->m_main_security_ctx.ip();
+    if (!(main_sctx_ip.length)) {
+      /*
+        No error accounting per IP in host_cache,
+        this is treated as a global server OOM error.
+        TODO: remove the need for my_strdup.
+      */
+      connection_errors_internal++;
+      return 1; /* The error is set by my_strdup(). */
+    }
+    thd->m_main_security_ctx.set_host_or_ip_ptr(main_sctx_ip.str,
+                                                main_sctx_ip.length);
+    if (!(specialflag & SPECIAL_NO_RESOLVE)) {
+      int rc;
+      char *host = nullptr;
+      LEX_CSTRING main_sctx_host;
+
+#ifdef HAVE_SETNS
+      /*
+        Check whether namespace is specified for a socket being handled.
+        If it is specified then set the namespace as active before resolving
+        ip address to host name. Restore original network namespace after
+        address resolution finished.
+      */
+
+      std::string network_namespace(net->vio->network_namespace);
+      if (!network_namespace.empty() &&
+          set_network_namespace(network_namespace)) {
+        return 1;
+      }
+#endif
+      rc = ip_to_hostname(&net->vio->remote, main_sctx_ip.str, &host,
+                          &connect_errors);
+#ifdef HAVE_SETNS
+      if (!network_namespace.empty() && restore_original_network_namespace()) {
+        if (host && host != my_localhost) {
+          my_free(host);
+        }
+        return 1;
+      }
+#endif
+      thd->m_main_security_ctx.assign_host(host, host ? strlen(host) : 0);
+      DBUG_EXECUTE_IF("vio_peer_addr_fake_hostname1", {
+        thd->m_main_security_ctx.assign_host(
+            "host_"
+            "1234567890abcdefghij1234567890abcdefghij1234567890abcdefghij123456"
+            "7890abcdefghij1234567890abcdefghij1234567890abcdefghij1234567890ab"
+            "cdefghij1234567890abcdefghij1234567890abcdefghij1234567890abcdefgh"
+            "ij1234567890abcdefghij1234567890abcdefghij1234567890",
+            255);
+      });
+
+      main_sctx_host = thd->m_main_security_ctx.host();
+      if (host && host != my_localhost) {
+        my_free(host);
+      }
+
+      /* Cut very long hostnames to avoid possible overflows */
+      if (main_sctx_host.length) {
+        if (main_sctx_host.str != my_localhost)
+          thd->m_main_security_ctx.set_host_ptr(
+              main_sctx_host.str,
+              min<size_t>(main_sctx_host.length, HOSTNAME_LENGTH));
+        thd->m_main_security_ctx.set_host_or_ip_ptr(main_sctx_host.str,
+                                                    main_sctx_host.length);
+      }
+
+      if (rc == RC_LONG_HOSTNAME) {
+        my_error(ER_HOSTNAME_TOO_LONG, MYF(0), HOSTNAME_LENGTH);
+        return 1;
+      }
+
+      if (rc == RC_BLOCKED_HOST) {
+        /* HOST_CACHE stats updated by ip_to_hostname(). */
+        my_error(ER_HOST_IS_BLOCKED, MYF(0),
+                 thd->m_main_security_ctx.host_or_ip().str);
+        return 1;
+      }
+    }
+    DBUG_PRINT("info",
+               ("Host: %s  ip: %s",
+                (thd->m_main_security_ctx.host().length
+                     ? thd->m_main_security_ctx.host().str
+                     : "unknown host"),
+                (main_sctx_ip.length ? main_sctx_ip.str : "unknown ip")));
+    if (acl_check_host(thd, thd->m_main_security_ctx.host().str,
+                       main_sctx_ip.str)) {
+      /* HOST_CACHE stats updated by acl_check_host(). */
+      my_error(ER_HOST_NOT_PRIVILEGED, MYF(0),
+               thd->m_main_security_ctx.host_or_ip().str);
+      return 1;
+    }
+  } else /* Hostname given means that the connection was on a socket */
+  {
+    LEX_CSTRING main_sctx_host = thd->m_main_security_ctx.host();
+    DBUG_PRINT("info", ("Host: %s", main_sctx_host.str));
+    thd->m_main_security_ctx.set_host_or_ip_ptr(main_sctx_host.str,
+                                                main_sctx_host.length);
+    thd->m_main_security_ctx.set_ip_ptr(STRING_WITH_LEN(""));
+    /* Reset sin_addr */
+    memset(&net->vio->remote, 0, sizeof(net->vio->remote));
+  }
+  vio_keepalive(net->vio, true);
+
+  if (thd->get_protocol_classic()->get_output_packet()->alloc(
+          thd->variables.net_buffer_length)) {
+    /*
+      Important note:
+      net_buffer_length is a SESSION variable,
+      so it may be tempting to account OOM conditions per IP in the HOST_CACHE,
+      in case some clients are more demanding than others ...
+      However, this session variable is *not* initialized with a per client
+      value during the initial connection, it is initialized from the
+      GLOBAL net_buffer_length variable from the server.
+      Hence, there is no reason to account on OOM conditions per client IP,
+      we count failures in the global server status instead.
+    */
+    connection_errors_internal++;
+    return 1; /* The error is set by alloc(). */
+  }
+
+  if (mysql_audit_notify(
+          thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_PRE_AUTHENTICATE))) {
+    return 1;
+  }
+
+  auth_rc = acl_authenticate(thd, COM_CONNECT);
+
+  if (mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_CONNECTION_CONNECT))) {
+    return 1;
+  }
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  PSI_THREAD_CALL(notify_session_connect)(thd->get_psi());
+#endif /* HAVE_PSI_THREAD_INTERFACE */
+
+  if (auth_rc == 0 && connect_errors != 0) {
+    /*
+      A client connection from this IP was successful,
+      after some previous failures.
+      Reset the connection error counter.
+    */
+    reset_host_connect_errors(thd->m_main_security_ctx.ip().str);
+  }
+
+  /*
+    Now that acl_authenticate() is executed,
+    the SSL info is available.
+    Advertise it to THD, so SSL status variables
+    can be inspected.
+  */
+  thd->set_ssl(net->vio);
+  return auth_rc;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc
+Function: do_command
+bool do_command(THD *thd) {
+  bool return_value;
+  int rc;
+  NET *net = nullptr;
+  enum enum_server_command command = COM_SLEEP;
+  COM_DATA com_data;
+  DBUG_TRACE;
+  assert(thd->is_classic_protocol());
+
+  /*
+    indicator of uninitialized lex => normal flow of errors handling
+    (see my_message_sql)
+  */
+  thd->lex->set_current_query_block(nullptr);
+
+  /*
+    XXX: this code is here only to clear possible errors of init_connect.
+    Consider moving to prepare_new_connection_state() instead.
+    That requires making sure the DA is cleared before non-parsing statements
+    such as COM_QUIT.
+  */
+  thd->clear_error();  // Clear error message
+  thd->get_stmt_da()->reset_diagnostics_area();
+
+  /*
+    This thread will do a blocking read from the client which
+    will be interrupted when the next command is received from
+    the client, the connection is closed or "net_wait_timeout"
+    number of seconds has passed.
+  */
+  net = thd->get_protocol_classic()->get_net();
+  my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+  net_new_transaction(net);
+
+  /*
+    Synchronization point for testing of KILL_CONNECTION.
+    This sync point can wait here, to simulate slow code execution
+    between the last test of thd->killed and blocking in read().
+
+    The goal of this test is to verify that a connection does not
+    hang, if it is killed at this point of execution.
+    (Bug#37780 - main.kill fails randomly)
+
+    Note that the sync point wait itself will be terminated by a
+    kill. In this case it consumes a condition broadcast, but does
+    not change anything else. The consumed broadcast should not
+    matter here, because the read/recv() below doesn't use it.
+  */
+  DEBUG_SYNC(thd, "before_do_command_net_read");
+
+  /* For per-query performance counters with log_slow_statement */
+  struct System_status_var query_start_status;
+  thd->clear_copy_status_var();
+  if (opt_log_slow_extra) {
+    thd->copy_status_var(&query_start_status);
+  }
+
+  rc = thd->m_mem_cnt.reset();
+  if (rc)
+    thd->m_mem_cnt.set_thd_error_status();
+  else {
+    /*
+      Because of networking layer callbacks in place,
+      this call will maintain the following instrumentation:
+      - IDLE events
+      - SOCKET events
+      - STATEMENT events
+      - STAGE events
+      when reading a new network packet.
+      In particular, a new instrumented statement is started.
+      See init_net_server_extension()
+    */
+    thd->m_server_idle = true;
+    rc = thd->get_protocol()->get_command(&com_data, &command);
+    thd->m_server_idle = false;
+  }
+
+  if (rc) {
+#ifndef NDEBUG
+    char desc[VIO_DESCRIPTION_SIZE];
+    vio_description(net->vio, desc);
+    DBUG_PRINT("info", ("Got error %d reading command from socket %s",
+                        net->error, desc));
+#endif  // NDEBUG
+    /* Instrument this broken statement as "statement/com/error" */
+    thd->m_statement_psi = MYSQL_REFINE_STATEMENT(
+        thd->m_statement_psi, com_statement_info[COM_END].m_key);
+
+    /* Check if we can continue without closing the connection */
+
+    /* The error must be set. */
+    assert(thd->is_error());
+    thd->send_statement_status();
+
+    /* Mark the statement completed. */
+    MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+    thd->m_statement_psi = nullptr;
+    thd->m_digest = nullptr;
+
+    if (rc < 0) {
+      return_value = true;  // We have to close it.
+      goto out;
+    }
+    net->error = NET_ERROR_UNSET;
+    return_value = false;
+    goto out;
+  }
+
+#ifndef NDEBUG
+  char desc[VIO_DESCRIPTION_SIZE];
+  vio_description(net->vio, desc);
+  DBUG_PRINT("info", ("Command on %s = %d (%s)", desc, command,
+                      Command_names::str_notranslate(command).c_str()));
+  expected_from_debug_flag = TDM::ANY;
+  DBUG_EXECUTE_IF("tdon", { expected_from_debug_flag = TDM::ON; });
+  DBUG_EXECUTE_IF("tdzero", { expected_from_debug_flag = TDM::ZERO; });
+  DBUG_EXECUTE_IF("tdna", { expected_from_debug_flag = TDM::NOT_AVAILABLE; });
+#endif  // NDEBUG
+  DBUG_PRINT("info", ("packet: '%*.s'; command: %d",
+                      (int)thd->get_protocol_classic()->get_packet_length(),
+                      thd->get_protocol_classic()->get_raw_packet(), command));
+  if (thd->get_protocol_classic()->bad_packet)
+    assert(0);  // Should be caught earlier
+
+  // Reclaim some memory
+  thd->get_protocol_classic()->get_output_packet()->shrink(
+      thd->variables.net_buffer_length);
+  /* Restore read timeout value */
+  my_net_set_read_timeout(net, thd->variables.net_read_timeout);
+
+  DEBUG_SYNC(thd, "before_command_dispatch");
+
+  return_value = dispatch_command(thd, &com_data, command);
+  thd->get_protocol_classic()->get_output_packet()->shrink(
+      thd->variables.net_buffer_length);
+
+out:
+  /* The statement instrumentation must be closed in all cases. */
+  assert(thd->m_digest == nullptr);
+  assert(thd->m_statement_psi == nullptr);
+  return return_value;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc
+Function: Protocol_classic::send_ok
+bool Protocol_classic::send_ok(uint server_status, uint statement_warn_count,
+                               ulonglong affected_rows,
+                               ulonglong last_insert_id, const char *message) {
+  DBUG_TRACE;
+  const bool retval =
+      net_send_ok(m_thd, server_status, statement_warn_count, affected_rows,
+                  last_insert_id, message, false);
+  // Reclaim some memory
+  convert.shrink(m_thd->variables.net_buffer_length);
+  return retval;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc
+Function: Protocol_classic::send_eof
+bool Protocol_classic::send_eof(uint server_status, uint statement_warn_count) {
+  DBUG_TRACE;
+  bool retval;
+  /*
+    Normally end of statement reply is signaled by OK packet, but in case
+    of binlog dump request an EOF packet is sent instead. Also, old clients
+    expect EOF packet instead of OK
+  */
+  if (has_client_capability(CLIENT_DEPRECATE_EOF) &&
+      (m_thd->get_command() != COM_BINLOG_DUMP &&
+       m_thd->get_command() != COM_BINLOG_DUMP_GTID))
+    retval = net_send_ok(m_thd, server_status, statement_warn_count, 0, 0,
+                         nullptr, true);
+  else
+    retval = net_send_eof(m_thd, server_status, statement_warn_count);
+  // Reclaim some memory
+  convert.shrink(m_thd->variables.net_buffer_length);
+  return retval;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc
+Function: Protocol_classic::send_error
+bool Protocol_classic::send_error(uint sql_errno, const char *err_msg,
+                                  const char *sql_state) {
+  DBUG_TRACE;
+  const bool retval =
+      net_send_error_packet(m_thd, sql_errno, err_msg, sql_state);
+  // Reclaim some memory
+  convert.shrink(m_thd->variables.net_buffer_length);
+  return retval;
+}
+
+

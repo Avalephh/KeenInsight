@@ -1,0 +1,1562 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_master_shutdown_loop
+static void srv_master_shutdown_loop() {
+  ut_a(srv_shutdown_state_matches([](auto state) {
+    return state == SRV_SHUTDOWN_MASTER_STOP ||
+           state == SRV_SHUTDOWN_EXIT_THREADS;
+  }));
+  auto last_print_time = std::chrono::steady_clock::now();
+  while (srv_shutdown_state.load() < SRV_SHUTDOWN_EXIT_THREADS &&
+         srv_master_do_shutdown_tasks(&last_print_time)) {
+    /* Shouldn't loop here in case of very fast shutdown */
+    ut_ad(srv_fast_shutdown < 2);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_master_do_shutdown_tasks
+         srv_master_do_shutdown_tasks(&last_print_time)) {
+    /* Shouldn't loop here in case of very fast shutdown */
+    ut_ad(srv_fast_shutdown < 2);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_shutdown_print_master_pending not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_shutdown_print_master_pending not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_shutdown_print_master_pending not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_master_pre_dd_shutdown_loop
+static void srv_master_pre_dd_shutdown_loop() {
+  ut_a(srv_shutdown_state_matches([](auto state) {
+    return state == SRV_SHUTDOWN_PRE_DD_AND_SYSTEM_TRANSACTIONS ||
+           state == SRV_SHUTDOWN_EXIT_THREADS;
+  }));
+  auto last_print_time = std::chrono::steady_clock::now();
+  while (srv_shutdown_state.load() < SRV_SHUTDOWN_EXIT_THREADS &&
+         srv_master_do_pre_dd_shutdown_tasks(&last_print_time)) {
+    /* Shouldn't loop here in case of very fast shutdown */
+    ut_ad(srv_fast_shutdown < 2);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_master_do_pre_dd_shutdown_tasks
+         srv_master_do_pre_dd_shutdown_tasks(&last_print_time)) {
+    /* Shouldn't loop here in case of very fast shutdown */
+    ut_ad(srv_fast_shutdown < 2);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_coordinator_thread
+void srv_purge_coordinator_thread() {
+  srv_slot_t *slot;
+
+  THD *thd = create_internal_thd();
+
+  purge_sys->is_this_a_purge_thread = true;
+
+  ulint n_total_purged = ULINT_UNDEFINED;
+
+  ut_ad(!srv_read_only_mode);
+  ut_a(srv_n_purge_threads >= 1);
+  ut_a(trx_purge_state() == PURGE_STATE_INIT);
+  ut_a(srv_force_recovery < SRV_FORCE_NO_BACKGROUND);
+
+  rw_lock_x_lock(&purge_sys->latch, UT_LOCATION_HERE);
+
+  purge_sys->running = true;
+  purge_sys->state = PURGE_STATE_RUN;
+
+  rw_lock_x_unlock(&purge_sys->latch);
+
+  slot = srv_reserve_slot(SRV_PURGE);
+
+  ulint rseg_history_len = trx_sys->rseg_history_len;
+
+  do {
+    /* If there are no records to purge or the last
+    purge didn't purge any records then wait for activity. */
+
+    if (srv_shutdown_state.load() < SRV_SHUTDOWN_PURGE &&
+        (purge_sys->state == PURGE_STATE_STOP || n_total_purged == 0)) {
+      srv_purge_coordinator_suspend(slot, rseg_history_len);
+    }
+
+    if (srv_purge_should_exit(n_total_purged)) {
+      ut_a(!slot->suspended);
+      break;
+    }
+
+    n_total_purged = 0;
+
+    rseg_history_len = srv_do_purge(&n_total_purged);
+
+  } while (!srv_purge_should_exit(n_total_purged));
+
+  /* This is just for test scenarios. Do not pass thd here,
+  because it would lead to wait on event then, and we would
+  never exit the srv_pre_dd_shutdown() which waits for this
+  thread to exit. That's because the signal for which we
+  would wait is signalled in srv_shutdown which happens
+  after the srv_pre_dd_shutdown is ended. */
+  srv_thread_delay_cleanup_if_needed(false);
+
+  /* Ensure that we don't jump out of the loop unless the
+  exit condition is satisfied. */
+
+  ut_a(srv_purge_should_exit(n_total_purged));
+
+  ulint n_pages_purged = ULINT_MAX;
+
+  /* Ensure that all records are purged if it is not a fast shutdown.
+  This covers the case where a record can be added after we exit the
+  loop above. */
+  while (srv_fast_shutdown == 0 && n_pages_purged > 0) {
+    n_pages_purged = trx_purge(1, srv_purge_batch_size, false);
+  }
+
+  /* This trx_purge is called to remove any undo records (added by
+  background threads) after completion of the above loop. When
+  srv_fast_shutdown != 0, a large batch size can cause significant
+  delay in shutdown, so reducing the batch size to magic number 20
+  (which was default in 5.5), which we hope will be sufficient to
+  remove all the undo records */
+  const uint temp_batch_size = 20;
+
+  n_pages_purged =
+      trx_purge(1,
+                srv_purge_batch_size <= temp_batch_size ? srv_purge_batch_size
+                                                        : temp_batch_size,
+                true);
+  ut_a(n_pages_purged == 0 || srv_fast_shutdown != 0);
+
+  /* The task queue should always be empty, independent of fast
+  shutdown state. */
+  ut_a(srv_get_task_queue_length() == 0);
+
+  srv_free_slot(slot);
+
+  /* Note that we are shutting down. */
+  rw_lock_x_lock(&purge_sys->latch, UT_LOCATION_HERE);
+
+  purge_sys->state = PURGE_STATE_EXIT;
+
+  /* Clear out any pending undo-tablespaces to truncate and reset
+  the list as we plan to shutdown the purge thread. */
+  purge_sys->undo_trunc.reset();
+
+  purge_sys->running = false;
+
+  rw_lock_x_unlock(&purge_sys->latch);
+
+  /* Ensure that all the worker threads quit. */
+  if (srv_n_purge_threads > 1) {
+    srv_release_threads(SRV_WORKER, srv_n_purge_threads - 1);
+  }
+
+  /* This is just for test scenarios. Do not pass thd here.
+  For explanation look at comment for similar usage above. */
+  srv_thread_delay_cleanup_if_needed(false);
+
+  destroy_internal_thd(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_should_exit not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_should_exit not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_should_exit not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_coordinator_suspend not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_coordinator_suspend not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_purge_coordinator_suspend not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc
+Function: srv_shutdown_waits_for_rollback_of_recovered_transactions
+bool srv_shutdown_waits_for_rollback_of_recovered_transactions() {
+  return (srv_force_recovery < SRV_FORCE_NO_TRX_UNDO && srv_fast_shutdown == 0);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc
+Function: srv_pre_dd_shutdown
+void srv_pre_dd_shutdown() {
+  ut_a(srv_shutdown_state.load() == SRV_SHUTDOWN_NONE);
+
+  /* Warn and wait if there are still some query threads alive.
+  If all is correct, then all user threads should already be gone,
+  because before clean_up() -> srv_pre_dd_shutdown() is called,
+  we are joining signal_hand thread, which before exiting waits
+  for all connections to be closed (close_connections()). */
+  for (size_t count = 0; count < 10; ++count) {
+    const auto threads_count = srv_conc_get_active_threads();
+    if (threads_count == 0) {
+      break;
+    }
+    ib::warn(ER_IB_MSG_1154, threads_count);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
+  /* Crash if some query threads are still alive. */
+  ut_a(srv_conc_get_active_threads() == 0);
+
+  ut_a(!srv_thread_is_active(srv_threads.m_recv_writer));
+
+  /* Avoid fast shutdown, if redo logging is disabled. Otherwise, we won't be
+  able to recover. */
+  if (mtr_t::s_logging.is_disabled() && srv_fast_shutdown == 2) {
+    ib::warn(ER_IB_WRN_FAST_SHUTDOWN_REDO_DISABLED);
+    srv_fast_shutdown = 1;
+  }
+
+  /* Stop service for persisting GTID */
+  auto &gtid_persistor = clone_sys->get_gtid_persistor();
+  gtid_persistor.stop();
+
+  if (srv_read_only_mode) {
+    /* Check that goal of SRV_SHUTDOWN_RECOVERY_ROLLBACK is reached:
+    1. In read-only mode, no rollbacks should be executed.
+    2. The trx_recovery_rollback thread should not be started. */
+    ut_ad(trx_sys_recovered_active_trxs_count() == 0);
+    ut_a(!srv_thread_is_active(srv_threads.m_trx_recovery_rollback));
+
+    /* Check the goal of SRV_SHUTDOWN_PRE_DD_AND_SYSTEM_TRANSACTIONS,
+    the following threads should not be started in read-only mode: */
+    ut_a(!srv_thread_is_active(srv_threads.m_dict_stats));
+    ut_a(!srv_thread_is_active(srv_threads.m_fts_optimize));
+    ut_a(!srv_thread_is_active(srv_threads.m_ts_alter_encrypt));
+
+    /* In read-only mode, there is no master thread. */
+    ut_a(!srv_thread_is_active(srv_threads.m_master));
+
+    /* In read-only mode, no purge should be done, so goal of the
+    SRV_SHUTDOWN_PURGE is already satisfied (no purge threads). */
+    ut_a(!srv_purge_threads_active());
+
+    /* Advance quickly through all states to SRV_SHUTDOWN_DD. */
+    srv_shutdown_set_state(SRV_SHUTDOWN_RECOVERY_ROLLBACK);
+    srv_shutdown_set_state(SRV_SHUTDOWN_PRE_DD_AND_SYSTEM_TRANSACTIONS);
+    srv_shutdown_set_state(SRV_SHUTDOWN_PURGE);
+    srv_shutdown_set_state(SRV_SHUTDOWN_DD);
+    return;
+  }
+
+  srv_shutdown_set_state(SRV_SHUTDOWN_RECOVERY_ROLLBACK);
+
+  if (srv_shutdown_waits_for_rollback_of_recovered_transactions()) {
+    /* We need to wait for rollback of recovered transactions. */
+    for (uint32_t count = 0;; ++count) {
+      /* Should not loop and wait if rollback thread isn't there. */
+      if (!srv_thread_is_active(srv_threads.m_trx_recovery_rollback)) {
+        break;
+      }
+      const auto total_trx = trx_sys_recovered_active_trxs_count();
+      if (total_trx == 0) {
+        break;
+      }
+      if (count >= SHUTDOWN_SLEEP_ROUNDS) {
+        ib::info(ER_IB_MSG_1249, total_trx);
+        count = 0;
+      }
+      std::this_thread::sleep_for(
+          std::chrono::microseconds(SHUTDOWN_SLEEP_TIME_US));
+    }
+  }
+
+  if (srv_thread_is_active(srv_threads.m_trx_recovery_rollback)) {
+    /* We should wait until rollback after recovery end to avoid
+    adding more for purge and to avoid touching transaction objects
+    since this point. */
+    srv_threads.m_trx_recovery_rollback.wait();
+  }
+
+  srv_shutdown_set_state(SRV_SHUTDOWN_PRE_DD_AND_SYSTEM_TRANSACTIONS);
+
+  if (srv_start_state_is_set(SRV_START_STATE_STAT)) {
+    fts_optimize_shutdown();
+    dict_stats_shutdown();
+    dict_stats_thread_deinit();
+  }
+  ut_a(!srv_thread_is_active(srv_threads.m_fts_optimize));
+  ut_a(!srv_thread_is_active(srv_threads.m_dict_stats));
+
+  for (uint32_t count = 1; srv_thread_is_active(srv_threads.m_ts_alter_encrypt);
+       ++count) {
+    if (count % SHUTDOWN_SLEEP_ROUNDS == 0) {
+      ib::info(ER_IB_MSG_WAIT_FOR_ENCRYPT_THREAD);
+    }
+    std::this_thread::sleep_for(
+        std::chrono::microseconds(SHUTDOWN_SLEEP_TIME_US));
+  }
+
+  /* Wait until the master thread exits its main loop and notices that:
+    - it should do shutdown-cleanup,
+    - and still is allowed to access DD objects. */
+  if (srv_thread_is_active(srv_threads.m_master)) {
+    srv_wake_master_thread();
+    os_event_wait(srv_threads.m_master_ready_for_dd_shutdown);
+  }
+
+  /* Since this point we do not expect accesses to DD coming from InnoDB. */
+  ut_d(trx_sys_before_pre_dd_shutdown_validate());
+
+  srv_shutdown_set_state(SRV_SHUTDOWN_PURGE);
+
+  for (uint32_t count = 1; srv_purge_threads_active(); ++count) {
+    srv_purge_wakeup();
+    if (count % SHUTDOWN_SLEEP_ROUNDS == 0) {
+      ib::info(ER_IB_MSG_1152);
+    }
+    std::this_thread::sleep_for(
+        std::chrono::microseconds(SHUTDOWN_SLEEP_TIME_US));
+  }
+  switch (trx_purge_state()) {
+    case PURGE_STATE_INIT:
+    case PURGE_STATE_EXIT:
+    case PURGE_STATE_DISABLED:
+      srv_start_state &= ~SRV_START_STATE_PURGE;
+      break;
+    case PURGE_STATE_RUN:
+    case PURGE_STATE_STOP:
+      ut_d(ut_error);
+  }
+
+  /* After this phase plugins are asked to be shut down, in which case they
+  will be marked as DELETED. Note: we cannot leave any transaction in the THD,
+  because the mechanism which cleans resources in THD would not be able to
+  unregister those transactions from mysql_trx_list, because the handler
+  of close_connection in InnoDB handlerton would not be called, because
+  InnoDB has already been marked as DELETED. You should close your thread
+  here, in the srv_pre_dd_shutdown, if it might do lookups in DD objects.
+  No other transactions should be useful, so for sake of simplicity we
+  require to have no transactions at all here, except transactions:
+    - with state = TRX_STATE_PREPARED,
+    - with state = TRX_STATE_ACTIVE and with is_recovered == true */
+
+  ut_d(trx_sys_after_pre_dd_shutdown_validate());
+
+  srv_shutdown_set_state(SRV_SHUTDOWN_DD);
+
+  DBUG_EXECUTE_IF("wait_for_threads_in_pre_dd_shutdown",
+                  srv_shutdown_cleanup_and_master_stop(););
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc
+Function: srv_shutdown_log
+static lsn_t srv_shutdown_log() {
+  ut_a(srv_shutdown_state.load() == SRV_SHUTDOWN_FLUSH_PHASE);
+  ut_a(!buf_flush_page_cleaner_is_active());
+  ut_ad(buf_pool_pending_io_reads_count() == 0);
+  ut_ad(buf_pool_pending_io_writes_count() == 0);
+
+  if (srv_fast_shutdown == 2) {
+    if (!srv_read_only_mode) {
+      ib::info(ER_IB_MSG_1253);
+
+      /* In this fastest shutdown we do not flush the
+      buffer pool:
+
+      it is essentially a 'crash' of the InnoDB server.
+      Make sure that the log is all flushed to disk, so
+      that we can recover all committed transactions in
+      a crash recovery. We must not write the lsn stamps
+      to the data files, since at a startup InnoDB deduces
+      from the stamps if the previous shutdown was clean. */
+
+      log_stop_background_threads(*log_sys);
+    }
+
+    /* No redo log might be generated since now. */
+    log_background_threads_inactive_validate();
+
+    srv_shutdown_set_state(SRV_SHUTDOWN_LAST_PHASE);
+
+    return (log_get_lsn(*log_sys));
+  }
+
+  if (!srv_read_only_mode) {
+    log_make_empty_and_stop_background_threads(*log_sys);
+  }
+
+  /* No redo log might be generated since now. */
+  log_background_threads_inactive_validate();
+  buf_must_be_all_freed();
+
+  const lsn_t lsn = log_get_lsn(*log_sys);
+
+  if (!srv_read_only_mode) {
+    /* Redo log has been flushed at the log_flusher's exit. */
+    fil_flush_file_spaces();
+  }
+
+  srv_shutdown_set_state(SRV_SHUTDOWN_LAST_PHASE);
+
+  /* Validate lsn and write it down. */
+  ut_a(log_is_data_lsn(lsn) || srv_force_recovery >= SRV_FORCE_NO_LOG_REDO);
+
+  ut_a(lsn == log_sys->last_checkpoint_lsn.load() ||
+       srv_force_recovery >= SRV_FORCE_NO_LOG_REDO);
+
+  ut_a(lsn == log_get_lsn(*log_sys));
+
+  if (!srv_read_only_mode) {
+    ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+
+    auto err = fil_write_flushed_lsn(lsn);
+    ut_a(err == DB_SUCCESS);
+  }
+
+  buf_must_be_all_freed();
+  ut_a(lsn == log_get_lsn(*log_sys));
+
+  if (srv_downgrade_logs) {
+    ut_a(!srv_read_only_mode);
+
+    /* InnoDB in any version is able to start on empty set of redo files. */
+    log_files_remove(*log_sys);
+  }
+
+  return (lsn);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0sys.cc
+Function: trx_sys_after_pre_dd_shutdown_validate
+void trx_sys_after_pre_dd_shutdown_validate() {
+  trx_sys_mutex_enter();
+  /** At this point we check the mysql_trx_list again, now we don't expect purge
+  thread transactions in the list */
+  for (auto trx : trx_sys->mysql_trx_list) {
+    ut_a(trx->state.load(std::memory_order_relaxed) == TRX_STATE_NOT_STARTED);
+  }
+  trx_sys_mutex_exit();
+
+  /* We assert that all transactions are rolled back if
+  [1] Not force recovery mode.
+  [2] Not fast shutdown
+  [3] The rollback thread has started and stopped gracefully.
+
+  The only left transactions are those that have state == TRX_STATE_PREPARED.
+
+  Above, [3] could be false during error exit, when the rollback thread might
+  never have started and we don't rollback the recovered transactions in that
+  case. */
+
+  const auto active_recovered_trxs = trx_sys_recovered_active_trxs_count();
+  if (srv_shutdown_waits_for_rollback_of_recovered_transactions() &&
+      srv_thread_is_stopped(srv_threads.m_trx_recovery_rollback)) {
+    ut_a(active_recovered_trxs == 0);
+  }
+
+  trx_sys_mutex_enter();
+  ut_a(UT_LIST_GET_LEN(trx_sys->rw_trx_list) ==
+       trx_sys->n_prepared_trx + active_recovered_trxs);
+  trx_sys_mutex_exit();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_truncate_marked_undo_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc
+Function: trx_purge_mark_undo_for_truncate
+static bool trx_purge_mark_undo_for_truncate(size_t truncate_count) {
+  /* We always have at least 2 undo spaces, even though one of them may be
+  inactive. */
+  ut_a(undo::spaces->size() >= FSP_IMPLICIT_UNDO_TABLESPACES);
+
+  /* Note if we are currently in a fast or slow shutdown. */
+  bool normal_operation = (srv_shutdown_state == SRV_SHUTDOWN_NONE);
+  bool in_fast_shutdown = (!normal_operation && srv_fast_shutdown > 0);
+
+  /* Save time during a fast shutdown by skipping undo truncation.
+  This does not affect correctness since undo tablespaces that need
+  truncation can be truncated during or after startup.*/
+  if (in_fast_shutdown) {
+    return (false);
+  }
+
+  /* Return true if an undo tablespace is already marked for truncate. */
+  auto undo_trunc = &purge_sys->undo_trunc;
+  if (undo_trunc->is_marked()) {
+    return (true);
+  }
+
+  undo::spaces->s_lock();
+
+  /* In order to implicitly select an undo space to truncate, we need
+  at least 2 active UNDO tablespaces.  As long as there is one undo
+  tablespace active the server will continue to operate. */
+  size_t num_active = 0;
+
+  /* Look for any undo space that is inactive explicitly. */
+  auto undo_ts = undo::spaces->find_first_inactive_explicit(&num_active);
+  if (undo_ts != nullptr) {
+    undo_trunc->mark(undo_ts);
+    undo::spaces->s_unlock();
+    return (true);
+  }
+
+  undo::spaces->s_unlock();
+
+  /* If we get here, there are no undo spaces currently being truncated
+  and none that are SET INACTIVE explicitly. */
+  ut_a(num_active > 0);
+
+  /* There may be some reasons not to truncate implicitly.
+  If truncate is disabled, do not truncate. */
+  if (!srv_undo_log_truncate) {
+    return (false);
+  }
+
+  if (normal_operation) {
+    /* Skip truncate if there is only one active undo tablespace to check. */
+    if (num_active == 1) {
+      return (false);
+    }
+
+    /* Skip truncate if the caller has already truncated an undo space. */
+    if (truncate_count > 0) {
+      return (false);
+    }
+
+    /* Wait at least one second between searches. */
+    if (undo_trunc->check_timer() < PURGE_CHECK_UNDO_TRUNCATE_DELAY_IN_MS) {
+      return (false);
+    }
+    undo_trunc->reset_timer();
+  }
+
+  /* Find an undo tablespace that is too big and needs to be truncated. */
+  undo::spaces->s_lock();
+
+  /* Avoid bias selection and so start the scan immediately after the
+  last space selected for truncate. Scan through all undo tablespaces. */
+  space_id_t space_num = undo_trunc->get_scan_space_num();
+  space_id_t first_space_num_scanned = space_num;
+
+  do {
+    auto undo_space = undo::spaces->find(space_num);
+
+    if (undo_space->needs_truncation()) {
+      /* Tablespace qualifies for truncate. */
+      undo_trunc->increment_scan();
+      undo_trunc->mark(undo_space);
+      break;
+    }
+
+    space_num = undo_trunc->increment_scan();
+
+  } while (space_num != first_space_num_scanned);
+
+  undo::spaces->s_unlock();
+
+  /* Return false if no undo space needs to be truncated. */
+  if (!undo_trunc->is_marked()) {
+    return (false);
+  }
+
+  ut_ad(space_num == undo_trunc->get_marked_space_num());
+
+  return (true);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0roll.cc
+Function: trx_rollback_or_clean_recovered
+void trx_rollback_or_clean_recovered(
+    bool all) /*!< in: false=roll back dictionary transactions;
+               true=roll back all non-PREPARED transactions */
+{
+  ut_ad(!srv_read_only_mode);
+
+  ut_a(srv_force_recovery < SRV_FORCE_NO_TRX_UNDO);
+  ut_ad(!all || trx_sys_need_rollback());
+
+  if (all) {
+    ib::info(ER_IB_MSG_1189) << "Starting in background the rollback"
+                                " of uncommitted transactions";
+  }
+
+  /* Note: For XA recovered transactions, we rely on MySQL to
+  do rollback. They will be in TRX_STATE_PREPARED state. If the server
+  is shutdown and they are still lingering in trx_sys_t::trx_list
+  then the shutdown will hang. */
+
+  /* Loop over the transaction list as long as there are
+  recovered transactions to clean up or recover. */
+
+  trx_sys_mutex_enter();
+  for (bool need_one_more_scan = true; need_one_more_scan;) {
+    need_one_more_scan = false;
+    for (auto trx : trx_sys->rw_trx_list) {
+      assert_trx_in_rw_list(trx);
+
+      /* In case of slow shutdown, we have to wait for the background
+      thread (trx_recovery_rollback) which is doing the rollbacks of
+      recovered transactions. Note that it can add undo to purge.
+      In case of fast shutdown we do not care if we left transactions
+      not rolled back. But still we want to stop the thread, so since
+      certain point of shutdown we might be sure there are no changes
+      to transactions / undo. */
+      if (srv_shutdown_state.load() >= SRV_SHUTDOWN_RECOVERY_ROLLBACK &&
+          srv_fast_shutdown != 0) {
+        ut_a(srv_shutdown_state_matches([](auto state) {
+          return state == SRV_SHUTDOWN_RECOVERY_ROLLBACK ||
+                 state == SRV_SHUTDOWN_EXIT_THREADS;
+        }));
+
+        trx_sys_mutex_exit();
+
+        if (all) {
+          ib::info(ER_IB_MSG_TRX_RECOVERY_ROLLBACK_NOT_COMPLETED);
+        }
+        return;
+      }
+
+      /* If this function does a cleanup or rollback
+      then it will release the trx_sys->mutex, therefore
+      we need to reacquire it before retrying the loop. */
+      if (trx_rollback_or_clean_resurrected(trx, all)) {
+        trx_sys_mutex_enter();
+        need_one_more_scan = true;
+        break;
+      }
+    }
+  }
+  trx_sys_mutex_exit();
+
+  if (all) {
+    ib::info(ER_IB_MSG_TRX_RECOVERY_ROLLBACK_COMPLETED);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc
+Function: buf_pool_free_instance
+static void buf_pool_free_instance(buf_pool_t *buf_pool) {
+  buf_chunk_t *chunk;
+  buf_chunk_t *chunks;
+  buf_page_t *bpage;
+  buf_page_t *prev_bpage = nullptr;
+
+  mutex_free(&buf_pool->LRU_list_mutex);
+  mutex_free(&buf_pool->free_list_mutex);
+  mutex_free(&buf_pool->zip_free_mutex);
+  mutex_free(&buf_pool->zip_hash_mutex);
+  mutex_free(&buf_pool->flush_state_mutex);
+  mutex_free(&buf_pool->zip_mutex);
+  mutex_free(&buf_pool->flush_list_mutex);
+
+  for (bpage = UT_LIST_GET_LAST(buf_pool->LRU); bpage != nullptr;
+       bpage = prev_bpage) {
+    prev_bpage = UT_LIST_GET_PREV(LRU, bpage);
+    buf_page_state state = buf_page_get_state(bpage);
+
+    ut_ad(buf_page_in_file(bpage));
+    ut_ad(bpage->in_LRU_list);
+
+    if (state != BUF_BLOCK_FILE_PAGE) {
+      /* We must not have any dirty block except
+      when doing a fast shutdown. */
+      ut_ad(state == BUF_BLOCK_ZIP_PAGE || srv_fast_shutdown == 2);
+      buf_page_free_descriptor(bpage);
+    }
+  }
+
+  ut::free(buf_pool->watch);
+  buf_pool->watch = nullptr;
+  mutex_enter(&buf_pool->chunks_mutex);
+  chunks = buf_pool->chunks;
+  chunk = chunks + buf_pool->n_chunks;
+
+  while (--chunk >= chunks) {
+    buf_block_t *block = chunk->blocks;
+
+    for (ulint i = chunk->size; i--; block++) {
+      mutex_free(&block->mutex);
+      rw_lock_free(&block->lock);
+
+      ut_d(rw_lock_free(&block->debug_latch));
+    }
+
+    buf_pool->deallocate_chunk(chunk);
+  }
+
+  for (ulint i = BUF_FLUSH_LRU; i < BUF_FLUSH_N_TYPES; ++i) {
+    os_event_destroy(buf_pool->no_flush[i]);
+  }
+
+  ut::free(buf_pool->chunks);
+  mutex_exit(&buf_pool->chunks_mutex);
+  mutex_free(&buf_pool->chunks_mutex);
+  ha_clear(buf_pool->page_hash);
+  ut::delete_(buf_pool->page_hash);
+  ut::delete_(buf_pool->zip_hash);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dump.cc
+Function: buf_dump_thread
+void buf_dump_thread() {
+  ut_ad(!srv_read_only_mode);
+
+  buf_dump_status(STATUS_VERBOSE, "Dumping of buffer pool not started");
+  buf_load_status(STATUS_VERBOSE, "Loading of buffer pool not started");
+
+  if (srv_buffer_pool_load_at_startup) {
+    buf_load();
+  }
+
+  while (!SHUTTING_DOWN()) {
+    os_event_wait(srv_buf_dump_event);
+
+    if (buf_dump_should_start) {
+      buf_dump_should_start = false;
+      buf_dump(true /* quit on shutdown */);
+    }
+
+    if (buf_load_should_start) {
+      buf_load_should_start = false;
+      buf_load();
+    }
+
+    os_event_reset(srv_buf_dump_event);
+  }
+
+  if (srv_buffer_pool_dump_at_shutdown && srv_fast_shutdown != 2) {
+    buf_dump(false /* ignore shutdown down flag,
+                keep going even if we are in a shutdown state */);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: buf_flush_page_coordinator_thread
+static void buf_flush_page_coordinator_thread() {
+  auto loop_start_time = std::chrono::steady_clock::now();
+  ulint n_flushed = 0;
+  ulint last_activity = srv_get_activity_count();
+  ulint last_pages = 0;
+
+  THD *thd = create_internal_thd();
+
+#ifdef UNIV_LINUX
+  /* linux might be able to set different setting for each thread.
+  worth to try to set high priority for page cleaner threads */
+  if (buf_flush_page_cleaner_set_priority(buf_flush_page_cleaner_priority)) {
+    ib::info(ER_IB_MSG_126) << "page_cleaner coordinator priority: "
+                            << buf_flush_page_cleaner_priority;
+  } else {
+    ib::info(ER_IB_MSG_127) << "If the mysqld execution user is authorized,"
+                               " page cleaner thread priority can be changed."
+                               " See the man page of setpriority().";
+  }
+#endif /* UNIV_LINUX */
+
+  /* We start from 1 because the coordinator thread is part of the
+  same set */
+  for (size_t i = 1; i < srv_threads.m_page_cleaner_workers_n; ++i) {
+    srv_threads.m_page_cleaner_workers[i] = os_thread_create(
+        page_flush_thread_key, i, buf_flush_page_cleaner_thread);
+
+    srv_threads.m_page_cleaner_workers[i].start();
+  }
+
+  while (!srv_read_only_mode &&
+         srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP &&
+         recv_sys->spaces != nullptr) {
+    /* treat flushing requests during recovery. */
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+
+    os_event_wait(recv_sys->flush_start);
+
+    if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP ||
+        recv_sys->spaces == nullptr) {
+      break;
+    }
+
+    switch (recv_sys->flush_type) {
+      case BUF_FLUSH_LRU:
+        /* Flush pages from end of LRU if required */
+        pc_request(0, LSN_MAX);
+        while (pc_flush_slot() > 0) {
+        }
+        pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+        break;
+
+      case BUF_FLUSH_LIST:
+        /* Flush all pages */
+        do {
+          pc_request(ULINT_MAX, LSN_MAX);
+          while (pc_flush_slot() > 0) {
+          }
+        } while (!pc_wait_finished(&n_flushed_lru, &n_flushed_list));
+        break;
+
+      default:
+        ut_d(ut_error);
+    }
+
+    os_event_reset(recv_sys->flush_start);
+    os_event_set(recv_sys->flush_end);
+  }
+
+  os_event_wait(buf_flush_event);
+
+  ulint ret_sleep = 0;
+  ulint n_evicted = 0;
+  ulint n_flushed_last = 0;
+  ulint warn_interval = 1;
+  ulint warn_count = 0;
+  bool is_sync_flush = false;
+  bool was_server_active = true;
+  int64_t sig_count = os_event_reset(buf_flush_event);
+
+  while (srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP) {
+    /* We consider server active if either we have just discovered a first
+    activity after a period of inactive server, or we are after the period
+    of active server in which case, it could be just the beginning of the
+    next period, so there is no reason to consider it idle yet.
+    The withdrawing blocks process when shrinking the buffer pool always
+    needs the page_cleaner activity. So, we consider server is active
+    during the withdrawing blocks process also. */
+
+    bool is_withdrawing = false;
+    for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+      buf_pool_t *buf_pool = buf_pool_from_array(i);
+      if (buf_get_withdraw_depth(buf_pool) > 0) {
+        is_withdrawing = true;
+        break;
+      }
+    }
+
+    const bool is_server_active = is_withdrawing || was_server_active ||
+                                  srv_check_activity(last_activity);
+
+    /* The page_cleaner skips sleep if the server is
+    idle and there are no pending IOs in the buffer pool
+    and there is work to do. */
+    if ((is_server_active || buf_get_n_pending_read_ios() || n_flushed == 0) &&
+        !is_sync_flush) {
+      ret_sleep = pc_sleep_if_needed(loop_start_time + std::chrono::seconds{1},
+                                     sig_count);
+
+      if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP) {
+        break;
+      }
+    } else if (std::chrono::steady_clock::now() >
+               loop_start_time + std::chrono::seconds{1}) {
+      ret_sleep = OS_SYNC_TIME_EXCEEDED;
+    } else {
+      ret_sleep = 0;
+    }
+
+    sig_count = os_event_reset(buf_flush_event);
+
+    if (ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+      const auto curr_time = std::chrono::steady_clock::now();
+
+      if (curr_time > loop_start_time + std::chrono::seconds{4}) {
+        if (warn_count == 0) {
+          auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+              curr_time - loop_start_time);
+
+          ib::info(ER_IB_MSG_128)
+              << "Page cleaner took " << diff_ms.count() << "ms to flush "
+              << n_flushed_last << " and evict " << n_evicted << " pages";
+
+          if (warn_interval > 300) {
+            warn_interval = 600;
+          } else {
+            warn_interval *= 2;
+          }
+
+          warn_count = warn_interval;
+        } else {
+          --warn_count;
+        }
+      } else {
+        /* reset counter */
+        warn_interval = 1;
+        warn_count = 0;
+      }
+
+      loop_start_time = curr_time;
+      n_flushed_last = n_evicted = 0;
+
+      was_server_active = srv_check_activity(last_activity);
+      last_activity = srv_get_activity_count();
+    }
+
+    lsn_t lsn_limit;
+    if (srv_flush_sync && !srv_read_only_mode) {
+      /* lsn_limit!=0 means there are requests. needs to check the lsn. */
+      lsn_limit = log_sync_flush_lsn(*log_sys);
+      if (lsn_limit != 0) {
+        /* Avoid aggressive sync flush beyond limit when redo is disabled. */
+        if (mtr_t::s_logging.is_enabled()) {
+          lsn_limit += Adaptive_flush::lsn_avg_rate * buf_flush_lsn_scan_factor;
+        }
+        is_sync_flush = true;
+      } else {
+        /* Stop the sync flush. */
+        is_sync_flush = false;
+      }
+    } else {
+      is_sync_flush = false;
+      lsn_limit = LSN_MAX;
+    }
+
+    if (!srv_read_only_mode && mtr_t::s_logging.is_enabled() &&
+        ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+      /* For smooth page flushing along with WAL,
+      flushes log as much as possible. */
+      log_sys->recent_written.advance_tail();
+      auto wait_stats = log_write_up_to(
+          *log_sys, log_buffer_ready_for_write_lsn(*log_sys), true);
+      MONITOR_INC_WAIT_STATS_EX(MONITOR_ON_LOG_, _PAGE_WRITTEN, wait_stats);
+    }
+
+    if (is_sync_flush || is_server_active) {
+      ulint n_to_flush;
+
+      /* Estimate pages from flush_list to be flushed */
+      if (is_sync_flush) {
+        ut_a(lsn_limit > 0);
+        ut_a(lsn_limit < LSN_MAX);
+        n_to_flush =
+            Adaptive_flush::page_recommendation(last_pages, true, lsn_limit);
+        last_pages = 0;
+        /* Flush n_to_flush pages or stop if you reach lsn_limit earlier.
+        This is because in sync-flush mode we want finer granularity of
+        flushes through all BP instances. */
+      } else if (ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+        n_to_flush =
+            Adaptive_flush::page_recommendation(last_pages, false, LSN_MAX);
+        lsn_limit = LSN_MAX;
+        last_pages = 0;
+      } else {
+        n_to_flush = 0;
+        lsn_limit = 0;
+      }
+
+      /* Request flushing for threads */
+      pc_request(n_to_flush, lsn_limit);
+
+      const auto flush_start = std::chrono::steady_clock::now();
+
+      /* Coordinator also treats requests */
+      while (pc_flush_slot() > 0) {
+        /* No op */
+      }
+
+      /* only coordinator is using these counters,
+      so no need to protect by lock. */
+      page_cleaner->flush_time +=
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - flush_start);
+      page_cleaner->flush_pass++;
+
+      /* Wait for all slots to be finished */
+      ulint n_flushed_lru = 0;
+      ulint n_flushed_list = 0;
+
+      pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+      if (n_flushed_list > 0 || n_flushed_lru > 0) {
+        buf_flush_stats(n_flushed_list, n_flushed_lru);
+      }
+
+      if (n_to_flush != 0) {
+        last_pages = n_flushed_list;
+      }
+
+      n_evicted += n_flushed_lru;
+      n_flushed_last += n_flushed_list;
+
+      n_flushed = n_flushed_lru + n_flushed_list;
+
+      if (is_sync_flush) {
+        MONITOR_INC_VALUE_CUMULATIVE(
+            MONITOR_FLUSH_SYNC_TOTAL_PAGE, MONITOR_FLUSH_SYNC_COUNT,
+            MONITOR_FLUSH_SYNC_PAGES, n_flushed_lru + n_flushed_list);
+      } else {
+        if (n_flushed_lru) {
+          MONITOR_INC_VALUE_CUMULATIVE(
+              MONITOR_LRU_BATCH_FLUSH_TOTAL_PAGE, MONITOR_LRU_BATCH_FLUSH_COUNT,
+              MONITOR_LRU_BATCH_FLUSH_PAGES, n_flushed_lru);
+        }
+        if (n_flushed_list) {
+          MONITOR_INC_VALUE_CUMULATIVE(
+              MONITOR_FLUSH_ADAPTIVE_TOTAL_PAGE, MONITOR_FLUSH_ADAPTIVE_COUNT,
+              MONITOR_FLUSH_ADAPTIVE_PAGES, n_flushed_list);
+        }
+      }
+
+    } else if (ret_sleep == OS_SYNC_TIME_EXCEEDED && srv_idle_flush_pct) {
+      /* no activity, slept enough */
+      buf_flush_lists(PCT_IO(srv_idle_flush_pct), LSN_MAX, &n_flushed);
+
+      n_flushed_last += n_flushed;
+
+      if (n_flushed) {
+        MONITOR_INC_VALUE_CUMULATIVE(MONITOR_FLUSH_BACKGROUND_TOTAL_PAGE,
+                                     MONITOR_FLUSH_BACKGROUND_COUNT,
+                                     MONITOR_FLUSH_BACKGROUND_PAGES, n_flushed);
+      }
+
+    } else {
+      /* no activity, but woken up by event */
+      n_flushed = 0;
+    }
+
+    ut_d(buf_flush_page_cleaner_disabled_loop());
+  }
+
+  /* This is just for test scenarios. */
+  srv_thread_delay_cleanup_if_needed(thd);
+
+  ut_ad(srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP);
+
+  if (srv_fast_shutdown == 2 ||
+      srv_shutdown_state.load() == SRV_SHUTDOWN_EXIT_THREADS) {
+    /* In very fast shutdown or when innodb failed to start, we
+    simulate a crash of the buffer pool. We are not required to do
+    any flushing. */
+    goto thread_exit;
+  }
+
+  /* In case of normal and slow shutdown the page_cleaner thread
+  must wait for all other activity in the server to die down.
+  Note that we can start flushing the buffer pool as soon as the
+  server enters shutdown phase but we must stay alive long enough
+  to ensure that any work done by the master or purge threads is
+  also flushed.
+  During shutdown we pass through three stages. In the first stage,
+  when SRV_SHUTDOWN_CLEANUP is set other threads like the master
+  and the purge threads may be working as well. We start flushing
+  the buffer pool but can't be sure that no new pages are being
+  dirtied until we enter SRV_SHUTDOWN_FLUSH_PHASE phase which is
+  the last phase (meanwhile we visit SRV_SHUTDOWN_MASTER_STOP).
+
+  Note, that if we are handling fatal error, we set the state
+  directly to EXIT_THREADS in which case we also might exit the loop
+  below, but still some new dirty pages could be arriving...
+  In such case we just want to stop and don't care about the new pages.
+  However we need to be careful not to crash (e.g. in assertions). */
+
+  do {
+    pc_request(ULINT_MAX, LSN_MAX);
+
+    while (pc_flush_slot() > 0) {
+    }
+
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+    pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+    n_flushed = n_flushed_lru + n_flushed_list;
+
+    /* We sleep only if there are no pages to flush */
+    if (n_flushed == 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  } while (srv_shutdown_state.load() < SRV_SHUTDOWN_FLUSH_PHASE);
+
+  /* At this point all threads including the master and the purge
+  thread must have been closed, unless we are handling some error
+  during initialization of InnoDB (srv_init_abort). In such case
+  we could have SRV_SHUTDOWN_EXIT_THREADS set directly from the
+  srv_shutdown_exit_threads(). */
+  if (srv_shutdown_state.load() != SRV_SHUTDOWN_EXIT_THREADS) {
+    /* We could have srv_shutdown_state.load() >= FLUSH_PHASE only
+    when either: shutdown started or init is being aborted. In the
+    first case we would have FLUSH_PHASE and keep waiting until
+    this thread is alive before we switch to LAST_PHASE.
+
+    In the second case, we would jump to EXIT_THREADS from NONE,
+    so we would not enter here. */
+    ut_a(!srv_is_being_started);
+    ut_a(srv_shutdown_state.load() == SRV_SHUTDOWN_FLUSH_PHASE);
+
+    ut_a(!srv_master_thread_is_active());
+    if (!srv_read_only_mode) {
+      ut_a(!srv_purge_threads_active());
+      ut_a(!srv_thread_is_active(srv_threads.m_dict_stats));
+      ut_a(!srv_thread_is_active(srv_threads.m_ts_alter_encrypt));
+    }
+  }
+
+  /* We can now make a final sweep on flushing the buffer pool
+  and exit after we have cleaned the whole buffer pool.
+  It is important that we wait for any running batch that has
+  been triggered by us to finish. Otherwise we can end up
+  considering end of that batch as a finish of our final
+  sweep and we'll come out of the loop leaving behind dirty pages
+  in the flush_list */
+  buf_flush_wait_batch_end(nullptr, BUF_FLUSH_LIST);
+  buf_flush_wait_LRU_batch_end();
+
+  bool success;
+  bool are_any_read_ios_still_underway;
+
+  do {
+    /* If there are any read operations pending, they can result in the ibuf
+    merges and a dirtying page after the read is completed. If there are any
+    IO reads running before we run the flush loop, we risk having some dirty
+    pages after flushing reports n_flushed == 0. The ibuf change merging on
+    page results in dirtying the page and is followed by decreasing the
+    n_pend_reads counter, thus it's safe to check it before flush loop and
+    have guarantees if it was seen with value of 0. These reads could be issued
+    in the previous stage(s), the srv_master thread on shutdown tasks clear the
+    ibuf unless it's the fast shutdown. */
+    are_any_read_ios_still_underway = buf_get_n_pending_read_ios() > 0;
+    pc_request(ULINT_MAX, LSN_MAX);
+
+    while (pc_flush_slot() > 0) {
+    }
+
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+    success = pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+    n_flushed = n_flushed_lru + n_flushed_list;
+
+    buf_flush_wait_batch_end(nullptr, BUF_FLUSH_LIST);
+    buf_flush_wait_LRU_batch_end();
+
+  } while (!success || n_flushed > 0 || are_any_read_ios_still_underway);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    ut_a(UT_LIST_GET_LEN(buf_pool->flush_list) == 0);
+  }
+
+  /* Mark that it is safe to recover as we have already flushed all dirty
+  pages in buffer pools. */
+  if (mtr_t::s_logging.is_disabled() && !srv_read_only_mode) {
+    log_persist_crash_safe(*log_sys);
+  }
+  log_crash_safe_validate(*log_sys);
+
+  /* We have lived our life. Time to die. */
+
+thread_exit:
+  /* All worker threads are waiting for the event here,
+  and no more access to page_cleaner structure by them.
+  Wakes worker threads up just to make them exit. */
+  page_cleaner->is_running = false;
+  os_event_set(page_cleaner->is_requested);
+
+  buf_flush_page_cleaner_close();
+
+  destroy_internal_thd(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0repl.cc
+Function: Clone_persist_gtid::periodic_write
+void Clone_persist_gtid::periodic_write() {
+  auto thd = create_internal_thd();
+
+  /* Allow GTID to be persisted on read only server. */
+  thd->set_skip_readonly_check();
+
+  /* Write all accumulated GTIDs while starting server. These GTIDs
+  are found in undo log during recovery. We must make sure all these
+  GTIDs are flushed and on disk before server is open for new operation
+  and new GTIDs are generated.
+
+  Why is it needed ?
+
+  1. mysql.gtid_executed table must be up to date at this point as global
+     variable gtid_executed is updated from it when binary log is disabled.
+
+  2. In older versions we used to have only one GTID storage in undo log
+     and PREAPARE GTID was stored in same place as COMMIT GTID. We used to
+     wait for PREPARE GTID to flush before writing commit GTID. Now this
+     limitation is removed and we no longer wait for PREPARE GTID to get
+     flushed before COMMIT as we store the PREPARE GTID in separate location.
+     However, while upgrading from previous version, there could be XA
+     transaction in PREPARED state with GTID stored in place of commit GTID.
+     Those GTIDs are also flushed here so that they are not overwritten later
+     at COMMIT.
+*/
+  flush_gtids(thd);
+
+  /* Let the caller wait till first set of GTIDs are persisted to table
+  after recovery. */
+  m_thread_active.store(true);
+
+  for (;;) {
+    /* Exit if last phase of shutdown */
+    auto is_shutdown = (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP);
+
+    if (is_shutdown || m_close_thread.load()) {
+      /* Stop accepting any more GTID */
+      m_active.store(false);
+      break;
+    }
+
+    if (!flush_immediate()) {
+      os_event_wait_time(m_event, s_time_threshold);
+    }
+    os_event_reset(m_event);
+    /* Write accumulated GTIDs to disk table */
+    flush_gtids(thd);
+  }
+
+  /* For slow shutdown, consume remaining GTIDs so that undo can be purged. */
+  if (m_num_gtid_mem.load() > 0 && srv_fast_shutdown < 2) {
+    flush_gtids(thd);
+    /* All GTIDs should have been flushed at this point. */
+    if (m_num_gtid_mem.load() > 0) {
+      ib::warn(ER_IB_MSG_GTID_FLUSH_AT_SHUTDOWN);
+    }
+  }
+
+  m_active.store(false);
+  destroy_internal_thd(thd);
+  m_thread_active.store(false);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: is_fast_shutdown
+static bool is_fast_shutdown() {
+#ifndef UNIV_HOTBACKUP
+  return srv_shutdown_state >= SRV_SHUTDOWN_LAST_PHASE &&
+         srv_fast_shutdown >= 2;
+#else
+  return false;
+#endif
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: fil_node_t::can_be_closed
+bool fil_node_t::can_be_closed() const {
+  ut_ad(is_open);
+  /* We need to wait for the pending extension and I/Os to finish. */
+  if (n_pending_ios != 0) {
+    return false;
+  }
+  if (n_pending_flushes != 0) {
+    return false;
+  }
+  if (is_being_extended) {
+    return false;
+  }
+#ifndef UNIV_HOTBACKUP
+  /* The file must be flushed, unless we are in very fast shutdown process. */
+  if (is_fast_shutdown()) {
+    return true;
+  }
+#endif
+  return is_flushed();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: Fil_shard::space_flush
+void Fil_shard::space_flush(space_id_t space_id) {
+  ut_ad(mutex_owned());
+
+  fil_space_t *space = get_space_by_id(space_id);
+
+  if (space == nullptr || space->purpose == FIL_TYPE_TEMPORARY ||
+      space->stop_new_ops) {
+    return;
+  }
+
+  const bool disable_flush = fil_disable_space_flushing(space);
+
+  if (disable_flush) {
+    /* No need to flush. User has explicitly disabled
+    buffering. However, flush should be called if the file
+    size changes to keep OЅ metadata in sync. */
+    ut_ad(!space->is_in_unflushed_spaces);
+    ut_ad(space_is_flushed(space));
+
+    /* Flush only if the file size changes */
+    bool no_flush = true;
+    for (const auto &file : space->files) {
+#ifdef UNIV_DEBUG
+      ut_ad(file.is_flushed());
+#endif /* UNIV_DEBUG */
+      if (file.flush_size != file.size) {
+        /* Found at least one file whose size has changed */
+        no_flush = false;
+        break;
+      }
+    }
+
+    if (no_flush) {
+      /* Nothing to flush. Just return */
+      return;
+    }
+  }
+
+  /* Prevent dropping of the space while we are flushing */
+  ++space->n_pending_flushes;
+
+  for (auto &file : space->files) {
+    int64_t old_mod_counter = file.modification_counter;
+
+    if (!file.is_open) {
+      continue;
+    }
+
+    /* Skip flushing if the file size has not changed since
+    last flush was done and the flush mode is O_DIRECT_NO_FSYNC */
+    if (disable_flush && (file.flush_size == file.size)) {
+      ut_ad(old_mod_counter <= file.flush_counter);
+      continue;
+    }
+
+    /* If we are here and the flush mode is O_DIRECT_NO_FSYNC, then
+    it means that the file size has changed and hence, it should be
+    flushed, irrespective of the mod_counter and flush counter values,
+    which are always same in case of O_DIRECT_NO_FSYNC to avoid flush
+    on every write operation.
+    For other flush modes, if the flush_counter is same or ahead of
+    the mod_counter, skip the flush. */
+    if (!disable_flush && (old_mod_counter <= file.flush_counter)) {
+      continue;
+    }
+
+    switch (space->purpose) {
+      case FIL_TYPE_TEMPORARY:
+        ut_error;  // we already checked for this
+
+      case FIL_TYPE_TABLESPACE:
+      case FIL_TYPE_IMPORT:
+        fil_n_pending_tablespace_flushes.fetch_add(1);
+        break;
+    }
+
+    bool skip_flush = is_fast_shutdown();
+#ifdef _WIN32
+    if (file.is_raw_disk) {
+      skip_flush |= true;
+    }
+#endif /* _WIN32 */
+
+    while (file.n_pending_flushes > 0 && !skip_flush) {
+      /* We want to avoid calling os_file_flush() on
+      the file twice at the same time, because we do
+      not know what bugs OS's may contain in file
+      I/O */
+
+      int64_t sig_count = os_event_reset(file.sync_event);
+
+      mutex_release();
+
+      os_event_wait_low(file.sync_event, sig_count);
+
+      mutex_acquire();
+
+      if (file.flush_counter >= old_mod_counter) {
+        skip_flush |= true;
+      }
+      skip_flush |= is_fast_shutdown();
+    }
+
+    if (!skip_flush) {
+      ut_a(file.is_open);
+      ++file.n_pending_flushes;
+
+      mutex_release();
+
+      os_file_flush(file.handle);
+
+      file.flush_size = file.size;
+
+      mutex_acquire();
+
+      os_event_set(file.sync_event);
+
+      --file.n_pending_flushes;
+    }
+
+    if (file.flush_counter < old_mod_counter) {
+      file.flush_counter = old_mod_counter;
+
+      remove_from_unflushed_list(space);
+    }
+
+    switch (space->purpose) {
+      case FIL_TYPE_TEMPORARY:
+        ut_error;  // we already checked for this
+
+      case FIL_TYPE_TABLESPACE:
+      case FIL_TYPE_IMPORT:
+        fil_n_pending_tablespace_flushes.fetch_sub(1);
+        continue;
+    }
+
+    ut_d(ut_error);
+  }
+
+  --space->n_pending_flushes;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: fil_validate_space_reference_count not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: Fil_system::close_all_files
+void Fil_shard::close_all_files() {
+  ut_ad(mutex_owned());
+
+  /* Iterates over a specified container of pair */
+  auto iterate_all_spaces_files = [this](auto &spaces, auto preprocess_space,
+                                         auto postprocess_space) {
+    for (auto &e : spaces) {
+      auto &space = e.second;
+      if (space == nullptr) {
+        continue;
+      }
+
+      preprocess_space(space);
+
+      for (auto &file : space->files) {
+        if (file.is_open && !file.can_be_closed()) {
+          mutex_release();
+          std::this_thread::sleep_for(std::chrono::milliseconds{1});
+          mutex_acquire();
+          /* Files or spaces could have changed when we did not hold the
+          mutex, restart the loop. */
+          return false;
+        }
+        if (file.is_open) {
+          close_file(&file);
+        }
+      }
+
+      postprocess_space(space);
+
+      space_free_low(space);
+
+      ut_a(space == nullptr);
+    }
+    return true;
+  };
+
+  for (;;) {
+    if (!iterate_all_spaces_files(
+            m_spaces,
+            [](auto space) {
+              ut_a(space->id == TRX_SYS_SPACE ||
+                   space->purpose == FIL_TYPE_TEMPORARY ||
+                   space->files.size() == 1);
+            },
+            [this](auto space) { space_detach(space); })) {
+      continue;
+    }
+
+    m_spaces.clear();
+
+#ifndef UNIV_HOTBACKUP
+    if (!iterate_all_spaces_files(
+            m_deleted_spaces,
+            [](auto space) {
+              ut_a(space->id != TRX_SYS_SPACE &&
+                   space->id != dict_sys_t::s_dict_space_id);
+
+              ut_a(space->files.size() <= 1);
+            },
+            [](auto) {})) {
+      continue;
+    }
+
+    m_deleted_spaces.clear();
+#endif /* !UNIV_HOTBACKUP */
+    break;
+  }
+}
+
+

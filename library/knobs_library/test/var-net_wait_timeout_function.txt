@@ -1,0 +1,427 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc
+Function: prepare_new_connection_state
+static void prepare_new_connection_state(THD *thd) {
+  NET *net = thd->get_protocol_classic()->get_net();
+  Security_context *sctx = thd->security_context();
+
+  if (thd->get_protocol()->has_client_capability(CLIENT_COMPRESS) ||
+      thd->get_protocol()->has_client_capability(
+          CLIENT_ZSTD_COMPRESSION_ALGORITHM)) {
+    net->compress = true;  // Use compression
+    enum enum_compression_algorithm algorithm = get_compression_algorithm(
+        thd->get_protocol()->get_compression_algorithm());
+    NET_SERVER *server_extn = static_cast<NET_SERVER *>(net->extension);
+    if (server_extn != nullptr)
+      mysql_compress_context_init(&server_extn->compress_ctx, algorithm,
+                                  thd->get_protocol()->get_compression_level());
+    if (net->extension == nullptr) {
+      LEX_CSTRING sctx_user = sctx->user();
+      Host_errors errors;
+      my_error(ER_NEW_ABORTING_CONNECTION, MYF(0), thd->thread_id(),
+               thd->db().str ? thd->db().str : "unconnected",
+               sctx_user.str ? sctx_user.str : "unauthenticated",
+               sctx->host_or_ip().str,
+               "Unable to allocate memory for compression context: Aborting "
+               "connection.");
+      thd->server_status &= ~SERVER_STATUS_CLEAR_SET;
+      thd->send_statement_status();
+      thd->killed = THD::KILL_CONNECTION;
+      errors.m_init_connect = 1;
+      inc_host_errors(thd->m_main_security_ctx.ip().str, &errors);
+      return;
+    }
+  }
+
+  // Initializing session system variables.
+  alloc_and_copy_thd_dynamic_variables(thd, true);
+
+  thd->set_proc_info(nullptr);
+  thd->set_command(COM_SLEEP);
+  thd->init_query_mem_roots();
+  const bool is_admin_conn =
+      (sctx->check_access(SUPER_ACL) ||
+       sctx->has_global_grant(STRING_WITH_LEN("CONNECTION_ADMIN")).first);
+  thd->m_mem_cnt.set_orig_mode(is_admin_conn ? MEM_CNT_UPDATE_GLOBAL_COUNTER
+                                             : (MEM_CNT_UPDATE_GLOBAL_COUNTER |
+                                                MEM_CNT_GENERATE_ERROR |
+                                                MEM_CNT_GENERATE_LOG_ERROR));
+  if (opt_init_connect.length && !is_admin_conn) {
+    if (sctx->password_expired()) {
+      LogErr(WARNING_LEVEL, ER_CONN_INIT_CONNECT_IGNORED, sctx->priv_user().str,
+             sctx->priv_host().str);
+      return;
+    }
+    if (sctx->is_in_registration_sandbox_mode()) {
+      LogErr(WARNING_LEVEL, ER_CONN_INIT_CONNECT_IGNORED_MFA,
+             sctx->priv_user().str, sctx->priv_host().str);
+      return;
+    }
+    // Do not print OOM error to error log.
+    thd->m_mem_cnt.set_curr_mode(
+        (MEM_CNT_UPDATE_GLOBAL_COUNTER | MEM_CNT_GENERATE_ERROR));
+    execute_init_command(thd, &opt_init_connect, &LOCK_sys_init_connect);
+    thd->m_mem_cnt.set_curr_mode(MEM_CNT_DEFAULT);
+    if (thd->is_error()) {
+      Host_errors errors;
+      ulong packet_length;
+      LEX_CSTRING sctx_user = sctx->user();
+      Diagnostics_area *da = thd->get_stmt_da();
+      const char *user = sctx_user.str ? sctx_user.str : "unauthenticated";
+      const char *what = "init_connect command failed";
+
+      LogEvent()
+          .prio(WARNING_LEVEL)
+          .subsys(LOG_SUBSYSTEM_TAG)
+          .thread_id(thd->thread_id())
+          .user(sctx_user)
+          .host(sctx->host_or_ip())
+          .source_file(MY_BASENAME)
+          .errcode(ER_SERVER_NEW_ABORTING_CONNECTION)
+          .sqlstate(da->returned_sqlstate())
+          .string_value(LOG_TAG_DIAG, da->message_text())
+          .string_value(LOG_TAG_AUX, what)
+          .lookup(ER_SERVER_NEW_ABORTING_CONNECTION, thd->thread_id(),
+                  thd->db().str ? thd->db().str : "unconnected", user,
+                  sctx->host_or_ip().str, what, da->mysql_errno(),
+                  da->message_text());
+
+      thd->lex->set_current_query_block(nullptr);
+      my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+      thd->clear_error();
+      net_new_transaction(net);
+      packet_length = my_net_read(net);
+      /*
+        If my_net_read() failed, my_error() has been already called,
+        and the main Diagnostics Area contains an error condition.
+      */
+      if (packet_length != packet_error)
+        my_error(ER_NEW_ABORTING_CONNECTION, MYF(0), thd->thread_id(),
+                 thd->db().str ? thd->db().str : "unconnected",
+                 sctx_user.str ? sctx_user.str : "unauthenticated",
+                 sctx->host_or_ip().str, "init_connect command failed");
+
+      thd->server_status &= ~SERVER_STATUS_CLEAR_SET;
+      thd->send_statement_status();
+      thd->killed = THD::KILL_CONNECTION;
+      errors.m_init_connect = 1;
+      inc_host_errors(thd->m_main_security_ctx.ip().str, &errors);
+      NET_SERVER *server_extn = static_cast<NET_SERVER *>(net->extension);
+      if (server_extn != nullptr)
+        mysql_compress_context_deinit(&server_extn->compress_ctx);
+      return;
+    }
+
+    thd->set_proc_info(nullptr);
+    thd->init_query_mem_roots();
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc
+Function: do_command
+bool do_command(THD *thd) {
+  bool return_value;
+  int rc;
+  NET *net = nullptr;
+  enum enum_server_command command = COM_SLEEP;
+  COM_DATA com_data;
+  DBUG_TRACE;
+  assert(thd->is_classic_protocol());
+
+  /*
+    indicator of uninitialized lex => normal flow of errors handling
+    (see my_message_sql)
+  */
+  thd->lex->set_current_query_block(nullptr);
+
+  /*
+    XXX: this code is here only to clear possible errors of init_connect.
+    Consider moving to prepare_new_connection_state() instead.
+    That requires making sure the DA is cleared before non-parsing statements
+    such as COM_QUIT.
+  */
+  thd->clear_error();  // Clear error message
+  thd->get_stmt_da()->reset_diagnostics_area();
+
+  /*
+    This thread will do a blocking read from the client which
+    will be interrupted when the next command is received from
+    the client, the connection is closed or "net_wait_timeout"
+    number of seconds has passed.
+  */
+  net = thd->get_protocol_classic()->get_net();
+  my_net_set_read_timeout(net, thd->variables.net_wait_timeout);
+  net_new_transaction(net);
+
+  /*
+    Synchronization point for testing of KILL_CONNECTION.
+    This sync point can wait here, to simulate slow code execution
+    between the last test of thd->killed and blocking in read().
+
+    The goal of this test is to verify that a connection does not
+    hang, if it is killed at this point of execution.
+    (Bug#37780 - main.kill fails randomly)
+
+    Note that the sync point wait itself will be terminated by a
+    kill. In this case it consumes a condition broadcast, but does
+    not change anything else. The consumed broadcast should not
+    matter here, because the read/recv() below doesn't use it.
+  */
+  DEBUG_SYNC(thd, "before_do_command_net_read");
+
+  /* For per-query performance counters with log_slow_statement */
+  struct System_status_var query_start_status;
+  thd->clear_copy_status_var();
+  if (opt_log_slow_extra) {
+    thd->copy_status_var(&query_start_status);
+  }
+
+  rc = thd->m_mem_cnt.reset();
+  if (rc)
+    thd->m_mem_cnt.set_thd_error_status();
+  else {
+    /*
+      Because of networking layer callbacks in place,
+      this call will maintain the following instrumentation:
+      - IDLE events
+      - SOCKET events
+      - STATEMENT events
+      - STAGE events
+      when reading a new network packet.
+      In particular, a new instrumented statement is started.
+      See init_net_server_extension()
+    */
+    thd->m_server_idle = true;
+    rc = thd->get_protocol()->get_command(&com_data, &command);
+    thd->m_server_idle = false;
+  }
+
+  if (rc) {
+#ifndef NDEBUG
+    char desc[VIO_DESCRIPTION_SIZE];
+    vio_description(net->vio, desc);
+    DBUG_PRINT("info", ("Got error %d reading command from socket %s",
+                        net->error, desc));
+#endif  // NDEBUG
+    /* Instrument this broken statement as "statement/com/error" */
+    thd->m_statement_psi = MYSQL_REFINE_STATEMENT(
+        thd->m_statement_psi, com_statement_info[COM_END].m_key);
+
+    /* Check if we can continue without closing the connection */
+
+    /* The error must be set. */
+    assert(thd->is_error());
+    thd->send_statement_status();
+
+    /* Mark the statement completed. */
+    MYSQL_END_STATEMENT(thd->m_statement_psi, thd->get_stmt_da());
+    thd->m_statement_psi = nullptr;
+    thd->m_digest = nullptr;
+
+    if (rc < 0) {
+      return_value = true;  // We have to close it.
+      goto out;
+    }
+    net->error = NET_ERROR_UNSET;
+    return_value = false;
+    goto out;
+  }
+
+#ifndef NDEBUG
+  char desc[VIO_DESCRIPTION_SIZE];
+  vio_description(net->vio, desc);
+  DBUG_PRINT("info", ("Command on %s = %d (%s)", desc, command,
+                      Command_names::str_notranslate(command).c_str()));
+  expected_from_debug_flag = TDM::ANY;
+  DBUG_EXECUTE_IF("tdon", { expected_from_debug_flag = TDM::ON; });
+  DBUG_EXECUTE_IF("tdzero", { expected_from_debug_flag = TDM::ZERO; });
+  DBUG_EXECUTE_IF("tdna", { expected_from_debug_flag = TDM::NOT_AVAILABLE; });
+#endif  // NDEBUG
+  DBUG_PRINT("info", ("packet: '%*.s'; command: %d",
+                      (int)thd->get_protocol_classic()->get_packet_length(),
+                      thd->get_protocol_classic()->get_raw_packet(), command));
+  if (thd->get_protocol_classic()->bad_packet)
+    assert(0);  // Should be caught earlier
+
+  // Reclaim some memory
+  thd->get_protocol_classic()->get_output_packet()->shrink(
+      thd->variables.net_buffer_length);
+  /* Restore read timeout value */
+  my_net_set_read_timeout(net, thd->variables.net_read_timeout);
+
+  DEBUG_SYNC(thd, "before_command_dispatch");
+
+  return_value = dispatch_command(thd, &com_data, command);
+  thd->get_protocol_classic()->get_output_packet()->shrink(
+      thd->variables.net_buffer_length);
+
+out:
+  /* The statement instrumentation must be closed in all cases. */
+  assert(thd->m_digest == nullptr);
+  assert(thd->m_statement_psi == nullptr);
+  return return_value;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc
+Function: thd_get_net_wait_timeout
+ulong thd_get_net_wait_timeout(THD *thd) {
+  return thd->variables.net_wait_timeout;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql-common/net_serv.cc
+Function: net_read_raw_loop
+static bool net_read_raw_loop(NET *net, size_t count) {
+  DBUG_TRACE;
+  bool eof = false;
+  unsigned int retry_count = 0;
+  uchar *buf = net->buff + net->where_b;
+  bool timeout_on_full_packet = false;
+  bool is_packet_timeout = false;
+#ifdef MYSQL_SERVER
+  NET_SERVER *server_ext = static_cast<NET_SERVER *>(net->extension);
+  if (server_ext) timeout_on_full_packet = server_ext->timeout_on_full_packet;
+#endif
+
+  time_t start_time = 0;
+  if (timeout_on_full_packet) start_time = time(&start_time);
+  while (count) {
+    size_t recvcnt = vio_read(net->vio, buf, count);
+
+    /* VIO_SOCKET_ERROR (-1) indicates an error. */
+    if (recvcnt == VIO_SOCKET_ERROR) {
+      /* A recoverable I/O error occurred? */
+      if (net_should_retry(net, &retry_count))
+        continue;
+      else
+        break;
+    }
+    /* Zero indicates end of file. */
+    else if (!recvcnt) {
+      eof = true;
+      break;
+    }
+
+    count -= recvcnt;
+    buf += recvcnt;
+#ifdef MYSQL_SERVER
+    thd_increment_bytes_received(recvcnt);
+#endif
+    if (timeout_on_full_packet) {
+      time_t current_time = time(&current_time);
+      if (static_cast<unsigned int>(current_time - start_time) >
+          net->read_timeout) {
+        is_packet_timeout = true;
+        break;
+      }
+    }
+  }
+
+  /* On failure, propagate the error code. */
+  if (count) {
+    /* Interrupted by a timeout? */
+    if (!eof && (vio_was_timeout(net->vio) || is_packet_timeout))
+      net->last_errno = ER_NET_READ_INTERRUPTED;
+    else
+      net->last_errno = ER_NET_READ_ERROR;
+
+#ifdef MYSQL_SERVER
+    /* First packet always wait for net_wait_timeout */
+    if (net->pkt_nr == 0 && (vio_was_timeout(net->vio) || is_packet_timeout)) {
+      net->last_errno = ER_CLIENT_INTERACTION_TIMEOUT;
+      /* Socket should be closed after trying to write/send error. */
+      THD *thd = current_thd;
+      if (thd) {
+        Security_context *sctx = thd->security_context();
+        std::string timeout{std::to_string(thd_get_net_wait_timeout(thd))};
+        Auth_id auth_id(sctx->priv_user(), sctx->priv_host());
+        LogErr(INFORMATION_LEVEL, ER_NET_WAIT_ERROR2, timeout.c_str(),
+               auth_id.auth_str().c_str());
+      } else {
+        LogErr(INFORMATION_LEVEL, ER_NET_WAIT_ERROR);
+      }
+    }
+    net->error = NET_ERROR_SOCKET_NOT_READABLE;
+    /*
+      Attempt to send error message to client although the client won't be
+      expecting messages. If later the client tries to send a command and fail
+      it will instead check if it can read an error message.
+    */
+    my_error(net->last_errno, MYF(0));
+#else
+    /* Socket should be closed. */
+    net->error = NET_ERROR_SOCKET_UNUSABLE;
+#endif
+  }
+
+  return count != 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc
+Function: server_mpvio_update_thd
+static void server_mpvio_update_thd(THD *thd, MPVIO_EXT *mpvio) {
+  thd->max_client_packet_length = mpvio->max_client_packet_length;
+  if (mpvio->protocol->has_client_capability(CLIENT_INTERACTIVE))
+    thd->variables.net_wait_timeout = thd->variables.net_interactive_timeout;
+  thd->security_context()->assign_user(
+      mpvio->auth_info.user_name,
+      (mpvio->auth_info.user_name ? strlen(mpvio->auth_info.user_name) : 0));
+  if (mpvio->acl_user) {
+    thd->security_context()->lock_account(mpvio->acl_user->account_locked);
+  }
+  if (mpvio->auth_info.user_name) my_free(mpvio->auth_info.user_name);
+  LEX_CSTRING sctx_user = thd->security_context()->user();
+  mpvio->auth_info.user_name = const_cast<char *>(sctx_user.str);
+  mpvio->auth_info.user_name_length = sctx_user.length;
+  if (thd->get_protocol()->has_client_capability(CLIENT_IGNORE_SPACE))
+    thd->variables.sql_mode |= MODE_IGNORE_SPACE;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: Trans_delegate::trans_begin
+int Trans_delegate::trans_begin(THD *thd, int &out) {
+  DBUG_TRACE;
+  if (m_rollback_transaction_on_begin) {
+    out = ER_OPERATION_NOT_ALLOWED_WHILE_PRIMARY_CHANGE_IS_RUNNING;
+    return 0;
+  }
+
+  Trans_param param;
+  TRANS_PARAM_ZERO(param);
+  param.server_uuid = server_uuid;
+  param.thread_id = thd->thread_id();
+  param.group_replication_consistency =
+      thd->variables.group_replication_consistency;
+  param.hold_timeout = thd->variables.net_wait_timeout;
+  param.server_id = thd->server_id;
+  param.rpl_channel_type = thd->rpl_thd_ctx.get_rpl_channel_type();
+
+  int ret = 0;
+  thd->rpl_thd_ctx.set_tx_rpl_delegate_stage_status(
+      Rpl_thd_context::TX_RPL_STAGE_BEGIN);
+  FOREACH_OBSERVER_ERROR_OUT(ret, begin, &param, out);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_get_command not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_get_command not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_get_command not found.
+

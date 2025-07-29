@@ -1,0 +1,573 @@
+Global Variable: System_variables.10
+Explicit Data Flow (91):
+  Instruction: %0 = load i64, i64* %optimizer_switch, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1772:23 | Function: THD::optimizer_switch_flag
+  Instruction: %and = and i64 %0, %1, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1772:40 | Function: THD::optimizer_switch_flag
+  Instruction: %tobool = icmp ne i64 %and, 0, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1772:12 | Function: THD::optimizer_switch_flag
+  Instruction: ret i1 %tobool, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:1772:5 | Function: THD::optimizer_switch_flag
+  Instruction: %call78 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %57, i64 1)
+          to label %invoke.cont77 unwind label %lpad76, !dbg !1255457 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:598:12 | Function: test_quick_select
+  Instruction: %frombool79 = zext i1 %call78 to i8, !dbg !1255455 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:597:14 | Function: test_quick_select
+  Instruction: store i8 %frombool79, i8* %index_merge_allowed, align 1, !dbg !1255455 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:597:14 | Function: test_quick_select
+  Instruction: %58 = load i8, i8* %index_merge_allowed, align 1, !dbg !1255460 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:600:7 | Function: test_quick_select
+  Instruction: %tobool80 = trunc i8 %58 to i1, !dbg !1255460 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:600:7 | Function: test_quick_select
+  Instruction: br i1 %tobool80, label %land.rhs, label %land.end, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:600:27 | Function: test_quick_select
+  Instruction: %61 = load i8, i8* %index_merge_allowed, align 1, !dbg !1255467 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:603:7 | Function: test_quick_select
+  Instruction: %tobool84 = trunc i8 %61 to i1, !dbg !1255467 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:603:7 | Function: test_quick_select
+  Instruction: br i1 %tobool84, label %land.rhs85, label %land.end88, !dbg !1255468 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:603:27 | Function: test_quick_select
+  Instruction: %64 = load i8, i8* %index_merge_allowed, align 1, !dbg !1255473 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:606:7 | Function: test_quick_select
+  Instruction: %tobool90 = trunc i8 %64 to i1, !dbg !1255473 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:606:7 | Function: test_quick_select
+  Instruction: br i1 %tobool90, label %land.rhs91, label %land.end94, !dbg !1255474 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:606:27 | Function: test_quick_select
+  Instruction: %call82 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %59, i64 2)
+          to label %invoke.cont81 unwind label %lpad76, !dbg !1255463 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:601:12 | Function: test_quick_select
+  Instruction: %60 = phi i1 [ false, %invoke.cont77 ], [ %call82, %invoke.cont81 ], !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:0:0 | Function: test_quick_select
+  Instruction: %frombool83 = zext i1 %60 to i8, !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:599:14 | Function: test_quick_select
+  Instruction: store i8 %frombool83, i8* %index_merge_union_allowed, align 1, !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:599:14 | Function: test_quick_select
+  Instruction: %call87 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %62, i64 4)
+          to label %invoke.cont86 unwind label %lpad76, !dbg !1255470 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:604:12 | Function: test_quick_select
+  Instruction: %63 = phi i1 [ false, %land.end ], [ %call87, %invoke.cont86 ], !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:0:0 | Function: test_quick_select
+  Instruction: %frombool89 = zext i1 %63 to i8, !dbg !1255466 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:602:14 | Function: test_quick_select
+  Instruction: store i8 %frombool89, i8* %index_merge_sort_union_allowed, align 1, !dbg !1255466 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:602:14 | Function: test_quick_select
+  Instruction: %call93 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %65, i64 8)
+          to label %invoke.cont92 unwind label %lpad76, !dbg !1255476 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:607:12 | Function: test_quick_select
+  Instruction: %66 = phi i1 [ false, %land.end88 ], [ %call93, %invoke.cont92 ], !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:0:0 | Function: test_quick_select
+  Instruction: %frombool95 = zext i1 %66 to i8, !dbg !1255472 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:605:14 | Function: test_quick_select
+  Instruction: store i8 %frombool95, i8* %index_merge_intersect_allowed, align 1, !dbg !1255472 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:605:14 | Function: test_quick_select
+  Instruction: %call219 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %149, i64 1048576)
+          to label %invoke.cont218 unwind label %lpad76, !dbg !1255671 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:692:12 | Function: test_quick_select
+  Instruction: br i1 %call219, label %if.then221, label %lor.lhs.false, !dbg !1255672 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:692:55 | Function: test_quick_select
+  Instruction: %call8 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %12, i64 16777216)
+          to label %invoke.cont7 unwind label %lpad, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:1423:14 | Function: sql_set_variables
+  Instruction: invoke void @_ZN3LEX30set_using_hypergraph_optimizerEb(%struct.LEX* %11, i1 zeroext %call8)
+          to label %invoke.cont9 unwind label %lpad, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:1422:10 | Function: sql_set_variables
+  Instruction: %call = call zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %1, i64 16777216), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3403:12 | Function: check_optimizer_switch
+  Instruction: %frombool = zext i1 %call to i8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3402:14 | Function: check_optimizer_switch
+  Instruction: store i8 %frombool, i8* %current_hypergraph_optimizer, align 1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3402:14 | Function: check_optimizer_switch
+  Instruction: %4 = load i8, i8* %current_hypergraph_optimizer, align 1, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3407:7 | Function: check_optimizer_switch
+  Instruction: %tobool2 = trunc i8 %4 to i1, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3407:7 | Function: check_optimizer_switch
+  Instruction: br i1 %tobool2, label %land.lhs.true, label %if.else, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3407:36 | Function: check_optimizer_switch
+  Instruction: %10 = load i8, i8* %current_hypergraph_optimizer, align 1, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3414:15 | Function: check_optimizer_switch
+  Instruction: %tobool7 = trunc i8 %10 to i1, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3414:15 | Function: check_optimizer_switch
+  Instruction: br i1 %tobool7, label %if.end12, label %land.lhs.true8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3414:44 | Function: check_optimizer_switch
+  Instruction: %call = call zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %2, i64 524288), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:498:13 | Function: TABLE_SHARE::usable_indexes
+  Instruction: br i1 %call, label %if.end, label %if.then, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:498:7 | Function: TABLE_SHARE::usable_indexes
+  Instruction: %call58 = call zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %44, i64 524288), !dbg !1255434 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:6391:18 | Function: Table_ref::process_index_hints
+  Instruction: br i1 %call58, label %if.end62, label %if.then59, !dbg !1255435 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:6387:11 | Function: Table_ref::process_index_hints
+  Instruction: %call = call zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %0, i64 65536), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:9755:15 | Function: Field::is_part_of_actual_key
+  Instruction: br i1 %call, label %land.lhs.true, label %cond.false, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:9755:76 | Function: Field::is_part_of_actual_key
+  Instruction: %call18 = call zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %29, i64 128), !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6960:12 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: br i1 %call18, label %land.lhs.true19, label %if.end36, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6960:67 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %call42 = call zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %47, i64 128), !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6991:14 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %lnot = xor i1 %call42, true, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6991:8 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %48 = phi i1 [ true, %if.end39 ], [ %lnot, %lor.rhs41 ] | Location: :0:0 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %frombool44 = zext i1 %48 to i8, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6989:14 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: store i8 %frombool44, i8* %force_dsmrr, align 1, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6989:14 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %49 = load i8, i8* %force_dsmrr, align 1, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6993:7 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %tobool45 = trunc i8 %49 to i1, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6993:7 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: br i1 %tobool45, label %land.lhs.true46, label %if.end51, !dbg !1255397 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6993:19 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %54 = load i8, i8* %force_dsmrr, align 1, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6996:7 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %tobool52 = trunc i8 %54 to i1, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6996:7 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: br i1 %tobool52, label %if.then57, label %lor.lhs.false53, !dbg !1255408 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:6996:19 | Function: DsMrr_impl::choose_mrr_impl
+  Instruction: %call273 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %199, i64 16777216)
+          to label %invoke.cont272 unwind label %lpad269, !dbg !1255749 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:371:16 | Function: Sql_cmd_create_table::execute
+  Instruction: invoke void @_ZN3LEX30set_using_hypergraph_optimizerEb(%struct.LEX* %198, i1 zeroext %call273)
+          to label %invoke.cont274 unwind label %lpad269, !dbg !1255750 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:370:12 | Function: Sql_cmd_create_table::execute
+  Instruction: %call27 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %32, i64 16777216)
+          to label %invoke.cont26 unwind label %lpad15, !dbg !1255545 | Location: /root/LLVM/mysql-8.0.36/sql/sql_load.cc:2145:12 | Function: Sql_cmd_load_table::execute
+  Instruction: invoke void @_ZN3LEX30set_using_hypergraph_optimizerEb(%struct.LEX* %31, i1 zeroext %call27)
+          to label %invoke.cont28 unwind label %lpad15, !dbg !1255546 | Location: /root/LLVM/mysql-8.0.36/sql/sql_load.cc:2144:8 | Function: Sql_cmd_load_table::execute
+  Instruction: %call331 = invoke zeroext i1 @_ZNK3THD21optimizer_switch_flagEy(%class.THD* %191, i64 16)
+          to label %invoke.cont330 unwind label %lpad, !dbg !1255654 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_push.cc:1129:14 | Function: ndb_pushed_builder_ctx::is_pushable_as_child
+  Instruction: br i1 %call331, label %if.then332, label %if.end529, !dbg !1255655 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_push.cc:1128:7 | Function: ndb_pushed_builder_ctx::is_pushable_as_child
+  Instruction: %1 = load i64, i64* %optimizer_switch, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4551:38 | Function: Query_block::update_semijoin_strategies
+  Instruction: %and = and i64 %1, %conv, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4551:55 | Function: Query_block::update_semijoin_strategies
+  Instruction: %conv2 = trunc i64 %and to i32, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4551:23 | Function: Query_block::update_semijoin_strategies
+  Instruction: store i32 %conv2, i32* %opt_switches, align 4, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4551:8 | Function: Query_block::update_semijoin_strategies
+  Instruction: %20 = load i32, i32* %opt_switches, align 4, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4574:15 | Function: Query_block::update_semijoin_strategies
+  Instruction: %cond = phi i32 [ %call10, %cond.true ], [ %20, %cond.false ], !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4572:9 | Function: Query_block::update_semijoin_strategies
+  Instruction: store i32 %cond, i32* %sj_enabled_strategies, align 4, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4571:49 | Function: Query_block::update_semijoin_strategies
+  Instruction: %sj_enabled_strategies = getelementptr inbounds %struct.NESTED_JOIN.13372, %struct.NESTED_JOIN.13372* %22, i32 0, i32 11, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4571:27 | Function: Query_block::update_semijoin_strategies
+  Instruction: %sj_enabled_strategies14 = getelementptr inbounds %struct.NESTED_JOIN.13372, %struct.NESTED_JOIN.13372* %25, i32 0, i32 11, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4577:29 | Function: Query_block::update_semijoin_strategies
+  Instruction: %26 = load i32, i32* %sj_enabled_strategies14, align 4, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4577:51 | Function: Query_block::update_semijoin_strategies
+  Instruction: %conv15 = zext i32 %26 to i64, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4577:51 | Function: Query_block::update_semijoin_strategies
+  Instruction: %and16 = and i64 %conv15, 25600, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4577:51 | Function: Query_block::update_semijoin_strategies
+  Instruction: %conv17 = trunc i64 %and16 to i32, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4577:51 | Function: Query_block::update_semijoin_strategies
+  Instruction: store i32 %conv17, i32* %sj_enabled_strategies14, align 4, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:4577:51 | Function: Query_block::update_semijoin_strategies
+  Instruction: %4 = load i64, i64* %optimizer_switch, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:414:50 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  Instruction: store i64 %4, i64* %m_save_optimizer_switch6, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:414:31 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  Instruction: %m_save_optimizer_switch6 = getelementptr inbounds %class.Enable_derived_merge_guard, %class.Enable_derived_merge_guard* %this1, i32 0, i32 2, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:414:7 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  Instruction: %m_save_optimizer_switch = getelementptr inbounds %class.Enable_derived_merge_guard, %class.Enable_derived_merge_guard* %this1, i32 0, i32 2, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:421:43 | Function: Enable_derived_merge_guard::~Enable_derived_merge_guard
+  Instruction: %1 = load i64, i64* %m_save_optimizer_switch, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:421:43 | Function: Enable_derived_merge_guard::~Enable_derived_merge_guard
+  Instruction: store i64 %1, i64* %optimizer_switch, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:421:41 | Function: Enable_derived_merge_guard::~Enable_derived_merge_guard
+  Instruction: %optimizer_switch = getelementptr inbounds %struct.System_variables.22385, %struct.System_variables.22385* %variables, i32 0, i32 10, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:421:24 | Function: Enable_derived_merge_guard::~Enable_derived_merge_guard
+  Instruction: %optimizer_switch9 = getelementptr inbounds %struct.System_variables.22385, %struct.System_variables.22385* %variables8, i32 0, i32 10, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:415:24 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  Instruction: %6 = load i64, i64* %optimizer_switch9, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:415:41 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  Instruction: %or = or i64 %6, 262144, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:415:41 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+  Instruction: store i64 %or, i64* %optimizer_switch9, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/thd_raii.h:415:41 | Function: Enable_derived_merge_guard::Enable_derived_merge_guard
+
+Implicit Data Flow (4):
+  Instruction: %60 = phi i1 [ false, %invoke.cont77 ], [ %call82, %invoke.cont81 ], !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:0:0test_quick_select
+  Instruction: %63 = phi i1 [ false, %land.end ], [ %call87, %invoke.cont86 ], !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:0:0test_quick_select
+  Instruction: %66 = phi i1 [ false, %land.end88 ], [ %call93, %invoke.cont92 ], !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:0:0test_quick_select
+  Instruction: %cond = phi i1 [ %call2, %cond.true ], [ %call3, %cond.false ], !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:9755:10Field::is_part_of_actual_key
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Scope_guard
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Bitmap
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: __assert_fail
+  Controlled Function: Table_ref::map
+  Controlled Function: get_mm_tree
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Cost_model_server::row_evaluate_cost
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: _db_keyword_
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Cost_estimate::add_cpu
+  Controlled Function: Cost_estimate::operator
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Cost_estimate::reset
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Cost_estimate::add_io
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_struct::add_utf8
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: double const& std::min
+  Controlled Function: double const& std::min
+  Controlled Function: dbug_print_tree
+  Controlled Function: get_forced_by_hint
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Scope_guard
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: MY_BITMAP::MY_BITMAP
+  Controlled Function: fill_used_fields_bitmap
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: get_key_scans_params
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: trace_basic_info
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: _db_keyword_
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: base_list::is_empty
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: print_quick
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: get_best_ror_intersect
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: List
+  Controlled Function: List
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: List_STL_Iterator
+  Controlled Function: List_STL_Iterator
+  Controlled Function: get_best_disjunct_quick
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: double const& std::min
+  Controlled Function: List_STL_Iterator
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Bitmap
+  Controlled Function: Scope_guard
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: __assert_fail
+  Controlled Function: Table_ref::map
+  Controlled Function: get_mm_tree
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Cost_model_server::row_evaluate_cost
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: _db_keyword_
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Cost_estimate::add_cpu
+  Controlled Function: Cost_estimate::operator
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Cost_estimate::reset
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Cost_estimate::add_io
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_struct::add_utf8
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: double const& std::min
+  Controlled Function: double const& std::min
+  Controlled Function: dbug_print_tree
+  Controlled Function: get_forced_by_hint
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Scope_guard
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: MY_BITMAP::MY_BITMAP
+  Controlled Function: fill_used_fields_bitmap
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: get_key_scans_params
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: trace_basic_info
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: _db_keyword_
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: base_list::is_empty
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: print_quick
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: get_best_ror_intersect
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: List
+  Controlled Function: List
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: List_STL_Iterator
+  Controlled Function: List_STL_Iterator
+  Controlled Function: get_best_disjunct_quick
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: double const& std::min
+  Controlled Function: List_STL_Iterator
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Bitmap
+  Controlled Function: Scope_guard
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Table_ref::map
+  Controlled Function: get_mm_tree
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Cost_model_server::row_evaluate_cost
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: _db_keyword_
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Cost_estimate::add_cpu
+  Controlled Function: Cost_estimate::operator
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Cost_estimate::reset
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Cost_estimate::add_io
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_struct::add_utf8
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: double const& std::min
+  Controlled Function: double const& std::min
+  Controlled Function: dbug_print_tree
+  Controlled Function: get_forced_by_hint
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Scope_guard
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: MY_BITMAP::MY_BITMAP
+  Controlled Function: fill_used_fields_bitmap
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: get_key_scans_params
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: trace_basic_info
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: _db_keyword_
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: base_list::is_empty
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: print_quick
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: get_best_ror_intersect
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: List
+  Controlled Function: List
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: List_STL_Iterator
+  Controlled Function: List_STL_Iterator
+  Controlled Function: get_best_disjunct_quick
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: double const& std::min
+  Controlled Function: List_STL_Iterator
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Scope_guard
+  Controlled Function: double const& std::min
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: dbug_print_tree
+  Controlled Function: get_forced_by_hint
+  Controlled Function: handler::ha_table_flags
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: MY_BITMAP::MY_BITMAP
+  Controlled Function: fill_used_fields_bitmap
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: Scope_guard
+  Controlled Function: get_key_scans_params
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: trace_basic_info
+  Controlled Function: RANGE_OPT_PARAM::~RANGE_OPT_PARAM
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::Opt_trace_object
+  Controlled Function: _db_keyword_
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: trace_basic_info
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: base_list::is_empty
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: print_quick
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_struct::add_alnum
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: get_best_ror_intersect
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_struct::add
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: Opt_trace_array::Opt_trace_array
+  Controlled Function: List
+  Controlled Function: List
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: List_STL_Iterator
+  Controlled Function: List_STL_Iterator
+  Controlled Function: get_best_disjunct_quick
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: AccessPath::num_output_rows
+  Controlled Function: double const& std::min
+  Controlled Function: List_STL_Iterator
+  Controlled Function: ER_THD
+  Controlled Function: push_warning
+  Controlled Function: ER_THD
+  Controlled Function: push_warning
+  Controlled Function: Bitmap
+  Controlled Function: my_error
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: List_iterator
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: find_type
+  Controlled Function: Bitmap
+  Controlled Function: my_error
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Bitmap
+  Controlled Function: Cost_estimate::Cost_estimate
+  Controlled Function: DsMrr_impl::get_disk_sweep_mrr_cost
+  Controlled Function: THD::optimizer_switch_flag
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: Cost_estimate::total_cost
+  Controlled Function: ndb_pushed_builder_ctx::required_ancestors
+  Controlled Function: ndb_table_map::add
+  Controlled Function: ndb_table_map::add
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ndb_pushed_builder_ctx::is_pushable_as_child_scan
+  Controlled Function: ndb_pushed_builder_ctx::set_ancestor_nests
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: pushed_table::ancestor_nests
+  Controlled Function: pushed_table::ancestor_nests
+  Controlled Function: ndb_pushed_builder_ctx::get_all_key_parents
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Bitmap
+  Controlled Function: ndb_table_map::add
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndb_table_map::add
+  Controlled Function: ndb_table_map::add
+  Controlled Function: pushed_table::ancestor_nests
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: __assert_fail
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: __assert_fail
+  Controlled Function: get_thd_ndb
+  Controlled Function: pushed_table::ancestor_nests
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: Ndb::getMinDbNodeVersion
+  Controlled Function: ndb_pushed_builder_ctx::required_ancestors
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndbd_support_param_cmp
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndb_pushed_builder_ctx::get_all_key_parents
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: __assert_fail
+  Controlled Function: ha_ndbcluster* down_cast
+  Controlled Function: ndb_pushed_builder_ctx::required_ancestors
+  Controlled Function: ndb_table_map::add
+  Controlled Function: Bitmap
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: Table_ref::map
+  Controlled Function: ndb_table_map::contain
+  Controlled Function: ha_ndbcluster_cond::get_interpreter_params
+  Controlled Function: __assert_fail
+  Controlled Function: Table_ref::map
+  Controlled Function: List
+  Controlled Function: ndb_pushed_builder_ctx::required_ancestors
+  Controlled Function: ndb_table_map::add
+  Controlled Function: base_list::size
+  Controlled Function: Bitmap
+  Controlled Function: unlikely
+  Controlled Function: __assert_fail
+  Controlled Function: ndb_table_map::add
+  Controlled Function: _db_pargs_
+  Controlled Function: ndb_pushed_builder_ctx::get_table_map
+  Controlled Function: _db_enabled_
+  Controlled Function: ndb_table_map::add
+  Controlled Function: ndb_table_map::add
+  Controlled Function: _db_doprnt_
+  Controlled Function: ndb_table_map::add
+
+Implicit Control Flow:
+
+----------------------------------------

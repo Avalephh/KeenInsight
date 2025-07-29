@@ -1,0 +1,1149 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_fusionio_get_sector_size
+void os_fusionio_get_sector_size() {
+  if (srv_unix_file_flush_method == SRV_UNIX_O_DIRECT ||
+      srv_unix_file_flush_method == SRV_UNIX_O_DIRECT_NO_FSYNC) {
+    ulint sector_size = UNIV_SECTOR_SIZE;
+    char *path = srv_data_home;
+    os_file_t check_file;
+    byte *block_ptr;
+    char current_dir[3];
+    char *dir_end;
+    ulint dir_len;
+    ulint check_path_len;
+    char *check_file_name;
+    ssize_t ret;
+
+    /* If the srv_data_home is empty, set the path to
+    current dir. */
+    if (*path == 0) {
+      current_dir[0] = FN_CURLIB;
+      current_dir[1] = FN_LIBCHAR;
+      current_dir[2] = 0;
+      path = current_dir;
+    }
+
+    /* Get the path of data file */
+    dir_end = strrchr(path, OS_PATH_SEPARATOR);
+    dir_len = dir_end ? dir_end - path : strlen(path);
+
+    /* allocate a new path and move the directory path to it. */
+    check_path_len = dir_len + sizeof "/check_sector_size";
+    check_file_name = static_cast<char *>(
+        ut::zalloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, check_path_len));
+    memcpy(check_file_name, path, dir_len);
+
+    /* Construct a check file name. */
+    strcat(check_file_name + dir_len, "/check_sector_size");
+
+    /* Create a tmp file for checking sector size. */
+    check_file = ::open(check_file_name,
+                        O_CREAT | O_TRUNC | O_WRONLY | O_DIRECT, S_IRWXU);
+
+    if (check_file == -1) {
+      ib::error(ER_IB_MSG_830)
+          << "Failed to create check sector file, errno:" << errno
+          << " Please confirm O_DIRECT is"
+          << " supported and remove the file " << check_file_name
+          << " if it exists.";
+      ut::free(check_file_name);
+      errno = 0;
+      return;
+    }
+
+    /* Try to write the file with different sector size
+    alignment. */
+    alignas(MAX_SECTOR_SIZE) byte data[MAX_SECTOR_SIZE];
+
+    while (sector_size <= MAX_SECTOR_SIZE) {
+      block_ptr = static_cast<byte *>(ut_align(&data, sector_size));
+      ret = pwrite(check_file, block_ptr, sector_size, 0);
+      if (ret > 0 && (ulint)ret == sector_size) {
+        break;
+      }
+      sector_size *= 2;
+    }
+
+    /* The sector size should <= MAX_SECTOR_SIZE. */
+    ut_ad(sector_size <= MAX_SECTOR_SIZE);
+
+    close(check_file);
+    unlink(check_file_name);
+
+    ut::free(check_file_name);
+    errno = 0;
+
+    os_io_ptr_align = sector_size;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_create_func
+pfs_os_file_t os_file_create_func(const char *name, ulint create_mode,
+                                  ulint purpose, ulint type, bool read_only,
+                                  bool *success) {
+  bool on_error_no_exit;
+  bool on_error_silent;
+  pfs_os_file_t file;
+
+  *success = false;
+
+  DBUG_EXECUTE_IF("ib_create_table_fail_disk_full", *success = false;
+                  errno = ENOSPC; file.m_file = OS_FILE_CLOSED; return (file););
+
+  int create_flag;
+  const char *mode_str = nullptr;
+
+  on_error_no_exit = create_mode & OS_FILE_ON_ERROR_NO_EXIT ? true : false;
+  on_error_silent = create_mode & OS_FILE_ON_ERROR_SILENT ? true : false;
+
+  create_mode &= ~OS_FILE_ON_ERROR_NO_EXIT;
+  create_mode &= ~OS_FILE_ON_ERROR_SILENT;
+
+  if (create_mode == OS_FILE_OPEN || create_mode == OS_FILE_OPEN_RAW ||
+      create_mode == OS_FILE_OPEN_RETRY) {
+    mode_str = "OPEN";
+
+    create_flag = read_only ? O_RDONLY : O_RDWR;
+
+  } else if (read_only) {
+    mode_str = "OPEN";
+
+    create_flag = O_RDONLY;
+
+  } else if (create_mode == OS_FILE_CREATE) {
+    mode_str = "CREATE";
+    create_flag = O_RDWR | O_CREAT | O_EXCL;
+
+  } else if (create_mode == OS_FILE_CREATE_PATH) {
+    /* Create subdirs along the path if needed. */
+    dberr_t err;
+
+    err = os_file_create_subdirs_if_needed(name);
+
+    if (err != DB_SUCCESS) {
+      *success = false;
+      ib::error(ER_IB_MSG_778)
+          << "Unable to create subdirectories '" << name << "'";
+
+      file.m_file = OS_FILE_CLOSED;
+      return (file);
+    }
+
+    create_flag = O_RDWR | O_CREAT | O_EXCL;
+    create_mode = OS_FILE_CREATE;
+
+  } else {
+    ib::error(ER_IB_MSG_779)
+        << "Unknown file create mode (" << create_mode << ")"
+        << " for file '" << name << "'";
+
+    file.m_file = OS_FILE_CLOSED;
+    return (file);
+  }
+
+  ut_a(type == OS_LOG_FILE || type == OS_DATA_FILE || type == OS_DBLWR_FILE ||
+       type == OS_CLONE_DATA_FILE || type == OS_CLONE_LOG_FILE ||
+       type == OS_BUFFERED_FILE || type == OS_REDO_LOG_ARCHIVE_FILE);
+
+  ut_a(purpose == OS_FILE_AIO || purpose == OS_FILE_NORMAL);
+
+#ifdef O_SYNC
+  /* We let O_SYNC only affect log files; note that we map O_DSYNC to
+  O_SYNC because the datasync options seemed to corrupt files in 2001
+  in both Linux and Solaris */
+
+  if (!read_only && type == OS_LOG_FILE &&
+      srv_unix_file_flush_method == SRV_UNIX_O_DSYNC) {
+    create_flag |= O_SYNC;
+  }
+#endif /* O_SYNC */
+
+  bool retry;
+
+  do {
+    file.m_file = ::open(name, create_flag, os_innodb_umask);
+
+    if (file.m_file == -1) {
+      const char *operation;
+
+      operation =
+          (create_mode == OS_FILE_CREATE && !read_only) ? "create" : "open";
+
+      *success = false;
+
+      if (on_error_no_exit) {
+        retry = os_file_handle_error_no_exit(name, operation, on_error_silent);
+      } else {
+        retry = os_file_handle_error(name, operation);
+      }
+    } else {
+      *success = true;
+      retry = false;
+    }
+
+  } while (retry);
+
+  /* We disable OS caching (O_DIRECT) only on data files. For clone we
+  need to set O_DIRECT even for read_only mode. */
+
+  if ((!read_only || type == OS_CLONE_DATA_FILE) && *success &&
+      (type == OS_DATA_FILE || type == OS_CLONE_DATA_FILE ||
+       type == OS_DBLWR_FILE) &&
+      (srv_unix_file_flush_method == SRV_UNIX_O_DIRECT ||
+       srv_unix_file_flush_method == SRV_UNIX_O_DIRECT_NO_FSYNC)) {
+    os_file_set_nocache(file.m_file, name, mode_str);
+  }
+
+#ifdef USE_FILE_LOCK
+  if (!read_only && *success && create_mode != OS_FILE_OPEN_RAW &&
+      /* Don't acquire file lock while cloning files. */
+      type != OS_CLONE_DATA_FILE && type != OS_CLONE_LOG_FILE &&
+      os_file_lock(file.m_file, name)) {
+    if (create_mode == OS_FILE_OPEN_RETRY) {
+      ib::info(ER_IB_MSG_780) << "Retrying to lock the first data file";
+
+      for (int i = 0; i < 100; i++) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        if (!os_file_lock(file.m_file, name)) {
+          *success = true;
+          return (file);
+        }
+      }
+
+      ib::info(ER_IB_MSG_781) << "Unable to open the first data file";
+    }
+
+    *success = false;
+    close(file.m_file);
+    file.m_file = -1;
+  }
+#endif /* USE_FILE_LOCK */
+
+  return (file);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_flush_low
+static void log_flush_low(log_t &log) {
+  ut_ad(log_flusher_mutex_own(log));
+
+#ifndef _WIN32
+  bool do_flush = srv_unix_file_flush_method != SRV_UNIX_O_DSYNC;
+#else
+  bool do_flush = true;
+#endif
+
+  if (!log.writer_threads_paused.load(std::memory_order_acquire)) {
+    os_event_reset(log.flusher_event);
+  }
+
+  const lsn_t last_flush_lsn = log.flushed_to_disk_lsn.load();
+
+  const lsn_t flush_up_to_lsn = log.write_lsn.load();
+
+  if (flush_up_to_lsn == last_flush_lsn) {
+    os_event_set(log.old_flush_event);
+    return;
+  }
+
+  log.last_flush_start_time = Log_clock::now();
+
+  ut_a(flush_up_to_lsn > last_flush_lsn);
+
+  if (do_flush) {
+    log_sync_point("log_flush_before_fsync");
+    log.m_current_file_handle.fsync();
+  }
+
+  log.last_flush_end_time = Log_clock::now();
+
+  if (log.last_flush_end_time < log.last_flush_start_time) {
+    /* Time was moved backward after we set start_time.
+    Let assume that the fsync operation was instant.
+
+    We move start_time backward, because we don't want
+    it to remain in the future. */
+    log.last_flush_start_time = log.last_flush_end_time;
+  }
+
+  log_sync_point("log_flush_before_flushed_to_disk_lsn");
+
+  log.flushed_to_disk_lsn.store(flush_up_to_lsn);
+
+  /* Notify other thread(s). */
+
+  DBUG_PRINT("ib_log", ("Flushed to disk up to " LSN_PF, flush_up_to_lsn));
+
+  if (!log.writer_threads_paused.load(std::memory_order_acquire)) {
+    const auto first_slot =
+        log_compute_flush_event_slot(log, last_flush_lsn + 1);
+
+    const auto last_slot = log_compute_flush_event_slot(log, flush_up_to_lsn);
+
+    if (first_slot == last_slot) {
+      log_sync_point("log_flush_before_users_notify");
+      os_event_set(log.flush_events[first_slot]);
+    } else {
+      log_sync_point("log_flush_before_notifier_notify");
+      os_event_set(log.flush_notifier_event);
+    }
+  } else {
+    log_sync_point("log_flush_before_users_notify");
+    log_sync_point("log_flush_before_notifier_notify");
+    os_event_set(log.old_flush_event);
+  }
+
+  /* Update stats. */
+
+  log_flush_update_stats(log);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_sys_init
+dberr_t log_sys_init(bool expect_no_files, lsn_t flushed_lsn,
+                     lsn_t &new_files_lsn) {
+  ut_a(log_is_data_lsn(flushed_lsn));
+  ut_a(log_sys == nullptr);
+
+  new_files_lsn = 0;
+
+  Log_files_context log_files_ctx{srv_log_group_home_dir,
+                                  Log_files_ruleset::PRE_8_0_30};
+
+  std::string root_path;
+  bool found_files_in_root{false};
+  dberr_t err =
+      log_sys_check_directory(log_files_ctx, root_path, found_files_in_root);
+
+  /* Report error if innodb_log_group_home_dir / datadir has not been found or
+  could not be listed. It's a proper decision for all redo format versions:
+    - older formats store there ib_logfile* files directly,
+    - newer formats store there #innodb_redo subdirectory. */
+  if (err != DB_SUCCESS) {
+    ib::error(ER_IB_MSG_LOG_INIT_DIR_LIST_FAILED, root_path.c_str());
+    return err;
+  }
+
+  Log_file_handle::s_on_before_read = [](Log_file_id, Log_file_type file_type,
+                                         os_offset_t, os_offset_t read_size) {
+    ut_a(file_type == Log_file_type::NORMAL);
+    ut_a(srv_is_being_started);
+#ifndef UNIV_HOTBACKUP
+    srv_stats.data_read.add(read_size);
+#endif /* !UNIV_HOTBACKUP */
+  };
+
+  Log_file_handle::s_on_before_write =
+      [](Log_file_id file_id, Log_file_type file_type, os_offset_t write_offset,
+         os_offset_t write_size) {
+        ut_a(!srv_read_only_mode);
+        if (!srv_is_being_started) {
+          ut_a(log_sys != nullptr);
+          auto file = log_sys->m_files.file(file_id);
+          if (file_type == Log_file_type::NORMAL) {
+            ut_a(file != log_sys->m_files.end());
+            ut_a((file_id == log_sys->m_current_file.m_id &&
+                  write_offset + write_size <= file->m_size_in_bytes) ||
+                 write_offset + write_size <= LOG_FILE_HDR_SIZE);
+          } else {
+            ut_a(file == log_sys->m_files.end());
+            ut_a(file_id == log_sys->m_current_file.next_id());
+          }
+        }
+#ifndef UNIV_HOTBACKUP
+        srv_stats.data_written.add(write_size);
+#endif
+      };
+
+#ifndef _WIN32
+  Log_file_handle::s_skip_fsyncs =
+      (srv_unix_file_flush_method == SRV_UNIX_O_DSYNC ||
+       srv_unix_file_flush_method == SRV_UNIX_NOSYNC);
+#endif /* !_WIN32 */
+
+  if (!found_files_in_root) {
+    log_files_ctx =
+        Log_files_context{srv_log_group_home_dir, Log_files_ruleset::CURRENT};
+
+    std::string subdir_path;
+    bool found_files_in_subdir{false};
+    err = log_sys_check_directory(log_files_ctx, subdir_path,
+                                  found_files_in_subdir);
+
+    switch (err) {
+      case DB_SUCCESS:
+        if (expect_no_files && found_files_in_subdir) {
+          ib::error(ER_IB_MSG_LOG_INIT_DIR_NOT_EMPTY_WONT_INITIALIZE,
+                    subdir_path.c_str());
+          return DB_ERROR;
+        }
+        if (!srv_read_only_mode) {
+          /* The problem is that a lot of people is not aware
+          that sending SHUTDOWN command does not end when the
+          server is no longer running, but earlier (obvious!).
+          Starting MySQL without waiting on previous instance
+          stopped, seems a bad idea and it often led to
+          quick failures here if we did not retry. */
+          for (size_t retries = 0;; ++retries) {
+            const auto remove_unused_files_ret =
+                log_remove_unused_files(log_files_ctx);
+            if (remove_unused_files_ret.first == DB_SUCCESS) {
+              break;
+            }
+            ut_a(retries < 300);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+          }
+        }
+        break;
+      case DB_NOT_FOUND:
+        /* The #innodb_redo directory has not been found. */
+        if (expect_no_files) {
+          /* InnoDB needs to create new directory #innodb_redo. */
+          if (!os_file_create_directory(subdir_path.c_str(), false)) {
+            return DB_ERROR;
+          }
+        } else {
+          /* InnoDB does not start if neither ib_logfile* files were found,
+          nor the #innodb_redo directory was found. User should be informed
+          about the problem and decide to either:
+            - use older version of MySQL (<= 8.0.29) and do a non-fast shutdown,
+            - or create the missing #innodb_redo */
+          ib::error(ER_IB_MSG_LOG_INIT_DIR_MISSING_SUBDIR, LOG_DIRECTORY_NAME,
+                    log_pre_8_0_30::FILE_BASE_NAME, root_path.c_str());
+          return DB_ERROR;
+        }
+        break;
+      default:
+        ib::error(ER_IB_MSG_LOG_INIT_DIR_LIST_FAILED, subdir_path.c_str());
+        return err;
+    }
+
+  } else {
+    /* Found existing files in old location for redo files (PRE_8_0_30).
+    If expected to see no files (and create new), return error emitting
+    the error message. */
+    if (expect_no_files) {
+      ib::error(ER_IB_MSG_LOG_INIT_DIR_NOT_EMPTY_WONT_INITIALIZE,
+                root_path.c_str());
+      return DB_ERROR;
+    }
+  }
+
+  log_sys_create();
+  ut_a(log_sys != nullptr);
+  log_t &log = *log_sys;
+
+  bool is_concurrency_margin_safe;
+  log_concurrency_margin(
+      Log_files_capacity::soft_logical_capacity_for_hard(
+          Log_files_capacity::hard_logical_capacity_for_physical(
+              srv_redo_log_capacity_used)),
+      is_concurrency_margin_safe);
+
+  if (!is_concurrency_margin_safe) {
+    os_offset_t min_redo_log_capacity = srv_redo_log_capacity_used;
+    os_offset_t max_redo_log_capacity = LOG_CAPACITY_MAX;
+    while (min_redo_log_capacity < max_redo_log_capacity) {
+      const os_offset_t capacity_to_check =
+          (min_redo_log_capacity + max_redo_log_capacity) / 2;
+
+      log_concurrency_margin(
+          Log_files_capacity::soft_logical_capacity_for_hard(
+              Log_files_capacity::hard_logical_capacity_for_physical(
+                  capacity_to_check)),
+          is_concurrency_margin_safe);
+
+      if (is_concurrency_margin_safe) {
+        max_redo_log_capacity = capacity_to_check;
+      } else {
+        min_redo_log_capacity = capacity_to_check + 1;
+      }
+    }
+
+    /* The innodb_redo_log_capacity is always rounded to 1M */
+    min_redo_log_capacity =
+        ut_uint64_align_up(min_redo_log_capacity, 1024UL * 1024);
+
+    ib::error(ER_IB_MSG_LOG_PARAMS_CONCURRENCY_MARGIN_UNSAFE,
+              ulonglong{srv_redo_log_capacity_used / 1024 / 1024},
+              ulong{srv_thread_concurrency},
+              ulonglong{min_redo_log_capacity / 1024 / 1024},
+              INNODB_PARAMETERS_MSG);
+
+    return DB_ERROR;
+  }
+
+  log.m_files_ctx = std::move(log_files_ctx);
+
+  if (expect_no_files) {
+    ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+    ut_a(!srv_read_only_mode);
+
+    ut_a(log.m_files_ctx.m_files_ruleset == Log_files_ruleset::CURRENT);
+
+    new_files_lsn = flushed_lsn;
+    return log_files_create(log, flushed_lsn);
+  }
+
+  if (srv_force_recovery >= SRV_FORCE_NO_LOG_REDO) {
+    return DB_SUCCESS;
+  }
+
+  Log_files_dict files{log.m_files_ctx};
+  Log_format format;
+  std::string creator_name;
+  Log_flags log_flags;
+  Log_uuid log_uuid;
+
+  ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+
+  auto res = log_files_find_and_analyze(
+      srv_read_only_mode, log.m_encryption_metadata, files, format,
+      creator_name, log_flags, log_uuid);
+  switch (res) {
+    case Log_files_find_result::FOUND_VALID_FILES:
+      log.m_format = format;
+      log.m_creator_name = creator_name;
+      log.m_log_flags = log_flags;
+      log.m_log_uuid = log_uuid;
+      log.m_files = std::move(files);
+      break;
+
+    case Log_files_find_result::FOUND_UNINITIALIZED_FILES:
+      ut_a(format == Log_format::CURRENT);
+      [[fallthrough]];
+    case Log_files_find_result::FOUND_NO_FILES:
+      ut_a(log.m_files_ctx.m_files_ruleset == Log_files_ruleset::CURRENT);
+      ut_a(files.empty());
+
+      if (srv_read_only_mode) {
+        ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+        ib::error(ER_IB_MSG_LOG_FILES_CREATE_AND_READ_ONLY_MODE);
+        return DB_ERROR;
+      }
+
+      {
+        const auto ret = log_remove_files(log.m_files_ctx);
+        ut_a(ret.first == DB_SUCCESS);
+      }
+      new_files_lsn =
+          flushed_lsn % OS_FILE_LOG_BLOCK_SIZE == LOG_BLOCK_HDR_SIZE
+              ? flushed_lsn
+              : ut_uint64_align_up(flushed_lsn, OS_FILE_LOG_BLOCK_SIZE) +
+                    LOG_BLOCK_HDR_SIZE;
+      return log_files_create(log, new_files_lsn);
+
+    case Log_files_find_result::SYSTEM_ERROR:
+    case Log_files_find_result::FOUND_CORRUPTED_FILES:
+    case Log_files_find_result::FOUND_DISABLED_FILES:
+    case Log_files_find_result::FOUND_VALID_FILES_BUT_MISSING_NEWEST:
+      return DB_ERROR;
+  }
+
+  /* Check format of the redo log and emit information to the error log,
+  if the format was not the newest one. */
+  err = log_sys_check_format(log);
+  if (err != DB_SUCCESS) {
+    return err;
+  }
+
+  /* Check creator of log files and mark fields of recv_sys: is_cloned_db,
+  is_meb_db if needed. */
+  err = log_sys_handle_creator(log);
+  if (err != DB_SUCCESS) {
+    return err;
+  }
+
+  if (log_file_header_check_flag(log_flags, LOG_HEADER_FLAG_NO_LOGGING)) {
+    auto result = mtr_t::s_logging.disable(nullptr);
+    /* Currently never fails. */
+    ut_a(result == 0);
+    srv_redo_log = false;
+  }
+
+  return DB_SUCCESS;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_io.cc
+Function: Log_file_handle::fsync
+void Log_file_handle::fsync() {
+  ut_ad(is_open());
+  ut_ad(m_access_mode != Log_file_access_mode::READ_ONLY);
+
+  if (s_skip_fsyncs) {
+    return;
+  }
+
+  s_total_fsyncs.fetch_add(1, std::memory_order_relaxed);
+  s_fsyncs_in_progress.fetch_add(1);
+
+  const bool success = os_file_flush(m_raw_handle);
+
+  s_fsyncs_in_progress.fetch_sub(1);
+  ut_a(success);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc
+Function: trx_flush_log_if_needed_low
+static void trx_flush_log_if_needed_low(lsn_t lsn) /*!< in: lsn up to which logs
+                                                   are to be flushed. */
+{
+#ifdef _WIN32
+  bool flush = true;
+#else
+  bool flush = srv_unix_file_flush_method != SRV_UNIX_NOSYNC;
+#endif /* _WIN32 */
+
+  Wait_stats wait_stats;
+
+  switch (srv_flush_log_at_trx_commit) {
+    case 2:
+      /* Write the log but do not flush it to disk */
+      flush = false;
+      [[fallthrough]];
+    case 1:
+      /* Write the log and optionally flush it to disk */
+      wait_stats = log_write_up_to(*log_sys, lsn, flush);
+
+      MONITOR_INC_WAIT_STATS(MONITOR_TRX_ON_LOG_, wait_stats);
+
+      return;
+    case 0:
+      /* Do nothing */
+      return;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dblwr.cc
+Function: Double_write::is_fsync_required
+  [[nodiscard]] static bool is_fsync_required() noexcept {
+    /* srv_unix_file_flush_method is a dynamic variable. */
+    return srv_unix_file_flush_method != SRV_UNIX_O_DIRECT &&
+           srv_unix_file_flush_method != SRV_UNIX_O_DIRECT_NO_FSYNC;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dblwr.cc
+Function: Double_write::write_dblwr_pages
+uint16_t Reduced_double_write::write_dblwr_pages(
+    buf_flush_t flush_type) noexcept {
+  ut_ad(mutex_own(&m_mutex));
+  ut_a(!m_buffer.empty());
+  ut_ad(m_buf != nullptr);
+
+  uint16_t data_len{};
+  byte *ptr = m_page + REDUCED_HEADER_SIZE;
+#ifdef UNIV_DEBUG
+  byte *ptr_orig = ptr;
+  const byte *end_ptr = m_page + REDUCED_BATCH_PAGE_SIZE;
+  const size_t bytes_needed = m_buf_pages.size() * REDUCED_ENTRY_SIZE;
+  ut_ad(bytes_needed <= REDUCED_DATA_SIZE);
+#endif /* UNIV_DEBUG */
+  for (uint32_t i = 0; i < m_buf_pages.size(); ++i) {
+    const auto bpage = std::get<0>(m_buf_pages.m_pages[i]);
+
+    Reduced_entry entry(bpage);
+    ut_ad(ptr + REDUCED_ENTRY_SIZE < end_ptr);
+    ptr = entry.write(ptr);
+    data_len += REDUCED_ENTRY_SIZE;
+  }
+  ut_ad(ptr - ptr_orig == data_len);
+  ut_ad(data_len <= REDUCED_DATA_SIZE);
+
+  // Calculate checksum for the data written
+  uint32_t checksum = calculate_checksum(data_len);
+
+  Batch_segment *batch_segment{};
+
+  auto segments = flush_type == BUF_FLUSH_LRU ? s_r_LRU_batch_segments
+                                              : s_r_flush_list_batch_segments;
+
+  while (!segments->dequeue(batch_segment)) {
+    std::this_thread::yield();
+  }
+
+  // Create Page header
+  create_header(batch_segment->id(), checksum, data_len, flush_type);
+
+  ut_ad(data_len / REDUCED_ENTRY_SIZE == m_buf_pages.size());
+
+  batch_segment->start(this);
+
+  batch_segment->write(m_page, REDUCED_BATCH_PAGE_SIZE);
+
+  m_bytes_written += REDUCED_BATCH_PAGE_SIZE;
+
+  m_buffer.clear();
+  clear();
+
+#ifndef _WIN32
+  if (is_fsync_required()) {
+    batch_segment->flush();
+  }
+#endif /* !_WIN32 */
+
+  batch_segment->set_batch_size(m_buf_pages.size());
+  return batch_segment->id();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dblwr.cc
+Function: Reduced_double_write::write_dblwr_pages
+uint16_t Reduced_double_write::write_dblwr_pages(
+    buf_flush_t flush_type) noexcept {
+  ut_ad(mutex_own(&m_mutex));
+  ut_a(!m_buffer.empty());
+  ut_ad(m_buf != nullptr);
+
+  uint16_t data_len{};
+  byte *ptr = m_page + REDUCED_HEADER_SIZE;
+#ifdef UNIV_DEBUG
+  byte *ptr_orig = ptr;
+  const byte *end_ptr = m_page + REDUCED_BATCH_PAGE_SIZE;
+  const size_t bytes_needed = m_buf_pages.size() * REDUCED_ENTRY_SIZE;
+  ut_ad(bytes_needed <= REDUCED_DATA_SIZE);
+#endif /* UNIV_DEBUG */
+  for (uint32_t i = 0; i < m_buf_pages.size(); ++i) {
+    const auto bpage = std::get<0>(m_buf_pages.m_pages[i]);
+
+    Reduced_entry entry(bpage);
+    ut_ad(ptr + REDUCED_ENTRY_SIZE < end_ptr);
+    ptr = entry.write(ptr);
+    data_len += REDUCED_ENTRY_SIZE;
+  }
+  ut_ad(ptr - ptr_orig == data_len);
+  ut_ad(data_len <= REDUCED_DATA_SIZE);
+
+  // Calculate checksum for the data written
+  uint32_t checksum = calculate_checksum(data_len);
+
+  Batch_segment *batch_segment{};
+
+  auto segments = flush_type == BUF_FLUSH_LRU ? s_r_LRU_batch_segments
+                                              : s_r_flush_list_batch_segments;
+
+  while (!segments->dequeue(batch_segment)) {
+    std::this_thread::yield();
+  }
+
+  // Create Page header
+  create_header(batch_segment->id(), checksum, data_len, flush_type);
+
+  ut_ad(data_len / REDUCED_ENTRY_SIZE == m_buf_pages.size());
+
+  batch_segment->start(this);
+
+  batch_segment->write(m_page, REDUCED_BATCH_PAGE_SIZE);
+
+  m_bytes_written += REDUCED_BATCH_PAGE_SIZE;
+
+  m_buffer.clear();
+  clear();
+
+#ifndef _WIN32
+  if (is_fsync_required()) {
+    batch_segment->flush();
+  }
+#endif /* !_WIN32 */
+
+  batch_segment->set_batch_size(m_buf_pages.size());
+  return batch_segment->id();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dblwr.cc
+Function: Double_write::sync_page_flush
+dberr_t Double_write::sync_page_flush(buf_page_t *bpage,
+                                      file::Block *e_block) noexcept {
+#ifdef UNIV_DEBUG
+  ut_d(auto page_id = bpage->id);
+
+  if (dblwr::Force_crash == page_id) {
+    auto frame = reinterpret_cast<const buf_block_t *>(bpage)->frame;
+    const auto p = reinterpret_cast<byte *>(frame);
+
+    ut_ad(page_get_space_id(p) == dblwr::Force_crash.space());
+    ut_ad(page_get_page_no(p) == dblwr::Force_crash.page_no());
+  }
+#endif /* UNIV_DEBUG */
+
+  Segment *segment{};
+
+  while (!s_single_segments->dequeue(segment)) {
+    std::this_thread::yield();
+  }
+
+  single_write(segment, bpage, e_block);
+
+#ifndef _WIN32
+  if (is_fsync_required()) {
+    segment->flush();
+  }
+#endif /* !_WIN32 */
+
+#ifdef UNIV_DEBUG
+  if (dblwr::Force_crash == page_id) {
+    DBUG_SUICIDE();
+  }
+#endif /* UNIV_DEBUG */
+
+  auto err = write_to_datafile(bpage, true, e_block);
+
+  if (err == DB_SUCCESS) {
+    fil_flush(bpage->id.space());
+  } else {
+    /* This block is not freed if the write_to_datafile doesn't succeed. */
+    if (e_block != nullptr) {
+      os_free_block(e_block);
+    }
+  }
+
+  while (!s_single_segments->enqueue(segment)) {
+    UT_RELAX_CPU();
+  }
+
+  /* true means we want to evict this page from the LRU list as well. */
+  buf_page_io_complete(bpage, true);
+
+  return DB_SUCCESS;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: buf_flush_fsync
+void buf_flush_fsync() {
+#ifdef _WIN32
+  switch (srv_win_file_flush_method) {
+    case SRV_WIN_IO_UNBUFFERED:
+      break;
+    case SRV_WIN_IO_NORMAL:
+      fil_flush_file_spaces();
+      break;
+  }
+#else  /* !_WIN32 */
+  switch (srv_unix_file_flush_method) {
+    case SRV_UNIX_NOSYNC:
+      break;
+    case SRV_UNIX_O_DSYNC:
+      /* O_SYNC is respected only for redo files and we need to
+      flush data files here. For details look inside os0file.cc. */
+    case SRV_UNIX_FSYNC:
+    case SRV_UNIX_LITTLESYNC:
+    case SRV_UNIX_O_DIRECT:
+    case SRV_UNIX_O_DIRECT_NO_FSYNC:
+      fil_flush_file_spaces();
+  }
+#endif /* _WIN32 */
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/srv0srv.h
+Function: srv_is_direct_io
+inline bool srv_is_direct_io() {
+  return (srv_unix_file_flush_method == SRV_UNIX_O_DIRECT ||
+          srv_unix_file_flush_method == SRV_UNIX_O_DIRECT_NO_FSYNC);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0clone.cc
+Function: Clone_Handle::open_file
+int Clone_Handle::open_file(Clone_Task *task, const Clone_file_ctx *file_ctx,
+                            ulint file_type, bool create_file,
+                            File_init_cbk &init_cbk) {
+  os_file_type_t type;
+  bool exists;
+  std::string file_name;
+
+  file_ctx->get_file_name(file_name);
+
+  /* Check if file exists */
+  auto status = os_file_status(file_name.c_str(), &exists, &type);
+
+  if (!status) {
+    return (0);
+  }
+
+  ulint option;
+  bool read_only;
+
+  if (create_file) {
+    option = exists ? OS_FILE_OPEN : OS_FILE_CREATE_PATH;
+    read_only = false;
+  } else {
+    ut_ad(exists);
+    option = OS_FILE_OPEN;
+    read_only = true;
+  }
+
+  option |= OS_FILE_ON_ERROR_NO_EXIT;
+  bool success = false;
+
+  auto handle = os_file_create(innodb_clone_file_key, file_name.c_str(), option,
+                               OS_FILE_NORMAL, file_type, read_only, &success);
+
+  int err = 0;
+
+  if (!success) {
+    /* purecov: begin inspected */
+    err = (option == OS_FILE_OPEN) ? ER_CANT_OPEN_FILE : ER_CANT_CREATE_FILE;
+    /* purecov: end */
+
+  } else if (create_file && init_cbk) {
+    auto db_err = init_cbk(handle);
+
+    if (db_err != DB_SUCCESS) {
+      /* purecov: begin inspected */
+      os_file_close(handle);
+      err = ER_ERROR_ON_WRITE;
+      /* purecov: end */
+    }
+  }
+
+  if (err != 0) {
+    /* purecov: begin inspected */
+    char errbuf[MYSYS_STRERROR_SIZE];
+    my_error(err, MYF(0), file_name.c_str(), errno,
+             my_strerror(errbuf, sizeof(errbuf), errno));
+    return err;
+    /* purecov: end */
+  }
+
+  if (task == nullptr) {
+    ut_ad(create_file);
+    os_file_close(handle);
+    return 0;
+  }
+
+  /* Set file descriptor in task. */
+  close_file(task);
+  task->m_current_file_des = handle;
+
+  ut_ad(handle.m_file != OS_FILE_CLOSED);
+
+  task->m_file_cache = true;
+
+  /* Set cache to false if direct IO(O_DIRECT) is used. */
+  if (file_type == OS_CLONE_DATA_FILE) {
+    task->m_file_cache = !srv_is_direct_io();
+
+    DBUG_EXECUTE_IF("clone_no_zero_copy", task->m_file_cache = false;);
+  }
+
+  auto file_meta = file_ctx->get_file_meta_read();
+
+  /* If the task has pinned file, the index should be set. */
+  ut_ad(!task->m_pinned_file ||
+        task->m_current_file_index == file_meta->m_file_index);
+
+  task->m_current_file_index = file_meta->m_file_index;
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0apply.cc
+Function: Clone_Handle::receive_data
+int Clone_Handle::receive_data(Clone_Task *task, uint64_t offset,
+                               uint64_t file_size, uint32_t size,
+                               Ha_clone_cbk *callback) {
+  ut_ad(m_clone_handle_type == CLONE_HDL_APPLY);
+
+  auto snapshot = m_clone_task_manager.get_snapshot();
+
+  auto file_ctx = snapshot->get_file_ctx_by_index(task->m_current_file_index);
+  auto file_meta = file_ctx->get_file_meta();
+
+  std::string file_name;
+  file_ctx->get_file_name(file_name);
+
+  /* If the file is deleted, then fetch the data and ignore. */
+  if (file_ctx->deleted()) {
+    unsigned char *data_buf = nullptr;
+    uint32_t data_len = 0;
+    callback->apply_buffer_cbk(data_buf, data_len);
+
+    std::string mesg("IGNORE DATA for DELETED FILE: ");
+    mesg.append(file_name);
+    mesg.append(" Space ID: ");
+    mesg.append(std::to_string(file_meta->m_space_id));
+
+    ib::info(ER_IB_MSG_CLONE_DDL_APPLY) << mesg;
+    return 0;
+  }
+
+  bool is_page_copy = (snapshot->get_state() == CLONE_SNAPSHOT_PAGE_COPY);
+  bool is_log_file = (snapshot->get_state() == CLONE_SNAPSHOT_REDO_COPY);
+
+  /* During page and redo copy, we encrypt the key in header page. */
+  bool key_page = (is_page_copy && offset == 0);
+  bool key_log = (is_log_file && file_meta->m_file_index == 0 && offset == 0);
+
+  if (key_page) {
+    /* Check and update file size for space header page */
+    if (file_meta->m_file_size < file_size) {
+      snapshot->update_file_size(task->m_current_file_index, file_size);
+    }
+  }
+
+  auto file_type = OS_CLONE_DATA_FILE;
+
+  if (is_log_file || is_page_copy ||
+      file_meta->m_space_id == dict_sys_t::s_invalid_space_id ||
+      file_meta->m_punch_hole) {
+    file_type = OS_CLONE_LOG_FILE;
+  }
+
+  /* Open destination file for first block. */
+  if (task->m_current_file_des.m_file == OS_FILE_CLOSED) {
+    ut_ad(file_meta != nullptr);
+
+    File_init_cbk empty_cbk;
+    auto err = open_file(task, file_ctx, file_type, true, empty_cbk);
+
+    if (err != 0) {
+      /* Save error with file name. */
+      /* purecov: begin inspected */
+      m_clone_task_manager.set_error(err, file_name.c_str());
+      return (err);
+      /* purecov: end */
+    }
+  }
+
+  ut_ad(task->m_current_file_index == file_meta->m_file_index);
+
+  /* Copy data to current destination file using callback. */
+  char errbuf[MYSYS_STRERROR_SIZE];
+
+  auto file_hdl = task->m_current_file_des.m_file;
+  auto success = os_file_seek(nullptr, file_hdl, offset);
+
+  if (!success) {
+    /* purecov: begin inspected */
+    my_error(ER_ERROR_ON_READ, MYF(0), file_name.c_str(), errno,
+             my_strerror(errbuf, sizeof(errbuf), errno));
+    /* Save error with file name. */
+    m_clone_task_manager.set_error(ER_ERROR_ON_READ, file_name.c_str());
+    return (ER_ERROR_ON_READ);
+    /* purecov: end */
+  }
+
+  if (task->m_file_cache) {
+    callback->set_os_buffer_cache();
+    /* For data file recommend zero copy for cached IO. */
+    if (!is_log_file) {
+      callback->set_zero_copy();
+    }
+  }
+
+  callback->set_dest_name(file_meta->m_file_name);
+
+  bool modify_buffer = false;
+
+  /* In case of page compression we need to punch hole. */
+  if (file_meta->m_punch_hole) {
+    ut_ad(!is_log_file);
+    modify_buffer = true;
+  }
+
+  /* We need to encrypt the tablespace key by master key. */
+  if (file_meta->can_encrypt() && (key_page || key_log)) {
+    modify_buffer = true;
+  }
+  auto err = file_callback(callback, task, size, modify_buffer, offset
+#ifdef UNIV_PFS_IO
+                           ,
+                           UT_LOCATION_HERE
+#endif /* UNIV_PFS_IO */
+  );
+
+  task->m_data_size += size;
+
+  if (err != 0) {
+    /* Save error with file name. */
+    /* purecov: begin inspected */
+    m_clone_task_manager.set_error(err, file_name.c_str());
+    /* purecov: end */
+  }
+  return (err);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc
+Function: Clone_Snapshot::update_block_size
+void Clone_Snapshot::update_block_size(uint buff_size) {
+  mutex_enter(&m_snapshot_mutex);
+
+  /* Transfer data block is used only for direct IO. */
+  if (m_snapshot_state != CLONE_SNAPSHOT_INIT || !srv_is_direct_io()) {
+    mutex_exit(&m_snapshot_mutex);
+    return;
+  }
+
+  /* Try to set block size bigger than the transfer buffer. */
+  while (buff_size > (block_size() * UNIV_PAGE_SIZE) &&
+         m_block_size_pow2 < SNAPSHOT_MAX_BLOCK_SIZE_POW2) {
+    ++m_block_size_pow2;
+  }
+
+  mutex_exit(&m_snapshot_mutex);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: fil_disable_space_flushing
+static inline bool fil_disable_space_flushing(const fil_space_t *space) {
+#ifndef _WIN32
+  if (space->purpose == FIL_TYPE_TABLESPACE &&
+      srv_unix_file_flush_method == SRV_UNIX_O_DIRECT_NO_FSYNC) {
+    return true;
+  }
+#endif /* !_WIN32 */
+  if (space->purpose == FIL_TYPE_TEMPORARY) {
+    return true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc
+Function: fil_fusionio_enable_atomic_write
+bool fil_fusionio_enable_atomic_write(pfs_os_file_t file) {
+  if (srv_unix_file_flush_method == SRV_UNIX_O_DIRECT) {
+    uint atomic = 1;
+
+    ut_a(file.m_file != -1);
+
+    if (ioctl(file.m_file, DFS_IOCTL_ATOMIC_WRITE_SET, &atomic) != -1) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+

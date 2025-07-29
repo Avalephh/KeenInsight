@@ -1,0 +1,14 @@
+Global Variable: System_variables.84
+Explicit Data Flow (3):
+  Instruction: %11 = load i8, i8* %big_tables, align 1, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2067:23 | Function: use_tmp_disk_storage_engine
+  Instruction: %tobool10 = trunc i8 %11 to i1, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2067:23 | Function: use_tmp_disk_storage_engine
+  Instruction: br i1 %tobool10, label %land.lhs.true, label %if.end13, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2067:35 | Function: use_tmp_disk_storage_engine
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

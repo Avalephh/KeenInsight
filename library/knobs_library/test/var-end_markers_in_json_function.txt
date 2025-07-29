@@ -1,0 +1,65 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc
+Function: Opt_trace_start::Opt_trace_start not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc
+Function: Opt_trace_start::Opt_trace_start not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc
+Function: Opt_trace_start::Opt_trace_start not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/opt_explain_json.cc
+Function: Explain_format_JSON::end_context
+bool Explain_format_JSON::end_context(enum_parsing_context ctx) {
+  assert(current_context->type == ctx);
+
+  bool ret = false;
+  if (current_context->parent == nullptr) {
+    Item *item;
+    Opt_trace_context json;
+    const size_t max_size = ULONG_MAX;
+    if (json.start(true,   // support_I_S (enable JSON generation)
+                   false,  // support_dbug_or_missing_priv
+                   current_thd->variables.end_markers_in_json,  // end_marker
+                   false,                                       // one_line
+                   0,                                           // offset
+                   1,                                           // limit
+                   max_size,                                    // max_mem_size
+                   Opt_trace_context::MISC))
+      return true;
+
+    {
+      Opt_trace_object braces(&json);
+
+      if (current_context->format(&json)) return true;
+    }
+    json.end();
+
+    Opt_trace_iterator it(&json);
+    if (!it.at_end()) {
+      Opt_trace_info info;
+      it.get_value(&info);
+      item =
+          new Item_string(info.trace_ptr, static_cast<uint>(info.trace_length),
+                          system_charset_info);
+    } else
+      item = new Item_null();
+
+    mem_root_deque<Item *> field_list(current_thd->mem_root);
+    field_list.push_back(item);
+    ret = (item == nullptr || output->send_data(current_thd, field_list));
+  } else if (ctx == CTX_DERIVED) {
+    if (!current_context->parent->find_and_set_derived(current_context)) {
+      assert(!"No derived table found!");
+      return true;
+    }
+  }
+
+  current_context = current_context->parent;
+  return ret;
+}
+
+

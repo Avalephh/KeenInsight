@@ -1,0 +1,387 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::alter_part_factory not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::alter_part_factory not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::alter_part_factory not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::alter_part_factory not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::alter_part_factory not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::create_one_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: alter_part_factory::create_one_low not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innopart.cc
+Function: ha_innopart::create
+int ha_innopart::create(const char *name, TABLE *form,
+                        HA_CREATE_INFO *create_info, dd::Table *table_def) {
+  int error;
+  /** {database}/{tablename} */
+  char table_name[FN_REFLEN];
+  /** absolute path of table */
+  char remote_path[FN_REFLEN];
+  char tablespace_name[NAME_LEN + 1];
+  char table_data_file_name[FN_REFLEN];
+  char table_level_tablespace_name[NAME_LEN + 1];
+  const char *table_index_file_name;
+  uint created = 0;
+  THD *thd = ha_thd();
+  trx_t *trx;
+
+  if (thd_sql_command(thd) == SQLCOM_TRUNCATE) {
+    return (truncate_impl(name, form, table_def));
+  }
+
+  if (high_level_read_only) {
+    return (HA_ERR_INNODB_READ_ONLY);
+  }
+
+  trx = check_trx_exists(thd);
+
+  DBUG_TRACE;
+
+  if (is_shared_tablespace(create_info->tablespace)) {
+    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION, PARTITION_IN_SHARED_TABLESPACE,
+                    MYF(0));
+    return HA_ERR_INTERNAL_ERROR;
+  }
+
+  create_table_info_t info(thd, form, create_info, table_name, remote_path,
+                           tablespace_name, srv_file_per_table, false, 0, 0,
+                           true);
+
+  ut_ad(create_info != nullptr);
+  ut_ad(m_part_info == form->part_info);
+  ut_ad(table_share != nullptr);
+
+  /* Not allowed to create temporary partitioned tables. */
+  if (create_info != nullptr &&
+      (create_info->options & HA_LEX_CREATE_TMP_TABLE) != 0) {
+    my_error(ER_PARTITION_NO_TEMPORARY, MYF(0));
+    ut_d(ut_error);  // Can we support partitioned temporary tables?
+    ut_o(return HA_ERR_INTERNAL_ERROR);
+  }
+
+  innobase_register_trx(ht, thd, trx);
+
+  if (form->found_next_number_field) {
+    dd_set_autoinc(table_def->se_private_data(),
+                   create_info->auto_increment_value);
+  }
+
+  error = info.initialize();
+  if (error != 0) {
+    return error;
+  }
+
+  /* Setup and check table level options. */
+  error = info.prepare_create_table(name);
+  if (error != 0) {
+    return error;
+  }
+
+  /* Save the original table name before adding partition information. */
+  const std::string saved_table_name(table_name);
+
+  if (create_info->data_file_name != nullptr) {
+    /* Strip the tablename from the path. */
+    strncpy(table_data_file_name, create_info->data_file_name, FN_REFLEN - 1);
+    table_data_file_name[FN_REFLEN - 1] = '\0';
+    char *ptr = strrchr(table_data_file_name, OS_PATH_SEPARATOR);
+    ut_ad(ptr != nullptr);
+    if (ptr != nullptr) {
+      ptr++;
+      *ptr = '\0';
+      create_info->data_file_name = table_data_file_name;
+    }
+  } else {
+    table_data_file_name[0] = '\0';
+  }
+  table_index_file_name = create_info->index_file_name;
+  if (create_info->tablespace != nullptr) {
+    strcpy(table_level_tablespace_name, create_info->tablespace);
+  } else {
+    table_level_tablespace_name[0] = '\0';
+  }
+
+  /* It's also doable to get tablespace names by accessing
+  dd::Tablespace::name according to dd_part->tablespace_id().
+  However, it costs more. So as long as partition_element contains
+  tablespace name, it's easier to check it */
+  std::vector<const char *> tablespace_names;
+  List_iterator_fast<partition_element> part_it(form->part_info->partitions);
+  partition_element *part_elem;
+  for (part_elem = part_it++; part_elem != nullptr; part_elem = part_it++) {
+    const char *tablespace;
+    if (form->part_info->is_sub_partitioned()) {
+      List_iterator_fast<partition_element> sub_it(part_elem->subpartitions);
+      partition_element *sub_elem;
+      for (sub_elem = sub_it++; sub_elem != nullptr; sub_elem = sub_it++) {
+        tablespace = partition_get_tablespace(table_level_tablespace_name,
+                                              part_elem, sub_elem);
+        if (is_shared_tablespace(tablespace)) {
+          tablespace_names.clear();
+          error = HA_ERR_INTERNAL_ERROR;
+          break;
+        }
+        tablespace_names.push_back(tablespace);
+      }
+    } else {
+      tablespace = partition_get_tablespace(table_level_tablespace_name,
+                                            part_elem, nullptr);
+      if (is_shared_tablespace(tablespace)) {
+        tablespace_names.clear();
+        error = HA_ERR_INTERNAL_ERROR;
+        break;
+      }
+      tablespace_names.push_back(tablespace);
+    }
+  }
+
+  if (error) {
+    my_printf_error(ER_ILLEGAL_HA_CREATE_OPTION, PARTITION_IN_SHARED_TABLESPACE,
+                    MYF(0));
+    return error;
+  }
+
+  for (const auto dd_part : *table_def->leaf_partitions()) {
+    std::string partition;
+    /* Build the partition name. */
+    dict_name::build_partition(dd_part, partition);
+
+    std::string part_table;
+    /* Build the partitioned table name. */
+    dict_name::build_table("", saved_table_name, partition, false, false,
+                           part_table);
+
+    if (part_table.length() + 1 >= FN_REFLEN - 1) {
+      error = HA_ERR_INTERNAL_ERROR;
+      my_error(ER_PATH_LENGTH, MYF(0), part_table.c_str());
+      break;
+    }
+
+    const dd::Properties &options = dd_part->options();
+    dd::String_type index_file_name;
+    dd::String_type data_file_name;
+    const char *tablespace_name;
+
+    if (options.exists(index_file_name_key))
+      (void)options.get(index_file_name_key, &index_file_name);
+    if (options.exists(data_file_name_key))
+      (void)options.get(data_file_name_key, &data_file_name);
+    ut_ad(created < tablespace_names.size());
+    tablespace_name = tablespace_names[created];
+
+    if (!data_file_name.empty()) {
+      create_info->data_file_name = data_file_name.c_str();
+    }
+
+    if (!index_file_name.empty()) {
+      create_info->index_file_name = index_file_name.c_str();
+    }
+
+    if (!data_file_name.empty() &&
+        dd_part->tablespace_id() == dd::INVALID_OBJECT_ID &&
+        (tablespace_name == nullptr ||
+         strcmp(tablespace_name, dict_sys_t::s_file_per_table_name) != 0)) {
+      create_info->tablespace = nullptr;
+    } else {
+      create_info->tablespace = tablespace_name;
+    }
+    info.flags_reset();
+    info.flags2_reset();
+
+    if ((error = info.prepare_create_table(part_table.c_str())) != 0) {
+      break;
+    }
+
+    info.set_remote_path_flags();
+
+    if ((error = info.create_table(&dd_part->table(), nullptr)) != 0) {
+      break;
+    }
+
+    if ((error = info.create_table_update_global_dd<dd::Partition>(
+             const_cast<dd::Partition *>(dd_part))) != 0) {
+      break;
+    }
+
+    if ((error = info.create_table_update_dict()) != 0) {
+      break;
+    }
+
+    info.detach();
+
+    ++created;
+    create_info->data_file_name = table_data_file_name;
+    create_info->index_file_name = table_index_file_name;
+    create_info->tablespace = table_level_tablespace_name;
+  }
+
+  create_info->data_file_name = nullptr;
+  create_info->index_file_name = nullptr;
+  create_info->tablespace = nullptr;
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_get_tablespace_type_by_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_get_tablespace_type_by_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_get_tablespace_type_by_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_get_tablespace_type_by_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_get_tablespace_type_by_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innobase_get_tablespace_type_by_name not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_init_params
+are determined in innodb_init_params(). */
+
+static char *innobase_data_home_dir = nullptr;
+static char *innobase_data_file_path = nullptr;
+static char *innobase_temp_data_file_path = nullptr;
+static char *innobase_enable_monitor_counter = nullptr;
+static char *innobase_disable_monitor_counter = nullptr;
+static char *innobase_reset_monitor_counter = nullptr;
+static char *innobase_reset_all_monitor_counter = nullptr;
+static char *innobase_doublewrite_dir = nullptr;
+
+static ulong innodb_flush_method;
+
+/* This variable can be set in the server configure file, specifying
+stopword table to be used */
+static char *innobase_server_stopword_table = nullptr;
+
+/* Below we have boolean-valued start-up parameters, and their default
+values */
+
+static bool innobase_rollback_on_timeout = false;
+static bool innobase_create_status_file = false;
+bool innobase_stats_on_metadata = true;
+static bool innodb_optimize_fulltext_only = false;
+
+static char *innodb_version_str = (char *)INNODB_VERSION_STR;
+
+static Innodb_data_lock_inspector innodb_data_lock_inspector;
+
+/** Note we cannot use rec_format_enum because we do not allow
+COMPRESSED row format for innodb_default_row_format option. */
+enum default_row_format_enum {
+  DEFAULT_ROW_FORMAT_REDUNDANT = 0,
+  DEFAULT_ROW_FORMAT_COMPACT = 1,
+  DEFAULT_ROW_FORMAT_DYNAMIC = 2,
+};
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::get_real_row_type not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::get_real_row_type not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::get_real_row_type not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::get_real_row_type not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::get_real_row_type not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::get_real_row_type not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: ha_innobase::create
+and rely on adjusting row format in table definition at ha_innobase::create()
+or ha_innobase::prepare_inplace_alter_table() time.
+*/
+enum row_type ha_innobase::get_real_row_type(
+    const HA_CREATE_INFO *create_info) const {
+  const bool is_temp = create_info->options & HA_LEX_CREATE_TMP_TABLE;
+  row_type rt = create_info->row_type;
+
+  if (is_temp && (create_info->options & HA_LEX_CREATE_INTERNAL_TMP_TABLE)) {
+    return (ROW_TYPE_DYNAMIC);
+  }
+
+  if (rt == ROW_TYPE_DEFAULT && create_info->key_block_size &&
+      get_zip_shift_size(create_info->key_block_size) && !is_temp &&
+      (srv_file_per_table || tablespace_is_shared_space(create_info))) {
+    rt = ROW_TYPE_COMPRESSED;
+  }
+
+  switch (rt) {
+    case ROW_TYPE_REDUNDANT:
+    case ROW_TYPE_DYNAMIC:
+    case ROW_TYPE_COMPACT:
+      return (rt);
+    case ROW_TYPE_COMPRESSED:
+      if (!is_temp &&
+          (srv_file_per_table || tablespace_is_shared_space(create_info))) {
+        return (rt);
+      } else {
+        return (ROW_TYPE_DYNAMIC);
+      }
+    case ROW_TYPE_NOT_USED:
+    case ROW_TYPE_FIXED:
+    case ROW_TYPE_PAGED:
+      return (ROW_TYPE_DYNAMIC);
+    case ROW_TYPE_DEFAULT:
+    default:
+      switch (innodb_default_row_format) {
+        case DEFAULT_ROW_FORMAT_REDUNDANT:
+          return (ROW_TYPE_REDUNDANT);
+        case DEFAULT_ROW_FORMAT_COMPACT:
+          return (ROW_TYPE_COMPACT);
+        case DEFAULT_ROW_FORMAT_DYNAMIC:
+          return (ROW_TYPE_DYNAMIC);
+        default:
+          ut_d(ut_error);
+          ut_o(return (ROW_TYPE_DYNAMIC));
+      }
+  }
+}
+
+

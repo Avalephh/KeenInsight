@@ -1,0 +1,25 @@
+Global Variable: System_variables.29
+Explicit Data Flow (7):
+  Instruction: %3 = load i64, i64* %max_error_count, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:604:53 | Function: Diagnostics_area::push_warning
+  Instruction: %cmp = icmp ult i64 %conv, %3, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:604:36 | Function: Diagnostics_area::push_warning
+  Instruction: br i1 %cmp, label %if.then, label %if.end8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:603:7 | Function: Diagnostics_area::push_warning
+  Instruction: %4 = load i64, i64* %max_error_count, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:594:29 | Function: Diagnostics_area::reserve_number_of_conditions
+  Instruction: %cmp = icmp ugt i64 %conv, %4, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:593:49 | Function: Diagnostics_area::reserve_number_of_conditions
+  Instruction: %5 = phi i1 [ false, %while.cond ], [ %cmp, %land.rhs ], !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:0:0 | Function: Diagnostics_area::reserve_number_of_conditions
+  Instruction: br i1 %5, label %while.body, label %while.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_error.cc:592:3 | Function: Diagnostics_area::reserve_number_of_conditions
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: operator new
+  Controlled Function: I_P_List
+  Controlled Function: operator delete
+  Controlled Function: I_P_List
+  Controlled Function: I_P_List
+  Controlled Function: I_P_List_counter::elements
+  Controlled Function: I_P_List_counter::elements
+
+Implicit Control Flow:
+
+----------------------------------------

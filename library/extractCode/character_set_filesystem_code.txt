@@ -1,0 +1,192 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/set_var.cc
+Function: sys_var::charset
+const CHARSET_INFO *sys_var::charset(THD *thd) {
+  return is_os_charset ? thd->variables.character_set_filesystem
+                       : system_charset_info;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_show.cc
+Function: get_one_variable_ext
+  return get_one_variable_ext(thd, thd, variable, value_type, show_type,
+                              status_var, charset, buff, length, is_null);
+}
+
+/**
+  @brief Returns the value of a system or a status variable.
+
+  @param running_thd     The handle of the current THD.
+  @param target_thd      The handle of the remote THD.
+  @param variable        Details of the variable.
+  @param value_type      Variable type.
+  @param show_type       Variable show type.
+  @param status_var      Status values or NULL if for system variable.
+  @param [out] charset   Character set of the value.
+  @param [in,out] buff   Buffer to store the value.
+  @param [out] length    Length of the value.
+  @param [out] is_null   Is variable value NULL or not. This parameter is set
+                         only for variables of string type.
+
+  @returns               Pointer to the value buffer.
+*/
+
+const char *get_one_variable_ext(THD *running_thd, THD *target_thd,
+                                 const SHOW_VAR *variable,
+                                 enum_var_type value_type, SHOW_TYPE show_type,
+                                 System_status_var *status_var,
+                                 const CHARSET_INFO **charset, char *buff,
+                                 size_t *length, bool *is_null) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.h
+Function: Sys_var_charptr::do_check
+  bool do_check(THD *thd, set_var *var) override {
+    bool fixed = false;
+    longlong v;
+    ulonglong uv;
+
+    v = var->value->val_int();
+    if (SIGNED) { /* target variable has signed type */
+      if (var->value->unsigned_flag) {
+        /*
+          Input value is such a large positive number that MySQL used
+          an unsigned item to hold it. When cast to a signed longlong,
+          if the result is negative there is "cycling" and this is
+          incorrect (large positive input value should not end up as a
+          large negative value in the session signed variable to be
+          set); instead, we need to pick the allowed number closest to
+          the positive input value, i.e. pick the biggest allowed
+          positive integer.
+        */
+        if (v < 0)
+          uv = max_of_int_range(ARGT);
+        else /* no cycling, longlong can hold true value */
+          uv = (ulonglong)v;
+      } else
+        uv = v;
+      /* This will further restrict with VALID_RANGE, BLOCK_SIZE */
+      var->save_result.ulonglong_value =
+        getopt_ll_limit_value(uv, &option, &fixed);
+    } else {
+      if (var->value->unsigned_flag) {
+        /* Guaranteed positive input value, ulonglong can hold it */
+        uv = (ulonglong)v;
+      } else {
+        /*
+          Maybe negative input value; in this case, cast to ulonglong
+          makes it positive, which is wrong. Pick the closest allowed
+          value i.e. 0.
+        */
+        uv = (ulonglong)(v < 0 ? 0 : v);
+      }
+      var->save_result.ulonglong_value =
+        getopt_ull_limit_value(uv, &option, &fixed);
+    }
+
+    if (max_var_ptr()) {
+      /* check constraint set with --maximum-...=X */
+      if (SIGNED) {
+        longlong max_val = *max_var_ptr();
+        if (((longlong)(var->save_result.ulonglong_value)) > max_val)
+          var->save_result.ulonglong_value = max_val;
+        /*
+          Signed variable probably has some kind of symmetry. Then
+          it's good to limit negative values just as we limit positive
+          values.
+        */
+        max_val = -max_val;
+        if (((longlong)(var->save_result.ulonglong_value)) < max_val)
+          var->save_result.ulonglong_value = max_val;
+      } else {
+        ulonglong max_val = *max_var_ptr();
+        if (var->save_result.ulonglong_value > max_val)
+          var->save_result.ulonglong_value = max_val;
+      }
+    }
+
+    return throw_bounds_warning(
+        thd, name.str, var->save_result.ulonglong_value != (ulonglong)v,
+        var->value->unsigned_flag, v);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_variable.cc
+Function: System_variable::init
+void System_variable::init(THD *target_thd, const SHOW_VAR *show_var,
+                           enum_var_type query_scope) {
+  if (show_var == nullptr || show_var->name == nullptr) {
+    return;
+  }
+
+  const enum_mysql_show_type show_var_type = show_var->type;
+  assert(show_var_type == SHOW_SYS);
+  THD *current_thread = current_thd;
+
+  m_name = show_var->name;
+  m_name_length = strlen(m_name);
+
+  /* Block remote target thread from updating this system variable. */
+  if (target_thd != current_thread) {
+    mysql_mutex_lock(&target_thd->LOCK_thd_sysvar);
+  }
+  /* Block system variable additions or deletions. */
+  mysql_mutex_lock(&LOCK_global_system_variables);
+
+  auto *system_var = (sys_var *)show_var->value;
+  assert(system_var != nullptr);
+  m_charset = system_var->charset(target_thd);
+  m_type = system_var->show_type();
+  m_scope = system_var->scope();
+
+  /* Get the value of the system variable. */
+  const char *value;
+  value = get_one_variable_ext(current_thread, target_thd, show_var,
+                               query_scope, show_var_type, nullptr, &m_charset,
+                               m_value_str, &m_value_length);
+
+  m_value_length = std::min(m_value_length, size_t{SHOW_VAR_FUNC_BUFF_SIZE});
+
+  /* Returned value may reference a string other than m_value_str. */
+  if (value != m_value_str) {
+    memcpy(m_value_str, value, m_value_length);
+  }
+  m_value_str[m_value_length] = 0;
+
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+  if (target_thd != current_thread) {
+    mysql_mutex_unlock(&target_thd->LOCK_thd_sysvar);
+  }
+
+  m_initialized = true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/perfschema/table_helper.cc
+Function: PFS_variable_value_row::make_row
+int PFS_host_row::make_row(PFS_host *pfs) {
+  m_host_name = pfs->m_key.m_host_name;
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::update_charset
+void THD::update_charset() {
+  size_t not_used;
+  charset_is_system_charset = !String::needs_conversion(
+      0, variables.character_set_client, system_charset_info, &not_used);
+  charset_is_collation_connection =
+      !String::needs_conversion(0, variables.character_set_client,
+                                variables.collation_connection, &not_used);
+  charset_is_character_set_filesystem =
+      !String::needs_conversion(0, variables.character_set_client,
+                                variables.character_set_filesystem, &not_used);
+}
+
+
