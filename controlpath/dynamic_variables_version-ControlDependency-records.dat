@@ -1,0 +1,23 @@
+Global Variable: System_variables.0
+Explicit Data Flow (9):
+  Instruction: store i64 0, i64* %dynamic_variables_version, align 8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3086:35 | Function: cleanup_variables
+  Instruction: %dynamic_variables_version = getelementptr inbounds %struct.System_variables, %struct.System_variables* %15, i32 0, i32 0, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3086:9 | Function: cleanup_variables
+  Instruction: %dynamic_variables_version = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables13, i32 0, i32 0, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3032:18 | Function: plugin_thdvar_init
+  Instruction: store i64 0, i64* %dynamic_variables_version, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3032:44 | Function: plugin_thdvar_init
+  Instruction: %dynamic_variables_version57 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables56, i32 0, i32 0, !dbg !1255422 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2972:18 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: store i64 %61, i64* %dynamic_variables_version57, align 8, !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2972:44 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %30 = load i64, i64* %dynamic_variables_version, align 8, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2956:38 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %cmp = icmp ule i64 %conv26, %30, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2956:20 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: br i1 %cmp, label %if.then40, label %lor.lhs.false, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2956:64 | Function: alloc_and_copy_thd_dynamic_variables
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: intern_find_sys_var
+  Controlled Function: sys_var::check_if_sensitive_in_context
+  Controlled Function: plugin_var_memalloc_session_update
+
+Implicit Control Flow:
+
+----------------------------------------

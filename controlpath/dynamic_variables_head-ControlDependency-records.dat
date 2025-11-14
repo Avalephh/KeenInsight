@@ -1,0 +1,19 @@
+Global Variable: System_variables.2
+Explicit Data Flow (6):
+  Instruction: store i32 %63, i32* %dynamic_variables_head, align 8, !dbg !1255428 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2974:41 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %dynamic_variables_head = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables58, i32 0, i32 2, !dbg !1255427 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2974:18 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %dynamic_variables_head = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables6, i32 0, i32 2, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:200:37 | Function: intern_sys_var_ptr
+  Instruction: %12 = load i32, i32* %dynamic_variables_head, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:200:37 | Function: intern_sys_var_ptr
+  Instruction: %cmp7 = icmp ugt i32 %10, %12, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:200:20 | Function: intern_sys_var_ptr
+  Instruction: br i1 %cmp7, label %if.then8, label %if.end15, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:199:7 | Function: intern_sys_var_ptr
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: alloc_and_copy_thd_dynamic_variables
+
+Implicit Control Flow:
+
+----------------------------------------

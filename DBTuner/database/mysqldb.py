@@ -233,9 +233,13 @@ class MysqlDB:
         time.sleep(10)
         os.system('rm -rf {}'.format(self.sock))
         os.system('rm -rf {}'.format(dst_data_path))  # avoid moving src into dst
-        logger.info('remove all files in {}'.format(dst_data_path))
+        print('remove all files in {}'.format(dst_data_path))
         os.system('cp -r {} {}'.format(src_data_path, dst_data_path))
-        logger.info('cp -r {} {}'.format(src_data_path, dst_data_path))
+        print('cp -r {} {}'.format(src_data_path, dst_data_path))
+        print('Fixing permissions for MySQL data directory')
+        os.system('sudo chown -R mysql:mysql {}'.format(dst_data_path))
+        os.system('sudo chmod -R 755 {}'.format(dst_data_path))
+        os.system('sudo chmod 755 {}'.format(dst_data_path))
         self.pre_combine_log_file_size = log_num_default * log_size_default
         self.apply_knobs_offline(self.default_knobs)
         self.reinit_interval = 0

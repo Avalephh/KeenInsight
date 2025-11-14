@@ -19,6 +19,8 @@ from DBTuner.workload import SYSBENCH_WORKLOAD, JOB_WORKLOAD, OLTPBENCH_WORKLOAD
 # from autotune.utils.constants import MAXINT, SUCCESS, FAILED, TIMEOUT
 # from autotune.utils.parser import is_number
 from DBTuner.database.postgresqldb import PostgresqlDB
+# from DBTuner.database.postgresqldb import PostgresqlDB
+from DBTuner.database.mysqldb import MysqlDB
 
 import re
 from collections import defaultdict
@@ -43,9 +45,9 @@ class DBEnv:
         self.step_count = 0
         self.connect_sucess = True
         self.reinit_interval = 0
-        self.reinit = False
+        self.reinit = True
         if self.reinit_interval:
-            self.reinit = False
+            self.reinit = True
         self.generate_time()
         self.y_variable = eval(args_tune['performance_metric'])
         self.reference_point = self.generate_reference_point(eval(args_tune['reference_point']))
@@ -1007,6 +1009,7 @@ class DBEnv:
     #     function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
     #     return benchmark_timeout, external_metrics, internal_metrics, function_range
      
+     
     def get_states_expe_tpcc(self, collect_resource=0):
         # start Internal Metrics Collection
         internal_metrics = Manager().list()
@@ -1015,59 +1018,70 @@ class DBEnv:
         self.db.set_im_alive(True)
         im.start()
 
-        # start Resource Monition (if activated)
         if collect_resource:
             rm = ResourceMonitor(self.db.pid, 1, BENCHMARK_WARMING_TIME, BENCHMARK_RUNNING_TIME)
             rm.run()
-        
         # start Benchmark
         benchmark_timeout = False
-        # cmd, filename = self.get_benchmark_cmd()
-        # print(cmd)
+        
         perf_output_dir = 'perf_data'  # Define a unified folder for perf data
         os.makedirs(perf_output_dir, exist_ok=True)
 
         timestamp = int(time.time())
-        tpcc_output_file = 'tpcc_log_{}.out'.format(timestamp)
-        cmd = [
-            "/usr/local/tpcc-mysql/tpcc_start",
-            "-h127.0.0.1",
-            "-P3306",
-            "-dtpcc",
-            "-uroot",
-            "-pDbiir@500",
-            "-w5",
-            "-c32",
-            "-r20",
-            "-l60",
-        ]
-        cmd = " ".join(cmd) 
-        print("cmd: ", cmd)
-        print("[{}] benchmark start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+        # TODO: benchbase
+        result_path = "./optimization_results/temp_results"
+        benchmark_path = "/root/benchbase/target/benchbase-mysql"
+        for filename in os.listdir(result_path):
+            print(f"REMOVE {filename}")
+            filepath = os.path.join(result_path, filename)
+            os.remove(filepath)
         
-        # tpcc TODO: 注释
-        with open(tpcc_output_file, "w") as logfile:
-            # 执行命令并保存输出到日志文件
-            p_benchmark = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT, stdout=logfile,
-                                    close_fds=True)
-            
+        with open(os.path.join(result_path, "out.txt"), 'w') as output_file:
+            process = subprocess.Popen(
+                ['java', '-jar', 'benchbase.jar', '-b', 'tpcc', 
+                "-c", "config/mysql/sample_tpcc_config.xml", 
+                "--create=false", "--clear=false", "--load=false", '--execute=true', 
+                "-d", '/root/sysinsight-main/optimization_results/temp_results'],
+                cwd=benchmark_path,
+                stdout=output_file
+            )
             # collect perf data
             perf_file = os.path.join(perf_output_dir, f'perf_data_{timestamp}.data')
-            pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
-            perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 55" 
-            print(perf_cmd)
-            time.sleep(25)
+            if(isinstance(self.db, MysqlDB)):
+                pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
+                perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 50" 
+                print("mysql: ",perf_cmd)
+
+            elif (isinstance(self.db, PostgresqlDB)):
+                lines = subprocess.check_output(
+                    "ps -eo pid,ppid,cmd | grep '[p]ostgres.*--config_file'", 
+                    shell=True
+                ).decode().strip().splitlines()
+                # 遍历每个 PID，找出其 cmdline 是否为主进程
+                main_pid = None
+                for line in lines:
+                    parts = line.strip().split(None, 2)
+                    if len(parts) < 3:
+                        continue
+                    pid, ppid, cmd = parts
+                    # 过滤掉 sudo 启动命令（即不是实际 postgres 主进程）
+                    if 'sudo' not in cmd:
+                        main_pid = pid
+                        break
+                perf_cmd = f"perf record -F 300 -p {main_pid} -g -o {perf_file} -- sleep 50"
+                print("postgresql: ",perf_cmd)
+            time.sleep(5)
             print("[{}] perf data collection start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             p_runperf = subprocess.Popen(perf_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                                         close_fds=True)
-            p_benchmark.wait()
+            process.wait()
             p_runperf.wait()
-        filename = tpcc_output_file
+        
         # try:
-        outs, errs = p_benchmark.communicate(timeout=TIMEOUT_TIME)
+        outs, errs = process.communicate(timeout=TIMEOUT_TIME)
         print(errs)
         print(outs)
-        ret_code = p_benchmark.poll()
+        ret_code = process.poll()
         if ret_code == 0:
             print("[{}] benchmark finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
         else:
@@ -1101,7 +1115,6 @@ class DBEnv:
         print(stackcollapse_script)
         
         perf_txt = os.path.join(perf_output_dir, f'perf_{timestamp}.txt')
-        # perf_script_cmd = f"perf script -i {perf_file} > {perf_txt}"
         perf_script_cmd = f"perf script -i {perf_file} | {stackcollapse_script} > {perf_txt}"
         p_perf_script = subprocess.Popen(perf_script_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                                     close_fds=True)
@@ -1124,31 +1137,162 @@ class DBEnv:
             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = 0, 0, 0, 0, 0
 
         # external_metrics = self.get_external_metrics(filename)
-        # tpcc TODO: 注释
-        external_metrics = self.get_tpcc_metrics(filename)
+        
+        # tpcc TODO: benchbase
+        external_metrics = self.get_throughput_benchbase()
+        print(external_metrics)
         
         internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
         logger.info('internal metrics: {}.'.format(list(internal_metrics)))
-
-        # Judge tps value
-        # rw
-        DEFAULT_TPS = 1507.88
-        FLOUCTUATION_PERCENTAGE = 0.05  # 5%
-        LOW_THRESHOLD = DEFAULT_TPS * (1 - FLOUCTUATION_PERCENTAGE)  # 
-        HIGH_THRESHOLD = DEFAULT_TPS * (1 + FLOUCTUATION_PERCENTAGE) # 
-        result_flag = 0
-        if external_metrics[0] > HIGH_THRESHOLD:
-            result_flag = 3
-        elif external_metrics[0] < LOW_THRESHOLD:
-            result_flag = 1
-        else:
-            result_flag = 2
         
-        # result_flag = 2
+        result_flag = 2
         function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
 
         return benchmark_timeout, external_metrics, internal_metrics, (
             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory, dirty_pages, hit_ratio, page_data), function_range
+        
+    # def get_states_expe_tpcc(self, collect_resource=0):
+    #     # start Internal Metrics Collection
+    #     internal_metrics = Manager().list()
+    #     im = mp.Process(target=self.db.get_internal_metrics,
+    #                     args=(internal_metrics, BENCHMARK_RUNNING_TIME, BENCHMARK_WARMING_TIME))
+    #     self.db.set_im_alive(True)
+    #     im.start()
+
+    #     # start Resource Monition (if activated)
+    #     if collect_resource:
+    #         rm = ResourceMonitor(self.db.pid, 1, BENCHMARK_WARMING_TIME, BENCHMARK_RUNNING_TIME)
+    #         rm.run()
+        
+    #     # start Benchmark
+    #     benchmark_timeout = False
+    #     # cmd, filename = self.get_benchmark_cmd()
+    #     # print(cmd)
+    #     perf_output_dir = 'perf_data'  # Define a unified folder for perf data
+    #     os.makedirs(perf_output_dir, exist_ok=True)
+
+    #     timestamp = int(time.time())
+    #     tpcc_output_file = 'tpcc_log_{}.out'.format(timestamp)
+    #     cmd = [
+    #         "/usr/local/tpcc-mysql/tpcc_start",
+    #         "-h127.0.0.1",
+    #         "-P3306",
+    #         "-dtpcc",
+    #         "-uroot",
+    #         "-pDbiir@500",
+    #         "-w5",
+    #         "-c32",
+    #         "-r20",
+    #         "-l60",
+    #     ]
+    #     cmd = " ".join(cmd) 
+    #     print("cmd: ", cmd)
+    #     print("[{}] benchmark start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+        
+    #     # tpcc TODO: 注释
+    #     with open(tpcc_output_file, "w") as logfile:
+    #         # 执行命令并保存输出到日志文件
+    #         p_benchmark = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT, stdout=logfile,
+    #                                 close_fds=True)
+            
+    #         # collect perf data
+    #         perf_file = os.path.join(perf_output_dir, f'perf_data_{timestamp}.data')
+    #         pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
+    #         perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 55" 
+    #         print(perf_cmd)
+    #         time.sleep(25)
+    #         print("[{}] perf data collection start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+    #         p_runperf = subprocess.Popen(perf_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
+    #                                     close_fds=True)
+    #         p_benchmark.wait()
+    #         p_runperf.wait()
+    #     filename = tpcc_output_file
+    #     # try:
+    #     outs, errs = p_benchmark.communicate(timeout=TIMEOUT_TIME)
+    #     print(errs)
+    #     print(outs)
+    #     ret_code = p_benchmark.poll()
+    #     if ret_code == 0:
+    #         print("[{}] benchmark finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+    #     else:
+    #         print("run benchmark get error {}".format(ret_code))
+    #     # except subprocess.TimeoutExpired:
+    #     #     #benchmark_timeout = True
+    #     #     print("[{}] benchmark timeout!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+    #     outs, errs = p_runperf.communicate(timeout=TIMEOUT_TIME)
+    #     print("collect perf data: ")
+    #     print(errs)
+    #     print(outs)
+    #     ret_code1 = p_runperf.poll()
+    #     if ret_code1 == 0:
+    #         print("[{}] perf data collection finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+    #     else:
+    #         print("perf data collection get error {}".format(ret_code1))
+
+    #     # terminate Benchmark
+    #     if not self.remote_mode:
+    #         subprocess.Popen(self.db.clear_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
+    #                         close_fds=True)
+    #         print("[{}] clear processlist".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+
+    #     # stop Internal Metrics Collection
+    #     self.db.set_im_alive(False)
+    #     im.join()
+        
+    #     # transfer perf data to perf txt
+    #     flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
+    #     stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
+    #     print(stackcollapse_script)
+        
+    #     perf_txt = os.path.join(perf_output_dir, f'perf_{timestamp}.txt')
+    #     # perf_script_cmd = f"perf script -i {perf_file} > {perf_txt}"
+    #     perf_script_cmd = f"perf script -i {perf_file} | {stackcollapse_script} > {perf_txt}"
+    #     p_perf_script = subprocess.Popen(perf_script_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
+    #                                 close_fds=True)
+    #     p_perf_script.wait()    
+    #     outs, errs = p_perf_script.communicate(timeout=TIMEOUT_TIME)
+    #     print("generate perf script: ")
+    #     print(errs)
+    #     print(outs) 
+    #     ret_code2 = p_perf_script.poll()
+    #     if ret_code2 == 0:
+    #         print("[{}] perf script generation finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+    #     else:
+    #         print("perf script generation get error {}".format(ret_code2))
+
+    #     # stop Resource Monition (if activated)
+    #     if collect_resource:
+    #         rm.terminate()
+    #         cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = rm.get_monitor_data_avg()
+    #     else:
+    #         cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = 0, 0, 0, 0, 0
+
+    #     # external_metrics = self.get_external_metrics(filename)
+    #     # tpcc TODO: 注释
+    #     external_metrics = self.get_tpcc_metrics(filename)
+        
+    #     internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
+    #     logger.info('internal metrics: {}.'.format(list(internal_metrics)))
+
+    #     # Judge tps value
+    #     # rw
+    #     DEFAULT_TPS = 1507.88
+    #     FLOUCTUATION_PERCENTAGE = 0.05  # 5%
+    #     LOW_THRESHOLD = DEFAULT_TPS * (1 - FLOUCTUATION_PERCENTAGE)  # 
+    #     HIGH_THRESHOLD = DEFAULT_TPS * (1 + FLOUCTUATION_PERCENTAGE) # 
+    #     result_flag = 0
+    #     if external_metrics[0] > HIGH_THRESHOLD:
+    #         result_flag = 3
+    #     elif external_metrics[0] < LOW_THRESHOLD:
+    #         result_flag = 1
+    #     else:
+    #         result_flag = 2
+        
+    #     # result_flag = 2
+    #     function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
+
+    #     return benchmark_timeout, external_metrics, internal_metrics, (
+    #          cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory, dirty_pages, hit_ratio, page_data), function_range
  
     def get_perf_function_range(self,tps_value, result_flag, filename=''):
     
@@ -1324,11 +1468,21 @@ class DBEnv:
     def step_GP_sysinght(self, knobs, collect_resource=True):
         #return False, np.random.rand(6), np.random.rand(65), np.random.rand(8)
         # re-init database if activated
-        if self.reinit_interval > 0 and self.reinit_interval % RESTART_FREQUENCY == 0:
+        # if self.reinit_interval > 0 and self.reinit_interval % RESTART_FREQUENCY == 0:
+        #     if self.reinit:
+        #         logger.info('reinitializing db begin')
+        #         self.db.reinitdb_magic(self.remote_mode)
+        #         logger.info('db reinitialized')
+        # self.step_count = self.step_count + 1
+        # self.reinit_interval = self.reinit_interval + 1
+        if self.args['workload'] == 'tpcc':
+            # print(self.reinit)
             if self.reinit:
-                logger.info('reinitializing db begin')
-                self.db.reinitdb_magic(self.remote_mode)
-                logger.info('db reinitialized')
+                # print("****************7777")
+                print('reinitializing db begin')
+                self.db.reinitdb_magic()
+                print('db reinitialized')
+
         self.step_count = self.step_count + 1
         self.reinit_interval = self.reinit_interval + 1
 

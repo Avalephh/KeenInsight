@@ -1,0 +1,23 @@
+Global Variable: System_variables.52
+Explicit Data Flow (9):
+  Instruction: %18 = load i64, i64* %max_sp_recursion_depth, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:1585:44 | Function: sp_setup_routine
+  Instruction: %cond = phi i64 [ %18, %cond.true ], [ 0, %cond.false ], !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:1584:23 | Function: sp_setup_routine
+  Instruction: store i64 %cond, i64* %depth, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:1584:15 | Function: sp_setup_routine
+  Instruction: %36 = load i64, i64* %depth, align 8, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:1594:56 | Function: sp_setup_routine
+  Instruction: %cmp46 = icmp ugt i64 %35, %36, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:1594:54 | Function: sp_setup_routine
+  Instruction: br i1 %cmp46, label %if.then47, label %if.end49, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:1594:9 | Function: sp_setup_routine
+  Instruction: %3 = load i64, i64* %max_sp_recursion_depth, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:305:46 | Function: recursion_level_error
+  Instruction: %conv = trunc i64 %3 to i32, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:305:31 | Function: recursion_level_error
+  Instruction: call void (i32, i32, ...) @_Z8my_erroriiz(i32 1456, i32 0, i32 %conv, i8* %5), !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:304:5 | Function: recursion_level_error
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: recursion_level_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,18 @@
+Global Variable: System_variables.47
+Explicit Data Flow (3):
+  Instruction: %17 = load i64, i64* %profiling_history_size, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/sql_profile.cc:426:44 | Function: PROFILING::finish_current_query
+  Instruction: %cmp23 = icmp ugt i64 %15, %17, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/sql_profile.cc:426:27 | Function: PROFILING::finish_current_query
+  Instruction: br i1 %cmp23, label %while.body, label %while.end, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_profile.cc:426:3 | Function: PROFILING::finish_current_query
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Queue
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: operator delete
+
+Implicit Control Flow:
+
+----------------------------------------

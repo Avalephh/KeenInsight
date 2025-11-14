@@ -1,0 +1,205 @@
+Global Variable: System_variables.101
+Explicit Data Flow (96):
+  Instruction: invoke void @_ZN18Gtid_specification13set_automaticEv(%struct.Gtid_specification* %gtid_next)
+          to label %invoke.cont27 unwind label %lpad, !dbg !1255373 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:1846:28 | Function: close_temporary_tables
+  Instruction: invoke void @_ZN18Gtid_specification13set_automaticEv(%struct.Gtid_specification* %gtid_next)
+          to label %invoke.cont77 unwind label %lpad70, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:3844:35 | Function: open_table_entry_fini
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1256433 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:907:38 | Function: mysql_rm_db
+  Instruction: %gtid = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next233, i32 0, i32 1, !dbg !1256444 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:910:36 | Function: mysql_rm_db
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1256114 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:3474:36 | Function: mysql_execute_command
+  Instruction: %type697 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next696, i32 0, i32 0, !dbg !1256210 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:3557:36 | Function: mysql_execute_command
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:2162:32 | Function: rm_table_eval_gtid_and_table_groups_state
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/sql/sql_admin.cc:1661:37 | Function: Sql_cmd_analyze_table::handle_histogram_command
+  Instruction: %type20 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next19, i32 0, i32 0, !dbg !1255425 | Location: /root/LLVM/mysql-8.0.36/sql/sql_admin.cc:1662:37 | Function: Sql_cmd_analyze_table::handle_histogram_command
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/sql_admin.cc:721:34 | Function: mysql_admin_table
+  Instruction: %type11 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next10, i32 0, i32 0, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/sql_admin.cc:722:34 | Function: mysql_admin_table
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1569:5 | Function: MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group
+  Instruction: %type4 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next3, i32 0, i32 0, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1572:35 | Function: MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group
+  Instruction: %type31 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next30, i32 0, i32 0, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1586:7 | Function: MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group
+  Instruction: %type36 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next35, i32 0, i32 0, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1590:37 | Function: MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group
+  Instruction: %type48 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next47, i32 0, i32 0, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1593:9 | Function: MYSQL_BIN_LOG::assign_automatic_gtids_to_flush_group
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1779:5 | Function: MYSQL_BIN_LOG::gtid_end_transaction
+  Instruction: %type69 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next68, i32 0, i32 0, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1885:39 | Function: MYSQL_BIN_LOG::gtid_end_transaction
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10623:60 | Function: handle_gtid_consistency_violation
+  Instruction: store %struct.Gtid_specification* %gtid_next4, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13306:29 | Function: Gtid_log_event::do_apply_event
+  Instruction: %16 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13308:38 | Function: Gtid_log_event::do_apply_event
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %16, i32 0, i32 0, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13308:49 | Function: Gtid_log_event::do_apply_event
+  Instruction: %17 = load i32, i32* %type, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13308:49 | Function: Gtid_log_event::do_apply_event
+  Instruction: %cmp11 = icmp eq i32 %17, 1, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13308:54 | Function: Gtid_log_event::do_apply_event
+  Instruction: br i1 %cmp11, label %if.then, label %if.end22, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13307:7 | Function: Gtid_log_event::do_apply_event
+  Instruction: %gtid85 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next84, i32 0, i32 1, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13373:32 | Function: Gtid_log_event::do_apply_event
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:12982:46 | Function: Gtid_log_event::Gtid_log_event
+  Instruction: invoke void @_ZN18Gtid_specification13set_automaticEv(%struct.Gtid_specification* %gtid_next)
+          to label %invoke.cont35 unwind label %lpad, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:80:32 | Function: set_gtid_next
+  Instruction: invoke void @_ZN18Gtid_specification13set_anonymousEv(%struct.Gtid_specification* %gtid_next47)
+          to label %invoke.cont48 unwind label %lpad, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:95:32 | Function: set_gtid_next
+  Instruction: %51 = bitcast %struct.Gtid_specification* %gtid_next90 to i8*, !dbg !1255412 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:121:36 | Function: set_gtid_next
+  Instruction: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 %51, i8* align 8 %52, i64 24, i1 false), !dbg !1255412 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:121:36 | Function: set_gtid_next
+  Instruction: %60 = bitcast %struct.Gtid_specification* %gtid_next103 to i8*, !dbg !1255433 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:132:36 | Function: set_gtid_next
+  Instruction: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 %60, i8* align 8 %61, i64 24, i1 false), !dbg !1255433 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:132:36 | Function: set_gtid_next
+  Instruction: %98 = bitcast %struct.Gtid_specification* %gtid_next171 to i8*, !dbg !1255513 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:177:32 | Function: set_gtid_next
+  Instruction: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 %98, i8* align 8 %99, i64 24, i1 false), !dbg !1255513 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:177:32 | Function: set_gtid_next
+  Instruction: store %struct.Gtid_specification* %gtid_next1, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:308:29 | Function: is_already_logged_transaction
+  Instruction: %3 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:312:9 | Function: is_already_logged_transaction
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %3, i32 0, i32 0, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:312:20 | Function: is_already_logged_transaction
+  Instruction: %4 = load i32, i32* %type, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:312:20 | Function: is_already_logged_transaction
+  Instruction: %cmp2 = icmp eq i32 %4, 1, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:312:25 | Function: is_already_logged_transaction
+  Instruction: br i1 %cmp2, label %if.then3, label %if.else9, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:312:9 | Function: is_already_logged_transaction
+  Instruction: store %struct.Gtid_specification* %gtid_next1, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:366:23 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %1 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:375:3 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %1, i32 0, i32 0, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:375:3 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %2 = load i32, i32* %type, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:375:3 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: invoke void (i8*, ...) @_Z11_db_doprnt_PKcz(i8* getelementptr inbounds ([32 x i8], [32 x i8]* @.str.20.43772, i64 0, i64 0), i32 %2, i8* %call4)
+          to label %invoke.cont5 unwind label %lpad, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:375:3 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %6 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:377:7 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %type6 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %6, i32 0, i32 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:377:18 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %7 = load i32, i32* %type6, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:377:18 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: %cmp = icmp eq i32 %7, 4, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:377:23 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: br i1 %cmp, label %if.then10, label %lor.lhs.false, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:377:50 | Function: gtid_reacquire_ownership_if_anonymous
+  Instruction: store %struct.Gtid_specification* %gtid_next1, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:445:23 | Function: gtid_pre_statement_checks
+  Instruction: %1 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:447:3 | Function: gtid_pre_statement_checks
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %1, i32 0, i32 0, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:447:3 | Function: gtid_pre_statement_checks
+  Instruction: %2 = load i32, i32* %type, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:447:3 | Function: gtid_pre_statement_checks
+  Instruction: invoke void (i8*, ...) @_Z11_db_doprnt_PKcz(i8* getelementptr inbounds ([51 x i8], [51 x i8]* @.str.22.43776, i64 0, i64 0), i32 %2, i32 %4, i64 %6)
+          to label %invoke.cont4 unwind label %lpad, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:447:3 | Function: gtid_pre_statement_checks
+  Instruction: %10 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:451:3 | Function: gtid_pre_statement_checks
+  Instruction: %type5 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %10, i32 0, i32 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:451:3 | Function: gtid_pre_statement_checks
+  Instruction: %11 = load i32, i32* %type5, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:451:3 | Function: gtid_pre_statement_checks
+  Instruction: %cmp = icmp ne i32 %11, 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:451:3 | Function: gtid_pre_statement_checks
+  Instruction: br i1 %cmp, label %lor.end, label %lor.rhs, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:451:3 | Function: gtid_pre_statement_checks
+  Instruction: %22 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:456:7 | Function: gtid_pre_statement_checks
+  Instruction: %type14 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %22, i32 0, i32 0, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:456:18 | Function: gtid_pre_statement_checks
+  Instruction: %23 = load i32, i32* %type14, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:456:18 | Function: gtid_pre_statement_checks
+  Instruction: %cmp15 = icmp eq i32 %23, 1, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:456:23 | Function: gtid_pre_statement_checks
+  Instruction: br i1 %cmp15, label %if.then16, label %if.end18, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:453:7 | Function: gtid_pre_statement_checks
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:342:3 | Function: skip_statement
+  Instruction: %gtid = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next14, i32 0, i32 1, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:357:51 | Function: skip_statement
+  Instruction: %gtid18 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next17, i32 0, i32 1, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:358:3 | Function: skip_statement
+  Instruction: %gtid23 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next22, i32 0, i32 1, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_execution.cc:359:53 | Function: skip_statement
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:778:34 | Function: Gtid_state::update_gtids_impl_do_nothing
+  Instruction: call void @_ZN18Gtid_specification13set_undefinedEv(%struct.Gtid_specification* %gtid_next4), !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:779:32 | Function: Gtid_state::update_gtids_impl_do_nothing
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:894:32 | Function: Gtid_state::update_gtids_impl_own_gtid
+  Instruction: call void @_ZN18Gtid_specification13set_undefinedEv(%struct.Gtid_specification* %gtid_next48), !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:896:30 | Function: Gtid_state::update_gtids_impl_own_gtid
+  Instruction: %type52 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next51, i32 0, i32 0, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:903:5 | Function: Gtid_state::update_gtids_impl_own_gtid
+  Instruction: %type56 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next55, i32 0, i32 0, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:903:5 | Function: Gtid_state::update_gtids_impl_own_gtid
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:923:3 | Function: Gtid_state::update_gtids_impl_own_anonymous
+  Instruction: %type4 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next3, i32 0, i32 0, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:923:3 | Function: Gtid_state::update_gtids_impl_own_anonymous
+  Instruction: %type16 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next15, i32 0, i32 0, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:940:47 | Function: Gtid_state::update_gtids_impl_own_anonymous
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:949:3 | Function: Gtid_state::update_gtids_impl_own_nothing
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:255:34 | Function: Gtid_state::end_gtid_violating_transaction
+  Instruction: %type5 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next4, i32 0, i32 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:258:7 | Function: Gtid_state::end_gtid_violating_transaction
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_gtid_state.cc:478:3 | Function: Gtid_state::generate_automatic_gtid
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:564:51 | Function: Trans_delegate::before_commit
+  Instruction: %gtid = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next6, i32 0, i32 1, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:565:52 | Function: Trans_delegate::before_commit
+  Instruction: %gtid11 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next10, i32 0, i32 1, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:566:50 | Function: Trans_delegate::before_commit
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2402:41 | Function: Relay_log_info::set_rli_description_event
+  Instruction: %type15 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next14, i32 0, i32 0, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2403:41 | Function: Relay_log_info::set_rli_description_event
+  Instruction: invoke void @_ZN18Gtid_specification22set_not_yet_determinedEv(%struct.Gtid_specification* %gtid_next33)
+          to label %invoke.cont34 unwind label %lpad, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2410:41 | Function: Relay_log_info::set_rli_description_event
+  Instruction: store %struct.Gtid_specification* %gtid_next5, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.cc:1538:29 | Function: Slave_worker::do_report
+  Instruction: %6 = load %struct.Gtid_specification*, %struct.Gtid_specification** %gtid_next, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.cc:1541:3 | Function: Slave_worker::do_report
+  Instruction: %call7 = call i32 @_ZNK18Gtid_specification9to_stringEPK7Sid_mapPcb(%struct.Gtid_specification* %6, %class.Sid_map* %7, i8* %arraydecay, i1 zeroext true), !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.cc:1541:14 | Function: Slave_worker::do_report
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next, i32 0, i32 0, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.h:766:41 | Function: Slave_worker::set_rli_description_event
+  Instruction: %type5 = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next4, i32 0, i32 0, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.h:767:41 | Function: Slave_worker::set_rli_description_event
+  Instruction: invoke void @_ZN18Gtid_specification22set_not_yet_determinedEv(%struct.Gtid_specification* %gtid_next21)
+          to label %invoke.cont22 unwind label %lpad, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli_pdb.h:774:41 | Function: Slave_worker::set_rli_description_event
+  Instruction: %type = getelementptr inbounds %struct.Gtid_specification, %struct.Gtid_specification* %gtid_next17, i32 0, i32 0, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0repl.cc:136:47 | Function: Clone_persist_gtid::set_persist_gtid
+
+Implicit Data Flow (1):
+  Instruction: %13 = phi i1 [ true, %do.end ], [ %call7, %invoke.cont6 ] | Location: :0:0gtid_pre_statement_checks
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Checkable_rwlock::rdlock
+  Controlled Function: Gtid_state::update_on_rollback
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Gtid_log_event::get_sidno
+  Controlled Function: Assign_gtids_to_anonymous_transactions_info::get_type
+  Controlled Function: Checkable_rwlock::unlock
+  Controlled Function: set_gtid_next
+  Controlled Function: Gtid_mode::get
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: gtid_pre_statement_checks
+  Controlled Function: __assert_fail
+  Controlled Function: THD::set_original_commit_timestamp_for_slave_thread
+  Controlled Function: Assign_gtids_to_anonymous_transactions_info::get_sidno
+  Controlled Function: Relay_log_info::started_processing
+  Controlled Function: _db_keyword_
+  Controlled Function: THD::get_transaction
+  Controlled Function: Transaction_ctx::is_empty
+  Controlled Function: binlog::BgcTicket::is_set
+  Controlled Function: gtid_pre_statement_checks
+  Controlled Function: __assert_fail
+  Controlled Function: Rpl_thd_context::binlog_group_commit_ctx
+  Controlled Function: THD::get_transaction
+  Controlled Function: Binlog_group_commit_ctx::get_session_ticket
+  Controlled Function: Transaction_ctx::is_empty
+  Controlled Function: binlog::BgcTicket::is_set
+  Controlled Function: __assert_fail
+  Controlled Function: Rpl_thd_context::binlog_group_commit_ctx
+  Controlled Function: Rpl_thd_context::binlog_group_commit_ctx
+  Controlled Function: Binlog_group_commit_ctx::get_session_ticket
+  Controlled Function: Binlog_group_commit_ctx::get_session_ticket
+  Controlled Function: __assert_fail
+  Controlled Function: binlog::operator>
+  Controlled Function: binlog::BgcTicket::is_set
+  Controlled Function: _db_pargs_
+  Controlled Function: __assert_fail
+  Controlled Function: Rpl_thd_context::binlog_group_commit_ctx
+  Controlled Function: _db_enabled_
+  Controlled Function: Binlog_group_commit_ctx::set_session_ticket
+  Controlled Function: _db_doprnt_
+  Controlled Function: set_tx_isolation
+  Controlled Function: Gtid::equals
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: Gtid_specification::set_anonymous
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Checkable_rwlock::rdlock
+  Controlled Function: set_gtid_next
+  Controlled Function: THD::set_original_commit_timestamp_for_slave_thread
+  Controlled Function: THD::owned_gtid_is_empty
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::in_active_multi_stmt_transaction
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: is_stmt_innocent
+  Controlled Function: Checkable_rwlock::rdlock
+  Controlled Function: THD::get_gtid_next_list_const
+  Controlled Function: Gtid_specification::to_string
+  Controlled Function: Checkable_rwlock::unlock
+  Controlled Function: _db_pargs_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::thread_id
+  Controlled Function: _db_doprnt_
+  Controlled Function: is_already_logged_transaction
+  Controlled Function: __assert_fail
+  Controlled Function: skip_statement
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: is_stmt_innocent
+  Controlled Function: Checkable_rwlock::rdlock
+  Controlled Function: THD::get_gtid_next_list_const
+  Controlled Function: Gtid_specification::to_string
+  Controlled Function: Checkable_rwlock::unlock
+  Controlled Function: _db_pargs_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::thread_id
+  Controlled Function: _db_doprnt_
+  Controlled Function: is_already_logged_transaction
+  Controlled Function: __assert_fail
+  Controlled Function: skip_statement
+
+Implicit Control Flow:
+
+----------------------------------------

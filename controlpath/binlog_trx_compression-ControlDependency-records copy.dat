@@ -1,0 +1,61 @@
+Global Variable: System_variables.65
+Explicit Data Flow (12):
+  Instruction: %1 = load i8, i8* %binlog_trx_compression, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:2064:26 | Function: Binlog_cache_compressor::shall_compress
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:2064:26 | Function: Binlog_cache_compressor::shall_compress
+  Instruction: br i1 %tobool, label %if.end6, label %if.then, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:2064:9 | Function: Binlog_cache_compressor::shall_compress
+  Instruction: %14 = load i8, i8* %binlog_trx_compression, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_applier_reader.cc:534:3 | Function: Rpl_applier_reader::debug_print_next_event_positions
+  Instruction: %tobool31 = trunc i8 %14 to i1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_applier_reader.cc:534:3 | Function: Rpl_applier_reader::debug_print_next_event_positions
+  Instruction: %15 = phi i1 [ false, %lor.rhs26 ], [ %tobool31, %land.rhs ], !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_applier_reader.cc:0:0 | Function: Rpl_applier_reader::debug_print_next_event_positions
+  Instruction: %16 = phi i1 [ true, %lor.rhs ], [ %15, %land.end ] | Location: :0:0 | Function: Rpl_applier_reader::debug_print_next_event_positions
+  Instruction: %17 = phi i1 [ true, %cond.end ], [ %16, %lor.end ] | Location: :0:0 | Function: Rpl_applier_reader::debug_print_next_event_positions
+  Instruction: br i1 %17, label %cond.true33, label %cond.false34, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_applier_reader.cc:534:3 | Function: Rpl_applier_reader::debug_print_next_event_positions
+  Instruction: store i8 %frombool, i8* %binlog_trx_compression, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6729:41 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_trx_compression = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 65, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6729:18 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_trx_compression = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 65, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_applier_reader.cc:534:3 | Function: Rpl_applier_reader::debug_print_next_event_positions
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: _db_keyword_
+  Controlled Function: _db_pargs_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::set_incident
+  Controlled Function: _db_doprnt_
+  Controlled Function: binlog_cache_data::has_incident
+  Controlled Function: THD::get_transaction
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: Transaction_ctx::has_modified_non_trans_table
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::get_transaction
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: Transaction_ctx::has_modified_non_trans_table
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::may_have_sbr_stmts
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Relay_log_info::get_group_master_log_name
+  Controlled Function: Relay_log_info::get_group_master_log_pos
+  Controlled Function: Relay_log_info::get_group_relay_log_name
+  Controlled Function: Relay_log_info::get_group_relay_log_pos
+  Controlled Function: Relay_log_info::get_event_relay_log_name
+  Controlled Function: Relay_log_info::get_event_relay_log_pos
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+
+Implicit Control Flow:
+
+----------------------------------------

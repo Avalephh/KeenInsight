@@ -1,0 +1,45 @@
+Global Variable: System_variables.125
+Explicit Data Flow (3):
+  Instruction: %731 = load i8, i8* %show_create_table_skip_secondary_engine, align 2, !dbg !1256710 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2553:25 | Function: store_create_info
+  Instruction: %tobool1084 = trunc i8 %731 to i1, !dbg !1256710 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2553:25 | Function: store_create_info
+  Instruction: br i1 %tobool1084, label %if.end1094, label %if.then1085, !dbg !1256711 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2552:9 | Function: store_create_info
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: String::append
+  Controlled Function: append_directory
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: append_directory
+  Controlled Function: Scope_guard
+  Controlled Function: String::append
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: String::~String
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: String::~String
+  Controlled Function: Scope_guard
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: String::~String
+  Controlled Function: String::~String
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: String::String
+  Controlled Function: partition_info::set_show_version_string
+  Controlled Function: String::c_ptr
+  Controlled Function: String::~String
+  Controlled Function: generate_partition_syntax
+  Controlled Function: String::append
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: my_free
+
+Implicit Control Flow:
+
+----------------------------------------

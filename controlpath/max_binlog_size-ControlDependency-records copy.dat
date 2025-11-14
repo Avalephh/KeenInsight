@@ -1,0 +1,31 @@
+Global Variable: max_binlog_size
+Explicit Data Flow (17):
+  Instruction: %360 = load i64, i64* @max_binlog_size, align 8, !dbg !1256298 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6925:61 | Function: init_server_components
+  Instruction: %call1626 = invoke zeroext i1 @_ZN13MYSQL_BIN_LOG11open_binlogEPKcS1_mbbbP28Format_description_log_eventj(%class.MYSQL_BIN_LOG* @mysql_bin_log, i8* %359, i8* null, i64 %360, i1 zeroext false, i1 zeroext true, i1 zeroext true, %class.Format_description_log_event* null, i32 0)
+          to label %invoke.cont1625 unwind label %lpad, !dbg !1256299 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6925:23 | Function: init_server_components
+  Instruction: %9 = load i64, i64* @max_binlog_size, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3095:60 | Function: fix_max_relay_log_size
+  Instruction: %cond = phi i64 [ %8, %cond.true ], [ %9, %cond.false ], !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:39 | Function: fix_max_relay_log_size
+  Instruction: call void @_ZN13MYSQL_BIN_LOG12set_max_sizeEm(%class.MYSQL_BIN_LOG* %relay_log, i64 %cond), !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:26 | Function: fix_max_relay_log_size
+  Instruction: %3 = load i64, i64* @max_binlog_size, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2939:30 | Function: fix_max_binlog_size
+  Instruction: call void @_ZN13MYSQL_BIN_LOG12set_max_sizeEm(%class.MYSQL_BIN_LOG* @mysql_bin_log, i64 %3), !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2939:17 | Function: fix_max_binlog_size
+  Instruction: %9 = load i64, i64* @max_binlog_size, align 8, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2951:58 | Function: fix_max_binlog_size
+  Instruction: call void @_ZN13MYSQL_BIN_LOG12set_max_sizeEm(%class.MYSQL_BIN_LOG* %relay_log, i64 %9), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2951:45 | Function: fix_max_binlog_size
+  Instruction: %15 = load i64, i64* @max_binlog_size, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:7941:36 | Function: MYSQL_BIN_LOG::open_binlog
+  Instruction: %call17 = call zeroext i1 @_ZN13MYSQL_BIN_LOG11open_binlogEPKcS1_mbbbP28Format_description_log_eventj(%class.MYSQL_BIN_LOG* %this1, i8* %14, i8* null, i64 %15, i1 zeroext false, i1 zeroext true, i1 zeroext true, %class.Format_description_log_event* null, i32 0), !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:7941:5 | Function: MYSQL_BIN_LOG::open_binlog
+  Instruction: %26 = load i64, i64* @max_binlog_size, align 8, !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:58 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %cond = phi i64 [ %25, %cond.true70 ], [ %26, %cond.false71 ], !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:16 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %call77 = invoke zeroext i1 bitcast (i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event*, i32)* @_ZN13MYSQL_BIN_LOG11open_binlogEPKcS1_mbbbP28Format_description_log_eventj to i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event.163303*, i32)*)(%class.MYSQL_BIN_LOG* %relay_log68, i8* %23, i8* null, i64 %cond, i1 zeroext true, i1 zeroext true, i1 zeroext true, %class.Format_description_log_event.163303* %call75, i32 0)
+          to label %invoke.cont76 unwind label %lpad, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1122:21 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %68 = load i64, i64* @max_binlog_size, align 8, !dbg !1255492 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:56 | Function: Relay_log_info::rli_init_info
+  Instruction: %cond276 = phi i64 [ %67, %cond.true273 ], [ %68, %cond.false274 ], !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:14 | Function: Relay_log_info::rli_init_info
+  Instruction: %call281 = invoke zeroext i1 bitcast (i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event*, i32)* @_ZN13MYSQL_BIN_LOG11open_binlogEPKcS1_mbbbP28Format_description_log_eventj to i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event.163303*, i32)*)(%class.MYSQL_BIN_LOG* %relay_log271, i8* %65, i8* null, i64 %cond276, i1 zeroext true, i1 zeroext true, i1 zeroext true, %class.Format_description_log_event.163303* %call279, i32 0)
+          to label %invoke.cont280 unwind label %lpad, !dbg !1255495 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1693:19 | Function: Relay_log_info::rli_init_info
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

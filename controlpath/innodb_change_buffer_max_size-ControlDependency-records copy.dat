@@ -1,0 +1,21 @@
+Global Variable: srv_change_buffer_max_size
+Explicit Data Flow (9):
+  Instruction: %67 = load i32, i32* @srv_change_buffer_max_size, align 4, !dbg !1255469 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5577:24 | Function: innobase_init_files
+  Instruction: %conv131 = zext i32 %67 to i64, !dbg !1255469 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5577:24 | Function: innobase_init_files
+  Instruction: invoke void @_Z20ibuf_max_size_updatem(i64 %conv131)
+          to label %invoke.cont132 unwind label %lpad, !dbg !1255470 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5577:3 | Function: innobase_init_files
+  Instruction: %6 = load i32, i32* @srv_change_buffer_max_size, align 4, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:20667:24 | Function: innodb_change_buffer_max_size_update
+  Instruction: %conv = zext i32 %6 to i64, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:20667:24 | Function: innodb_change_buffer_max_size_update
+  Instruction: call void @_Z20ibuf_max_size_updatem(i64 %conv), !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:20667:3 | Function: innodb_change_buffer_max_size_update
+  Instruction: %405 = load i32, i32* @srv_change_buffer_max_size, align 4, !dbg !1256303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:2579:24 | Function: buf_pool_resize
+  Instruction: %conv611 = zext i32 %405 to i64, !dbg !1256303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:2579:24 | Function: buf_pool_resize
+  Instruction: call void @_Z20ibuf_max_size_updatem(i64 %conv611), !dbg !1256304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0buf.cc:2579:3 | Function: buf_pool_resize
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,14 @@
+Global Variable: System_variables.82
+Explicit Data Flow (3):
+  Instruction: %313 = load i8, i8* %keep_files_on_create, align 1, !dbg !1256232 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8960:22 | Function: create_table_impl
+  Instruction: %tobool470 = trunc i8 %313 to i1, !dbg !1256232 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8960:22 | Function: create_table_impl
+  Instruction: br i1 %tobool470, label %if.then471, label %if.end473, !dbg !1256233 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8960:7 | Function: create_table_impl
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

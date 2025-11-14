@@ -1,0 +1,109 @@
+Global Variable: System_variables.64
+Explicit Data Flow (16):
+  Instruction: %15 = load i64, i64* %binlog_row_image, align 8, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7104:33 | Function: check_binlog_row_value_options
+  Instruction: %cmp18 = icmp eq i64 %15, 2, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7104:50 | Function: check_binlog_row_value_options
+  Instruction: br i1 %cmp18, label %if.then19, label %if.end20, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7104:18 | Function: check_binlog_row_value_options
+  Instruction: %15 = load i64, i64* %binlog_row_image, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:5718:28 | Function: TABLE::mark_columns_per_binlog_row_image
+  Instruction: switch i64 %15, label %sw.default [
+    i64 2, label %sw.bb
+    i64 1, label %sw.bb28
+    i64 0, label %sw.bb57
+  ], !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:5718:5 | Function: TABLE::mark_columns_per_binlog_row_image
+  Instruction: %18 = load i64, i64* %binlog_row_image, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7842:28 | Function: binlog_log_row
+  Instruction: %cmp11 = icmp eq i64 %18, 0, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7842:45 | Function: binlog_log_row
+  Instruction: br i1 %cmp11, label %if.then12, label %if.end21, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7842:13 | Function: binlog_log_row
+  Instruction: %18 = load i64, i64* %binlog_row_image, align 8, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11313:23 | Function: binlog_prepare_row_images
+  Instruction: %cmp14 = icmp ult i64 %18, 2, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11313:40 | Function: binlog_prepare_row_images
+  Instruction: br i1 %cmp14, label %land.lhs.true15, label %if.end60, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11313:65 | Function: binlog_prepare_row_images
+  Instruction: %28 = load i64, i64* %binlog_row_image31, align 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11324:28 | Function: binlog_prepare_row_images
+  Instruction: switch i64 %28, label %sw.default [
+    i64 0, label %sw.bb
+    i64 1, label %sw.bb36
+  ], !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11324:5 | Function: binlog_prepare_row_images
+  Instruction: %3 = load i64, i64* %binlog_row_image, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:3494:30 | Function: Applier_security_context_guard::has_access
+  Instruction: %cmp4 = icmp eq i64 %3, 2, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:3494:47 | Function: Applier_security_context_guard::has_access
+  Instruction: br i1 %cmp4, label %if.then5, label %if.else, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:3494:7 | Function: Applier_security_context_guard::has_access
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: bitmap_set_all
+  Controlled Function: bitmap_set_all
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Field::is_flag_set
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Field::field_index
+  Controlled Function: Field::field_index
+  Controlled Function: bitmap_set_bit
+  Controlled Function: bitmap_set_bit
+  Controlled Function: std::array
+  Controlled Function: std::array
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: Binlog_log_row_cleanup::~Binlog_log_row_cleanup
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: Binlog_log_row_cleanup::~Binlog_log_row_cleanup
+  Controlled Function: __assert_fail
+  Controlled Function: __cxa_begin_catch
+  Controlled Function: my_error
+  Controlled Function: add_pke
+  Controlled Function: THD::is_error
+  Controlled Function: __cxa_end_catch
+  Controlled Function: __cxa_end_catch
+  Controlled Function: _db_dump_
+  Controlled Function: write_locked_table_maps
+  Controlled Function: likely
+  Controlled Function: __clang_call_terminate
+  Controlled Function: handler::has_transactions
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: ha_check_storage_engine_flag
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unsigned int const& std::min
+  Controlled Function: __assert_fail
+  Controlled Function: bitmap_is_set
+  Controlled Function: bitmap_is_clear_all
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: __assert_fail
+  Controlled Function: _db_doprnt_
+  Controlled Function: __assert_fail
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: bitmap_union
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Field::field_index
+  Controlled Function: bitmap_clear_bit
+  Controlled Function: __assert_fail
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: bitmap_union
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Field::is_flag_set
+  Controlled Function: unsigned int const& std::min
+  Controlled Function: Field::field_index
+  Controlled Function: bitmap_is_set
+  Controlled Function: bitmap_clear_bit
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: std::tuple
+  Controlled Function: std::enable_if
+  Controlled Function: std::tuple
+  Controlled Function: std::enable_if
+  Controlled Function: std::vector
+  Controlled Function: Applier_security_context_guard::extract_columns_to_check
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+
+Implicit Control Flow:
+
+----------------------------------------

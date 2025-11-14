@@ -1,0 +1,14 @@
+Global Variable: System_variables.15
+Explicit Data Flow (2):
+  Instruction: %24 = load i64, i64* %optimizer_trace_max_mem_size, align 8, !dbg !1255386 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:221:37 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %call30 = invoke zeroext i1 @_ZN17Opt_trace_context5startEbbbbllmy(%class.Opt_trace_context* %13, i1 zeroext %tobool19, i1 zeroext %tobool20, i1 zeroext %tobool22, i1 zeroext %tobool24, i64 %20, i64 %22, i64 %24, i64 %26)
+          to label %invoke.cont29 unwind label %lpad, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:216:16 | Function: Opt_trace_start::Opt_trace_start
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

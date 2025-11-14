@@ -1,0 +1,1191 @@
+Global Variable: max_connections
+Explicit Data Flow (211):
+  Instruction: %88 = load i64, i64* @max_connections, align 8, !dbg !1255487 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:28 | Function: init_common_variables
+  Instruction: %div = udiv i64 %88, 100, !dbg !1255489 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:44 | Function: init_common_variables
+  Instruction: %add = add i64 8, %div, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:26 | Function: init_common_variables
+  Instruction: store i64 %add, i64* %default_value, align 8, !dbg !1255491 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:22 | Function: init_common_variables
+  Instruction: store i64 100, i64* %default_value, align 8, !dbg !1255494 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:72 | Function: init_common_variables
+  Instruction: %90 = load i64, i64* %default_value, align 8, !dbg !1255501 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5051:23 | Function: init_common_variables
+  Instruction: call void %92(%class.sys_var* %89, i64 %90), !dbg !1255502 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5051:8 | Function: init_common_variables
+  Instruction: store i64 %add318, i64* %default_value, align 8, !dbg !1255506 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5054:22 | Function: init_common_variables
+  Instruction: store i64 %add322, i64* %default_value, align 8, !dbg !1255513 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5055:22 | Function: init_common_variables
+  Instruction: store i64 2000, i64* %default_value, align 8, !dbg !1255516 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5056:19 | Function: init_common_variables
+  Instruction: %102 = load i64, i64* %default_value, align 8, !dbg !1255523 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5058:23 | Function: init_common_variables
+  Instruction: call void %104(%class.sys_var* %101, i64 %102), !dbg !1255524 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5058:8 | Function: init_common_variables
+  Instruction: %cmp306 = icmp sgt i64 %add, 100, !dbg !1255492 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:51 | Function: init_common_variables
+  Instruction: br i1 %cmp306, label %if.then307, label %if.end308, !dbg !1255493 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5049:7 | Function: init_common_variables
+  Instruction: %93 = load i64, i64* @max_connections, align 8, !dbg !1255503 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5054:30 | Function: init_common_variables
+  Instruction: %add318 = add i64 128, %93, !dbg !1255505 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5054:28 | Function: init_common_variables
+  Instruction: %cmp319 = icmp sgt i64 %add318, 628, !dbg !1255507 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5054:47 | Function: init_common_variables
+  Instruction: br i1 %cmp319, label %land.lhs.true320, label %if.end325, !dbg !1255508 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5054:53 | Function: init_common_variables
+  Instruction: %94 = load i64, i64* @max_connections, align 8, !dbg !1255509 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5055:32 | Function: init_common_variables
+  Instruction: %sub = sub i64 %94, 500, !dbg !1255510 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5055:48 | Function: init_common_variables
+  Instruction: %div321 = udiv i64 %sub, 20, !dbg !1255511 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5055:55 | Function: init_common_variables
+  Instruction: %add322 = add i64 628, %div321, !dbg !1255512 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5055:28 | Function: init_common_variables
+  Instruction: %cmp323 = icmp sgt i64 %add322, 2000, !dbg !1255514 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5055:62 | Function: init_common_variables
+  Instruction: br i1 %cmp323, label %if.then324, label %if.end325, !dbg !1255515 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5054:7 | Function: init_common_variables
+  Instruction: %106 = load i64, i64* @max_connections, align 8, !dbg !1255528 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5063:16 | Function: init_common_variables
+  Instruction: %div339 = udiv i64 %106, 100, !dbg !1255529 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5063:32 | Function: init_common_variables
+  Instruction: %add340 = add i64 8, %div339, !dbg !1255530 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5063:14 | Function: init_common_variables
+  Instruction: store i64 %add340, i64* @_ZN29Per_thread_connection_handler20max_blocked_pthreadsE, align 8, !dbg !1255531 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5062:60 | Function: init_common_variables
+  Instruction: %4 = load i64, i64* @_ZN29Per_thread_connection_handler20max_blocked_pthreadsE, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5143:9 | Function: modify_thread_cache_size
+  Instruction: call void @_ZN29Per_thread_connection_handler24modify_thread_cache_sizeEm(i64 %4), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5142:5 | Function: modify_thread_cache_size
+  Instruction: store i64 100, i64* @_ZN29Per_thread_connection_handler20max_blocked_pthreadsE, align 8, !dbg !1255534 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5064:57 | Function: init_common_variables
+  Instruction: %1 = load i64, i64* @_ZN29Per_thread_connection_handler20max_blocked_pthreadsE, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:146:31 | Function: Per_thread_connection_handler::block_until_new_connection
+  Instruction: %cmp = icmp ult i64 %0, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:146:29 | Function: Per_thread_connection_handler::block_until_new_connection
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end32, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:146:52 | Function: Per_thread_connection_handler::block_until_new_connection
+  Instruction: %11 = load i64, i64* @_ZN29Per_thread_connection_handler20max_blocked_pthreadsE, align 8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:164:50 | Function: Per_thread_connection_handler::block_until_new_connection
+  Instruction: %cmp14 = icmp ule i64 %10, %11, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:164:47 | Function: Per_thread_connection_handler::block_until_new_connection
+  Instruction: br i1 %cmp14, label %if.then15, label %if.end17, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:164:9 | Function: Per_thread_connection_handler::block_until_new_connection
+  Instruction: %cmp341 = icmp ugt i64 %add340, 100, !dbg !1255532 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5063:39 | Function: init_common_variables
+  Instruction: br i1 %cmp341, label %if.then342, label %if.end343, !dbg !1255533 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5061:7 | Function: init_common_variables
+  Instruction: %114 = load i64, i64* @max_connections, align 8, !dbg !1255539 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5068:32 | Function: init_common_variables
+  Instruction: %add346 = add i64 128, %114, !dbg !1255540 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5068:30 | Function: init_common_variables
+  Instruction: %conv347 = trunc i64 %add346 to i32, !dbg !1255541 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5068:26 | Function: init_common_variables
+  Instruction: store i32 %conv347, i32* @host_cache_size, align 4, !dbg !1255542 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5068:24 | Function: init_common_variables
+  Instruction: store i32 %conv353, i32* @host_cache_size, align 4, !dbg !1255550 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:24 | Function: init_common_variables
+  Instruction: store i32 2000, i32* @host_cache_size, align 4, !dbg !1255553 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5070:21 | Function: init_common_variables
+  Instruction: %0 = load i32, i32* @host_cache_size, align 4, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6172:47 | Function: init_server_components
+  Instruction: %call4 = invoke zeroext i1 @_Z19hostname_cache_initj(i32 %0)
+          to label %invoke.cont3 unwind label %lpad, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6172:27 | Function: init_server_components
+  Instruction: br i1 %call4, label %if.then, label %if.end, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:6172:7 | Function: init_server_components
+  Instruction: %3 = load i32, i32* @host_cache_size, align 4, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6522:25 | Function: fix_host_cache_size
+  Instruction: call void @_Z21hostname_cache_resizej(i32 %3), !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:6522:3 | Function: fix_host_cache_size
+  Instruction: %cmp348 = icmp ugt i32 %conv347, 628, !dbg !1255543 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5068:49 | Function: init_common_variables
+  Instruction: br i1 %cmp348, label %land.lhs.true349, label %if.end356, !dbg !1255544 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5068:55 | Function: init_common_variables
+  Instruction: %115 = load i64, i64* @max_connections, align 8, !dbg !1255545 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:34 | Function: init_common_variables
+  Instruction: %sub350 = sub i64 %115, 500, !dbg !1255546 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:50 | Function: init_common_variables
+  Instruction: %div351 = udiv i64 %sub350, 20, !dbg !1255547 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:57 | Function: init_common_variables
+  Instruction: %add352 = add i64 628, %div351, !dbg !1255548 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:30 | Function: init_common_variables
+  Instruction: %conv353 = trunc i64 %add352 to i32, !dbg !1255549 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:26 | Function: init_common_variables
+  Instruction: %cmp354 = icmp ugt i32 %conv353, 2000, !dbg !1255551 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5069:64 | Function: init_common_variables
+  Instruction: br i1 %cmp354, label %if.then355, label %if.end356, !dbg !1255552 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5067:7 | Function: init_common_variables
+  Instruction: %117 = load i64, i64* @max_connections, align 8, !dbg !1255559 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5073:36 | Function: init_common_variables
+  Instruction: store i64 %117, i64* @back_log, align 8, !dbg !1255560 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5073:34 | Function: init_common_variables
+  Instruction: store i64 65535, i64* @back_log, align 8, !dbg !1255563 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5073:71 | Function: init_common_variables
+  Instruction: %31 = load i64, i64* @back_log, align 8, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:3228:32 | Function: network_init
+  Instruction: %conv = trunc i64 %31 to i32, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:3228:32 | Function: network_init
+  Instruction: invoke void @_ZN22Mysqld_socket_listenerC1ERKNSt7__cxx114listI17Bind_address_infoSaIS2_EEEjRKS2_jbjjNS0_12basic_stringIcSt11char_traitsIcESaIcEEE(%class.Mysqld_socket_listener* %27, %"class.std::__cxx11::list"* dereferenceable(24) %bind_addresses_info, i32 %28, %struct.Bind_address_info* dereferenceable(64) %admin_address_info, i32 %29, i1 zeroext %cond69, i32 %conv, i32 %32, %"class.std::__cxx11::basic_string"* %agg.tmp)
+          to label %invoke.cont74 unwind label %lpad73, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:3223:9 | Function: network_init
+  Instruction: %cmp359 = icmp ugt i64 %117, 65535, !dbg !1255561 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5073:53 | Function: init_common_variables
+  Instruction: br i1 %cmp359, label %if.then360, label %if.end361, !dbg !1255562 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:5073:7 | Function: init_common_variables
+  Instruction: %15 = load i64, i64* @max_connections, align 8, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:7376:45 | Function: mysqld_main
+  Instruction: store i64 %15, i64* getelementptr inbounds (%struct.PFS_global_param, %struct.PFS_global_param* @pfs_param, i32 0, i32 62, i32 2), align 8, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:7376:43 | Function: mysqld_main
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8801:51 | Function: adjust_table_cache_size
+  Instruction: %sub1 = sub i64 %sub, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8801:49 | Function: adjust_table_cache_size
+  Instruction: %div = udiv i64 %sub1, 2, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8801:68 | Function: adjust_table_cache_size
+  Instruction: store i64 %div, i64* %ref.tmp, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8801:22 | Function: adjust_table_cache_size
+  Instruction: %call = call dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %ref.tmp, i64* dereferenceable(8) @_ZL20TABLE_OPEN_CACHE_MIN), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8801:11 | Function: adjust_table_cache_size
+  Instruction: %2 = load i64, i64* @max_connections, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8790:15 | Function: adjust_max_connections
+  Instruction: %cmp = icmp ult i64 %1, %2, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8790:13 | Function: adjust_max_connections
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8790:7 | Function: adjust_max_connections
+  Instruction: %4 = load i64, i64* @max_connections, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8791:5 | Function: adjust_max_connections
+  Instruction: %call15 = invoke dereferenceable(32) %class.LogEvent* (%class.LogEvent*, i64, ...) @_ZN8LogEvent6lookupExz(%class.LogEvent* %call13, i64 10141, i64 %3, i64 %4)
+          to label %invoke.cont14 unwind label %lpad, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8791:5 | Function: adjust_max_connections
+  Instruction: %0 = load i64, i64* @max_connections, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:18 | Function: adjust_open_files_limit
+  Instruction: %add = add i64 10, %0, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:16 | Function: adjust_open_files_limit
+  Instruction: %add1 = add i64 %add, %mul, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:34 | Function: adjust_open_files_limit
+  Instruction: store i64 %add1, i64* %limit_1, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:11 | Function: adjust_open_files_limit
+  Instruction: %call = call dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %limit_1, i64* dereferenceable(8) %limit_2), !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8762:35 | Function: adjust_open_files_limit
+  Instruction: %2 = load i64, i64* @max_connections, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8757:13 | Function: adjust_open_files_limit
+  Instruction: %mul2 = mul i64 %2, 5, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8757:29 | Function: adjust_open_files_limit
+  Instruction: store i64 %mul2, i64* %limit_2, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8757:11 | Function: adjust_open_files_limit
+  Instruction: %call3 = call dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %call, i64* dereferenceable(8) %limit_3), !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8762:24 | Function: adjust_open_files_limit
+  Instruction: %0 = load i64, i64* @max_connections, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:300:38 | Function: get_max_connections
+  Instruction: ret i64 %0, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:300:31 | Function: get_max_connections
+  Instruction: %0 = load i64, i64* @max_connections, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:436:10 | Function: Per_thread_connection_handler::get_max_threads
+  Instruction: %conv = trunc i64 %0 to i32, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:436:10 | Function: Per_thread_connection_handler::get_max_threads
+  Instruction: ret i32 %conv, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_per_thread.cc:436:3 | Function: Per_thread_connection_handler::get_max_threads
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc:94:26 | Function: Connection_handler_manager::valid_connection_count
+  Instruction: %cmp = icmp ugt i64 %conv, %1, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc:94:24 | Function: Connection_handler_manager::valid_connection_count
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc:94:7 | Function: Connection_handler_manager::valid_connection_count
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc:114:26 | Function: Connection_handler_manager::check_and_incr_conn_count
+  Instruction: %cmp = icmp ugt i64 %conv, %1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc:114:24 | Function: Connection_handler_manager::check_and_incr_conn_count
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.else, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/conn_handler/connection_handler_manager.cc:114:42 | Function: Connection_handler_manager::check_and_incr_conn_count
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Abstract_tableEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Abstract_tableEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Abstract_tableEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Abstract_tableEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7CharsetEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7CharsetEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7CharsetEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7CharsetEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_9CollationEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_9CollationEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_9CollationEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_9CollationEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_17Column_statisticsEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1182"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_17Column_statisticsEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1182"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_17Column_statisticsEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1182"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_17Column_statisticsEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1182"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_5EventEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_5EventEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_5EventEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_5EventEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7RoutineEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1215"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7RoutineEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1215"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7RoutineEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1215"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_7RoutineEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1215"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_6SchemaEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_6SchemaEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_6SchemaEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_6SchemaEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_24Spatial_reference_systemEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_24Spatial_reference_systemEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_24Spatial_reference_systemEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_24Spatial_reference_systemEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1193"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_10TablespaceEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_10TablespaceEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_10TablespaceEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_10TablespaceEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %1 = load i64, i64* @max_connections, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:36 | Function: dd::cache::Shared_multi_map
+  Instruction: %cmp = icmp ugt i64 %call, %1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:34 | Function: dd::cache::Shared_multi_map
+  Instruction: ret i1 %cmp, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.h:271:5 | Function: dd::cache::Shared_multi_map
+  Instruction: %call43 = call zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Resource_groupEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1), !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:8 | Function: dd::cache::Shared_multi_map
+  Instruction: br i1 %call43, label %if.else, label %if.then, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:107:7 | Function: dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Resource_groupEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Resource_groupEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %call145 = invoke zeroext i1 @_ZNK2dd5cache16Shared_multi_mapINS_14Resource_groupEE22pool_capacity_exceededEv(%"class.dd::cache::Shared_multi_map.1160"* %this1)
+          to label %invoke.cont144 unwind label %lpad, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:10 | Function: void dd::cache::Shared_multi_map
+  Instruction: br i1 %call145, label %if.else149, label %if.then146, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_multi_map.cc:368:9 | Function: void dd::cache::Shared_multi_map
+  Instruction: %0 = load i64, i64* @max_connections, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_dictionary_cache.cc:51:53 | Function: dd::cache::Shared_dictionary_cache::init
+  Instruction: call void @_ZN2dd5cache16Shared_multi_mapINS_14Abstract_tableEE12set_capacityEm(%"class.dd::cache::Shared_multi_map"* %call5, i64 %0), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/shared_dictionary_cache.cc:51:40 | Function: dd::cache::Shared_dictionary_cache::init
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pop_
+  Controlled Function: _db_is_pushed_
+  Controlled Function: __assert_fail
+  Controlled Function: connection_events_loop_aborted
+  Controlled Function: inline_mysql_cond_wait
+  Controlled Function: inline_mysql_cond_signal
+  Controlled Function: std::__cxx11::list
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::list
+  Controlled Function: std::__cxx11::list
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: inline_mysql_cond_signal
+  Controlled Function: unireg_abort
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: randominit
+  Controlled Function: my_timer_initialize
+  Controlled Function: setup_fpu
+  Controlled Function: setup_error_log
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: xa::Transaction_cache::initialize
+  Controlled Function: LogEvent::prio
+  Controlled Function: setup_error_log_components
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: unireg_abort
+  Controlled Function: MDL_context_backup_manager::init
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: delegates_init
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: __errno_location
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: unsigned long array_elements
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: strlen
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: strlen
+  Controlled Function: rpl_make_log_name
+  Controlled Function: _db_pargs_
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: MYSQL_BIN_LOG::generate_name
+  Controlled Function: MYSQL_BIN_LOG::generate_name
+  Controlled Function: rpl_make_log_name
+  Controlled Function: _db_enabled_
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: rpl_make_log_name
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: _db_doprnt_
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::lookup
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: my_free
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: dirname_length
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: my_strdup
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: strmake
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: MYSQL_BIN_LOG::open_index_file
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::prio
+  Controlled Function: rpl_make_log_name
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::lookup
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::source_line
+  Controlled Function: dirname_length
+  Controlled Function: basename_index
+  Controlled Function: basename_index
+  Controlled Function: strmake
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_file
+  Controlled Function: rpl_make_log_name
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::lookup
+  Controlled Function: dirname_length
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: strmake
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: strcmp
+  Controlled Function: LogEvent::subsys
+  Controlled Function: strmake
+  Controlled Function: process_key_caches
+  Controlled Function: LogEvent::source_line
+  Controlled Function: strcat
+  Controlled Function: ha_init_errors
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: strmake
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::prio
+  Controlled Function: strcat
+  Controlled Function: gtid_server_init
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: Log_resource::dummy_function_to_ensure_we_are_linked_into_the_server
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: Gtid_mode::get
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::function
+  Controlled Function: basename_index
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: udf_init_globals
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: init_server_auto_options
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::subsys
+  Controlled Function: basename_index
+  Controlled Function: plugin_register_early_plugins
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: plugin_register_builtin_and_init_core_se
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: init_sql_command_flags
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::subsys
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: basename_index
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::subsys
+  Controlled Function: dd::init
+  Controlled Function: dd::init
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::lookup
+  Controlled Function: basename_index
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: dd::init
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: init_optimizer_cost_module
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::subsys
+  Controlled Function: basename_index
+  Controlled Function: std::atomic
+  Controlled Function: Scope_guard
+  Controlled Function: dd::upgrade::no_server_upgrade_required
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::source_file
+  Controlled Function: init_server_components
+  Controlled Function: std::atomic
+  Controlled Function: plugin_register_dynamic_and_init_all
+  Controlled Function: LogEvent::function
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::lookup
+  Controlled Function: delete_optimizer_cost_module
+  Controlled Function: Scope_guard
+  Controlled Function: std::atomic
+  Controlled Function: Scope_guard
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: dd::upgrade_57::in_progress
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::lookup
+  Controlled Function: delete_optimizer_cost_module
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: dd::init
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: resourcegroups::Resource_group_mgr::instance
+  Controlled Function: plugin_is_ready
+  Controlled Function: LogEvent::prio
+  Controlled Function: resourcegroups::Resource_group_mgr::disable_resource_group
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: dd::upgrade_57::in_progress
+  Controlled Function: LogEvent::subsys
+  Controlled Function: resourcegroups::Resource_group_mgr::set_unsupport_reason
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: LogEvent::source_line
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: basename_index
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: dd::upgrade_57::in_progress
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: dd::init
+  Controlled Function: LogEvent::lookup
+  Controlled Function: dd::upgrade_57::in_progress
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: dd::upgrade::I_S_upgrade_required
+  Controlled Function: init_optimizer_cost_module
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: Delegate::is_empty
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: dd::init
+  Controlled Function: LogEvent::prio
+  Controlled Function: dd::performance_schema::init_pfs_tables
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: Server_state_delegate::after_dd_upgrade_from_57
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: dd::performance_schema::init_pfs_tables
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: dd::upgrade::no_server_upgrade_required
+  Controlled Function: delete_optimizer_cost_module
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::source_line
+  Controlled Function: unireg_abort
+  Controlled Function: resourcegroups::Resource_group_mgr::instance
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_index
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: init_optimizer_cost_module
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::function
+  Controlled Function: strlen
+  Controlled Function: my_malloc
+  Controlled Function: dd::init
+  Controlled Function: LogEvent::prio
+  Controlled Function: bootstrap::run_bootstrap_thread
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::lookup
+  Controlled Function: strcpy
+  Controlled Function: Session_tracker::server_boot_verify
+  Controlled Function: resourcegroups::Resource_group_mgr::post_init
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: delete_optimizer_cost_module
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: dd::upgrade::plugin_initialize_delayed_after_upgrade
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::prio
+  Controlled Function: my_free
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: is_help_or_validate_option
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::subsys
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::subsys
+  Controlled Function: handle_options
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_line
+  Controlled Function: unireg_abort
+  Controlled Function: MY_LOCALE_ERRMSGS::is_loaded
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::lookup
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: basename_index
+  Controlled Function: unireg_abort
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_file
+  Controlled Function: ha_init
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: dd::ndbinfo::init_schema_and_tables
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: my_free
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::prio
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: plugin_is_ready
+  Controlled Function: Query_logger::set_handlers
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: Query_logger::set_log_file
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::prio
+  Controlled Function: Query_logger::reopen_log_file
+  Controlled Function: Query_logger::set_log_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::subsys
+  Controlled Function: Query_logger::reopen_log_file
+  Controlled Function: initialize_storage_engine
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::function
+  Controlled Function: basename_index
+  Controlled Function: unireg_abort
+  Controlled Function: initialize_storage_engine
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::function
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: _db_keyword_
+  Controlled Function: set_externally_disabled_storage_engine_names
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: ha_is_storage_engine_disabled
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: LogEvent::prio
+  Controlled Function: ha_is_storage_engine_disabled
+  Controlled Function: Recovered_xa_transactions::init
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: Delegate::is_empty
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::prio
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: Server_state_delegate::before_recovery
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::lookup
+  Controlled Function: basename_index
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: dd::reset_tables_and_tablespaces
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: ha_post_recover
+  Controlled Function: LogEvent::subsys
+  Controlled Function: Recovered_xa_transactions::instance
+  Controlled Function: LogEvent::source_line
+  Controlled Function: Recovered_xa_transactions::recover_prepared_xa_transactions
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: unireg_abort
+  Controlled Function: Gtid_mode::get
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: Rpl_encryption::initialize
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: MYSQL_BIN_LOG::get_log_lock
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: inline_mysql_mutex_lock
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: MYSQL_BIN_LOG::open_binlog
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::prio
+  Controlled Function: __assert_fail
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::lookup
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: LogEvent::source_line
+  Controlled Function: mi_log
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: basename_index
+  Controlled Function: getuid
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::source_file
+  Controlled Function: setreuid
+  Controlled Function: operator new
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: mlockall
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: PasswdValue::IsVoid
+  Controlled Function: Rpl_acf_configuration_handler::init
+  Controlled Function: operator delete
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: set_user
+  Controlled Function: unireg_abort
+  Controlled Function: operator new
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: Udf_load_service::init
+  Controlled Function: operator delete
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: init_optimizer_cost_module
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: ft_init_stopwords
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: __errno_location
+  Controlled Function: strerror
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: init_max_user_conn
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: unireg_abort
+  Controlled Function: __errno_location
+  Controlled Function: LogEvent::lookup
+  Controlled Function: init_icu_data_directory
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: time
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: dd::cache::Shared_multi_map
+  Controlled Function: std::vector
+  Controlled Function: dd::cache::Cache_element
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+
+Implicit Control Flow:
+
+----------------------------------------

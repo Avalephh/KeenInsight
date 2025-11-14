@@ -1,0 +1,57 @@
+Global Variable: System_variables.109
+Explicit Data Flow (13):
+  Instruction: %3 = load i64, i64* %information_schema_stats_expiry, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:85:44 | Function: 
+  Instruction: %tobool1 = icmp ne i64 %3, 0, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:85:29 | Function: 
+  Instruction: br i1 %tobool1, label %if.end, label %if.then, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:85:7 | Function: 
+  Instruction: %15 = load i64, i64* %information_schema_stats_expiry6, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:104:38 | Function: 
+  Instruction: %cmp = icmp ugt i64 %13, %15, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:104:21 | Function: 
+  Instruction: store i1 %cmp, i1* %retval, align 1, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:104:3 | Function: 
+  Instruction: %16 = load i1, i1* %retval, align 1, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:105:1 | Function: 
+  Instruction: ret i1 %16, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:105:1 | Function: 
+  Instruction: %call3 = invoke zeroext i1 @_ZN12_GLOBAL__N_132is_persistent_statistics_expiredEP3THDRKy(%class.THD* %5, i64* dereferenceable(8) %6)
+          to label %invoke.cont2 unwind label %lpad, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:457:8 | Function: dd::info_schema::Table_statistics::read_stat
+  Instruction: br i1 %call3, label %if.end5, label %if.then4, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:457:7 | Function: dd::info_schema::Table_statistics::read_stat
+  Instruction: %5 = load i64, i64* %information_schema_stats_expiry, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:75:26 | Function: 
+  Instruction: %tobool = icmp ne i64 %5, 0, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:75:11 | Function: 
+  Instruction: br i1 %tobool, label %land.lhs.true, label %land.end, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:75:58 | Function: 
+
+Implicit Data Flow (1):
+  Instruction: %15 = phi i1 [ false, %land.lhs.true12 ], [ false, %land.lhs.true10 ], [ false, %land.lhs.true8 ], [ false, %land.lhs.true6 ], [ false, %land.lhs.true4 ], [ false, %land.lhs.true ], [ false, %if.end ], [ %cmp15, %land.rhs ], !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc:0:0
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_longlong_to_datetime_with_warn
+  Controlled Function: THD::query_start_in_secs
+  Controlled Function: dd::info_schema::Table_statistics::is_stat_cached_in_mem
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: dd::info_schema::Table_statistics::get_stat
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: THD::push_diagnostics_area
+  Controlled Function: String::ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: MYSQL_LEX_CSTRING lex_cstring_handle
+  Controlled Function: ha_resolve_by_name_raw
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: handlerton* plugin_data
+  Controlled Function: dd::info_schema::Table_statistics::read_stat_by_open_table
+  Controlled Function: dd::info_schema::Table_statistics::read_stat_from_SE
+  Controlled Function: THD::pop_diagnostics_area
+  Controlled Function: THD::is_error
+  Controlled Function: Diagnostics_area::copy_non_errors_from_da
+  Controlled Function: Diagnostics_area::is_error
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: Diagnostics_area::returned_sqlstate
+  Controlled Function: Diagnostics_area::set_error_status
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: Diagnostics_area::returned_sqlstate
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: Diagnostics_area::push_warning
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: strcmp
+
+Implicit Control Flow:
+
+----------------------------------------

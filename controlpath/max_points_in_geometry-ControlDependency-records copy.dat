@@ -1,0 +1,27 @@
+Global Variable: System_variables.31
+Explicit Data Flow (6):
+  Instruction: %52 = load i64, i64* %max_points_in_geometry, align 8, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc:184:40 | Function: Item_func_buffer_strategy::val_str
+  Instruction: %conv = uitofp i64 %52 to double, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc:184:17 | Function: Item_func_buffer_strategy::val_str
+  Instruction: %cmp66 = fcmp ogt double %49, %conv, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc:184:15 | Function: Item_func_buffer_strategy::val_str
+  Instruction: br i1 %cmp66, label %if.then67, label %if.end77, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc:183:11 | Function: Item_func_buffer_strategy::val_str
+  Instruction: %55 = load i64, i64* %max_points_in_geometry69, align 8, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc:187:41 | Function: Item_func_buffer_strategy::val_str
+  Instruction: invoke void (i32, i32, ...) @_Z8my_erroriiz(i32 3134, i32 0, i8* getelementptr inbounds ([18 x i8], [18 x i8]* @.str.2.40279, i64 0, i64 0), i64 %55, i8* %call73)
+          to label %invoke.cont74 unwind label %lpad, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc_buffer.cc:185:9 | Function: Item_func_buffer_strategy::val_str
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: TLS wrapper function for current_thd
+  Controlled Function: float8store
+  Controlled Function: my_error
+  Controlled Function: String::~String
+  Controlled Function: Item::error_str
+  Controlled Function: String::~String
+  Controlled Function: String::length
+  Controlled Function: my_error
+  Controlled Function: Item::error_str
+
+Implicit Control Flow:
+
+----------------------------------------

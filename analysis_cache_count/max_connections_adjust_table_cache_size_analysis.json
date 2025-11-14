@@ -1,0 +1,7 @@
+{
+  "param_name": "max_connections",
+  "function_name": "adjust_table_cache_size",
+  "analysis": "<需要提供函数>\n不需要提供其他函数的具体实现，当前提供的函数片段足够用于分析。\n\n<思考过程>\n1. 参数通过控制关键函数对数据库性能的影响：\n    - max_connections 通过调整table_cache_size的计算机制影响 adjust_table_cache_size，进而产生数据库性能影响。\n    - 机制：max_connections的值影响计算limit的公式 (requested_open_files - 10 - max_connections) / 2。当max_connections增加时，limit值减小，从而可能降低table_cache_size的值。\n    - 数据库性能影响：提高max_connections可能导致table_cache_size减小，从而可能增加需要重新打开表文件的次数，降低查询性能，因为每次表文件打开都会有一定的开销。如果limit值过低，可能导致缓存不足以维持高连接数的同时执行高效查询。\n\n<火焰图采样分析与调优方向>\n2. 基于 adjust_table_cache_size执行状态和相关函数片段给出max_connections 优化建议：\n    - 不涉及到其他函数，主要监控adjust_table_cache_size即可。\n    - 根据adjust_table_cache_size在火焰图中的采样状态，建议：\n        - 如果在高连接数情况下，adjust_table_cache_size频繁影响limit和table_cache_size的调整，导致查询性能下降，建议降低max_connections值，使limit提高，进而增大table_cache_size，减少表文件的打开频率。\n        - 如果火焰图中表文件打开频率低且性能尚可，则可以保持当前max_connections设置或者适当调高以支持更多连接，但需要持续监控潜在性能影响。",
+  "code_snippets": "static void adjust_table_cache_size(ulong requested_open_files) {\n  ulong limit;\n\n  limit = max<ulong>((requested_open_files - 10 - max_connections) / 2,\n                     TABLE_OPEN_CACHE_MIN);\n\n  if (limit < table_cache_size) {\n    LogErr(WARNING_LEVEL, ER_CHANGED_TABLE_OPEN_CACHE, limit, table_cache_size);\n\n    table_cache_size = limit;\n  }\n\n  table_cache_size_per_instance = table_cache_size / table_cache_instances;\n}",
+  "timestamp": "2025-07-28T04:40:14.365200"
+}

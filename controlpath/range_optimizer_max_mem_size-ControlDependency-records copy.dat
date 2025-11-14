@@ -1,0 +1,18 @@
+Global Variable: System_variables.45
+Explicit Data Flow (6):
+  Instruction: %13 = load i64, i64* %range_optimizer_max_mem_size, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:353:50 | Function: setup_range_optimizer_param
+  Instruction: call void @_ZN8MEM_ROOT16set_max_capacityEm(%struct.MEM_ROOT* %11, i64 %13), !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:353:18 | Function: setup_range_optimizer_param
+  Instruction: %11 = load i64, i64* %range_optimizer_max_mem_size, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/internal.h:93:39 | Function: Range_optimizer_error_handler::handle_condition
+  Instruction: call void (%class.THD*, i32, i32, i8*, ...) @_Z19push_warning_printfP3THDN13Sql_condition19enum_severity_levelEjPKcz(%class.THD* %8, i32 1, i32 3170, i8* %call, i64 %11, i8* getelementptr inbounds ([29 x i8], [29 x i8]* @.str.95.1470, i64 0, i64 0), i8* %call8), !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/internal.h:90:9 | Function: Range_optimizer_error_handler::handle_condition
+  Instruction: %26 = load i64, i64* %range_optimizer_max_mem_size, align 8, !dbg !1255408 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/partition_pruning.cc:291:41 | Function: prune_partitions
+  Instruction: invoke void @_ZN8MEM_ROOT16set_max_capacityEm(%struct.MEM_ROOT* %alloc, i64 %26)
+          to label %invoke.cont34 unwind label %lpad33, !dbg !1255409 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/partition_pruning.cc:291:9 | Function: prune_partitions
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

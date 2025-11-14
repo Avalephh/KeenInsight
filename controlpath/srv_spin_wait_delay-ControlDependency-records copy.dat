@@ -1,0 +1,74 @@
+Global Variable: srv_spin_wait_delay
+Explicit Data Flow (49):
+  Instruction: %5 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:36 | Function: void mutex_enter_inline
+  Instruction: %conv1 = trunc i64 %5 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:36 | Function: void mutex_enter_inline
+  Instruction: call void @_ZN11PolicyMutexI12OSTrackMutexI13GenericPolicyEE5enterEjjPKcj(%struct.PolicyMutex.827* %3, i32 %conv, i32 %conv1, i8* %6, i32 %conv2), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:6 | Function: void mutex_enter_inline
+  Instruction: %9 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:958:49 | Function: log_self_write_up_to
+  Instruction: %call6 = call i64 @_ZN2utL25random_from_interval_fastEmm.70619(i64 0, i64 %9), !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:958:16 | Function: log_self_write_up_to
+  Instruction: %8 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:957:9 | Function: log_self_write_up_to
+  Instruction: %tobool = icmp ne i64 %8, 0, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:957:9 | Function: log_self_write_up_to
+  Instruction: br i1 %tobool, label %if.then5, label %if.end8, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:957:9 | Function: log_self_write_up_to
+  Instruction: %12 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:508:51 | Function: log_buffer_s_lock_wait
+  Instruction: %call2 = call i64 @_ZN2utL25random_from_interval_fastEmm.68998(i64 0, i64 %12), !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:508:18 | Function: log_buffer_s_lock_wait
+  Instruction: %11 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:507:11 | Function: log_buffer_s_lock_wait
+  Instruction: %tobool = icmp ne i64 %11, 0, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:507:11 | Function: log_buffer_s_lock_wait
+  Instruction: br i1 %tobool, label %if.then1, label %if.end, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:507:11 | Function: log_buffer_s_lock_wait
+  Instruction: %109 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255436 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:628:51 | Function: log_buffer_x_lock_enter
+  Instruction: %call26 = call i64 @_ZN2utL25random_from_interval_fastEmm.68998(i64 0, i64 %109), !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:628:18 | Function: log_buffer_x_lock_enter
+  Instruction: %108 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255432 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:627:11 | Function: log_buffer_x_lock_enter
+  Instruction: %tobool24 = icmp ne i64 %108, 0, !dbg !1255432 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:627:11 | Function: log_buffer_x_lock_enter
+  Instruction: br i1 %tobool24, label %if.then25, label %if.end28, !dbg !1255435 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0buf.cc:627:11 | Function: log_buffer_x_lock_enter
+  Instruction: %21 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/lock/lock0lock.cc:6164:49 | Function: lock_trx_release_locks
+  Instruction: %call44 = call i64 @_ZN2utL25random_from_interval_fastEmm.68833(i64 0, i64 %21), !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/lock/lock0lock.cc:6164:16 | Function: lock_trx_release_locks
+  Instruction: %5 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:36 | Function: void mutex_enter_inline
+  Instruction: %conv1 = trunc i64 %5 to i32, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:36 | Function: void mutex_enter_inline
+  Instruction: call void @_ZN11PolicyMutexI14TTASEventMutexI16BlockMutexPolicyEE5enterEjjPKcj(%struct.PolicyMutex.833* %3, i32 %conv, i32 %conv1, i8* %6, i32 %conv2), !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:6 | Function: void mutex_enter_inline
+  Instruction: %5 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:36 | Function: void mutex_enter_inline
+  Instruction: %conv1 = trunc i64 %5 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:36 | Function: void mutex_enter_inline
+  Instruction: call void @_ZN11PolicyMutexI14TTASEventMutexI13GenericPolicyEE5enterEjjPKcj(%struct.PolicyMutex* %3, i32 %conv, i32 %conv1, i8* %6, i32 %conv2), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0mutex.h:113:6 | Function: void mutex_enter_inline
+  Instruction: %9 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:287:9 | Function: rw_lock_s_lock_spin
+  Instruction: %tobool = icmp ne i64 %9, 0, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:287:9 | Function: rw_lock_s_lock_spin
+  Instruction: br i1 %tobool, label %if.then5, label %if.end8, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:287:9 | Function: rw_lock_s_lock_spin
+  Instruction: %10 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:288:49 | Function: rw_lock_s_lock_spin
+  Instruction: %call6 = call i64 @_ZN2utL25random_from_interval_fastEmm.80262(i64 0, i64 %10), !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:288:16 | Function: rw_lock_s_lock_spin
+  Instruction: %19 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:599:11 | Function: rw_lock_x_lock_func
+  Instruction: %tobool22 = icmp ne i64 %19, 0, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:599:11 | Function: rw_lock_x_lock_func
+  Instruction: br i1 %tobool22, label %if.then23, label %if.end26, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:599:11 | Function: rw_lock_x_lock_func
+  Instruction: %20 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:600:51 | Function: rw_lock_x_lock_func
+  Instruction: %call24 = call i64 @_ZN2utL25random_from_interval_fastEmm.80262(i64 0, i64 %20), !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:600:18 | Function: rw_lock_x_lock_func
+  Instruction: %6 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:383:9 | Function: rw_lock_x_lock_wait_func
+  Instruction: %tobool = icmp ne i64 %6, 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:383:9 | Function: rw_lock_x_lock_wait_func
+  Instruction: br i1 %tobool, label %if.then8, label %if.end11, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:383:9 | Function: rw_lock_x_lock_wait_func
+  Instruction: %7 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:384:49 | Function: rw_lock_x_lock_wait_func
+  Instruction: %call9 = call i64 @_ZN2utL25random_from_interval_fastEmm.80262(i64 0, i64 %7), !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:384:16 | Function: rw_lock_x_lock_wait_func
+  Instruction: %23 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:664:11 | Function: rw_lock_sx_lock_func
+  Instruction: %tobool = icmp ne i64 %23, 0, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:664:11 | Function: rw_lock_sx_lock_func
+  Instruction: br i1 %tobool, label %if.then20, label %if.end23, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:664:11 | Function: rw_lock_sx_lock_func
+  Instruction: %24 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:665:51 | Function: rw_lock_sx_lock_func
+  Instruction: %call21 = call i64 @_ZN2utL25random_from_interval_fastEmm.80262(i64 0, i64 %24), !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0rw.cc:665:18 | Function: rw_lock_sx_lock_func
+  Instruction: %1 = load i64, i64* @srv_spin_wait_delay, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:682:43 | Function: Fil_shard::acquire
+  Instruction: %conv2 = trunc i64 %1 to i32, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:682:43 | Function: Fil_shard::acquire
+  Instruction: call void @_ZN11PolicyMutexI14TTASEventMutexI13GenericPolicyEE5enterEjjPKcj(%struct.PolicyMutex* %m_mutex, i32 %conv, i32 %conv2, i8* getelementptr inbounds ([56 x i8], [56 x i8]* @.str.28.94663, i64 0, i64 0), i32 %2), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/fil/fil0fil.cc:682:13 | Function: Fil_shard::acquire
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+  Controlled Function: ut::random_from_interval_fast
+  Controlled Function: ut_delay
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,23 @@
+Global Variable: System_variables.119
+Explicit Data Flow (11):
+  Instruction: %1 = load i8, i8* %sql_generate_invisible_primary_key, align 1, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_gipk.cc:59:26 | Function: is_generate_invisible_primary_key_mode_active
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_gipk.cc:59:26 | Function: is_generate_invisible_primary_key_mode_active
+  Instruction: br i1 %tobool, label %land.lhs.true, label %land.end, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_gipk.cc:59:61 | Function: is_generate_invisible_primary_key_mode_active
+  Instruction: store i8 0, i8* %sql_generate_invisible_primary_key, align 1, !dbg !1255513 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7078:55 | Function: handle_slave_sql
+  Instruction: %sql_generate_invisible_primary_key = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables120, i32 0, i32 119, !dbg !1255512 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7078:20 | Function: handle_slave_sql
+  Instruction: %sql_generate_invisible_primary_key147 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables146, i32 0, i32 119, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6051:20 | Function: handle_slave_worker
+  Instruction: store i8 1, i8* %sql_generate_invisible_primary_key147, align 1, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6051:55 | Function: handle_slave_worker
+  Instruction: %sql_generate_invisible_primary_key = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables132, i32 0, i32 119, !dbg !1255441 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6046:18 | Function: handle_slave_worker
+  Instruction: store i8 1, i8* %sql_generate_invisible_primary_key136, align 1, !dbg !1255533 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7083:57 | Function: handle_slave_sql
+  Instruction: %sql_generate_invisible_primary_key136 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables135, i32 0, i32 119, !dbg !1255532 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7083:22 | Function: handle_slave_sql
+  Instruction: store i8 0, i8* %sql_generate_invisible_primary_key, align 1, !dbg !1255442 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6046:53 | Function: handle_slave_worker
+
+Implicit Data Flow (1):
+  Instruction: %4 = phi i1 [ false, %land.lhs.true ], [ false, %entry ], [ %lnot, %land.rhs ], !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_gipk.cc:0:0is_generate_invisible_primary_key_mode_active
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

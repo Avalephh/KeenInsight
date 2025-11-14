@@ -1,0 +1,40 @@
+Global Variable: srv_flush_neighbors
+Explicit Data Flow (6):
+  Instruction: %7 = load i64, i64* @srv_flush_neighbors, align 8, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1484:7 | Function: buf_flush_try_neighbors
+  Instruction: %cmp25 = icmp eq i64 %7, 0, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1484:27 | Function: buf_flush_try_neighbors
+  Instruction: br i1 %cmp25, label %if.then26, label %if.else, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1483:7 | Function: buf_flush_try_neighbors
+  Instruction: %20 = load i64, i64* @srv_flush_neighbors, align 8, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1502:9 | Function: buf_flush_try_neighbors
+  Instruction: %cmp37 = icmp eq i64 %20, 1, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1502:29 | Function: buf_flush_try_neighbors
+  Instruction: br i1 %cmp37, label %if.then38, label %if.end66, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1502:9 | Function: buf_flush_try_neighbors
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: unsigned int const& std::min
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: buf_flush_check_neighbor
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: buf_flush_check_neighbor
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: buf_flush_check_neighbor
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: buf_flush_check_neighbor
+
+Implicit Control Flow:
+
+----------------------------------------

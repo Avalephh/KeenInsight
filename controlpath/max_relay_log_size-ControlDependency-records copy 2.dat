@@ -1,0 +1,174 @@
+Global Variable: max_relay_log_size
+Explicit Data Flow (21):
+  Instruction: %7 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:39 | Function: fix_max_relay_log_size
+  Instruction: %tobool = icmp ne i64 %7, 0, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:39 | Function: fix_max_relay_log_size
+  Instruction: br i1 %tobool, label %cond.true, label %cond.false, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:39 | Function: fix_max_relay_log_size
+  Instruction: %8 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:60 | Function: fix_max_relay_log_size
+  Instruction: %cond = phi i64 [ %8, %cond.true ], [ %9, %cond.false ], !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:39 | Function: fix_max_relay_log_size
+  Instruction: call void @_ZN13MYSQL_BIN_LOG12set_max_sizeEm(%class.MYSQL_BIN_LOG* %relay_log, i64 %cond), !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:26 | Function: fix_max_relay_log_size
+  Instruction: %4 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2944:8 | Function: fix_max_binlog_size
+  Instruction: %tobool = icmp ne i64 %4, 0, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2944:8 | Function: fix_max_binlog_size
+  Instruction: br i1 %tobool, label %if.end10, label %if.then, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2944:7 | Function: fix_max_binlog_size
+  Instruction: %24 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:16 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %tobool69 = icmp ne i64 %24, 0, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:16 | Function: Relay_log_info::purge_relay_logs
+  Instruction: br i1 %tobool69, label %cond.true70, label %cond.false71, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:16 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %25 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255386 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:37 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %cond = phi i64 [ %25, %cond.true70 ], [ %26, %cond.false71 ], !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:16 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %call77 = invoke zeroext i1 bitcast (i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event*, i32)* @_ZN13MYSQL_BIN_LOG11open_binlogEPKcS1_mbbbP28Format_description_log_eventj to i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event.163303*, i32)*)(%class.MYSQL_BIN_LOG* %relay_log68, i8* %23, i8* null, i64 %cond, i1 zeroext true, i1 zeroext true, i1 zeroext true, %class.Format_description_log_event.163303* %call75, i32 0)
+          to label %invoke.cont76 unwind label %lpad, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1122:21 | Function: Relay_log_info::purge_relay_logs
+  Instruction: %66 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:14 | Function: Relay_log_info::rli_init_info
+  Instruction: %tobool272 = icmp ne i64 %66, 0, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:14 | Function: Relay_log_info::rli_init_info
+  Instruction: br i1 %tobool272, label %cond.true273, label %cond.false274, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:14 | Function: Relay_log_info::rli_init_info
+  Instruction: %67 = load i64, i64* @max_relay_log_size, align 8, !dbg !1255491 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:35 | Function: Relay_log_info::rli_init_info
+  Instruction: %cond276 = phi i64 [ %67, %cond.true273 ], [ %68, %cond.false274 ], !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:14 | Function: Relay_log_info::rli_init_info
+  Instruction: %call281 = invoke zeroext i1 bitcast (i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event*, i32)* @_ZN13MYSQL_BIN_LOG11open_binlogEPKcS1_mbbbP28Format_description_log_eventj to i1 (%class.MYSQL_BIN_LOG*, i8*, i8*, i64, i1, i1, i1, %class.Format_description_log_event.163303*, i32)*)(%class.MYSQL_BIN_LOG* %relay_log271, i8* %65, i8* null, i64 %cond276, i1 zeroext true, i1 zeroext true, i1 zeroext true, %class.Format_description_log_event.163303* %call279, i32 0)
+          to label %invoke.cont280 unwind label %lpad, !dbg !1255495 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1693:19 | Function: Relay_log_info::rli_init_info
+
+Implicit Data Flow (3):
+  Instruction: %cond = phi i64 [ %8, %cond.true ], [ %9, %cond.false ], !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3094:39
+  Instruction: %cond = phi i64 [ %25, %cond.true70 ], [ %26, %cond.false71 ], !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1124:16
+  Instruction: %cond276 = phi i64 [ %67, %cond.true273 ], [ %68, %cond.false274 ], !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1695:14
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: MYSQL_BIN_LOG::set_max_size
+  Controlled Function: Multisource_info::wrlock
+  Controlled Function: Multisource_info::begin[abi:cxx11]
+  Controlled Function: Multisource_info::end[abi:cxx11]
+  Controlled Function: std::operator!=
+  Controlled Function: std::_Rb_tree_iterator
+  Controlled Function: Multisource_info::unlock
+  Controlled Function: MYSQL_BIN_LOG::set_max_size
+  Controlled Function: std::_Rb_tree_iterator
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: Transaction_boundary_parser::reset
+  Controlled Function: basename_prefix_find
+  Controlled Function: inline_mysql_mutex_lock
+  Controlled Function: basename_prefix_eval
+  Controlled Function: Master_info::clear_gtid_monitoring_info
+  Controlled Function: LogEvent::subsys
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: LogEvent::source_line
+  Controlled Function: inline_mysql_mutex_lock
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: Checkable_rwlock::wrlock
+  Controlled Function: LogEvent::function
+  Controlled Function: MYSQL_BIN_LOG::get_log_fname
+  Controlled Function: Gtid_set::clear_set_and_sid_map
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: Checkable_rwlock::unlock
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MYSQL_BIN_LOG::get_log_fname
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Relay_log_info::count_relay_log_space
+  Controlled Function: llstr
+  Controlled Function: MYSQL_BIN_LOG::close
+  Controlled Function: _db_doprnt_
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: Rpl_info_handler::init_info
+  Controlled Function: basename_prefix_find
+  Controlled Function: Rpl_info_handler::end_info
+  Controlled Function: basename_prefix_eval
+  Controlled Function: Relay_log_info::check_if_info_was_cleared
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: MYSQL_BIN_LOG::close
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::prio
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Relay_log_info::reset_group_relay_log_pos
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_prefix_find
+  Controlled Function: LogEvent::function
+  Controlled Function: basename_prefix_eval
+  Controlled Function: get_server_state
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::subsys
+  Controlled Function: Relay_log_info::flush_info
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: MYSQL_BIN_LOG::find_first_log
+  Controlled Function: basename_index
+  Controlled Function: Relay_log_info::count_relay_log_space
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: LogEvent::function
+  Controlled Function: Relay_log_info::is_group_relay_log_name_invalid
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: Relay_log_info::clear_info
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: basename_prefix_eval
+  Controlled Function: basename_prefix_find
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::subsys
+  Controlled Function: basename_prefix_eval
+  Controlled Function: basename_prefix_find
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: basename_prefix_eval
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_line
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: basename_index
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: std::__cxx11::to_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: LogEvent::lookup
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: std::__cxx11::basic_string
+
+Implicit Control Flow:
+
+----------------------------------------

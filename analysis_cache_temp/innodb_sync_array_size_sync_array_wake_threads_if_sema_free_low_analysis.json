@@ -1,0 +1,7 @@
+{
+  "param_name": "innodb_sync_array_size",
+  "function_name": "sync_array_wake_threads_if_sema_free_low",
+  "analysis": "<需要提供函数>\n不需要提供其他函数的具体实现。\n\n<思考过程>\n1. 参数通过控制关键函数对数据库性能的影响：\n    - innodb_sync_array_size通过影响sync_array_wake_threads_if_sema_free_low的机制是控制待唤醒线程的数量和锁等待的粒度。\n    - 机制：innodb_sync_array_size决定了sync_array_t结构中的数组大小arr->next_free_slot。在sync_array_wake_threads_if_sema_free_low中循环检查和唤醒线程次数与此参数密切相关。如果innodb_sync_array_size增大，意味着更多的线程会在锁被释后尝试竞争资源。\n    - 数据库性能影响：增加innodb_sync_array_size可以提高线程并发处理能力，但如果内存消耗大或线程竞争激烈，可能导致上下文切换频繁，从而影响整体性能。而减小此参数则可能减少竞争，改善响应时间。\n\n<火焰图采样分析与调优方向>\n2. 基于sync_array_wake_threads_if_sema_free_low执行状态和相关函数片段给出innodb_sync_array_size优化建议：\n    - 除了监控sync_array_wake_threads_if_sema_free_low之外，不需要监控其他函数。\n    - 根据sync_array_wake_threads_if_sema_free_low的火焰图采样率，如果发现该函数调用频率过高且持续时间长，建议降低innodb_sync_array_size以减少线程竞争和上下文切换频率。相反，如果该函数被调用较少且处理逻辑不复杂，可以适当升高innodb_sync_array_size以提高吞吐量，充分利用多核性能。调整依据应基于系统资源消耗情况和线程竞争程度分析。",
+  "code_snippets": "static void sync_array_wake_threads_if_sema_free_low(\n    sync_array_t *arr) /* in/out: wait array */\n{\n  sync_array_enter(arr);\n\n  for (ulint i = 0; i < arr->next_free_slot; ++i) {\n    sync_cell_t *cell;\n\n    cell = sync_array_get_nth_cell(arr, i);\n\n    if (cell->latch.mutex != nullptr && sync_arr_cell_can_wake_up(cell)) {\n      os_event_t event;\n\n      event = sync_cell_get_event(cell);\n\n      os_event_set(event);\n    }\n  }\n\n  sync_array_exit(arr);\n}",
+  "timestamp": "2025-07-18T12:59:05.138421"
+}

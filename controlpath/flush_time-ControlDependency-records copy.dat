@@ -1,0 +1,67 @@
+Global Variable: flush_time
+Explicit Data Flow (11):
+  Instruction: %0 = load i64, i64* @flush_time, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:109:7 | Function: start_handle_manager
+  Instruction: %tobool = icmp ne i64 %0, 0, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:109:7 | Function: start_handle_manager
+  Instruction: br i1 %tobool, label %land.lhs.true, label %if.end27, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:109:18 | Function: start_handle_manager
+  Instruction: %1 = load i64, i64* @flush_time, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:109:21 | Function: start_handle_manager
+  Instruction: %cmp = icmp ne i64 %1, -1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:109:32 | Function: start_handle_manager
+  Instruction: br i1 %cmp, label %if.then, label %if.end27, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:109:7 | Function: start_handle_manager
+  Instruction: %0 = load i64, i64* @flush_time, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:77:11 | Function: handle_manager
+  Instruction: %tobool = icmp ne i64 %0, 0, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:77:11 | Function: handle_manager
+  Instruction: br i1 %tobool, label %if.then, label %if.else, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:77:11 | Function: handle_manager
+  Instruction: %2 = load i64, i64* @flush_time, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:79:34 | Function: handle_manager
+  Instruction: invoke void @_Z12set_timespecP8timespecm(%struct.timeval* %abstime, i64 %2)
+          to label %invoke.cont6 unwind label %lpad, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/sql_manager.cc:79:11 | Function: handle_manager
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_thread_handle::my_thread_handle
+  Controlled Function: inline_mysql_thread_create
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: my_thread_handle::my_thread_handle
+  Controlled Function: inline_mysql_thread_create
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: set_timespec
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: inline_mysql_cond_wait
+  Controlled Function: inline_mysql_cond_timedwait
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: is_timeout
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_thread_end
+  Controlled Function: tdc_flush_unused_tables
+  Controlled Function: inline_mysql_mutex_lock
+
+Implicit Control Flow:
+
+----------------------------------------

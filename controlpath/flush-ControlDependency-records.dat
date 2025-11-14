@@ -1,0 +1,35 @@
+Global Variable: myisam_flush
+Explicit Data Flow (6):
+  Instruction: %126 = load i8, i8* @myisam_flush, align 1, !dbg !1255541 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/mi_locking.cc:113:17 | Function: mi_lock_database
+  Instruction: %tobool176 = trunc i8 %126 to i1, !dbg !1255541 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/mi_locking.cc:113:17 | Function: mi_lock_database
+  Instruction: br i1 %tobool176, label %if.then177, label %if.else201, !dbg !1255543 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/mi_locking.cc:113:17 | Function: mi_lock_database
+  Instruction: %78 = load i8, i8* @myisam_flush, align 1, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:11140:7 | Function: get_options
+  Instruction: %tobool218 = trunc i8 %78 to i1, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:11140:7 | Function: get_options
+  Instruction: br i1 %tobool218, label %if.then219, label %if.end220, !dbg !1255485 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:11140:7 | Function: get_options
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_msync
+  Controlled Function: inline_mysql_file_sync
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: mi_report_error
+  Controlled Function: my_errno
+  Controlled Function: inline_mysql_file_sync
+  Controlled Function: my_errno
+  Controlled Function: _db_pargs_
+  Controlled Function: my_lock
+  Controlled Function: list_delete
+  Controlled Function: _db_enabled_
+  Controlled Function: my_lock
+  Controlled Function: _db_doprnt_
+  Controlled Function: my_errno
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: my_errno
+  Controlled Function: _mi_report_crashed
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

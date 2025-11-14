@@ -14,7 +14,7 @@ from llambo.task_logger import TaskLogger
 from llambo.extract_knob import ParameterLibrary
 from DBTuner.utils.matchFunctions import read_function_names, get_knob_in_keyFunctions
 from library.rule_library.rule_extract import extract_rule
-from DBTuner.utils.matchRule import knob_normalize,updateMetric_useful,updateMetric_useless,update_rule_file,process_rule_catagory
+from DBTuner.utils.matchRule_revision import knob_normalize,updateMetric_useful,updateMetric_useless,update_rule_file,process_rule_catagory,knob_value_to_mem_percent
 
 class LLAMBO:
     def __init__(self, 
@@ -300,7 +300,7 @@ class LLAMBO:
                 
                 ###################TODO：ctt 规则维护：需要比较两次的参数值和tps变化值  ##############################################################################################
                 # 初始化调用日志文件路径
-                call_log_file = "matched_rules_calls_tpch.json"
+                call_log_file = "matched_rules_calls_tpcc.json"
 
                 # 初始化或加载调用记录
                 if os.path.exists(call_log_file):
@@ -312,8 +312,9 @@ class LLAMBO:
                 # 当前是第几次调用
                 current_call_id = f"call_{len(rule_call_log) + 1}"
                 
-                selected_rules, globalRules,defaultFile,rule_file = self.promptlib.transfer_rule()
+                selected_rules, globalRules,defaultFile,rule_file,memory_knobs = self.promptlib.transfer_rule()
                 if selected_rules:
+                    print("selected_rules: ",selected_rules)
                     # 查看现在的参数改变情况是否符合规则中的参数配置，并且tps变化是否符合规则
                     matched_rules = []
                     processed_matched_rules = []
@@ -322,26 +323,36 @@ class LLAMBO:
                     new_performance = sel_candidate_fval["score"].values[0]
                     performance_change = (new_performance - old_performance) / old_performance * 100
                     print("performance change: ", performance_change)
+                    # if performance_change < 0:
+                    #     continue
+                    # print("rule_config_change:",rule_config_change)
                     for change in rule_config_change:
+                        print("change:",change)
                         knob_name = change['knob']
                         old_value = change['old_value']
                         new_value = change['new_value']
                         for rule1 in selected_rules:
                             rule = process_rule_catagory(rule1)
+                            print("rule: ",rule)
                             for knob_info in rule['knob']:
+                                # print("knob_info: ",knob_info)
                                 if knob_info['name'] == knob_name:
                                     # old_value = self.promptlib.config[key]
-                                    old_value_norm = knob_normalize(defaultFile,knob_name,old_value)
-                                    new_value_norm = knob_normalize(defaultFile,knob_name,new_value)
+                                    if knob_name in memory_knobs:
+                                        old_value_norm = knob_value_to_mem_percent(knob_name, old_value)
+                                        new_value_norm = knob_value_to_mem_percent(knob_name, new_value)
+                                    else:
+                                        old_value_norm = knob_normalize(defaultFile, knob_name, old_value)
+                                        new_value_norm = knob_normalize(defaultFile,knob_name,new_value)
                                     change_amount = new_value_norm - old_value_norm
                                     lower_bound = knob_info['lower_bound']
                                     upper_bound = knob_info['upper_bound']
                                     # print("change_amount : ",change_amount)
-                                    # print("key:{} old_value:{} new_value:{}, change_amount: {}",knob_name, old_value, new_value, change_amount)
-                                    if (lower_bound <= change_amount <= upper_bound) or (lower_bound == -float("inf") and change_amount <= upper_bound) or (upper_bound == -float("inf") and change_amount > lower_bound):      
+                                    print("key:{} old_value:{} new_value:{}, change_amount: {}",knob_name, old_value, new_value, change_amount)
+                                    if (lower_bound <= change_amount <= upper_bound) or (lower_bound == -float("inf") and change_amount <= upper_bound) or (upper_bound == -float("inf") and change_amount > lower_bound) :
+                                        print("the former matched.")
                                         if rule['performance']['lower_bound'] <= performance_change <= rule['performance']['upper_bound']:
                                             #  匹配到规则
-                                            # TODO 记录下每次匹配到的规则，以及更改的值 -- 4950 -> 4951查看一下
                                             rule = updateMetric_useful(rule)
                                             print("rule matched.")
                                         else:
@@ -352,6 +363,45 @@ class LLAMBO:
                                             matched_rule_set.add(rule1)
                                             matched_rules.append(rule1)
                                             processed_matched_rules.append(rule)
+                # if selected_rules:
+                #     # 查看现在的参数改变情况是否符合规则中的参数配置，并且tps变化是否符合规则
+                #     matched_rules = []
+                #     processed_matched_rules = []
+                #     matched_rule_set = set() 
+                #     old_performance = self.observed_fvals.iloc[-1]["score"]
+                #     new_performance = sel_candidate_fval["score"].values[0]
+                #     performance_change = (new_performance - old_performance) / old_performance * 100
+                #     print("performance change: ", performance_change)
+                #     for change in rule_config_change:
+                #         knob_name = change['knob']
+                #         old_value = change['old_value']
+                #         new_value = change['new_value']
+                #         for rule1 in selected_rules:
+                #             rule = process_rule_catagory(rule1)
+                #             for knob_info in rule['knob']:
+                #                 if knob_info['name'] == knob_name:
+                #                     # old_value = self.promptlib.config[key]
+                #                     old_value_norm = knob_normalize(defaultFile,knob_name,old_value)
+                #                     new_value_norm = knob_normalize(defaultFile,knob_name,new_value)
+                #                     change_amount = new_value_norm - old_value_norm
+                #                     lower_bound = knob_info['lower_bound']
+                #                     upper_bound = knob_info['upper_bound']
+                #                     # print("change_amount : ",change_amount)
+                #                     # print("key:{} old_value:{} new_value:{}, change_amount: {}",knob_name, old_value, new_value, change_amount)
+                #                     if (lower_bound <= change_amount <= upper_bound) or (lower_bound == -float("inf") and change_amount <= upper_bound) or (upper_bound == -float("inf") and change_amount > lower_bound):      
+                #                         if rule['performance']['lower_bound'] <= performance_change <= rule['performance']['upper_bound']:
+                #                             #  匹配到规则
+                #                             # TODO 记录下每次匹配到的规则，以及更改的值 -- 4950 -> 4951查看一下
+                #                             rule = updateMetric_useful(rule)
+                #                             print("rule matched.")
+                #                         else:
+                #                             # 没有匹配到规则
+                #                             rule = updateMetric_useless(rule)
+                #                             print("rule not matched.")
+                #                         if rule1 not in matched_rule_set:
+                #                             matched_rule_set.add(rule1)
+                #                             matched_rules.append(rule1)
+                #                             processed_matched_rules.append(rule)
                                             
                     update_rule_file(globalRules, processed_matched_rules, rule_file)
                     # 记录当前调用匹配到的规则（使用字符串列表）

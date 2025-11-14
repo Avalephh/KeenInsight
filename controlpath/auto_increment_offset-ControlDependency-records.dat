@@ -1,0 +1,77 @@
+Global Variable: System_variables.21
+Explicit Data Flow (57):
+  Instruction: %1 = load i64, i64* %auto_increment_offset, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:295:25 | Function: thd_get_autoinc
+  Instruction: store i64 %1, i64* %2, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:295:8 | Function: thd_get_autoinc
+  Instruction: %8 = load i64, i64* %auto_increment_offset, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3605:24 | Function: compute_next_insert_id
+  Instruction: %sub = sub i64 %add2, %8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3604:54 | Function: compute_next_insert_id
+  Instruction: %div = udiv i64 %sub, %10, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3605:48 | Function: compute_next_insert_id
+  Instruction: store i64 %div, i64* %nr.addr, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3604:8 | Function: compute_next_insert_id
+  Instruction: %11 = load i64, i64* %nr.addr, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3607:11 | Function: compute_next_insert_id
+  Instruction: %mul = mul i64 %11, %13, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3607:14 | Function: compute_next_insert_id
+  Instruction: %add6 = add i64 %mul, %15, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3607:63 | Function: compute_next_insert_id
+  Instruction: store i64 %add6, i64* %nr.addr, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3607:8 | Function: compute_next_insert_id
+  Instruction: %16 = load i64, i64* %nr.addr, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3611:16 | Function: compute_next_insert_id
+  Instruction: %cmp7 = icmp ule i64 %16, %17, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3611:19 | Function: compute_next_insert_id
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp7), !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3611:7 | Function: compute_next_insert_id
+  Instruction: br i1 %call, label %if.then8, label %if.end9, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3611:7 | Function: compute_next_insert_id
+  Instruction: %15 = load i64, i64* %auto_increment_offset5, align 8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3608:22 | Function: compute_next_insert_id
+  Instruction: %55 = load i64, i64* %auto_increment_offset, align 8, !dbg !1255432 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3848:37 | Function: handler::update_auto_increment
+  Instruction: invoke void %60(%class.handler* %this1, i64 %55, i64 %57, i64 %58, i64* %nr, i64* %nb_reserved_values)
+          to label %invoke.cont92 unwind label %lpad, !dbg !1255436 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3848:7 | Function: handler::update_auto_increment
+  Instruction: %2 = load i64, i64* %auto_increment_offset, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3643:32 | Function: prev_insert_id
+  Instruction: %cmp = icmp ult i64 %0, %2, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3643:19 | Function: prev_insert_id
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3643:7 | Function: prev_insert_id
+  Instruction: br i1 %call, label %if.then, label %if.end4, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3643:7 | Function: prev_insert_id
+  Instruction: %5 = load i64, i64* %auto_increment_offset3, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3649:5 | Function: prev_insert_id
+  Instruction: call void (i8*, ...) @_Z11_db_doprnt_PKcz(i8* getelementptr inbounds ([65 x i8], [65 x i8]* @.str.253.27840, i64 0, i64 0), i64 %3, i64 %5), !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3649:5 | Function: prev_insert_id
+  Instruction: %12 = load i64, i64* %auto_increment_offset8, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3656:27 | Function: prev_insert_id
+  Instruction: %sub = sub i64 %10, %12, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3656:14 | Function: prev_insert_id
+  Instruction: %div = udiv i64 %sub, %14, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3656:51 | Function: prev_insert_id
+  Instruction: store i64 %div, i64* %nr.addr, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3656:6 | Function: prev_insert_id
+  Instruction: %15 = load i64, i64* %nr.addr, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3658:11 | Function: prev_insert_id
+  Instruction: %mul = mul i64 %15, %17, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3658:14 | Function: prev_insert_id
+  Instruction: %add = add i64 %mul, %19, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3658:63 | Function: prev_insert_id
+  Instruction: store i64 %add, i64* %retval, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3658:3 | Function: prev_insert_id
+  Instruction: %20 = load i64, i64* %retval, align 8, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3660:1 | Function: prev_insert_id
+  Instruction: ret i64 %20, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3660:1 | Function: prev_insert_id
+  Instruction: %call154 = invoke i64 @_Z14prev_insert_idyP16System_variables(i64 %call152, %struct.System_variables* %80)
+          to label %invoke.cont153 unwind label %lpad, !dbg !1255500 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3898:10 | Function: handler::update_auto_increment
+  Instruction: store i64 %call154, i64* %nr, align 8, !dbg !1255501 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3898:8 | Function: handler::update_auto_increment
+  Instruction: %83 = load i64, i64* %nr, align 8, !dbg !1255505 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3899:60 | Function: handler::update_auto_increment
+  Instruction: %call160 = invoke i32 %85(%class.Field* %82, i64 %83, i1 zeroext true)
+          to label %invoke.cont159 unwind label %lpad, !dbg !1255506 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3899:44 | Function: handler::update_auto_increment
+  Instruction: store i64 %call170, i64* %nr, align 8, !dbg !1255512 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3900:10 | Function: handler::update_auto_increment
+  Instruction: %91 = load i64, i64* %nr, align 8, !dbg !1255520 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3903:43 | Function: handler::update_auto_increment
+  Instruction: invoke void @_ZN17Discrete_interval7replaceEyyy(%class.Discrete_interval* %auto_inc_interval_for_cur_row175, i64 %91, i64 %92, i64 %94)
+          to label %invoke.cont177 unwind label %lpad, !dbg !1255524 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3903:35 | Function: handler::update_auto_increment
+  Instruction: %100 = load i64, i64* %nr, align 8, !dbg !1255543 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3921:27 | Function: handler::update_auto_increment
+  Instruction: store i64 %100, i64* %insert_id_for_cur_row197, align 8, !dbg !1255545 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3921:25 | Function: handler::update_auto_increment
+  Instruction: %insert_id_for_cur_row197 = getelementptr inbounds %class.handler, %class.handler* %this1, i32 0, i32 37, !dbg !1255544 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3921:3 | Function: handler::update_auto_increment
+  Instruction: %insert_id_for_cur_row = getelementptr inbounds %class.handler, %class.handler* %75, i32 0, i32 37, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/persistent_dynamic_loader.cc:435:43 | Function: mysql_persistent_dynamic_loader_imp::load
+  Instruction: %call57 = invoke { %"struct.std::_Rb_tree_node_base"*, i8 } @_ZNSt3mapINSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEmSt4lessIS5_ESaISt4pairIKS5_mEEE7emplaceIJRPKcRyEEES8_ISt17_Rb_tree_iteratorISA_EbEDpOT_(%"class.std::map.152"* @_ZN35mysql_persistent_dynamic_loader_imp19component_id_by_urnB5cxx11E, i8** dereferenceable(8) %arrayidx54, i64* dereferenceable(8) %insert_id_for_cur_row)
+          to label %invoke.cont56 unwind label %lpad20, !dbg !1255397 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/persistent_dynamic_loader.cc:434:64 | Function: mysql_persistent_dynamic_loader_imp::load
+  Instruction: %101 = load i64, i64* %nr, align 8, !dbg !1255546 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3926:45 | Function: handler::update_auto_increment
+  Instruction: %call199 = invoke i64 @_Z22compute_next_insert_idyP16System_variables(i64 %101, %struct.System_variables* %102)
+          to label %invoke.cont198 unwind label %lpad, !dbg !1255548 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3926:22 | Function: handler::update_auto_increment
+  Instruction: %19 = load i64, i64* %auto_increment_offset11, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:3659:22 | Function: prev_insert_id
+  Instruction: store i64 %conv127, i64* %auto_increment_offset130, align 8, !dbg !1255408 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4505:40 | Function: Query_log_event::do_apply_event
+  Instruction: %auto_increment_offset130 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables129, i32 0, i32 21, !dbg !1255407 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4505:18 | Function: Query_log_event::do_apply_event
+  Instruction: %auto_increment_offset = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables9, i32 0, i32 21, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7343:30 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: %15 = load i64, i64* %auto_increment_offset, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7343:30 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: call void @_ZN10binary_log11Query_eventC2EPKcS2_S2_jmymmjyi(%"class.binary_log::Query_event"* %2, i8* %3, i8* %5, i8* %7, i32 %conv, i64 %conv7, i64 %11, i64 %13, i64 %15, i32 %18, i64 %20, i32 %21), !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7339:7 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: store i64 1, i64* %auto_increment_offset, align 8, !dbg !1255489 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:5751:46 | Function: Rotate_log_event::do_update_pos
+  Instruction: %auto_increment_offset = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables166, i32 0, i32 21, !dbg !1255488 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:5751:24 | Function: Rotate_log_event::do_update_pos
+  Instruction: %15 = load i64, i64* %auto_increment_offset, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3804:30 | Function: Query_log_event::Query_log_event
+  Instruction: call void @_ZN10binary_log11Query_eventC2EPKcS2_S2_jmymmjyi(%"class.binary_log::Query_event"* %2, i8* %3, i8* %5, i8* %7, i32 %conv, i64 %conv8, i64 %11, i64 %13, i64 %15, i32 %18, i64 %20, i32 %21), !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3800:7 | Function: Query_log_event::Query_log_event
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+
+Implicit Control Flow:
+
+----------------------------------------

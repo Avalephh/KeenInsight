@@ -1,0 +1,20 @@
+Global Variable: System_variables.53
+Explicit Data Flow (8):
+  Instruction: %11 = load i64, i64* %default_week_format, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1380:51 | Function: Item_func_week::itemize
+  Instruction: invoke void @_ZN8Item_intC2ERK11Name_stringxj(%class.Item_int* %9, %class.Name_string* dereferenceable(16) %ref.tmp, i64 %11, i32 1)
+          to label %invoke.cont6 unwind label %lpad, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1380:9 | Function: Item_func_week::itemize
+  Instruction: %16 = load i64, i64* %default_week_format, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2807:44 | Function: Item_extract::val_int
+  Instruction: store i64 %16, i64* %week_format, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2807:19 | Function: Item_extract::val_int
+  Instruction: %17 = load i64, i64* %week_format, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2808:41 | Function: Item_extract::val_int
+  Instruction: %conv25 = trunc i64 %17 to i32, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2808:41 | Function: Item_extract::val_int
+  Instruction: %call26 = call i32 @_ZL9week_modej(i32 %conv25), !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2808:31 | Function: Item_extract::val_int
+  Instruction: %call27 = call i32 @_Z9calc_weekRK10MYSQL_TIMEjPj(%struct.MYSQL_TIME* dereferenceable(48) %ltime, i32 %call26, i32* %year), !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2808:14 | Function: Item_extract::val_int
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

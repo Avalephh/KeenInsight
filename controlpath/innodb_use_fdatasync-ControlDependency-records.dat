@@ -1,0 +1,32 @@
+Global Variable: srv_use_fdatasync
+Explicit Data Flow (3):
+  Instruction: %1 = load i8, i8* @srv_use_fdatasync, align 1, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2837:22 | Function: os_file_fsync_posix
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2837:22 | Function: os_file_fsync_posix
+  Instruction: br i1 %tobool, label %cond.true, label %cond.false, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2837:22 | Function: os_file_fsync_posix
+
+Implicit Data Flow (1):
+  Instruction: %cond = phi i32 [ %call, %cond.true ], [ %call1, %cond.false ], !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2837:22
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: fdatasync
+  Controlled Function: fsync
+  Controlled Function: __errno_location
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::fatal::fatal
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+
+Implicit Control Flow:
+
+----------------------------------------

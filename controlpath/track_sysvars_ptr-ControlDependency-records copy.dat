@@ -1,0 +1,36 @@
+Global Variable: System_variables.105
+Explicit Data Flow (18):
+  Instruction: %1 = load i8*, i8** %track_sysvars_ptr, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:603:23 | Function: Session_sysvars_tracker::enable
+  Instruction: %tobool = icmp ne i8* %1, null, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:603:8 | Function: Session_sysvars_tracker::enable
+  Instruction: br i1 %tobool, label %if.end, label %if.then, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:603:7 | Function: Session_sysvars_tracker::enable
+  Instruction: %3 = load i8*, i8** %track_sysvars_ptr3, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:605:33 | Function: Session_sysvars_tracker::enable
+  Instruction: store i8* %3, i8** %str, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:605:16 | Function: Session_sysvars_tracker::enable
+  Instruction: %str = getelementptr inbounds %class.Simple_cstring, %class.Simple_cstring* %var_list, i32 0, i32 0, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:605:12 | Function: Session_sysvars_tracker::enable
+  Instruction: %str37 = getelementptr inbounds %class.Simple_cstring, %class.Simple_cstring* %49, i32 0, i32 0, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/security_context_imp.cc:318:37 | Function: mysql_security_context_imp::set
+  Instruction: %50 = load i8*, i8** %str37, align 8, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/security_context_imp.cc:318:37 | Function: mysql_security_context_imp::set
+  Instruction: invoke void bitcast (void (%class.Security_context.48479*, i8*, i64)* @_ZN16Security_context17assign_proxy_userEPKcm to void (%class.Security_context*, i8*, i64)*)(%class.Security_context* %48, i8* %50, i64 %52)
+          to label %invoke.cont39 unwind label %lpad, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/security_context_imp.cc:318:12 | Function: mysql_security_context_imp::set
+  Instruction: %5 = load i8*, i8** %track_sysvars_ptr5, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:606:43 | Function: Session_sysvars_tracker::enable
+  Instruction: %call = call i64 @strlen(i8* %5) #21, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:606:21 | Function: Session_sysvars_tracker::enable
+  Instruction: %1 = load i8*, i8** %track_sysvars_ptr, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:660:23 | Function: Session_sysvars_tracker::update
+  Instruction: %tobool = icmp ne i8* %1, null, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:660:8 | Function: Session_sysvars_tracker::update
+  Instruction: br i1 %tobool, label %if.end, label %if.then, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:660:7 | Function: Session_sysvars_tracker::update
+  Instruction: store i8* null, i8** %track_sysvars_ptr, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3077:38 | Function: cleanup_variables
+  Instruction: %track_sysvars_ptr = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables1, i32 0, i32 105, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3077:20 | Function: cleanup_variables
+  Instruction: %track_sysvars_ptr = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables32, i32 0, i32 105, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3051:52 | Function: plugin_thdvar_init
+  Instruction: %call34 = invoke zeroext i1 @_ZN31Session_sysvar_resource_manager4initEPPc(%class.Session_sysvar_resource_manager* %session_sysvar_res_mgr, i8** %track_sysvars_ptr)
+          to label %invoke.cont33 unwind label %lpad, !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3051:31 | Function: plugin_thdvar_init
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: strlen
+  Controlled Function: THD::charset
+  Controlled Function: Session_sysvars_tracker::vars_list::parse_var_list
+  Controlled Function: Session_sysvars_tracker::vars_list::update
+  Controlled Function: Session_sysvars_tracker::vars_list::update
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,18 @@
+Global Variable: rpl_read_size
+Explicit Data Flow (6):
+  Instruction: %4 = load i64, i64* @rpl_read_size, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:455:60 | Function: MYSQL_BIN_LOG::Binlog_ofile::open_existing
+  Instruction: %call = invoke zeroext i1 @_ZN16IO_CACHE_istream4openEjjPKcim(%class.IO_CACHE_ostream* %istream, i32 %1, i32 %2, i8* %3, i32 144, i64 %4)
+          to label %invoke.cont2 unwind label %lpad1, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:454:17 | Function: MYSQL_BIN_LOG::Binlog_ofile::open_existing
+  Instruction: %6 = load i64, i64* @rpl_read_size, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/binlog_istream.cc:220:57 | Function: Binlog_ifile::open_file
+  Instruction: %call2 = call zeroext i1 @_ZN16IO_CACHE_istream4openEjjPKcim(%class.IO_CACHE_ostream* %2, i32 %3, i32 %4, i8* %5, i32 144, i64 %6), !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/binlog_istream.cc:219:14 | Function: Binlog_ifile::open_file
+  Instruction: %6 = load i64, i64* @rpl_read_size, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/binlog_istream.cc:231:57 | Function: Relaylog_ifile::open_file
+  Instruction: %call2 = call zeroext i1 @_ZN16IO_CACHE_istream4openEjjPKcim(%class.IO_CACHE_ostream* %2, i32 %3, i32 %4, i8* %5, i32 144, i64 %6), !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/binlog_istream.cc:230:14 | Function: Relaylog_ifile::open_file
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

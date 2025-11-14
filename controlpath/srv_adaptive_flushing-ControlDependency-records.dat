@@ -1,0 +1,17 @@
+Global Variable: srv_adaptive_flushing
+Explicit Data Flow (3):
+  Instruction: %9 = load i8, i8* @srv_adaptive_flushing, align 1, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2526:42 | Function: Adaptive_flush::get_pct_for_lsn
+  Instruction: %tobool = trunc i8 %9 to i1, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2526:42 | Function: Adaptive_flush::get_pct_for_lsn
+  Instruction: br i1 %tobool, label %if.end7, label %if.then6, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2526:7 | Function: Adaptive_flush::get_pct_for_lsn
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: sqrt
+
+Implicit Control Flow:
+
+----------------------------------------

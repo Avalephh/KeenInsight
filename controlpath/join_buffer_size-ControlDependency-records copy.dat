@@ -1,0 +1,82 @@
+Global Variable: System_variables.26
+Explicit Data Flow (66):
+  Instruction: %81 = load i64, i64* %join_buff_size, align 8, !dbg !1255440 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:887:41 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %conv65 = uitofp i64 %81 to double, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:887:26 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %div = fdiv double %mul63, %conv65, !dbg !1255441 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:886:75 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %add66 = fadd double 1.000000e+00, %div, !dbg !1255442 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:886:15 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: store double %add66, double* %buffer_count, align 8, !dbg !1255432 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:885:20 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %82 = load double, double* %buffer_count, align 8, !dbg !1255443 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:890:11 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %mul72 = fmul double %82, %add71, !dbg !1255453 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:890:24 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: store double %mul72, double* %scan_and_filter_cost, align 8, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:889:28 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %94 = load double, double* %scan_and_filter_cost, align 8, !dbg !1255460 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:901:10 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: ret double %94, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:901:3 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: %call181 = invoke double @_ZN20Optimize_table_order19calculate_scan_costEPK8JOIN_TABjPK7Key_usedbbPdP16Opt_trace_object(%class.Optimize_table_order.16374* %this1, %class.JOIN_TAB.12164* %127, i32 %128, %class.Key_use.12147* %129, double %130, i1 zeroext %tobool178, i1 zeroext %tobool179, double* %rows_after_filtering, %class.Opt_trace_object* %trace_access_scan)
+          to label %invoke.cont180 unwind label %lpad49, !dbg !1255578 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1141:29 | Function: Optimize_table_order::best_access_path
+  Instruction: store double %call181, double* %scan_read_cost, align 8, !dbg !1255571 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1141:12 | Function: Optimize_table_order::best_access_path
+  Instruction: %133 = load double, double* %scan_read_cost, align 8, !dbg !1255581 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1152:9 | Function: Optimize_table_order::best_access_path
+  Instruction: %add184 = fadd double %133, %call183, !dbg !1255587 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1152:24 | Function: Optimize_table_order::best_access_path
+  Instruction: store double %add184, double* %scan_total_cost, align 8, !dbg !1255580 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1151:18 | Function: Optimize_table_order::best_access_path
+  Instruction: %140 = load double, double* %scan_total_cost, align 8, !dbg !1255592 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1156:35 | Function: Optimize_table_order::best_access_path
+  Instruction: %call188 = invoke dereferenceable(56) %class.Opt_trace_struct* @_ZN16Opt_trace_struct3addEPKcd(%class.Opt_trace_struct* %139, i8* getelementptr inbounds ([5 x i8], [5 x i8]* @.str.16.15176, i64 0, i64 0), double %140)
+          to label %invoke.cont187 unwind label %lpad49, !dbg !1255593 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1156:23 | Function: Optimize_table_order::best_access_path
+  Instruction: %147 = load double, double* %scan_read_cost, align 8, !dbg !1255608 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1166:24 | Function: Optimize_table_order::best_access_path
+  Instruction: store double %147, double* %best_read_cost, align 8, !dbg !1255610 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1166:22 | Function: Optimize_table_order::best_access_path
+  Instruction: %177 = load double, double* %best_read_cost, align 8, !dbg !1255679 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1215:18 | Function: Optimize_table_order::best_access_path
+  Instruction: %add245 = fadd double %177, %176, !dbg !1255679 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1215:18 | Function: Optimize_table_order::best_access_path
+  Instruction: store double %add245, double* %best_read_cost, align 8, !dbg !1255679 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1215:18 | Function: Optimize_table_order::best_access_path
+  Instruction: %182 = load double, double* %best_read_cost, align 8, !dbg !1255688 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1218:20 | Function: Optimize_table_order::best_access_path
+  Instruction: store double %182, double* %read_cost248, align 8, !dbg !1255691 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1218:18 | Function: Optimize_table_order::best_access_path
+  Instruction: %read_cost248 = getelementptr inbounds %struct.POSITION.12148, %struct.POSITION.12148* %183, i32 0, i32 1, !dbg !1255690 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:1218:8 | Function: Optimize_table_order::best_access_path
+  Instruction: %read_cost = getelementptr inbounds %struct.POSITION.12148, %struct.POSITION.12148* %15, i32 0, i32 1, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2458:20 | Function: get_partial_join_cost
+  Instruction: %16 = load double, double* %read_cost, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2458:20 | Function: get_partial_join_cost
+  Instruction: %add5 = fadd double %16, %call4, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2458:30 | Function: get_partial_join_cost
+  Instruction: %add6 = fadd double %19, %add5, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2458:12 | Function: get_partial_join_cost
+  Instruction: store double %add6, double* %cost, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2458:12 | Function: get_partial_join_cost
+  Instruction: %call74 = call dereferenceable(8) double* @_ZSt3minIdERKT_S2_S2_(double* dereferenceable(8) %buffer_count, double* dereferenceable(8) @_ZL17ULLONG_MAX_DOUBLE), !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:897:34 | Function: Optimize_table_order::calculate_scan_cost
+  Instruction: invoke void @_Z11NewIteratorI11BKAIteratorJSt10unique_ptrI11RowIterator12Destroy_onlyIS2_EE16Prealloced_arrayIP5TABLELm4EES5_RmRKjRKfRKbRKmRP21MultiRangeRowIteratorRK8JoinTypeEES5_P3THDP8MEM_ROOTDpOT0_(%"class.std::unique_ptr.182"* sret %ref.tmp693, %class.THD.75795* %437, %struct.MEM_ROOT* %438, %"class.std::unique_ptr.182"* dereferenceable(8) %call697, %class.Prealloced_array.603* dereferenceable(40) %ref.tmp698, %"class.std::unique_ptr.182"* dereferenceable(8) %call705, i64* dereferenceable(8) %join_buff_size, i32* dereferenceable(4) %mrr_length_per_rec, float* dereferenceable(4) %rec_per_key, i8* dereferenceable(1) %store_rowids706, i64* dereferenceable(8) %tables_to_get_rowid_for707, %class.MultiRangeRowIterator** dereferenceable(8) %mrr_iterator, i32* dereferenceable(4) %join_type708)
+          to label %invoke.cont709 unwind label %lpad702, !dbg !1256524 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/access_path.cc:741:20 | Function: CreateIteratorFromAccessPath
+  Instruction: invoke void @_Z11NewIteratorI16HashJoinIteratorJSt10unique_ptrI11RowIterator12Destroy_onlyIS2_EE16Prealloced_arrayIP5TABLELm4EERdS5_S9_RKbRKmRmSt6vectorI17HashJoinConditionSaISH_EESC_R8JoinTypeR14Mem_root_arrayIP4ItemESC_RPmEES5_P3THDP8MEM_ROOTDpOT0_(%"class.std::unique_ptr.182"* sret %ref.tmp776, %class.THD.75795* %495, %struct.MEM_ROOT* %496, %"class.std::unique_ptr.182"* dereferenceable(8) %call780, %class.Prealloced_array.603* dereferenceable(40) %ref.tmp781, double* dereferenceable(8) %estimated_build_rows, %"class.std::unique_ptr.182"* dereferenceable(8) %call788, %class.Prealloced_array.603* dereferenceable(40) %ref.tmp789, i8* dereferenceable(1) %store_rowids792, i64* dereferenceable(8) %tables_to_get_rowid_for793, i64* dereferenceable(8) %join_buff_size795, %"class.std::vector.612"* dereferenceable(24) %call796, i8* dereferenceable(1) %allow_spill_to_disk, i32* dereferenceable(4) %join_type757, %class.Mem_root_array.90* dereferenceable(32) %join_conditions, i8* dereferenceable(1) %probe_input_batch_mode, i64** dereferenceable(8) %hash_table_generation)
+          to label %invoke.cont799 unwind label %lpad798, !dbg !1256655 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/access_path.cc:818:20 | Function: CreateIteratorFromAccessPath
+  Instruction: %13 = load i64, i64* %join_buff_size, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3497:37 | Function: 
+  Instruction: %conv = uitofp i64 %13 to double, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3497:20 | Function: 
+  Instruction: %div = fdiv double %mul, %conv, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3496:72 | Function: 
+  Instruction: store double %div, double* %ref.tmp2, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3496:16 | Function: 
+  Instruction: %call3 = call dereferenceable(8) double* @_ZSt3minIdERKT_S2_S2_(double* dereferenceable(8) %ref.tmp, double* dereferenceable(8) %ref.tmp2), !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3495:35 | Function: 
+  Instruction: %14 = load double, double* %call3, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3495:35 | Function: 
+  Instruction: store double %14, double* %buffer_usage, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3495:20 | Function: 
+  Instruction: %15 = load double, double* %buffer_usage, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3498:20 | Function: 
+  Instruction: %mul4 = fmul double %15, %16, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3498:33 | Function: 
+  Instruction: %sub = fsub double 1.000000e+00, %mul4, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3498:18 | Function: 
+  Instruction: store double %sub, double* %retval, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3498:7 | Function: 
+  Instruction: %17 = load double, double* %retval, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3500:3 | Function: 
+  Instruction: ret double %17, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3500:3 | Function: 
+  Instruction: %call211 = call double @"_ZZN12_GLOBAL__N_115CostingReceiver15ProposeHashJoinEmmP10AccessPathS2_PK13JoinPredicateSt6bitsetILm64EES7_bPbENK4$_19clEv"(%class.anon.769* %ref.tmp), !dbg !1255696 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3478:43 | Function: 
+  Instruction: store double %call211, double* %reuse_buffer_probability, align 8, !dbg !1255695 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3478:16 | Function: 
+  Instruction: %193 = load double, double* %reuse_buffer_probability, align 8, !dbg !1255699 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3504:14 | Function: 
+  Instruction: %sub = fsub double 1.000000e+00, %193, !dbg !1255700 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3504:12 | Function: 
+  Instruction: %mul213 = fmul double %sub, %195, !dbg !1255703 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3504:40 | Function: 
+  Instruction: %add214 = fadd double %192, %mul213, !dbg !1255704 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3503:29 | Function: 
+  Instruction: %add216 = fadd double %add214, %mul215, !dbg !1255708 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3504:69 | Function: 
+  Instruction: store double %add216, double* %init_once_cost217, align 8, !dbg !1255710 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3502:28 | Function: 
+  Instruction: %init_once_cost217 = getelementptr inbounds %struct.AccessPath.78827, %struct.AccessPath.78827* %join_path, i32 0, i32 8, !dbg !1255709 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3502:13 | Function: 
+  Instruction: %init_once_cost = getelementptr inbounds %struct.AccessPath.78827, %struct.AccessPath.78827* %89, i32 0, i32 8, !dbg !1255445 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:2642:27 | Function: 
+  Instruction: store double 0.000000e+00, double* %init_once_cost, align 8, !dbg !1255446 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:2642:42 | Function: 
+  Instruction: %init_once_cost = getelementptr inbounds %struct.AccessPath.78827, %struct.AccessPath.78827* %path, i32 0, i32 8, !dbg !1255882 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:2034:25 | Function: 
+  Instruction: store double 0.000000e+00, double* %init_once_cost, align 8, !dbg !1255883 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:2034:40 | Function: 
+  Instruction: %196 = load double, double* %reuse_buffer_probability, align 8, !dbg !1255705 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3505:7 | Function: 
+  Instruction: %mul215 = fmul double %196, %197, !dbg !1255707 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3505:32 | Function: 
+  Instruction: %16 = load double, double* %buffer_usage, align 8, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:3498:35 | Function: 
+  Instruction: %24 = load i64, i64* %join_buff_size, align 8, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/hash_join_iterator.cc:639:33 | Function: HashJoinIterator::ReadNextHashJoinChunk
+  Instruction: call void (i32, i32, ...) @_Z8my_erroriiz(i32 1037, i32 1024, i64 %24), !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/hash_join_iterator.cc:638:7 | Function: HashJoinIterator::ReadNextHashJoinChunk
+  Instruction: %51 = load i64, i64* %join_buff_size, align 8, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/hash_join_iterator.cc:560:35 | Function: HashJoinIterator::BuildHashTable
+  Instruction: invoke void (i32, i32, ...) @_Z8my_erroriiz(i32 1037, i32 1024, i64 %51)
+          to label %invoke.cont150 unwind label %lpad, !dbg !1255457 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/hash_join_iterator.cc:559:9 | Function: HashJoinIterator::BuildHashTable
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

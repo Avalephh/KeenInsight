@@ -1,0 +1,202 @@
+Global Variable: srv_log_file_size
+Explicit Data Flow (131):
+  Instruction: %13 = load i64, i64* @srv_log_file_size, align 8, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4655:36 | Function: innodb_redo_log_capacity_init
+  Instruction: %mul = mul i64 %13, %14, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4655:54 | Function: innodb_redo_log_capacity_init
+  Instruction: store i64 %mul, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4655:34 | Function: innodb_redo_log_capacity_init
+  Instruction: %56 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255540 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1814:25 | Function: log_sys_init
+  Instruction: %div142 = udiv i64 %56, 1024, !dbg !1255541 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1814:52 | Function: log_sys_init
+  Instruction: %div143 = udiv i64 %div142, 1024, !dbg !1255542 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1814:59 | Function: log_sys_init
+  Instruction: store i64 %div143, i64* %ref.tmp141, align 8, !dbg !1255543 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1814:15 | Function: log_sys_init
+  Instruction: invoke void @_ZN2ib5errorC2IJymyRPKcEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured140, i32 13092, i64* dereferenceable(8) %ref.tmp141, i64* dereferenceable(8) %ref.tmp144, i64* dereferenceable(8) %ref.tmp145, i8** dereferenceable(8) @INNODB_PARAMETERS_MSG)
+          to label %invoke.cont148 unwind label %lpad13, !dbg !1255550 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1813:5 | Function: log_sys_init
+  Instruction: %46 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255506 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1790:41 | Function: log_sys_init
+  Instruction: store i64 %46, i64* %min_redo_log_capacity, align 8, !dbg !1255505 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1790:17 | Function: log_sys_init
+  Instruction: %47 = load i64, i64* %min_redo_log_capacity, align 8, !dbg !1255510 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1792:12 | Function: log_sys_init
+  Instruction: %cmp126 = icmp ult i64 %47, %48, !dbg !1255512 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1792:34 | Function: log_sys_init
+  Instruction: br i1 %cmp126, label %while.body, label %while.end, !dbg !1255509 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1792:5 | Function: log_sys_init
+  Instruction: %49 = load i64, i64* %min_redo_log_capacity, align 8, !dbg !1255516 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1794:12 | Function: log_sys_init
+  Instruction: %add = add i64 %49, %50, !dbg !1255518 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1794:34 | Function: log_sys_init
+  Instruction: %div = udiv i64 %add, 2, !dbg !1255519 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1794:59 | Function: log_sys_init
+  Instruction: store i64 %div, i64* %capacity_to_check, align 8, !dbg !1255515 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1793:25 | Function: log_sys_init
+  Instruction: %51 = load i64, i64* %capacity_to_check, align 8, !dbg !1255520 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1799:19 | Function: log_sys_init
+  Instruction: %call128 = invoke i64 @_ZN18Log_files_capacity34hard_logical_capacity_for_physicalEm(i64 %51)
+          to label %invoke.cont127 unwind label %lpad13, !dbg !1255521 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1798:15 | Function: log_sys_init
+  Instruction: %53 = load i64, i64* %capacity_to_check, align 8, !dbg !1255527 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1803:33 | Function: log_sys_init
+  Instruction: store i64 %53, i64* %max_redo_log_capacity, align 8, !dbg !1255529 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1803:31 | Function: log_sys_init
+  Instruction: %48 = load i64, i64* %max_redo_log_capacity, align 8, !dbg !1255511 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1792:36 | Function: log_sys_init
+  Instruction: %50 = load i64, i64* %max_redo_log_capacity, align 8, !dbg !1255517 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1794:36 | Function: log_sys_init
+  Instruction: %44 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255496 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1786:15 | Function: log_sys_init
+  Instruction: %call119 = invoke i64 @_ZN18Log_files_capacity34hard_logical_capacity_for_physicalEm(i64 %44)
+          to label %invoke.cont118 unwind label %lpad13, !dbg !1255497 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1785:11 | Function: log_sys_init
+  Instruction: %0 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:226:48 | Function: Log_files_capacity::update_target
+  Instruction: store i64 %0, i64* %target_physical_capacity, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:226:21 | Function: Log_files_capacity::update_target
+  Instruction: %2 = load i64, i64* %target_physical_capacity, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:227:37 | Function: Log_files_capacity::update_target
+  Instruction: %cmp = icmp eq i64 %1, %2, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:227:34 | Function: Log_files_capacity::update_target
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:227:7 | Function: Log_files_capacity::update_target
+  Instruction: %13 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:179:35 | Function: Log_files_capacity::initialize
+  Instruction: store i64 %13, i64* %ref.tmp, align 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:179:23 | Function: Log_files_capacity::initialize
+  Instruction: %call16 = call dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %max_t, i64* dereferenceable(8) %ref.tmp), !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:179:7 | Function: Log_files_capacity::initialize
+  Instruction: %14 = load i64, i64* %call16, align 8, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:179:7 | Function: Log_files_capacity::initialize
+  Instruction: store i64 %14, i64* %m_current_physical_capacity17, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:178:60 | Function: Log_files_capacity::initialize
+  Instruction: %m_current_physical_capacity17 = getelementptr inbounds %class.Log_files_capacity, %class.Log_files_capacity* %this1, i32 0, i32 1, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:178:32 | Function: Log_files_capacity::initialize
+  Instruction: %m_current_physical_capacity = getelementptr inbounds %class.Log_files_capacity, %class.Log_files_capacity* %this1, i32 0, i32 1, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h:258:15 | Function: Log_files_capacity::Log_files_capacity
+  Instruction: store i64 0, i64* %m_current_physical_capacity, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h:258:15 | Function: Log_files_capacity::Log_files_capacity
+  Instruction: %m_current_physical_capacity = getelementptr inbounds %class.Log_files_capacity, %class.Log_files_capacity* %this1, i32 0, i32 1, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:529:10 | Function: Log_files_capacity::current_physical_capacity
+  Instruction: %0 = load i64, i64* %m_current_physical_capacity, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:529:10 | Function: Log_files_capacity::current_physical_capacity
+  Instruction: ret i64 %0, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:529:3 | Function: Log_files_capacity::current_physical_capacity
+  Instruction: %call6 = call i64 @_ZNK18Log_files_capacity25current_physical_capacityEv(%class.Log_files_capacity* %m_capacity5), !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:915:48 | Function: log_files::is_consumption_needed
+  Instruction: store i64 %call6, i64* %current_capacity, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:915:14 | Function: log_files::is_consumption_needed
+  Instruction: %5 = load i64, i64* %current_capacity, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:917:3 | Function: log_files::is_consumption_needed
+  Instruction: %cmp = icmp ule i64 %4, %5, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:917:3 | Function: log_files::is_consumption_needed
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:917:3 | Function: log_files::is_consumption_needed
+  Instruction: %cmp8 = icmp eq i32 0, %conv, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:917:3 | Function: log_files::is_consumption_needed
+  Instruction: %call9 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp8), !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:917:3 | Function: log_files::is_consumption_needed
+  Instruction: %call = invoke i64 @_ZNK18Log_files_capacity25current_physical_capacityEv(%class.Log_files_capacity* %m_capacity)
+          to label %invoke.cont unwind label %lpad, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/clone0snapshot.h:767:45 | Function: Clone_Snapshot::init_disk_estimate
+  Instruction: store i64 %call, i64* %m_data_bytes_disk, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/clone0snapshot.h:767:23 | Function: Clone_Snapshot::init_disk_estimate
+  Instruction: %m_data_bytes_disk = getelementptr inbounds %class.Clone_Snapshot, %class.Clone_Snapshot* %this1, i32 0, i32 19, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/clone0snapshot.h:767:5 | Function: Clone_Snapshot::init_disk_estimate
+  Instruction: %m_data_bytes_disk = getelementptr inbounds %class.Clone_Snapshot, %class.Clone_Snapshot* %this1, i32 0, i32 19, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:144:5 | Function: Clone_Snapshot::set_state_info
+  Instruction: store i64 %8, i64* %m_data_bytes_disk, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:144:23 | Function: Clone_Snapshot::set_state_info
+  Instruction: %m_data_bytes_disk = getelementptr inbounds %class.Clone_Snapshot, %class.Clone_Snapshot* %this1, i32 0, i32 19, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:106:35 | Function: Clone_Snapshot::get_state_info
+  Instruction: %8 = load i64, i64* %m_data_bytes_disk, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:106:35 | Function: Clone_Snapshot::get_state_info
+  Instruction: store i64 %8, i64* %m_estimate_disk, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:106:33 | Function: Clone_Snapshot::get_state_info
+  Instruction: %m_estimate_disk = getelementptr inbounds %struct.Clone_Desc_State, %struct.Clone_Desc_State* %9, i32 0, i32 6, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:106:17 | Function: Clone_Snapshot::get_state_info
+  Instruction: %m_estimate_disk = getelementptr inbounds %struct.Clone_Desc_State, %struct.Clone_Desc_State* %7, i32 0, i32 6, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:144:37 | Function: Clone_Snapshot::set_state_info
+  Instruction: %8 = load i64, i64* %m_estimate_disk, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc:144:37 | Function: Clone_Snapshot::set_state_info
+  Instruction: %call2 = call i64 @_ZNK18Log_files_capacity25current_physical_capacityEv(%class.Log_files_capacity* %m_capacity1), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:637:22 | Function: log_files_next_file_size
+  Instruction: %cmp = icmp ult i64 %call2, %add, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:637:50 | Function: log_files_next_file_size
+  Instruction: br i1 %cmp, label %if.then, label %if.end25, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:637:7 | Function: log_files_next_file_size
+  Instruction: %call1 = call i64 @_ZNK18Log_files_capacity25current_physical_capacityEv(%class.Log_files_capacity* %m_capacity), !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:825:25 | Function: log_files::physical_capacity_allows_to_recycle
+  Instruction: %cmp = icmp ule i64 %5, %call1, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:824:38 | Function: log_files::physical_capacity_allows_to_recycle
+  Instruction: ret i1 %cmp, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:824:3 | Function: log_files::physical_capacity_allows_to_recycle
+  Instruction: %call1 = call zeroext i1 @_ZN9log_filesL35physical_capacity_allows_to_recycleERK5log_tmm(%struct.log_t.221592* dereferenceable(3840) %1, i64 %2, i64 %3), !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:872:10 | Function: log_files::might_recycle_file
+  Instruction: %4 = phi i1 [ false, %entry ], [ %call1, %land.rhs ], !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:0:0 | Function: log_files::might_recycle_file
+  Instruction: ret i1 %4, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:871:3 | Function: log_files::might_recycle_file
+  Instruction: %call18 = call zeroext i1 @_ZN9log_filesL18might_recycle_fileERK5log_tmm(%struct.log_t.221592* dereferenceable(3840) %7, i64 %8, i64 %9), !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:989:7 | Function: log_files_process_consumed_file
+  Instruction: br i1 %call18, label %if.then19, label %if.else, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:989:7 | Function: log_files_process_consumed_file
+  Instruction: %call = call zeroext i1 @_ZN9log_filesL35physical_capacity_allows_to_recycleERK5log_tmm(%struct.log_t.221592* dereferenceable(3840) %0, i64 0, i64 %1), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:830:10 | Function: log_files::physical_capacity_allows_to_create
+  Instruction: ret i1 %call, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:830:3 | Function: log_files::physical_capacity_allows_to_create
+  Instruction: %call1 = call zeroext i1 @_ZN9log_filesL34physical_capacity_allows_to_createERK5log_tm(%struct.log_t.221592* dereferenceable(3840) %1, i64 %2), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:879:10 | Function: log_files::might_create_unused_file
+  Instruction: %3 = phi i1 [ false, %entry ], [ %call1, %land.rhs ], !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:0:0 | Function: log_files::might_create_unused_file
+  Instruction: ret i1 %3, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:878:3 | Function: log_files::might_create_unused_file
+  Instruction: %call1 = call zeroext i1 @_ZN9log_filesL24might_create_unused_fileERK5log_tm(%struct.log_t.221592* dereferenceable(3840) %3, i64 %4), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:1031:8 | Function: log_files_create_next_as_unused_if_needed
+  Instruction: br i1 %call1, label %if.end, label %if.then, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc:1031:7 | Function: log_files_create_next_as_unused_if_needed
+  Instruction: store i64 %14, i64* %m_target_physical_capacity18, align 8, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:178:30 | Function: Log_files_capacity::initialize
+  Instruction: %m_target_physical_capacity18 = getelementptr inbounds %class.Log_files_capacity, %class.Log_files_capacity* %this1, i32 0, i32 2, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:178:3 | Function: Log_files_capacity::initialize
+  Instruction: %m_target_physical_capacity = getelementptr inbounds %class.Log_files_capacity, %class.Log_files_capacity* %this1, i32 0, i32 2, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h:266:15 | Function: Log_files_capacity::Log_files_capacity
+  Instruction: store i64 0, i64* %m_target_physical_capacity, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h:266:15 | Function: Log_files_capacity::Log_files_capacity
+  Instruction: %m_target_physical_capacity = getelementptr inbounds %class.Log_files_capacity, %class.Log_files_capacity* %this1, i32 0, i32 2, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:554:35 | Function: Log_files_capacity::next_file_earlier_margin
+  Instruction: %0 = load i64, i64* %m_target_physical_capacity, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:554:35 | Function: Log_files_capacity::next_file_earlier_margin
+  Instruction: %call = call i64 @_ZN18Log_files_capacity24next_file_earlier_marginEm(i64 %0), !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:554:10 | Function: Log_files_capacity::next_file_earlier_margin
+  Instruction: %10 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %cmp11 = icmp eq i64 %10, 0, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %11 = phi i1 [ false, %lor.rhs ], [ %cmp11, %land.rhs ], !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:0:0 | Function: Log_files_capacity::initialize
+  Instruction: %12 = phi i1 [ true, %do.body ], [ %11, %land.end ] | Location: :0:0 | Function: Log_files_capacity::initialize
+  Instruction: %conv = zext i1 %12 to i32, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %cmp12 = icmp eq i32 0, %conv, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %call13 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp12), !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %8 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %cmp9 = icmp ule i64 8388608, %8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: br i1 %cmp9, label %lor.end, label %lor.rhs, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc:175:3 | Function: Log_files_capacity::initialize
+  Instruction: %36 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4714:7 | Function: innodb_redo_log_capacity_init
+  Instruction: %rem112 = urem i64 %36, 1048576, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4714:7 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp113 = icmp eq i64 %rem112, 0, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4714:7 | Function: innodb_redo_log_capacity_init
+  Instruction: %conv114 = zext i1 %cmp113 to i32, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4714:7 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp115 = icmp eq i32 0, %conv114, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4714:7 | Function: innodb_redo_log_capacity_init
+  Instruction: %call117 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp115)
+          to label %invoke.cont116 unwind label %lpad, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4714:7 | Function: innodb_redo_log_capacity_init
+  Instruction: invoke void @_ZN2ib4warnC2IJRyEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured50, i32 13907, i64* dereferenceable(8) @srv_redo_log_capacity_used)
+          to label %invoke.cont51 unwind label %lpad, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4657:7 | Function: innodb_redo_log_capacity_init
+  Instruction: %13 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21839:12 | Function: innodb_redo_log_capacity_update
+  Instruction: %div = udiv i64 %13, 1048576, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21839:39 | Function: innodb_redo_log_capacity_update
+  Instruction: store i64 %div, i64* %ref.tmp, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21839:12 | Function: innodb_redo_log_capacity_update
+  Instruction: call void @_ZN2ib4infoC2IJyEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured, i32 13884, i64* dereferenceable(8) %ref.tmp), !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21838:3 | Function: innodb_redo_log_capacity_update
+  Instruction: store i64 %12, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21836:30 | Function: innodb_redo_log_capacity_update
+  Instruction: %42 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4726:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %rem157 = urem i64 %42, 1048576, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4726:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp158 = icmp eq i64 %rem157, 0, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4726:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %conv159 = zext i1 %cmp158 to i32, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4726:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp160 = icmp eq i32 0, %conv159, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4726:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %call162 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp160)
+          to label %invoke.cont161 unwind label %lpad, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4726:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %41 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4725:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp146 = icmp ule i64 %41, 549755813888, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4725:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %conv147 = zext i1 %cmp146 to i32, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4725:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp148 = icmp eq i32 0, %conv147, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4725:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %call150 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp148)
+          to label %invoke.cont149 unwind label %lpad, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4725:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %40 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255476 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4724:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp135 = icmp ule i64 8388608, %40, !dbg !1255476 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4724:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %conv136 = zext i1 %cmp135 to i32, !dbg !1255476 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4724:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %cmp137 = icmp eq i32 0, %conv136, !dbg !1255476 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4724:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %call139 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp137)
+          to label %invoke.cont138 unwind label %lpad, !dbg !1255476 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4724:3 | Function: innodb_redo_log_capacity_init
+  Instruction: %37 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255462 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4716:26 | Function: innodb_redo_log_capacity_init
+  Instruction: %div124 = udiv i64 %37, 1048576, !dbg !1255463 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4716:53 | Function: innodb_redo_log_capacity_init
+  Instruction: store i64 %div124, i64* %ref.tmp, align 8, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4716:16 | Function: innodb_redo_log_capacity_init
+  Instruction: invoke void @_ZN2ib4warnC2IJyEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured123, i32 13906, i64* dereferenceable(8) %ref.tmp)
+          to label %invoke.cont125 unwind label %lpad, !dbg !1255465 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4715:7 | Function: innodb_redo_log_capacity_init
+  Instruction: store i64 %35, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4711:34 | Function: innodb_redo_log_capacity_init
+  Instruction: %11 = load i64, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21832:20 | Function: innodb_redo_log_capacity_update
+  Instruction: %cmp21 = icmp eq i64 %10, %11, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21832:17 | Function: innodb_redo_log_capacity_update
+  Instruction: br i1 %cmp21, label %if.then22, label %if.end23, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21832:7 | Function: innodb_redo_log_capacity_update
+  Instruction: store i64 %6, i64* @srv_redo_log_capacity_used, align 8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4634:30 | Function: innodb_redo_log_capacity_init
+
+Implicit Data Flow (1):
+  Instruction: %12 = phi i1 [ true, %do.body ], [ %11, %land.end ] | Location: :0:0
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Log_files_capacity::hard_logical_capacity_for_physical
+  Controlled Function: ut_uint64_align_up
+  Controlled Function: Log_files_capacity::soft_logical_capacity_for_hard
+  Controlled Function: ib::error::error
+  Controlled Function: log_concurrency_margin
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Log_files_context::~Log_files_context
+  Controlled Function: ib::error::~error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Log_files_context::~Log_files_context
+  Controlled Function: Log_files_capacity::cancel_resize
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: log_files_oldest_needed_lsn
+  Controlled Function: Log_files_dict::begin
+  Controlled Function: Log_files_dict::end
+  Controlled Function: Log_files_dict::Const_iterator::operator!=
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Log_files_dict::Const_iterator::operator->
+  Controlled Function: Log_file::contains
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_files_recycle_file
+  Controlled Function: log_files_remove_consumed_file
+  Controlled Function: log_files_next_unused_id
+  Controlled Function: log_create_unused_file
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unsigned long const& std::max
+  Controlled Function: Log_files_capacity::is_target_reached_for_resizing_down
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Log_files_capacity::hard_logical_capacity_for_physical
+  Controlled Function: Log_files_capacity::update_exposed
+  Controlled Function: Log_files_capacity::update
+  Controlled Function: ib::info::info
+  Controlled Function: ib::info::~info
+  Controlled Function: std::atomic
+
+Implicit Control Flow:
+
+----------------------------------------

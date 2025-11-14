@@ -1,0 +1,24 @@
+Global Variable: srv_flush_sync
+Explicit Data Flow (6):
+  Instruction: %2 = load i8, i8* @srv_flush_sync, align 1, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:723:14 | Function: log_request_sync_flush
+  Instruction: %tobool4 = trunc i8 %2 to i1, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:723:14 | Function: log_request_sync_flush
+  Instruction: br i1 %tobool4, label %if.then5, label %if.else9, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:723:14 | Function: log_request_sync_flush
+  Instruction: %62 = load i8, i8* @srv_flush_sync, align 1, !dbg !1255555 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:3337:9 | Function: buf_flush_page_coordinator_thread
+  Instruction: %tobool152 = trunc i8 %62 to i1, !dbg !1255555 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:3337:9 | Function: buf_flush_page_coordinator_thread
+  Instruction: br i1 %tobool152, label %land.lhs.true153, label %if.else166, !dbg !1255557 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:3337:24 | Function: buf_flush_page_coordinator_thread
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: os_event_reset
+  Controlled Function: os_event_set
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: os_event_wait_time_low
+  Controlled Function: log_sync_flush_lsn
+  Controlled Function: mtr_t::Logging::is_enabled
+
+Implicit Control Flow:
+
+----------------------------------------

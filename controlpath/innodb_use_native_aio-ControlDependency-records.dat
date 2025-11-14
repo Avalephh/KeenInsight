@@ -1,0 +1,154 @@
+Global Variable: srv_use_native_aio
+Explicit Data Flow (50):
+  Instruction: %55 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:7160:9 | Function: os_aio_func
+  Instruction: %tobool80 = trunc i8 %55 to i1, !dbg !1255438 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:7160:9 | Function: os_aio_func
+  Instruction: br i1 %tobool80, label %if.then81, label %if.else83, !dbg !1255441 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:7160:9 | Function: os_aio_func
+  Instruction: %47 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:7143:9 | Function: os_aio_func
+  Instruction: %tobool70 = trunc i8 %47 to i1, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:7143:9 | Function: os_aio_func
+  Instruction: br i1 %tobool70, label %if.then71, label %if.else, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:7143:9 | Function: os_aio_func
+  Instruction: %0 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %lnot = xor i1 %tobool, true, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %conv = zext i1 %lnot to i32, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %cmp = icmp eq i32 0, %conv, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp), !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6887:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %0 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %lnot = xor i1 %tobool, true, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %conv = zext i1 %lnot to i32, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %cmp = icmp eq i32 0, %conv, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp), !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6873:3 | Function: AIO::wake_simulated_handler_thread
+  Instruction: %0 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255278 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6915:7 | Function: os_aio_simulated_wake_handler_threads
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255278 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6915:7 | Function: os_aio_simulated_wake_handler_threads
+  Instruction: br i1 %tobool, label %if.then, label %if.end, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6915:7 | Function: os_aio_simulated_wake_handler_threads
+  Instruction: %96 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255570 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6791:7 | Function: AIO::reserve_slot
+  Instruction: %tobool137 = trunc i8 %96 to i1, !dbg !1255570 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6791:7 | Function: AIO::reserve_slot
+  Instruction: br i1 %tobool137, label %land.lhs.true138, label %if.end176, !dbg !1255572 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6791:26 | Function: AIO::reserve_slot
+  Instruction: %76 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255510 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6762:7 | Function: AIO::reserve_slot
+  Instruction: %tobool108 = trunc i8 %76 to i1, !dbg !1255510 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6762:7 | Function: AIO::reserve_slot
+  Instruction: br i1 %tobool108, label %land.lhs.true, label %if.end136, !dbg !1255512 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6762:26 | Function: AIO::reserve_slot
+  Instruction: %73 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255501 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6758:8 | Function: AIO::reserve_slot
+  Instruction: %tobool104 = trunc i8 %73 to i1, !dbg !1255501 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6758:8 | Function: AIO::reserve_slot
+  Instruction: br i1 %tobool104, label %if.end107, label %if.then105, !dbg !1255503 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6758:7 | Function: AIO::reserve_slot
+  Instruction: %9 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6687:7 | Function: AIO::reserve_slot
+  Instruction: %tobool18 = trunc i8 %9 to i1, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6687:7 | Function: AIO::reserve_slot
+  Instruction: br i1 %tobool18, label %if.then19, label %if.else, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6687:7 | Function: AIO::reserve_slot
+  Instruction: %6 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6659:10 | Function: AIO::reserve_slot
+  Instruction: %tobool = trunc i8 %6 to i1, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6659:10 | Function: AIO::reserve_slot
+  Instruction: br i1 %tobool, label %if.end17, label %if.then16, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6659:9 | Function: AIO::reserve_slot
+  Instruction: %0 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6201:7 | Function: AIO::init
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6201:7 | Function: AIO::init
+  Instruction: br i1 %tobool, label %if.then3, label %if.end4, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6201:7 | Function: AIO::init
+  Instruction: %0 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6062:7 | Function: os_aio_handler
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6062:7 | Function: os_aio_handler
+  Instruction: br i1 %tobool, label %if.then, label %if.else, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:6062:7 | Function: os_aio_handler
+  Instruction: %37 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2801:11 | Function: os_file_get_last_error_low
+  Instruction: %tobool65 = trunc i8 %37 to i1, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2801:11 | Function: os_file_get_last_error_low
+  Instruction: br i1 %tobool65, label %if.then66, label %if.end67, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2801:11 | Function: os_file_get_last_error_low
+  Instruction: %36 = load i8, i8* @srv_use_native_aio, align 1, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2796:11 | Function: os_file_get_last_error_low
+  Instruction: %tobool61 = trunc i8 %36 to i1, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2796:11 | Function: os_file_get_last_error_low
+  Instruction: br i1 %tobool61, label %if.then62, label %if.end63, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc:2796:11 | Function: os_file_get_last_error_low
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: IORequest::is_wake
+  Controlled Function: AIO::get_segment_no_from_slot
+  Controlled Function: AIO::wake_simulated_handler_thread
+  Controlled Function: IORequest::is_wake
+  Controlled Function: AIO::get_segment_no_from_slot
+  Controlled Function: AIO::wake_simulated_handler_thread
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: AIO::slots_per_segment
+  Controlled Function: AIO::acquire
+  Controlled Function: AIO::at
+  Controlled Function: AIO::release
+  Controlled Function: AIO::release
+  Controlled Function: os_event_set
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: AIO::get_array_and_local_segment
+  Controlled Function: AIO::wake_simulated_handler_thread
+  Controlled Function: AIO::wake_simulated_handler_thread
+  Controlled Function: AIO::release
+  Controlled Function: IORequest::is_write
+  Controlled Function: IORequest::is_encrypted
+  Controlled Function: AIO::release
+  Controlled Function: IORequest::is_log
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: os_file_encrypt_page
+  Controlled Function: os_free_block
+  Controlled Function: AIO::acquire
+  Controlled Function: IORequest::is_write
+  Controlled Function: AIO::release
+  Controlled Function: IORequest::is_compressed
+  Controlled Function: IORequest::is_write
+  Controlled Function: IORequest::is_encrypted
+  Controlled Function: IORequest::is_log
+  Controlled Function: unlikely
+  Controlled Function: AIO::release
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: IORequest::is_log
+  Controlled Function: unlikely
+  Controlled Function: AIO::release
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: os_file_compress_page
+  Controlled Function: IORequest::punch_hole
+  Controlled Function: AIO::acquire
+  Controlled Function: os_file_encrypt_page
+  Controlled Function: os_free_block
+  Controlled Function: AIO::acquire
+  Controlled Function: auto AIO::reserve_slot
+  Controlled Function: std::__atomic_base
+  Controlled Function: std::vector
+  Controlled Function: unlikely
+  Controlled Function: AIO::at
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: std::__atomic_base
+  Controlled Function: auto AIO::reserve_slot
+  Controlled Function: std::__atomic_base
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: os_event_reset
+  Controlled Function: std::vector
+  Controlled Function: os_event_reset
+  Controlled Function: std::chrono::_V2::steady_clock::now
+  Controlled Function: IORequest::is_read
+  Controlled Function: IORequest::is_write
+  Controlled Function: IORequest::get_original_size
+  Controlled Function: unlikely
+  Controlled Function: IORequest::get_original_size
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: IORequest::set_original_size
+  Controlled Function: IORequest::set_original_size
+  Controlled Function: IORequest::is_write
+  Controlled Function: AIO::release
+  Controlled Function: IORequest::is_compressed
+  Controlled Function: IORequest::is_write
+  Controlled Function: IORequest::is_encrypted
+  Controlled Function: IORequest::is_log
+  Controlled Function: unlikely
+  Controlled Function: AIO::release
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: IORequest::is_log
+  Controlled Function: unlikely
+  Controlled Function: AIO::release
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: os_file_compress_page
+  Controlled Function: IORequest::punch_hole
+  Controlled Function: AIO::acquire
+  Controlled Function: os_file_encrypt_page
+  Controlled Function: os_free_block
+  Controlled Function: AIO::acquire
+  Controlled Function: os_aio_simulated_wake_handler_threads
+  Controlled Function: srv_set_io_thread_op_info
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: srv_set_io_thread_op_info
+  Controlled Function: os_aio_simulated_handler
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,23 @@
+Global Variable: System_variables.130
+Explicit Data Flow (11):
+  Instruction: %35 = load i32, i32* %select_into_disk_sync_delay, align 4, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:246:24 | Function: create_file
+  Instruction: %tobool32 = icmp ne i32 %35, 0, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:246:9 | Function: create_file
+  Instruction: br i1 %tobool32, label %if.then33, label %if.end36, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:246:9 | Function: create_file
+  Instruction: %37 = load i32, i32* %select_into_disk_sync_delay35, align 4, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:247:47 | Function: create_file
+  Instruction: store i32 %37, i32* %disk_sync_delay, align 4, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:247:30 | Function: create_file
+  Instruction: %disk_sync_delay = getelementptr inbounds %struct.IO_CACHE, %struct.IO_CACHE* %38, i32 0, i32 36, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:247:14 | Function: create_file
+  Instruction: %disk_sync_delay111 = getelementptr inbounds %struct.IO_CACHE, %struct.IO_CACHE* %86, i32 0, i32 36, !dbg !1255491 | Location: /root/LLVM/mysql-8.0.36/mysys/mf_iocache.cc:1490:51 | Function: my_b_flush_io_cache
+  Instruction: %87 = load i32, i32* %disk_sync_delay111, align 4, !dbg !1255491 | Location: /root/LLVM/mysql-8.0.36/mysys/mf_iocache.cc:1490:51 | Function: my_b_flush_io_cache
+  Instruction: %mul = mul i32 %87, 1000, !dbg !1255492 | Location: /root/LLVM/mysql-8.0.36/mysys/mf_iocache.cc:1490:67 | Function: my_b_flush_io_cache
+  Instruction: %conv = zext i32 %mul to i64, !dbg !1255490 | Location: /root/LLVM/mysql-8.0.36/mysys/mf_iocache.cc:1490:45 | Function: my_b_flush_io_cache
+  Instruction: invoke void @_Z8my_sleepl(i64 %conv)
+          to label %invoke.cont112 unwind label %lpad, !dbg !1255493 | Location: /root/LLVM/mysql-8.0.36/mysys/mf_iocache.cc:1490:36 | Function: my_b_flush_io_cache
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

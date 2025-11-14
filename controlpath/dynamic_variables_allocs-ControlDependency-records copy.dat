@@ -1,0 +1,42 @@
+Global Variable: System_variables.4
+Explicit Data Flow (25):
+  Instruction: %1 = load %struct.LIST*, %struct.LIST** %dynamic_variables_allocs, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:21 | Function: plugin_var_memalloc_free
+  Instruction: store %struct.LIST* %1, %struct.LIST** %root, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:13 | Function: plugin_var_memalloc_free
+  Instruction: %2 = load %struct.LIST*, %struct.LIST** %root, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:47 | Function: plugin_var_memalloc_free
+  Instruction: %tobool = icmp ne %struct.LIST* %2, null, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:47 | Function: plugin_var_memalloc_free
+  Instruction: br i1 %tobool, label %for.body, label %for.end, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:3 | Function: plugin_var_memalloc_free
+  Instruction: %3 = load %struct.LIST*, %struct.LIST** %root, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3178:12 | Function: plugin_var_memalloc_free
+  Instruction: %next1 = getelementptr inbounds %struct.LIST, %struct.LIST* %3, i32 0, i32 1, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3178:18 | Function: plugin_var_memalloc_free
+  Instruction: %4 = load %struct.LIST*, %struct.LIST** %next1, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3178:18 | Function: plugin_var_memalloc_free
+  Instruction: store %struct.LIST* %4, %struct.LIST** %next, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3178:10 | Function: plugin_var_memalloc_free
+  Instruction: %7 = load %struct.LIST*, %struct.LIST** %next, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:60 | Function: plugin_var_memalloc_free
+  Instruction: store %struct.LIST* %7, %struct.LIST** %root, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3177:58 | Function: plugin_var_memalloc_free
+  Instruction: %5 = load %struct.LIST*, %struct.LIST** %root, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3179:13 | Function: plugin_var_memalloc_free
+  Instruction: %6 = bitcast %struct.LIST* %5 to i8*, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3179:13 | Function: plugin_var_memalloc_free
+  Instruction: invoke void @_Z7my_freePv(i8* %6)
+          to label %invoke.cont unwind label %lpad, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3179:5 | Function: plugin_var_memalloc_free
+  Instruction: store %struct.LIST* null, %struct.LIST** %dynamic_variables_allocs2, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3181:34 | Function: plugin_var_memalloc_free
+  Instruction: %dynamic_variables_allocs2 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %11, i32 0, i32 4, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3181:9 | Function: plugin_var_memalloc_free
+  Instruction: %dynamic_variables_allocs23 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %38, i32 0, i32 4, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:147:11 | Function: plugin_var_memalloc_session_update
+  Instruction: store %struct.LIST* %call22, %struct.LIST** %dynamic_variables_allocs23, align 8, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:147:36 | Function: plugin_var_memalloc_session_update
+  Instruction: %dynamic_variables_allocs20 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %35, i32 0, i32 4, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:148:27 | Function: plugin_var_memalloc_session_update
+  Instruction: %16 = load %struct.LIST*, %struct.LIST** %dynamic_variables_allocs, align 8, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:136:24 | Function: plugin_var_memalloc_session_update
+  Instruction: %call7 = invoke %struct.LIST* @_Z8list_addP4LISTS0_(%struct.LIST* %16, %struct.LIST* %17)
+          to label %invoke.cont6 unwind label %lpad, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:136:9 | Function: plugin_var_memalloc_session_update
+  Instruction: store %struct.LIST* %call7, %struct.LIST** %dynamic_variables_allocs8, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:135:36 | Function: plugin_var_memalloc_session_update
+  Instruction: %dynamic_variables_allocs8 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %18, i32 0, i32 4, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:135:11 | Function: plugin_var_memalloc_session_update
+  Instruction: %36 = load %struct.LIST*, %struct.LIST** %dynamic_variables_allocs20, align 8, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:148:27 | Function: plugin_var_memalloc_session_update
+  Instruction: %call22 = invoke %struct.LIST* @_Z11list_deleteP4LISTS0_(%struct.LIST* %36, %struct.LIST* %37)
+          to label %invoke.cont21 unwind label %lpad, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin_var.cc:148:9 | Function: plugin_var_memalloc_session_update
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_free
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

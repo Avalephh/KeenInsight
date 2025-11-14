@@ -1,0 +1,42 @@
+Global Variable: temptable_max_ram
+Explicit Data Flow (12):
+  Instruction: %0 = load i64, i64* @temptable_max_ram, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:769:3 | Function: temptable::Handler::get_memory_buffer_size
+  Instruction: invoke void (i8*, ...) @_Z11_db_doprnt_PKcz(i8* getelementptr inbounds ([21 x i8], [21 x i8]* @.str.25.143294, i64 0, i64 0), %"class.temptable::Handler"* %this1, i64 %0)
+          to label %invoke.cont3 unwind label %lpad, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:769:3 | Function: temptable::Handler::get_memory_buffer_size
+  Instruction: %4 = load i64, i64* @temptable_max_ram, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:772:10 | Function: temptable::Handler::get_memory_buffer_size
+  Instruction: ret i64 %4, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:773:1 | Function: temptable::Handler::get_memory_buffer_size
+  Instruction: %0 = load i64, i64* @temptable_max_ram, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:74:40 | Function: temptable::MemoryMonitor::RAM::threshold
+  Instruction: ret i64 %0, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:74:33 | Function: temptable::MemoryMonitor::RAM::threshold
+  Instruction: %call1 = call i64 @_ZN9temptable13MemoryMonitor3RAM9thresholdEv(), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:217:45 | Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+  Instruction: %cmp = icmp ult i64 %call, %call1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:217:43 | Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+  Instruction: br i1 %cmp, label %if.then, label %if.end8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:217:9 | Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+  Instruction: %call3 = call i64 @_ZN9temptable13MemoryMonitor3RAM9thresholdEv(), !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:219:11 | Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+  Instruction: %cmp4 = icmp ule i64 %call2, %call3, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:218:52 | Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+  Instruction: br i1 %cmp4, label %if.then5, label %if.else, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/include/temptable/allocator.h:218:11 | Function: temptable::Prefer_RAM_over_MMAP_policy::block_source
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: temptable::MemoryMonitor::RAM::increase
+  Controlled Function: temptable::MemoryMonitor::RAM::threshold
+  Controlled Function: temptable::MemoryMonitor::MMAP::consumption
+  Controlled Function: temptable::MemoryMonitor::MMAP::threshold
+  Controlled Function: temptable::MemoryMonitor::RAM::decrease
+  Controlled Function: temptable::MemoryMonitor::MMAP::increase
+  Controlled Function: temptable::MemoryMonitor::MMAP::threshold
+  Controlled Function: __cxa_allocate_exception
+  Controlled Function: __cxa_throw
+  Controlled Function: temptable::MemoryMonitor::MMAP::decrease
+  Controlled Function: temptable::MemoryMonitor::RAM::decrease
+  Controlled Function: temptable::MemoryMonitor::MMAP::consumption
+  Controlled Function: temptable::MemoryMonitor::MMAP::threshold
+  Controlled Function: temptable::MemoryMonitor::MMAP::increase
+  Controlled Function: temptable::MemoryMonitor::MMAP::threshold
+  Controlled Function: __cxa_allocate_exception
+  Controlled Function: __cxa_throw
+  Controlled Function: temptable::MemoryMonitor::MMAP::decrease
+
+Implicit Control Flow:
+
+----------------------------------------

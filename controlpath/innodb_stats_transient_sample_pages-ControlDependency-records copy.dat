@@ -1,0 +1,47 @@
+Global Variable: srv_stats_transient_sample_pages
+Explicit Data Flow (8):
+  Instruction: %19 = load i64, i64* @srv_stats_transient_sample_pages, align 8, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5457:7 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: %cmp = icmp ugt i64 %19, %21, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5457:40 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: br i1 %cmp, label %if.then17, label %if.else23, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5457:7 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: %26 = load i64, i64* @srv_stats_transient_sample_pages, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5464:22 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: store i64 %26, i64* %n_sample_pages, align 8, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5464:20 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: %28 = load i64, i64* %n_sample_pages, align 8, !dbg !1255386 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5469:19 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: %cmp25 = icmp ult i64 %27, %28, !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5469:17 | Function: btr_estimate_number_of_different_key_vals
+  Instruction: br i1 %cmp25, label %for.body, label %for.end103, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/btr/btr0cur.cc:5469:3 | Function: btr_estimate_number_of_different_key_vals
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: mtr_t::start
+  Controlled Function: btr_cur_open_at_rnd_pos
+  Controlled Function: mtr_t::~mtr_t
+  Controlled Function: BTR_TABLE_STATS_FROM_SAMPLE
+  Controlled Function: mem_heap_free
+  Controlled Function: btr_cur_get_page
+  Controlled Function: mtr_t::commit
+  Controlled Function: page_get_infimum_rec
+  Controlled Function: mem_heap_free
+  Controlled Function: mtr_t::~mtr_t
+  Controlled Function: page_rec_get_next
+  Controlled Function: BTR_TABLE_STATS_FROM_SAMPLE
+  Controlled Function: page_rec_is_supremum
+  Controlled Function: rec_get_offsets
+  Controlled Function: page_rec_is_supremum
+  Controlled Function: btr_record_not_null_field_in_rec
+  Controlled Function: page_rec_get_next
+  Controlled Function: dict_index_get_n_unique_in_tree
+  Controlled Function: page_rec_is_supremum
+  Controlled Function: btr_page_get_prev
+  Controlled Function: mtr_t::commit
+  Controlled Function: lob::btr_rec_get_externally_stored_len
+  Controlled Function: rec_get_offsets
+  Controlled Function: page_is_spatial_non_leaf
+  Controlled Function: btr_page_get_next
+  Controlled Function: cmp_rec_rec_with_match
+  Controlled Function: btr_record_not_null_field_in_rec
+  Controlled Function: lob::btr_rec_get_externally_stored_len
+
+Implicit Control Flow:
+
+----------------------------------------

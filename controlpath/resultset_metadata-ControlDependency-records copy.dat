@@ -1,0 +1,42 @@
+Global Variable: System_variables.77
+Explicit Data Flow (14):
+  Instruction: %12 = load i64, i64* %resultset_metadata, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2828:21 | Function: THD::send_result_metadata
+  Instruction: switch i64 %12, label %sw.default [
+    i64 1, label %sw.bb
+    i64 0, label %sw.bb49
+  ], !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2828:3 | Function: THD::send_result_metadata
+  Instruction: %15 = load i64, i64* %resultset_metadata, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3097:50 | Function: Protocol_classic::start_result_metadata
+  Instruction: %conv19 = trunc i64 %15 to i8, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3097:33 | Function: Protocol_classic::start_result_metadata
+  Instruction: store i8 %conv19, i8* %16, align 1, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3097:12 | Function: Protocol_classic::start_result_metadata
+  Instruction: %24 = load i64, i64* %resultset_metadata35, align 8, !dbg !1255371 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3111:24 | Function: Protocol_classic::start_result_metadata
+  Instruction: %cmp = icmp eq i64 %24, 1, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3111:43 | Function: Protocol_classic::start_result_metadata
+  Instruction: br i1 %cmp, label %if.then36, label %if.else, !dbg !1255373 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3111:7 | Function: Protocol_classic::start_result_metadata
+  Instruction: %9 = load i64, i64* %resultset_metadata, align 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3052:52 | Function: Protocol_classic::store_ps_status
+  Instruction: %conv20 = trunc i64 %9 to i8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3052:35 | Function: Protocol_classic::store_ps_status
+  Instruction: store i8 %conv20, i8* %arrayidx21, align 1, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3052:14 | Function: Protocol_classic::store_ps_status
+  Instruction: %arrayidx21 = getelementptr inbounds [13 x i8], [13 x i8]* %buff, i64 0, i64 12, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/protocol_classic.cc:3052:5 | Function: Protocol_classic::store_ps_status
+  Instruction: %arrayidx80 = getelementptr inbounds [13 x i8], [13 x i8]* %password, i64 0, i64 12, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_initialize.cc:156:5 | Function: Compiled_in_command_iterator::begin
+  Instruction: store i8 0, i8* %arrayidx80, align 1, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_initialize.cc:156:41 | Function: Compiled_in_command_iterator::begin
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: VisibleFields
+  Controlled Function: String::~String
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: VisibleFieldsContainer
+  Controlled Function: String::~String
+  Controlled Function: VisibleFieldsContainer
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: VisibleFieldsAdapter
+  Controlled Function: VisibleFieldsAdapter
+  Controlled Function: my_error
+  Controlled Function: VisibleFieldsAdapter
+  Controlled Function: Query_arena::alloc
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,26 @@
+Global Variable: System_variables.132
+Explicit Data Flow (12):
+  Instruction: %20 = load i64, i64* %conn_mem_limit, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:180:55 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %call26 = call i32 @_ZN11Thd_mem_cnt14generate_errorEiyy(%class.Thd_mem_cnt* %this1, i32 4082, i64 %20, i64 %21), !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:180:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %24 = load i64, i64* %conn_mem_limit31, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:185:38 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %cmp32 = icmp ugt i64 %22, %24, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:185:19 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: br i1 %cmp32, label %if.then33, label %if.end44, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:185:7 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %27 = load i64, i64* %conn_mem_limit40, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:191:63 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %call42 = call i32 @_ZN11Thd_mem_cnt14generate_errorEiyy(%class.Thd_mem_cnt* %this1, i32 4082, i64 %27, i64 %28), !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:191:13 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %30 = load i64, i64* %conn_mem_limit, align 8, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:273:62 | Function: Thd_mem_cnt::reset
+  Instruction: %cmp27 = icmp ugt i64 %28, %30, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:273:43 | Function: Thd_mem_cnt::reset
+  Instruction: br i1 %cmp27, label %if.then28, label %if.end34, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:273:7 | Function: Thd_mem_cnt::reset
+  Instruction: %32 = load i64, i64* %conn_mem_limit31, align 8, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:274:62 | Function: Thd_mem_cnt::reset
+  Instruction: %call33 = call i32 @_ZN11Thd_mem_cnt14generate_errorEiyy(%class.Thd_mem_cnt* %this1, i32 4082, i64 %32, i64 %33), !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:274:12 | Function: Thd_mem_cnt::reset
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: _db_keyword_
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: Thd_mem_cnt::generate_error
+
+Implicit Control Flow:
+
+----------------------------------------

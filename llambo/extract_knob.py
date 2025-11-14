@@ -4,7 +4,7 @@ from DBTuner.utils.matchFunctions import match_knob_functions,read_function_name
 from DBTuner.utils.matchFunctions_shap import getShapFuncKnobs
 from DBTuner.utils.extractCode import extract_code_for_knob_from_json
 from DBTuner.utils.getRule import get_rules,group_rules_by_knob
-from DBTuner.utils.matchRule import searchRule,read_rules_from_file
+from DBTuner.utils.matchRule_revision import searchRule,read_rules_from_file
 import time
 from .simple_parameter_analyzer import SimpleParameterAnalyzer
 
@@ -283,7 +283,6 @@ Please don't recommend values that appear repeatedly.
         # 将总结添加到模板中
         # keyFunctions = replacements["keyFunction"]
         knobs_str = ", ".join(knobs)
-        # keyFunctions_str = ", ".join(keyFunctions)
         # TODO no knob
         template = template.replace("{variable}", knobs_str)
         # template = template.replace("{keyFunction}", keyFunctions_str)
@@ -409,17 +408,17 @@ Please don't recommend values that appear repeatedly.
         
         
         # shap
-        res_file_path = '/root/sysinsight-main/rule_collect_results_sysbench.json'
-        bkFunctions_list_shap, updateKnobs_shap = getShapFuncKnobs(staticFile,self.keyFunction_file, res_file_path)
-        print("ininin: ",updateKnobs_shap)
-        for item in updateKnobs_shap:
-            knob_name = item.get('knob_name')
-            if knob_name and knob_name not in updateKnobs_names:
-                updateKnobs_names.append(knob_name)
+        # res_file_path = '/root/sysinsight-main/rule_collect_results_tpcc.json'
+        # bkFunctions_list_shap, updateKnobs_shap = getShapFuncKnobs(staticFile,self.keyFunction_file, res_file_path)
+        # print("ininin: ",updateKnobs_shap)
+        # for item in updateKnobs_shap:
+        #     knob_name = item.get('knob_name')
+        #     if knob_name and knob_name not in updateKnobs_names:
+        #         updateKnobs_names.append(knob_name)
                 
-        bkFunctions_list += bkFunctions_list_shap
-        bkFunctions_list = list(set(bkFunctions_list))
-        print(bkFunctions_list)
+        # bkFunctions_list += bkFunctions_list_shap
+        # bkFunctions_list = list(set(bkFunctions_list))
+        # print(bkFunctions_list)
         
         self.store_bkFunctions_list = bkFunctions_list
         self.store_updateKnobs = updateKnobs
@@ -430,7 +429,7 @@ Please don't recommend values that appear repeatedly.
         # 检索要调整参数的规则列表
         # 规则库
         # rule_file = '/root/sysinsight-main/HisRule/gptuner_update_rule_tpch_runtime_144_0.1.txt'
-        rule_file = '/root/sysinsight-main/HisRule/gptuner_update_rule_sysbench_80.txt'
+        rule_file = '/root/sysinsight-main/HisRule/rule_mysql_tpcc_update_rule_revision.txt'
         defaultKnob_file = '/root/sysinsight-main/DBTuner/knobspace/gptuner_target_knobs.json'
         # ruleFunctionRaneg_file = '/root/RUC/DBTune/scripts/rule/function_range_tpch_gptuner.csv'
         
@@ -517,25 +516,23 @@ Please don't recommend values that appear repeatedly.
 
     def transfer_rule(self):
         # rule_file = '/root/sysinsight-main/HisRule/gptuner_update_rule_tpch_runtime_144_0.1.txt'
-        rule_file = '/root/sysinsight-main/HisRule/gptuner_update_rule_sysbench_80.txt'
+        rule_file = '/root/sysinsight-main/HisRule/rule_mysql_tpcc_update_rule_revision.txt'
         defaultKnob_file = '/root/sysinsight-main/DBTuner/knobspace/gptuner_target_knobs.json'
         # ruleFunctionRaneg_file = '/root/RUC/DBTune/scripts/rule/function_range_tpch_gptuner.csv'
         
         print("transfer_rule ing...")
-        # selected_rules=[]
-        # processed_selected_rules=[]
-        # globalRules = read_rules_from_file(rule_file)
-        # for rule in globalRules:
-        #     ajustKnobs, processed_rule = searchRule(defaultKnob_file,rule,self.config,self.keyFunction_file,ruleFunctionRaneg_file)
-        #     if ajustKnobs and processed_rule: 
-        #         selected_rules.append(rule)
-        #         # processed_selected_rules.append(processed_rule)
-        
-        # return selected_rules, globalRules, defaultKnob_file,rule_file
-        
+        memory_knobs = [
+            'tmp_table_size', 'max_heap_table_size', 'query_prealloc_size',
+            'sort_buffer_size', 'innodb_buffer_pool_size', 
+            'innodb_online_alter_log_max_size', 'join_buffer_size',
+            'table_open_cache', 'thread_cache_size', 
+            'range_optimizer_max_mem_size', 'stored_program_definition_cache',
+            'tablespace_definition_cache', 'temptable_max_ram',
+            'key_cache_block_size', 'max_relay_log_size'
+        ]
         globalRules = read_rules_from_file(rule_file)
         selected_rules = self.replacements.get("searchRule", [])
-        return selected_rules, globalRules, defaultKnob_file,rule_file
+        return selected_rules, globalRules, defaultKnob_file,rule_file,memory_knobs
         
         # 分组
         # selected_rules = self.replacements.get("searchRule", [])
@@ -560,6 +557,3 @@ if __name__ == "__main__":
     print(prompt)
     # 使用示例
     
-
-
-

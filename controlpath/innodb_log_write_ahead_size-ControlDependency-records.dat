@@ -1,0 +1,292 @@
+Global Variable: srv_log_write_ahead_size
+Explicit Data Flow (97):
+  Instruction: %43 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: %rem85 = urem i64 %add84, %43, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: %cmp86 = icmp eq i64 %rem85, 0, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: %conv87 = zext i1 %cmp86 to i32, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: %cmp88 = icmp eq i32 0, %conv87, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: %call89 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp88), !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: br i1 %call89, label %if.then90, label %if.end91, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1502:9 | Function: Log_files_write_impl::compute_how_much_to_write
+  Instruction: %25 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %add.ptr27 = getelementptr inbounds i8, i8* %24, i64 %25, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %cmp28 = icmp ule i8* %add.ptr26, %add.ptr27, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %conv29 = zext i1 %cmp28 to i32, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %cmp30 = icmp eq i32 0, %conv29, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %call31 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp30), !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: br i1 %call31, label %if.then32, label %if.end33, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1638:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %2 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1617:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %cmp = icmp ule i64 %1, %2, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1617:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1617:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1617:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1617:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1617:3 | Function: Log_files_write_impl::copy_to_write_ahead_buffer
+  Instruction: %7 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %rem = urem i64 %6, %7, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %cmp4 = icmp eq i64 %rem, 0, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %conv5 = zext i1 %cmp4 to i32, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %cmp6 = icmp eq i32 0, %conv5, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %call7 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp6), !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: br i1 %call7, label %if.then8, label %if.end9, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1407:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %3 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1404:34 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %add = add i64 %2, %3, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1404:32 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: store i64 %add, i64* %next_wa, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1404:14 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %4 = load i64, i64* %next_wa, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1406:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %cmp = icmp ugt i64 %4, %5, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1406:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1406:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1406:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %call2 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1406:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: br i1 %call2, label %if.then, label %if.end, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1406:3 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %1 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1402:41 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %call = call i64 @_ZL20ut_uint64_align_downmm.70650(i64 %0, i64 %1), !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1402:7 | Function: Log_files_write_impl::compute_next_write_ahead_end
+  Instruction: %13 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %rem31 = urem i64 %add30, %13, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %cmp32 = icmp eq i64 %rem31, 0, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %14 = phi i1 [ true, %do.body27 ], [ %cmp32, %lor.rhs ] | Location: :0:0 | Function: Log_files_write_impl::write_blocks
+  Instruction: %conv33 = zext i1 %14 to i32, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %cmp34 = icmp eq i32 0, %conv33, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %call35 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp34), !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: br i1 %call35, label %if.then36, label %if.end37, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1573:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %6 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %rem19 = urem i64 %5, %6, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %cmp20 = icmp eq i64 %rem19, 0, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %conv21 = zext i1 %cmp20 to i32, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %cmp22 = icmp eq i32 0, %conv21, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %call23 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp22), !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: br i1 %call23, label %if.then24, label %if.end25, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1571:3 | Function: Log_files_write_impl::write_blocks
+  Instruction: %6 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1713:35 | Function: Log_files_write_impl::update_current_write_ahead
+  Instruction: %call = call i64 @_ZL20ut_uint64_align_downmm.70650(i64 %5, i64 %6), !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1713:9 | Function: Log_files_write_impl::update_current_write_ahead
+  Instruction: %2 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1348:30 | Function: log_allocate_write_ahead_buffer
+  Instruction: %conv10 = trunc i64 %2 to i32, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1348:30 | Function: log_allocate_write_ahead_buffer
+  Instruction: store i32 %conv10, i32* %write_ahead_buf_size, align 64, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1348:28 | Function: log_allocate_write_ahead_buffer
+  Instruction: %write_ahead_buf_size = getelementptr inbounds %struct.log_t, %struct.log_t* %3, i32 0, i32 42, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1348:7 | Function: log_allocate_write_ahead_buffer
+  Instruction: %write_ahead_buf_size15 = getelementptr inbounds %struct.log_t, %struct.log_t* %6, i32 0, i32 42, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1350:51 | Function: log_allocate_write_ahead_buffer
+  Instruction: %7 = load i32, i32* %write_ahead_buf_size15, align 64, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1350:51 | Function: log_allocate_write_ahead_buffer
+  Instruction: %conv16 = zext i32 %7 to i64, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1350:47 | Function: log_allocate_write_ahead_buffer
+  Instruction: call void @_ZN2ut5CountC2Em(%union.anon.0* %agg.tmp14, i64 %conv16), !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1350:37 | Function: log_allocate_write_ahead_buffer
+  Instruction: %1 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1346:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %cmp3 = icmp ule i64 %1, 16384, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1346:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %conv4 = zext i1 %cmp3 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1346:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %cmp5 = icmp eq i32 0, %conv4, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1346:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %call6 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp5), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1346:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: br i1 %call6, label %if.then7, label %if.end8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1346:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %0 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1345:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %cmp = icmp uge i64 %0, 512, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1345:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1345:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1345:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %call = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1345:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1345:3 | Function: log_allocate_write_ahead_buffer
+  Instruction: %94 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255552 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4895:41 | Function: innodb_init_params
+  Instruction: %cmp234 = icmp ne i64 %93, %94, !dbg !1255553 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4895:38 | Function: innodb_init_params
+  Instruction: br i1 %cmp234, label %if.then235, label %if.end236, !dbg !1255554 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4895:9 | Function: innodb_init_params
+  Instruction: %91 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255542 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4892:43 | Function: innodb_init_params
+  Instruction: %cmp232 = icmp ult i64 %90, %91, !dbg !1255543 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4892:41 | Function: innodb_init_params
+  Instruction: br i1 %cmp232, label %while.body, label %while.end, !dbg !1255540 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4892:5 | Function: innodb_init_params
+  Instruction: %87 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255528 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4887:7 | Function: innodb_init_params
+  Instruction: %cmp229 = icmp ugt i64 %87, %88, !dbg !1255531 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4887:32 | Function: innodb_init_params
+  Instruction: br i1 %cmp229, label %if.then230, label %if.else231, !dbg !1255532 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4887:7 | Function: innodb_init_params
+  Instruction: %67 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255468 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4853:3 | Function: innodb_init_params
+  Instruction: %cmp168 = icmp ugt i64 %67, 0, !dbg !1255468 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4853:3 | Function: innodb_init_params
+  Instruction: %conv169 = zext i1 %cmp168 to i32, !dbg !1255468 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4853:3 | Function: innodb_init_params
+  Instruction: %cmp170 = icmp eq i32 0, %conv169, !dbg !1255468 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4853:3 | Function: innodb_init_params
+  Instruction: %call172 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp170)
+          to label %invoke.cont171 unwind label %lpad2, !dbg !1255468 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4853:3 | Function: innodb_init_params
+  Instruction: br i1 %call172, label %if.then173, label %if.end175, !dbg !1255471 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4853:3 | Function: innodb_init_params
+  Instruction: %66 = load i64, i64* @srv_log_write_ahead_size, align 8, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+  Instruction: %rem156 = urem i64 %66, 512, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+  Instruction: %cmp157 = icmp eq i64 %rem156, 0, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+  Instruction: %conv158 = zext i1 %cmp157 to i32, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+  Instruction: %cmp159 = icmp eq i32 0, %conv158, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+  Instruction: %call161 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp159)
+          to label %invoke.cont160 unwind label %lpad2, !dbg !1255461 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+  Instruction: br i1 %call161, label %if.then162, label %if.end164, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4852:3 | Function: innodb_init_params
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Log_data_block_header::set_lsn
+  Controlled Function: log_block_get_first_rec_group
+  Controlled Function: log_data_block_header_serialize
+  Controlled Function: log_block_store_checksum
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: void log_sync_point
+  Controlled Function: ut_uint64_align_down
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Log_data_block_header::set_lsn
+  Controlled Function: log_block_get_first_rec_group
+  Controlled Function: log_data_block_header_serialize
+  Controlled Function: log_block_store_checksum
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_data_blocks_write
+  Controlled Function: meb::redo_log_archive_produce
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: log_data_blocks_write
+  Controlled Function: meb::redo_log_archive_produce
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::Count::Count
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::Count::Count
+  Controlled Function: ut::aligned_array_pointer
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: unsigned long const& std::max
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innodb_log_checksums_func_update
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innobase_commit_concurrency_init_default
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::info::~info
+  Controlled Function: os_is_o_direct_supported
+  Controlled Function: unlikely
+  Controlled Function: strlen
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: page_size_t::page_size_t
+  Controlled Function: ib::warn::warn
+  Controlled Function: page_size_t::copy_from
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: Tablespace::set_space_id
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fsp_flags_init
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: fsp_flags_set_sdi
+  Controlled Function: ib::warn::~warn
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: fsp_flags_init
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: innodb_buffer_pool_size_init
+  Controlled Function: innodb_undo_tablespaces_deprecate
+  Controlled Function: innodb_redo_log_capacity_init
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: buf_pool_size_align
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: __assert_fail
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: unsigned long const& std::max
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innodb_log_checksums_func_update
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innobase_commit_concurrency_init_default
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::info::~info
+  Controlled Function: os_is_o_direct_supported
+  Controlled Function: unlikely
+  Controlled Function: strlen
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: page_size_t::page_size_t
+  Controlled Function: ib::warn::warn
+  Controlled Function: page_size_t::copy_from
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: Tablespace::set_space_id
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fsp_flags_init
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: fsp_flags_set_sdi
+  Controlled Function: ib::warn::~warn
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: fsp_flags_init
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: innodb_buffer_pool_size_init
+  Controlled Function: innodb_undo_tablespaces_deprecate
+  Controlled Function: innodb_redo_log_capacity_init
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: buf_pool_size_align
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,7 @@
+{
+  "param_name": "max_connections",
+  "function_name": "adjust_max_connections",
+  "analysis": "<需要提供函数>\n不需要，只需分析函数adjust_max_connections\n\n<思考过程>\n1. 参数通过控制关键函数对数据库性能的影响：\n    - max_connections通过限制服务器可以同时处理的客户端连接数量，影响adjust_max_connections，进而可能限制或优化服务器资源使用\n    - 机制：如果requested_open_files低于一定值，max_connections的限制可能会被动态调整为更低的值。这种机制确保了服务器不会过度分配文件资源，也就是说，当系统资源不足以支持高数目的连接时，max_connections会减少。\n    - 数据库性能影响：调整max_connections可能会限制并发连接数，从而降低数据库在高负载下的资源消耗和潜在的性能问题，如连接争用。但可能也导致峰值负载下的可用性降低\n\n<火焰图采样分析与调优方向>\n2. 基于 adjust_max_connections执行状态和相关函数片段给出max_connections优化建议：\n    - 不涉及到其他函数。在本例中，只需关注 adjust_max_connections 的行为\n    - 根据adjust_max_connections和系统的表现火焰图采样，如果 max_connections 被频繁调整或限制值过低，并导致性能瓶颈，可以考虑调优其他系统参数（如open_files_limit），从而提升max_connections的可接受值。推荐根据需要适当提高max_connections，但需小心监控系统资源使用情况，以防止资源耗尽导致性能崩溃。",
+  "code_snippets": "static void adjust_max_connections(ulong requested_open_files) {\n  ulong limit;\n\n  limit = requested_open_files - 10 - TABLE_OPEN_CACHE_MIN * 2;\n\n  if (limit < max_connections) {\n    LogErr(WARNING_LEVEL, ER_CHANGED_MAX_CONNECTIONS, limit, max_connections);\n\n    // This can be done unprotected since it is only called on startup.\n    max_connections = limit;\n  }\n}",
+  "timestamp": "2025-07-18T12:01:13.315147"
+}

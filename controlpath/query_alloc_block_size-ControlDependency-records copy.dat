@@ -1,0 +1,18 @@
+Global Variable: System_variables.56
+Explicit Data Flow (6):
+  Instruction: %3 = load i64, i64* %query_alloc_block_size, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1131:38 | Function: THD::init_query_mem_roots
+  Instruction: call void @_ZN8MEM_ROOT14set_block_sizeEm(%struct.MEM_ROOT* %2, i64 %3), !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1131:13 | Function: THD::init_query_mem_roots
+  Instruction: %8 = load i64, i64* %query_alloc_block_size, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:2300:37 | Function: Prepared_statement::Prepared_statement
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %m_mem_root2, i32 %6, i64 %8)
+          to label %invoke.cont unwind label %lpad, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:2299:7 | Function: Prepared_statement::Prepared_statement
+  Instruction: %7 = load i64, i64* %query_alloc_block_size, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3931:50 | Function: fix_thd_mem_root
+  Instruction: call void @_ZN8MEM_ROOT14set_block_sizeEm(%struct.MEM_ROOT* %5, i64 %7), !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3931:20 | Function: fix_thd_mem_root
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

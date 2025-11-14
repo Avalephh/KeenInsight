@@ -1,0 +1,15 @@
+Global Variable: srv_log_wait_for_flush_spin_hwm
+Explicit Data Flow (4):
+  Instruction: %18 = load i64, i64* @srv_log_wait_for_flush_spin_hwm, align 8, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:896:29 | Function: log_wait_for_flush
+  Instruction: %conv = uitofp i64 %18 to double, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:896:29 | Function: log_wait_for_flush
+  Instruction: %cmp2 = fcmp oge double %17, %conv, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:896:26 | Function: log_wait_for_flush
+  Instruction: br i1 %cmp2, label %if.then3, label %if.end4, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:896:7 | Function: log_wait_for_flush
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

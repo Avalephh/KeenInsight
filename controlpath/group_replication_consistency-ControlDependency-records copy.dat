@@ -1,0 +1,17 @@
+Global Variable: System_variables.117
+Explicit Data Flow (6):
+  Instruction: %17 = load i64, i64* %group_replication_consistency, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:574:22 | Function: Trans_delegate::before_commit
+  Instruction: store i64 %17, i64* %group_replication_consistency23, align 8, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:573:39 | Function: Trans_delegate::before_commit
+  Instruction: %group_replication_consistency23 = getelementptr inbounds %struct.Trans_param, %struct.Trans_param* %param, i32 0, i32 16, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:573:9 | Function: Trans_delegate::before_commit
+  Instruction: %group_replication_consistency3 = getelementptr inbounds %struct.Trans_param, %struct.Trans_param* %param, i32 0, i32 16, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:863:9 | Function: Trans_delegate::trans_begin
+  Instruction: store i64 %4, i64* %group_replication_consistency3, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:863:39 | Function: Trans_delegate::trans_begin
+  Instruction: %4 = load i64, i64* %group_replication_consistency, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:864:22 | Function: Trans_delegate::trans_begin
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,130 @@
+Global Variable: table_cache_size
+Explicit Data Flow (52):
+  Instruction: %14 = load i64, i64* @table_cache_size, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:7375:46 | Function: mysqld_main
+  Instruction: store i64 %14, i64* getelementptr inbounds (%struct.PFS_global_param, %struct.PFS_global_param* @pfs_param, i32 0, i32 62, i32 1), align 8, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:7375:44 | Function: mysqld_main
+  Instruction: %0 = load i64, i64* @table_cache_size, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8817:36 | Function: adjust_table_def_size
+  Instruction: %div = udiv i64 %0, 2, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8817:53 | Function: adjust_table_def_size
+  Instruction: %add = add i64 400, %div, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8817:34 | Function: adjust_table_def_size
+  Instruction: store i64 %add, i64* %ref.tmp, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8817:30 | Function: adjust_table_def_size
+  Instruction: %call = call dereferenceable(8) i64* @_ZSt3minImERKT_S2_S2_(i64* dereferenceable(8) %ref.tmp, i64* dereferenceable(8) %ref.tmp1), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8817:19 | Function: adjust_table_def_size
+  Instruction: %4 = load i64, i64* @table_cache_size, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8804:15 | Function: adjust_table_cache_size
+  Instruction: %cmp = icmp ult i64 %3, %4, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8804:13 | Function: adjust_table_cache_size
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8804:7 | Function: adjust_table_cache_size
+  Instruction: %6 = load i64, i64* @table_cache_size, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8805:5 | Function: adjust_table_cache_size
+  Instruction: %call17 = invoke dereferenceable(32) %class.LogEvent* (%class.LogEvent*, i64, ...) @_ZN8LogEvent6lookupExz(%class.LogEvent* %call15, i64 10142, i64 %5, i64 %6)
+          to label %invoke.cont16 unwind label %lpad, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8805:5 | Function: adjust_table_cache_size
+  Instruction: %11 = load i64, i64* @table_cache_size, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8810:35 | Function: adjust_table_cache_size
+  Instruction: %div18 = udiv i64 %11, %12, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8810:52 | Function: adjust_table_cache_size
+  Instruction: store i64 %div18, i64* @table_cache_size_per_instance, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8810:33 | Function: adjust_table_cache_size
+  Instruction: %1 = load i64, i64* @table_cache_size_per_instance, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:320:23 | Function: Table_cache::free_unused_tables_if_necessary
+  Instruction: %cmp = icmp ugt i64 %conv, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:320:21 | Function: Table_cache::free_unused_tables_if_necessary
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:320:53 | Function: Table_cache::free_unused_tables_if_necessary
+  Instruction: %4 = load i64, i64* @table_cache_size_per_instance, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:322:28 | Function: Table_cache::free_unused_tables_if_necessary
+  Instruction: %cmp4 = icmp ugt i64 %conv3, %4, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:322:26 | Function: Table_cache::free_unused_tables_if_necessary
+  Instruction: br i1 %cmp4, label %land.rhs, label %land.end, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:322:58 | Function: Table_cache::free_unused_tables_if_necessary
+  Instruction: store i64 %div, i64* @table_cache_size_per_instance, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5105:33 | Function: fix_table_cache_size
+  Instruction: %1 = load i64, i64* @table_cache_size, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:36 | Function: adjust_open_files_limit
+  Instruction: %mul = mul i64 %1, 2, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:53 | Function: adjust_open_files_limit
+  Instruction: %add1 = add i64 %add, %mul, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:34 | Function: adjust_open_files_limit
+  Instruction: store i64 %add1, i64* %limit_1, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8750:11 | Function: adjust_open_files_limit
+  Instruction: %call = call dereferenceable(8) i64* @_ZSt3maxImERKT_S2_S2_(i64* dereferenceable(8) %limit_1, i64* dereferenceable(8) %limit_2), !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:8762:35 | Function: adjust_open_files_limit
+  Instruction: %3 = load i64, i64* @table_cache_size, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5105:35 | Function: fix_table_cache_size
+  Instruction: %div = udiv i64 %3, %4, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:5105:52 | Function: fix_table_cache_size
+  Instruction: %103 = load i64, i64* @table_cache_size, align 8, !dbg !1255583 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4914:31 | Function: innodb_init_params
+  Instruction: %cmp248 = icmp ugt i64 %103, 300, !dbg !1255584 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4914:48 | Function: innodb_init_params
+  Instruction: br i1 %cmp248, label %if.then249, label %if.end250, !dbg !1255585 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4914:9 | Function: innodb_init_params
+  Instruction: %104 = load i64, i64* @table_cache_size, align 8, !dbg !1255586 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4915:29 | Function: innodb_init_params
+  Instruction: store i64 %104, i64* @_ZL19innobase_open_files, align 8, !dbg !1255588 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4915:27 | Function: innodb_init_params
+  Instruction: %105 = load i64, i64* @_ZL19innobase_open_files, align 8, !dbg !1255591 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4919:7 | Function: innodb_init_params
+  Instruction: %cmp252 = icmp sgt i64 %105, %106, !dbg !1255594 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4919:27 | Function: innodb_init_params
+  Instruction: br i1 %cmp252, label %if.then253, label %if.end263, !dbg !1255595 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4919:7 | Function: innodb_init_params
+  Instruction: %108 = load i64, i64* @_ZL19innobase_open_files, align 8, !dbg !1255599 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4922:9 | Function: innodb_init_params
+  Instruction: %cmp260 = icmp sgt i64 %108, %109, !dbg !1255602 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4922:29 | Function: innodb_init_params
+  Instruction: br i1 %cmp260, label %if.then261, label %if.end262, !dbg !1255603 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4922:9 | Function: innodb_init_params
+  Instruction: store i64 %110, i64* @_ZL19innobase_open_files, align 8, !dbg !1255606 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4923:27 | Function: innodb_init_params
+  Instruction: %0 = load i64, i64* @_ZL19innobase_open_files, align 8, !dbg !1255278 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5075:47 | Function: innobase_get_open_files_limit
+  Instruction: ret i64 %0, !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5075:40 | Function: innobase_get_open_files_limit
+  Instruction: %call64 = invoke i64 @_Z29innobase_get_open_files_limitv()
+          to label %invoke.cont63 unwind label %lpad, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:1664:12 | Function: srv_start
+  Instruction: invoke void @_Z8fil_initm(i64 %call64)
+          to label %invoke.cont65 unwind label %lpad, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:1664:3 | Function: srv_start
+  Instruction: store i64 %0, i64* @_ZL19innobase_open_files, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5077:23 | Function: innobase_set_open_files_limit
+  Instruction: %101 = load i64, i64* @_ZL19innobase_open_files, align 8, !dbg !1255574 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4912:7 | Function: innodb_init_params
+  Instruction: %cmp245 = icmp slt i64 %101, 10, !dbg !1255576 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4912:27 | Function: innodb_init_params
+  Instruction: br i1 %cmp245, label %if.then246, label %if.end251, !dbg !1255577 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4912:7 | Function: innodb_init_params
+  Instruction: store i64 300, i64* @_ZL19innobase_open_files, align 8, !dbg !1255578 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4913:25 | Function: innodb_init_params
+  Instruction: %109 = load i64, i64* @table_cache_size, align 8, !dbg !1255601 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4922:37 | Function: innodb_init_params
+  Instruction: %110 = load i64, i64* @table_cache_size, align 8, !dbg !1255604 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4923:29 | Function: innodb_init_params
+
+Implicit Data Flow (1):
+  Instruction: %6 = phi i1 [ false, %while.cond ], [ %tobool6, %land.rhs ], !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/table_cache.h:0:0
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: inline_mysql_mutex_lock
+  Controlled Function: Table_cache::remove_table
+  Controlled Function: intern_close_table
+  Controlled Function: inline_mysql_mutex_unlock
+  Controlled Function: Table_cache::remove_table
+  Controlled Function: intern_close_table
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: innobase_commit_concurrency_init_default
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::info::~info
+  Controlled Function: os_is_o_direct_supported
+  Controlled Function: unlikely
+  Controlled Function: strlen
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: page_size_t::page_size_t
+  Controlled Function: ib::warn::warn
+  Controlled Function: page_size_t::copy_from
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: Tablespace::set_space_id
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fsp_flags_init
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: fsp_flags_set_sdi
+  Controlled Function: ib::warn::~warn
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: fsp_flags_init
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: innodb_buffer_pool_size_init
+  Controlled Function: innodb_undo_tablespaces_deprecate
+  Controlled Function: innodb_redo_log_capacity_init
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: buf_pool_size_align
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+
+Implicit Control Flow:
+
+----------------------------------------

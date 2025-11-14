@@ -1,0 +1,108 @@
+Global Variable: srv_flush_log_at_trx_commit
+Explicit Data Flow (21):
+  Instruction: %29 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:2566:9 | Function: log_flusher
+  Instruction: %cmp20 = icmp ne i64 %29, 1, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:2566:37 | Function: log_flusher
+  Instruction: br i1 %cmp20, label %if.then21, label %if.end76, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:2566:9 | Function: log_flusher
+  Instruction: %1 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1592:9 | Function: notify_about_advanced_write_lsn
+  Instruction: %cmp = icmp eq i64 %1, 1, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1592:37 | Function: notify_about_advanced_write_lsn
+  Instruction: br i1 %cmp, label %if.then1, label %if.end, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1592:9 | Function: notify_about_advanced_write_lsn
+  Instruction: %54 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255433 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1155:9 | Function: log_write_up_to
+  Instruction: %cmp68 = icmp ne i64 %54, 1, !dbg !1255434 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1155:37 | Function: log_write_up_to
+  Instruction: br i1 %cmp68, label %if.then69, label %if.end78, !dbg !1255435 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1155:9 | Function: log_write_up_to
+  Instruction: %16 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5668:28 | Function: innobase_flush_logs
+  Instruction: %cmp11 = icmp eq i64 %16, 1, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5668:56 | Function: innobase_flush_logs
+  Instruction: %17 = phi i1 [ true, %if.end9 ], [ %cmp11, %lor.rhs ] | Location: :0:0 | Function: innobase_flush_logs
+  Instruction: invoke void @_Z24log_buffer_flush_to_diskb(i1 zeroext %17)
+          to label %invoke.cont12 unwind label %lpad, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5667:3 | Function: innobase_flush_logs
+  Instruction: %5 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5645:29 | Function: innobase_flush_logs
+  Instruction: %cmp2 = icmp eq i64 %5, 0, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5645:57 | Function: innobase_flush_logs
+  Instruction: br i1 %cmp2, label %if.then3, label %if.end4, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:5645:7 | Function: innobase_flush_logs
+  Instruction: %60 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255496 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:2077:17 | Function: trx_commit_in_memory
+  Instruction: %cmp150 = icmp eq i64 %60, 0, !dbg !1255498 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:2077:45 | Function: trx_commit_in_memory
+  Instruction: br i1 %cmp150, label %land.lhs.true, label %lor.lhs.false151, !dbg !1255499 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:2077:50 | Function: trx_commit_in_memory
+  Instruction: %1 = load i64, i64* @srv_flush_log_at_trx_commit, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1760:11 | Function: trx_flush_log_if_needed_low
+  Instruction: switch i64 %1, label %sw.epilog [
+    i64 2, label %sw.bb
+    i64 1, label %sw.bb1
+    i64 0, label %sw.bb4
+  ], !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1760:3 | Function: trx_flush_log_if_needed_low
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: std::chrono::_V2::system_clock::now
+  Controlled Function: Wait_stats Log_thread_waiting::wait
+  Controlled Function: bool std::chrono::operator>=
+  Controlled Function: unlikely
+  Controlled Function: monitor_inc_value
+  Controlled Function: monitor_inc_value
+  Controlled Function: monitor_inc_value
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: bool std::chrono::operator
+  Controlled Function: std::common_type
+  Controlled Function: _ZNSt6chrono13duration_castINS_8durationIlSt5ratioILl1ELl1000EEEElS2_ILl1ELl1000000000EEEENSt9enable_ifIXsr13__is_durationIT_EE5valueES7_E4typeERKNS1_IT0_T1_EE
+  Controlled Function: std::atomic
+  Controlled Function: std::chrono::duration
+  Controlled Function: bool std::chrono::operator>=
+  Controlled Function: unlikely
+  Controlled Function: log_writer_is_active
+  Controlled Function: std::atomic
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: PolicyMutex
+  Controlled Function: os_event_wait
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: get_srv_flush_log_at_timeout
+  Controlled Function: bool std::chrono::operator
+  Controlled Function: std::operator&
+  Controlled Function: PolicyMutex
+  Controlled Function: std::atomic
+  Controlled Function: __clang_call_terminate
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: std::common_type
+  Controlled Function: std::chrono::duration
+  Controlled Function: os_event_wait_time_low
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: log_flush_low
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: PolicyMutex
+  Controlled Function: os_event_set
+  Controlled Function: std::operator&
+  Controlled Function: log_wait_for_flush
+  Controlled Function: Wait_stats::operator+=
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::atomic
+  Controlled Function: log_self_write_up_to
+  Controlled Function: Wait_stats::operator+=
+  Controlled Function: log_wait_for_write
+  Controlled Function: Wait_stats::operator+=
+  Controlled Function: std::operator&
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: __clang_call_terminate
+  Controlled Function: log_wait_for_write
+  Controlled Function: Wait_stats::operator+=
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Clone_Sys::get_gtid_persistor
+  Controlled Function: log_buffer_flush_to_disk
+  Controlled Function: std::function
+  Controlled Function: Clone_persist_gtid::wait_flush
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: thd_requested_durability
+  Controlled Function: trx_flush_log_if_needed
+  Controlled Function: log_write_up_to
+  Controlled Function: monitor_inc_value
+  Controlled Function: monitor_inc_value
+  Controlled Function: monitor_inc_value
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,35 @@
+Global Variable: System_variables.18
+Explicit Data Flow (24):
+  Instruction: %4 = load i64, i64* %select_limit4, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:2451:35 | Function: Query_block::get_limit
+  Instruction: store i64 %4, i64* %retval, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:2451:5 | Function: Query_block::get_limit
+  Instruction: %5 = load i64, i64* %retval, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:2454:1 | Function: Query_block::get_limit
+  Instruction: ret i64 %5, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:2454:1 | Function: Query_block::get_limit
+  Instruction: %call2 = call i64 @_ZNK11Query_block9get_limitEPK3THD(%class.Query_block.13356* %2, %class.THD.13569* %3), !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:3747:32 | Function: Query_expression::set_limit
+  Instruction: store i64 %call2, i64* %select_limit_cnt, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:3747:20 | Function: Query_expression::set_limit
+  Instruction: %select_limit_cnt = getelementptr inbounds %class.Query_expression.13361, %class.Query_expression.13361* %this1, i32 0, i32 16, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:3747:3 | Function: Query_expression::set_limit
+  Instruction: %select_limit_cnt9 = getelementptr inbounds %class.Query_expression.13361, %class.Query_expression.13361* %this1, i32 0, i32 16, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:3752:5 | Function: Query_expression::set_limit
+  Instruction: %3 = load i64, i64* %select_limit, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:431:45 | Function: sp_compile
+  Instruction: store i64 %3, i64* %old_select_limit, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:431:11 | Function: sp_compile
+  Instruction: %18 = load i64, i64* %old_select_limit, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:443:35 | Function: sp_compile
+  Instruction: store i64 %18, i64* %select_limit16, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:443:33 | Function: sp_compile
+  Instruction: %select_limit16 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables15, i32 0, i32 18, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:443:20 | Function: sp_compile
+  Instruction: %select_limit35 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables34, i32 0, i32 18, !dbg !1255399 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:237:18 | Function: Sql_cmd_call::execute_inner
+  Instruction: store i64 %35, i64* %select_limit35, align 8, !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:237:31 | Function: Sql_cmd_call::execute_inner
+  Instruction: %select_limit32 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables31, i32 0, i32 18, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:226:18 | Function: Sql_cmd_call::execute_inner
+  Instruction: store i64 -1, i64* %select_limit6, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:439:31 | Function: sp_compile
+  Instruction: %select_limit6 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables5, i32 0, i32 18, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:439:18 | Function: sp_compile
+  Instruction: store i64 %53, i64* %select_limit39, align 8, !dbg !1255415 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:466:31 | Function: sp_compile
+  Instruction: %select_limit39 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables38, i32 0, i32 18, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:466:18 | Function: sp_compile
+  Instruction: %30 = load i64, i64* %select_limit30, align 8, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:225:41 | Function: Sql_cmd_call::execute_inner
+  Instruction: store i64 %30, i64* %select_limit, align 8, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:225:11 | Function: Sql_cmd_call::execute_inner
+  Instruction: %35 = load i64, i64* %select_limit, align 8, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:237:33 | Function: Sql_cmd_call::execute_inner
+  Instruction: store i64 -1, i64* %select_limit32, align 8, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/sql_call.cc:226:31 | Function: Sql_cmd_call::execute_inner
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

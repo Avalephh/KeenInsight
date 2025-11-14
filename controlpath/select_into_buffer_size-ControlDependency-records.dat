@@ -1,0 +1,13 @@
+Global Variable: System_variables.128
+Explicit Data Flow (2):
+  Instruction: %27 = load i64, i64* %select_into_buffer_size, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:237:49 | Function: create_file
+  Instruction: %call22 = call i32 @_Z13init_io_cacheP8IO_CACHEim10cache_typeybi(%struct.IO_CACHE* %24, i32 %25, i64 %27, i32 2, i64 0, i1 zeroext true, i32 16), !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/query_result.cc:237:7 | Function: create_file
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

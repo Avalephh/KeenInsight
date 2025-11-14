@@ -1,0 +1,58 @@
+Global Variable: System_variables.135
+Explicit Data Flow (7):
+  Instruction: %1 = load i8, i8* %xa_detach_on_prepare, align 1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:4770:25 | Function: is_xa_tran_detached_on_prepare
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:4770:25 | Function: is_xa_tran_detached_on_prepare
+  Instruction: ret i1 %tobool, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:4770:3 | Function: is_xa_tran_detached_on_prepare
+  Instruction: %call31 = invoke zeroext i1 @_Z30is_xa_tran_detached_on_preparePK3THD(%class.THD* %25)
+          to label %invoke.cont30 unwind label %lpad, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:7360:7 | Function: open_temporary_table
+  Instruction: br i1 %call31, label %land.lhs.true32, label %if.end41, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:7360:43 | Function: open_temporary_table
+  Instruction: %call2 = invoke zeroext i1 @_Z30is_xa_tran_detached_on_preparePK3THD(%class.THD* %1)
+          to label %invoke.cont1 unwind label %lpad, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/xa.cc:560:8 | Function: applier_reset_xa_trans
+  Instruction: br i1 %call2, label %if.end23, label %if.then, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/xa.cc:560:7 | Function: applier_reset_xa_trans
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: THD::get_transaction
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: XID_STATE::check_in_xa
+  Controlled Function: __assert_fail
+  Controlled Function: Table_ref::set_updatable
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: _db_pargs_
+  Controlled Function: Table_ref::set_insertable
+  Controlled Function: _db_enabled_
+  Controlled Function: TABLE::reset
+  Controlled Function: TABLE::init
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: my_error
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: attach_native_trx
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: Transaction_ctx::set_ha_trx_info
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MDL_context_backup_manager::instance
+  Controlled Function: Transaction_ctx::set_no_2pc
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: Transaction_ctx::cleanup
+  Controlled Function: xid_t::key
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: xid_t::key_length
+  Controlled Function: THD::is_error
+  Controlled Function: MDL_context_backup_manager::create_backup
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Transaction_ctx::reset_unsafe_rollback_flags
+  Controlled Function: xa::Transaction_cache::detach
+  Controlled Function: XID_STATE::reset
+
+Implicit Control Flow:
+
+----------------------------------------

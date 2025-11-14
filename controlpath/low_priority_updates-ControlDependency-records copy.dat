@@ -1,0 +1,41 @@
+Global Variable: System_variables.80
+Explicit Data Flow (27):
+  Instruction: %10 = load i8, i8* %low_priority_updates, align 1, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:2631:29 | Function: open_table_get_mdl_lock
+  Instruction: %tobool8 = trunc i8 %10 to i1, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:2631:29 | Function: open_table_get_mdl_lock
+  Instruction: br i1 %tobool8, label %land.lhs.true, label %if.end, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:2631:50 | Function: open_table_get_mdl_lock
+  Instruction: %8 = load i8, i8* %low_priority_updates, align 1, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1083:18 | Function: THD::init
+  Instruction: %tobool15 = trunc i8 %8 to i1, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1083:18 | Function: THD::init
+  Instruction: %9 = zext i1 %tobool15 to i64, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1083:8 | Function: THD::init
+  Instruction: %cond = select i1 %tobool15, i32 10, i32 11, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1083:8 | Function: THD::init
+  Instruction: store i32 %cond, i32* %update_lock_default, align 8, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1082:23 | Function: THD::init
+  Instruction: %update_lock_default = getelementptr inbounds %class.THD, %class.THD* %this1, i32 0, i32 74, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1082:3 | Function: THD::init
+  Instruction: %update_lock_default = getelementptr inbounds %class.THD, %class.THD* %5, i32 0, i32 74, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2845:10 | Function: fix_low_prio_updates
+  Instruction: store i32 %cond, i32* %update_lock_default, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2845:30 | Function: fix_low_prio_updates
+  Instruction: %10 = load i8, i8* %low_priority_updates17, align 1, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1085:18 | Function: THD::init
+  Instruction: %tobool18 = trunc i8 %10 to i1, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1085:18 | Function: THD::init
+  Instruction: %11 = zext i1 %tobool18 to i64, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1085:8 | Function: THD::init
+  Instruction: %cond19 = select i1 %tobool18, i32 10, i32 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1085:8 | Function: THD::init
+  Instruction: store i32 %cond19, i32* %insert_lock_default, align 4, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1084:23 | Function: THD::init
+  Instruction: %insert_lock_default = getelementptr inbounds %class.THD, %class.THD* %this1, i32 0, i32 75, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1084:3 | Function: THD::init
+  Instruction: %insert_lock_default = getelementptr inbounds %class.THD, %class.THD* %9, i32 0, i32 75, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2848:10 | Function: fix_low_prio_updates
+  Instruction: store i32 %cond4, i32* %insert_lock_default, align 4, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2848:30 | Function: fix_low_prio_updates
+  Instruction: %3 = load i8, i8* %low_priority_updates, align 1, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2846:25 | Function: fix_low_prio_updates
+  Instruction: %tobool = trunc i8 %3 to i1, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2846:25 | Function: fix_low_prio_updates
+  Instruction: %4 = zext i1 %tobool to i64, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2846:10 | Function: fix_low_prio_updates
+  Instruction: %cond = select i1 %tobool, i32 10, i32 11, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2846:10 | Function: fix_low_prio_updates
+  Instruction: %7 = load i8, i8* %low_priority_updates2, align 1, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2849:25 | Function: fix_low_prio_updates
+  Instruction: %tobool3 = trunc i8 %7 to i1, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2849:25 | Function: fix_low_prio_updates
+  Instruction: %8 = zext i1 %tobool3 to i64, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2849:10 | Function: fix_low_prio_updates
+  Instruction: %cond4 = select i1 %tobool3, i32 10, i32 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2849:10 | Function: fix_low_prio_updates
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Table_ref::lock_descriptor
+  Controlled Function: MDL_request::init_by_key_with_source
+  Controlled Function: Table_ref::lock_descriptor
+
+Implicit Control Flow:
+
+----------------------------------------

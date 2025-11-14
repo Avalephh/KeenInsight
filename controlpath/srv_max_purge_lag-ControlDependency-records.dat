@@ -1,0 +1,67 @@
+Global Variable: srv_max_purge_lag
+Explicit Data Flow (43):
+  Instruction: %18 = load i64, i64* @srv_max_purge_lag, align 8, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2919:54 | Function: srv_do_purge
+  Instruction: %cmp17 = icmp ugt i64 %17, %18, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2919:52 | Function: srv_do_purge
+  Instruction: br i1 %cmp17, label %if.then18, label %if.else, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2918:9 | Function: srv_do_purge
+  Instruction: %16 = load i64, i64* @srv_max_purge_lag, align 8, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2919:10 | Function: srv_do_purge
+  Instruction: %cmp16 = icmp ugt i64 %16, 0, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2919:28 | Function: srv_do_purge
+  Instruction: br i1 %cmp16, label %land.lhs.true, label %if.else, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2919:32 | Function: srv_do_purge
+  Instruction: %10 = load i64, i64* @srv_max_purge_lag, align 8, !dbg !1255541 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2189:7 | Function: Purge_groups_t::distribute_if_needed
+  Instruction: %cmp = icmp ugt i64 %10, 0, !dbg !1255543 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2189:25 | Function: Purge_groups_t::distribute_if_needed
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end, !dbg !1255544 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2189:29 | Function: Purge_groups_t::distribute_if_needed
+  Instruction: %12 = load i64, i64* @srv_max_purge_lag, align 8, !dbg !1255546 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2189:51 | Function: Purge_groups_t::distribute_if_needed
+  Instruction: %cmp3 = icmp ugt i64 %11, %12, !dbg !1255547 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2189:49 | Function: Purge_groups_t::distribute_if_needed
+  Instruction: br i1 %cmp3, label %if.then, label %if.end, !dbg !1255548 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2189:7 | Function: Purge_groups_t::distribute_if_needed
+  Instruction: %0 = load i64, i64* @srv_max_purge_lag, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2326:7 | Function: trx_purge_dml_delay
+  Instruction: %cmp = icmp ugt i64 %0, 0, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2326:25 | Function: trx_purge_dml_delay
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end14, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2326:29 | Function: trx_purge_dml_delay
+  Instruction: %23 = load i64, i64* @srv_max_purge_lag, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2330:55 | Function: trx_purge_dml_delay
+  Instruction: %conv4 = uitofp i64 %23 to float, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2330:55 | Function: trx_purge_dml_delay
+  Instruction: %div = fdiv float %conv, %conv4, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2330:53 | Function: trx_purge_dml_delay
+  Instruction: store float %div, float* %ratio, align 4, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2330:11 | Function: trx_purge_dml_delay
+  Instruction: %24 = load float, float* %ratio, align 4, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2332:9 | Function: trx_purge_dml_delay
+  Instruction: %conv5 = fpext float %24 to double, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2332:9 | Function: trx_purge_dml_delay
+  Instruction: %cmp6 = fcmp ogt double %conv5, 1.000000e+00, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2332:15 | Function: trx_purge_dml_delay
+  Instruction: br i1 %cmp6, label %if.then7, label %if.end, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2332:9 | Function: trx_purge_dml_delay
+  Instruction: %25 = load float, float* %ratio, align 4, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2335:24 | Function: trx_purge_dml_delay
+  Instruction: %conv8 = fpext float %25 to double, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2335:24 | Function: trx_purge_dml_delay
+  Instruction: %sub = fsub double %conv8, 9.995000e-01, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2335:30 | Function: trx_purge_dml_delay
+  Instruction: %mul9 = fmul double %sub, 1.000000e+04, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2335:40 | Function: trx_purge_dml_delay
+  Instruction: %conv10 = fptoui double %mul9 to i64, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2335:22 | Function: trx_purge_dml_delay
+  Instruction: store i64 %conv10, i64* %delay, align 8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2335:13 | Function: trx_purge_dml_delay
+  Instruction: %26 = load i64, i64* %delay, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2338:9 | Function: trx_purge_dml_delay
+  Instruction: %cmp11 = icmp ugt i64 %26, %27, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2338:15 | Function: trx_purge_dml_delay
+  Instruction: br i1 %cmp11, label %if.then12, label %if.end13, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2338:9 | Function: trx_purge_dml_delay
+  Instruction: store i64 %28, i64* %delay, align 8, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2339:13 | Function: trx_purge_dml_delay
+  Instruction: %29 = load i64, i64* %delay, align 8, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2342:5 | Function: trx_purge_dml_delay
+  Instruction: call void @_Z11monitor_set12monitor_id_tlbb(i32 176, i64 %29, i1 zeroext true, i1 zeroext true), !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2342:5 | Function: trx_purge_dml_delay
+  Instruction: %30 = load i64, i64* %delay, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2345:11 | Function: trx_purge_dml_delay
+  Instruction: ret i64 %30, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2345:3 | Function: trx_purge_dml_delay
+  Instruction: %call2 = call i64 @_ZL19trx_purge_dml_delayv(), !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2402:26 | Function: trx_purge
+  Instruction: store i64 %call2, i64* @srv_dml_needed_delay, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2402:24 | Function: trx_purge
+  Instruction: call void @_ZNSt6chrono8durationIlSt5ratioILl1ELl1000000EEEC2ImvEERKT_(%union.anon.0* %ref.tmp, i64* dereferenceable(8) @srv_dml_needed_delay), !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0mysql.cc:142:9 | Function: row_mysql_delay_if_needed
+  Instruction: %0 = load i64, i64* @srv_dml_needed_delay, align 8, !dbg !1255278 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0mysql.cc:140:7 | Function: row_mysql_delay_if_needed
+  Instruction: %tobool = icmp ne i64 %0, 0, !dbg !1255278 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0mysql.cc:140:7 | Function: row_mysql_delay_if_needed
+  Instruction: br i1 %tobool, label %if.then, label %if.end, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0mysql.cc:140:7 | Function: row_mysql_delay_if_needed
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: srv_check_activity
+  Controlled Function: srv_get_activity_count
+  Controlled Function: srv_check_activity
+  Controlled Function: srv_get_activity_count
+  Controlled Function: Purge_groups_t::distribute
+  Controlled Function: Purge_groups_t::distribute
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: monitor_set
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+
+Implicit Control Flow:
+
+----------------------------------------

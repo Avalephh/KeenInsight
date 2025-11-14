@@ -1,0 +1,23 @@
+Global Variable: connect_timeout
+Explicit Data Flow (9):
+  Instruction: %5 = load i64, i64* @connect_timeout, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:702:49 | Function: login_connection
+  Instruction: invoke void %7(%class.Protocol_classic* %call6, i64 %5, i1 zeroext true)
+          to label %invoke.cont7 unwind label %lpad, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:702:32 | Function: login_connection
+  Instruction: %9 = load i64, i64* @connect_timeout, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:703:50 | Function: login_connection
+  Instruction: invoke void %11(%class.Protocol_classic* %call9, i64 %9)
+          to label %invoke.cont12 unwind label %lpad, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:703:32 | Function: login_connection
+  Instruction: %52 = load i64, i64* @connect_timeout, align 8, !dbg !1255404 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:394:36 | Function: mysql_clone_connect
+  Instruction: %conv68 = trunc i64 %52 to i32, !dbg !1255404 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:394:36 | Function: mysql_clone_connect
+  Instruction: store i32 %conv68, i32* %timeout, align 4, !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:394:8 | Function: mysql_clone_connect
+  Instruction: %54 = bitcast i32* %timeout to i8*, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:396:17 | Function: mysql_clone_connect
+  Instruction: %call70 = invoke i32 @mysql_options(%struct.MYSQL* %53, i32 0, i8* %54)
+          to label %invoke.cont69 unwind label %lpad, !dbg !1255407 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:395:3 | Function: mysql_clone_connect
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

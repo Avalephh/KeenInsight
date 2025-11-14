@@ -1,0 +1,43 @@
+Global Variable: max_binlog_cache_size
+Explicit Data Flow (14):
+  Instruction: %call271 = invoke dereferenceable(8) i64* @_ZSt3maxIyERKT_S2_S2_(i64* dereferenceable(8) @max_binlog_cache_size, i64* dereferenceable(8) @max_binlog_stmt_cache_size)
+          to label %invoke.cont270 unwind label %lpad, !dbg !1255580 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:2795:9 | Function: MYSQL_BIN_LOG::rollback
+  Instruction: %5 = load i64, i64* @max_binlog_cache_size, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1194:46 | Function: binlog_cache_mngr::init
+  Instruction: %call2 = call zeroext i1 @_ZN17binlog_cache_data4openEyy(%class.binlog_cache_data* %3, i64 %4, i64 %5), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1194:22 | Function: binlog_cache_mngr::init
+  Instruction: %call303 = invoke dereferenceable(8) i64* @_ZSt3maxIyERKT_S2_S2_(i64* dereferenceable(8) @max_binlog_cache_size, i64* dereferenceable(8) @max_binlog_stmt_cache_size)
+          to label %invoke.cont302 unwind label %lpad49, !dbg !1255628 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:8343:9 | Function: MYSQL_BIN_LOG::commit
+  Instruction: %1 = load i64, i64* @max_binlog_cache_size, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1289:27 | Function: check_binlog_cache_size
+  Instruction: %cmp = icmp ugt i64 %0, %1, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1289:25 | Function: check_binlog_cache_size
+  Instruction: br i1 %cmp, label %if.then, label %if.end23, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1289:7 | Function: check_binlog_cache_size
+  Instruction: %6 = load i64, i64* @max_binlog_cache_size, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1294:44 | Function: check_binlog_cache_size
+  Instruction: call void (%class.THD*, i32, i32, i8*, ...) @_Z19push_warning_printfP3THDN13Sql_condition19enum_severity_levelEjPKcz(%class.THD* %3, i32 1, i32 1738, i8* %call, i64 %5, i64 %6), !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1291:7 | Function: check_binlog_cache_size
+  Instruction: %8 = load i64, i64* @max_binlog_cache_size, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1296:7 | Function: check_binlog_cache_size
+  Instruction: %call22 = invoke dereferenceable(32) %class.LogEvent* (%class.LogEvent*, i64, ...) @_ZN8LogEvent6lookupExz(%class.LogEvent* %call20, i64 10903, i64 %7, i64 %8)
+          to label %invoke.cont21 unwind label %lpad, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1296:7 | Function: check_binlog_cache_size
+  Instruction: %12 = load i64, i64* @max_binlog_cache_size, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1299:44 | Function: check_binlog_cache_size
+  Instruction: store i64 %12, i64* @binlog_cache_size, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1299:23 | Function: check_binlog_cache_size
+  Instruction: %4 = load i64, i64* @binlog_cache_size, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1194:27 | Function: binlog_cache_mngr::init
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: basename_prefix_find
+  Controlled Function: basename_prefix_eval
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+
+Implicit Control Flow:
+
+----------------------------------------

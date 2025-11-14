@@ -1,0 +1,7 @@
+{
+  "param_name": "max_connections",
+  "function_name": "adjust_max_connections",
+  "analysis": "<需要提供函数>\n不需要提供其他函数的具体实现，现有的函数片段足够分析。\n\n<思考过程>\n1. 参数通过控制关键函数对数据库性能的影响：\n    - max_connections 通过设置限制影响 adjust_max_connections，进而产生数据库性能影响。\n    - 机制：在启动时，adjust_max_connections根据 requested_open_files 设置 max_connections 的上限。如果 requested_open_files 的值减去一定的固定值和最小表缓存值后得到的 limit 小于 max_connections，则会将 max_connections 限制为 limit。这确保了在启动时由于打开文件限制导致的连接数超出系统承载能力的问题。\n    - 数据库性能影响：如果 max_connections 被调整为低于实际需求的连接数上限，可能导致新连接被拒绝，影响并发能力。但如果 max_connections 设置过高，又可能因为系统资源限制而导致性能瓶颈或故障。\n\n<火焰图采样分析与调优方向>\n2. 基于 adjust_max_connections 执行状态和相关函数片段给出 max_connections 优化建议：\n    - 是否涉及其他函数：目前 adjust_max_connections 的火焰图采样应足以提供所需信息，因为该函数专注于设置连接上限，关键在于它的调用与文件限制相关，与其他函数的直接关联较少。\n    - 推荐方向：可以监控 adjust_max_connections 的调用频率，与 requested_open_files，以及当前 max_connections 的使用情况做比较。在系统资源允许的前提下，若该函数经常调整 max_connections 限制以减少连接，建议适度提高 max_connections 设置，以提高数据库的并发处理能力。但这需要结合具体系统资源监控数据，以防止超过系统资源能力。",
+  "code_snippets": "static void adjust_max_connections(ulong requested_open_files) {\n  ulong limit;\n\n  limit = requested_open_files - 10 - TABLE_OPEN_CACHE_MIN * 2;\n\n  if (limit < max_connections) {\n    LogErr(WARNING_LEVEL, ER_CHANGED_MAX_CONNECTIONS, limit, max_connections);\n\n    // This can be done unprotected since it is only called on startup.\n    max_connections = limit;\n  }\n}",
+  "timestamp": "2025-07-28T04:24:10.764451"
+}

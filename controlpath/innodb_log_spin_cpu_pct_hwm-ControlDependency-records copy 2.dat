@@ -1,0 +1,13 @@
+Global Variable: srv_log_spin_cpu_pct_hwm
+Explicit Data Flow (2):
+  Instruction: %1 = load i32, i32* @srv_log_spin_cpu_pct_hwm, align 4, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:812:24 | Function: log_max_spins_when_waiting_in_user_thread
+  Instruction: store i32 %1, i32* %hwm, align 4, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:812:18 | Function: log_max_spins_when_waiting_in_user_thread
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

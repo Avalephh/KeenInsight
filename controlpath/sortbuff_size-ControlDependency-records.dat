@@ -1,0 +1,23 @@
+Global Variable: System_variables.51
+Explicit Data Flow (10):
+  Instruction: %151 = load i64, i64* %sortbuff_size, align 8, !dbg !1255653 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:1191:24 | Function: get_best_disjunct_quick
+  Instruction: %call191 = invoke double @_ZN6Unique12get_use_costEjjyPK16Cost_model_table(i32 %conv188, i32 %149, i64 %151, %class.Cost_model_table* %152)
+          to label %invoke.cont190 unwind label %lpad22, !dbg !1255655 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc:1189:37 | Function: get_best_disjunct_quick
+  Instruction: %1 = load i64, i64* %sortbuff_size, align 8, !dbg !1255505 | Location: /root/LLVM/mysql-8.0.36/sql/filesort.cc:371:43 | Function: filesort
+  Instruction: store i64 %1, i64* %memory_available, align 8, !dbg !1255502 | Location: /root/LLVM/mysql-8.0.36/sql/filesort.cc:371:9 | Function: filesort
+  Instruction: %68 = load i64, i64* %sortbuff_size, align 8, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:1652:45 | Function: 
+  Instruction: %call54 = invoke double bitcast (double (i32, i32, i64, %class.Cost_model_table*)* @_ZN6Unique12get_use_costEjjyPK16Cost_model_table to double (i32, i32, i64, %class.Cost_model_table.78667*)*)(i32 %conv48, i32 %66, i64 %68, %class.Cost_model_table.78667* %call52)
+          to label %invoke.cont53 unwind label %lpad, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:1651:7 | Function: 
+  Instruction: %9 = load i64, i64* %sortbuff_size, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_merge.cc:117:46 | Function: IndexMergeIterator::Init
+  Instruction: store i64 %9, i64* %sort_buffer_size, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_merge.cc:117:10 | Function: IndexMergeIterator::Init
+  Instruction: store i64 256, i64* %sort_buffer_size, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_merge.cc:119:69 | Function: IndexMergeIterator::Init
+  Instruction: call void @_Z24make_unique_destroy_onlyI6UniqueJRFiPKvS2_S2_ERP7handlerRjRmEESt10unique_ptrIT_12Destroy_onlyISB_EEP8MEM_ROOTDpOT0_(%"class.std::unique_ptr.678"* sret %tempfile, %struct.MEM_ROOT* %27, i32 (i8*, i8*, i8*)* @refpos_order_cmp, %class.handler.112524** dereferenceable(8) %file30, i32* dereferenceable(4) %ref_length, i64* dereferenceable(8) %sortbuff_size), !dbg !1255551 | Location: /root/LLVM/mysql-8.0.36/sql/sql_delete.cc:1028:23 | Function: DeleteRowsIterator::Init
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

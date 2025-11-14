@@ -1,0 +1,67 @@
+Global Variable: System_variables.110
+Explicit Data Flow (3):
+  Instruction: %649 = load i8, i8* %show_create_table_verbosity, align 8, !dbg !1256545 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2493:24 | Function: store_create_info
+  Instruction: %tobool956 = trunc i8 %649 to i1, !dbg !1256545 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2493:24 | Function: store_create_info
+  Instruction: br i1 %tobool956, label %if.then957, label %if.else965, !dbg !1256546 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2493:9 | Function: store_create_info
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: String::append
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: Scope_guard
+  Controlled Function: String::append
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: longlong10_to_str
+  Controlled Function: String::append
+  Controlled Function: should_print_encryption_clause
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: String::~String
+  Controlled Function: Scope_guard
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: String::~String
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: String::append
+  Controlled Function: TABLE_SHARE::has_secondary_engine
+  Controlled Function: append_unescaped
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: String::append
+  Controlled Function: append_directory
+  Controlled Function: String::append
+  Controlled Function: append_unescaped
+  Controlled Function: append_directory
+  Controlled Function: String::append
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: TABLE_SHARE::db_type
+  Controlled Function: String::String
+  Controlled Function: partition_info::set_show_version_string
+  Controlled Function: String::c_ptr
+  Controlled Function: String::~String
+  Controlled Function: generate_partition_syntax
+  Controlled Function: String::append
+  Controlled Function: String::~String
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: my_free
+
+Implicit Control Flow:
+
+----------------------------------------

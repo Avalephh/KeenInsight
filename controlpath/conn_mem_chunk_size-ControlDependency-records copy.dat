@@ -1,0 +1,92 @@
+Global Variable: System_variables.133
+Explicit Data Flow (58):
+  Instruction: %36 = load i64, i64* %conn_mem_chunk_size, align 8, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:199:42 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %div = udiv i64 %34, %36, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:199:23 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %add57 = add i64 %div, 1, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:199:62 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %mul = mul i64 %add57, %38, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:199:67 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: store i64 %mul, i64* %curr_mem, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:198:21 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %39 = load i64, i64* %curr_mem, align 8, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:201:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %cmp62 = icmp ugt i64 %39, %40, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:201:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: br i1 %cmp62, label %land.rhs63, label %land.end66, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:201:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %41 = load i64, i64* %curr_mem, align 8, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:201:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %cmp65 = icmp ugt i64 %41, %42, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:201:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %43 = phi i1 [ false, %if.then53 ], [ %cmp65, %land.rhs63 ], !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:0:0 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: br i1 %43, label %cond.true67, label %cond.false68, !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:201:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %45 = load i64, i64* %curr_mem, align 8, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:202:23 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %sub = sub i64 %45, %46, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:202:32 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: store i64 %sub, i64* %delta, align 8, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:202:15 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %47 = load i64, i64* %delta, align 8, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:207:34 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %add71 = add i64 %48, %47, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:207:31 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: store i64 %add71, i64* @global_conn_mem_counter, align 8, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:207:31 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %4 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:9497:35 | Function: show_global_mem_counter
+  Instruction: store i64 %4, i64* %6, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/mysqld.cc:9497:23 | Function: show_global_mem_counter
+  Instruction: %1 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:287:5 | Function: Thd_mem_cnt::flush
+  Instruction: %cmp3 = icmp uge i64 %1, %2, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:287:5 | Function: Thd_mem_cnt::flush
+  Instruction: br i1 %cmp3, label %cond.true, label %cond.false, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:287:5 | Function: Thd_mem_cnt::flush
+  Instruction: %5 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:288:29 | Function: Thd_mem_cnt::flush
+  Instruction: %sub = sub i64 %5, %4, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:288:29 | Function: Thd_mem_cnt::flush
+  Instruction: store i64 %sub, i64* @global_conn_mem_counter, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:288:29 | Function: Thd_mem_cnt::flush
+  Instruction: %48 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:207:31 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %49 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:208:38 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: store i64 %49, i64* %global_conn_mem_counter_save, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:208:36 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %53 = load i64, i64* %global_conn_mem_counter_save, align 8, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:213:9 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %cmp77 = icmp ugt i64 %53, %54, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:213:38 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: br i1 %cmp77, label %if.then78, label %if.end86, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:213:9 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %8 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:256:7 | Function: Thd_mem_cnt::reset
+  Instruction: %cmp7 = icmp uge i64 %8, %9, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:256:7 | Function: Thd_mem_cnt::reset
+  Instruction: br i1 %cmp7, label %cond.true, label %cond.false, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:256:7 | Function: Thd_mem_cnt::reset
+  Instruction: %12 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:257:31 | Function: Thd_mem_cnt::reset
+  Instruction: %sub8 = sub i64 %12, %11, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:257:31 | Function: Thd_mem_cnt::reset
+  Instruction: store i64 %sub8, i64* @global_conn_mem_counter, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:257:31 | Function: Thd_mem_cnt::reset
+  Instruction: %13 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:258:38 | Function: Thd_mem_cnt::reset
+  Instruction: store i64 %13, i64* %global_conn_mem_counter_save, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:258:36 | Function: Thd_mem_cnt::reset
+  Instruction: %23 = load i64, i64* %global_conn_mem_counter_save, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:269:10 | Function: Thd_mem_cnt::reset
+  Instruction: %cmp17 = icmp ugt i64 %23, %24, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:269:39 | Function: Thd_mem_cnt::reset
+  Instruction: br i1 %cmp17, label %if.then18, label %if.end19, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:268:9 | Function: Thd_mem_cnt::reset
+  Instruction: %26 = load i64, i64* %global_conn_mem_counter_save, align 8, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:271:29 | Function: Thd_mem_cnt::reset
+  Instruction: %call = call i32 @_ZN11Thd_mem_cnt14generate_errorEiyy(%class.Thd_mem_cnt* %this1, i32 4081, i64 %25, i64 %26), !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:270:14 | Function: Thd_mem_cnt::reset
+  Instruction: %18 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:263:31 | Function: Thd_mem_cnt::reset
+  Instruction: %add = add i64 %18, %17, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:263:31 | Function: Thd_mem_cnt::reset
+  Instruction: store i64 %add, i64* @global_conn_mem_counter, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:263:31 | Function: Thd_mem_cnt::reset
+  Instruction: %19 = load i64, i64* @global_conn_mem_counter, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:264:38 | Function: Thd_mem_cnt::reset
+  Instruction: store i64 %19, i64* %global_conn_mem_counter_save, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:264:36 | Function: Thd_mem_cnt::reset
+  Instruction: %51 = load i64, i64* %curr_mem, align 8, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:211:24 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: store i64 %51, i64* %glob_mem_counter72, align 8, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:211:22 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %glob_mem_counter72 = getelementptr inbounds %class.Thd_mem_cnt, %class.Thd_mem_cnt* %this1, i32 0, i32 6, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:211:5 | Function: Thd_mem_cnt::alloc_cnt
+  Instruction: %glob_mem_counter = getelementptr inbounds %class.Thd_mem_cnt, %class.Thd_mem_cnt* %this1, i32 0, i32 6, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:253:13 | Function: Thd_mem_cnt::Thd_mem_cnt
+  Instruction: store i64 0, i64* %glob_mem_counter, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:253:13 | Function: Thd_mem_cnt::Thd_mem_cnt
+  Instruction: %glob_mem_counter14 = getelementptr inbounds %class.Thd_mem_cnt, %class.Thd_mem_cnt* %this1, i32 0, i32 6, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:267:5 | Function: Thd_mem_cnt::reset
+  Instruction: store i64 %21, i64* %glob_mem_counter14, align 8, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:267:22 | Function: Thd_mem_cnt::reset
+  Instruction: %38 = load i64, i64* %conn_mem_chunk_size60, align 8, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:200:26 | Function: Thd_mem_cnt::alloc_cnt
+
+Implicit Data Flow (1):
+  Instruction: %43 = phi i1 [ false, %if.then53 ], [ %cmp65, %land.rhs63 ], !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:0:0Thd_mem_cnt::alloc_cnt
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: unsigned long long const& std::max
+  Controlled Function: _db_keyword_
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: __assert_fail
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: unsigned long long const& std::max
+  Controlled Function: _db_keyword_
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: __assert_fail
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: _db_keyword_
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: __assert_fail
+  Controlled Function: Generic_mutex_lock
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: Thd_mem_cnt::generate_error
+  Controlled Function: Thd_mem_cnt::generate_error
+
+Implicit Control Flow:
+
+----------------------------------------

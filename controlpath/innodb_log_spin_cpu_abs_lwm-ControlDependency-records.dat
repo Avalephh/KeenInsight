@@ -1,0 +1,47 @@
+Global Variable: srv_log_spin_cpu_abs_lwm
+Explicit Data Flow (20):
+  Instruction: %5 = load i32, i32* @srv_log_spin_cpu_abs_lwm, align 4, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %conv = uitofp i32 %5 to double, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %cmp = fcmp olt double %4, %conv, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:33 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: br i1 %cmp, label %if.then, label %lor.lhs.false, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:60 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %5 = load i32, i32* @srv_log_spin_cpu_abs_lwm, align 4, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %conv = uitofp i32 %5 to double, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %cmp = fcmp olt double %4, %conv, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:33 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: br i1 %cmp, label %if.then, label %lor.lhs.false, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:60 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %5 = load i32, i32* @srv_log_spin_cpu_abs_lwm, align 4, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %conv = uitofp i32 %5 to double, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %cmp = fcmp olt double %4, %conv, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:33 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: br i1 %cmp, label %if.then, label %lor.lhs.false, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:60 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %5 = load i32, i32* @srv_log_spin_cpu_abs_lwm, align 4, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %conv = uitofp i32 %5 to double, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:35 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %cmp = fcmp olt double %4, %conv, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:33 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: br i1 %cmp, label %if.then, label %lor.lhs.false, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:1240:60 | Function: Wait_stats Log_thread_waiting::wait
+  Instruction: %3 = load i32, i32* @srv_log_spin_cpu_abs_lwm, align 4, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:814:33 | Function: log_max_spins_when_waiting_in_user_thread
+  Instruction: %conv = uitofp i32 %3 to double, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:814:33 | Function: log_max_spins_when_waiting_in_user_thread
+  Instruction: %cmp = fcmp olt double %2, %conv, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:814:31 | Function: log_max_spins_when_waiting_in_user_thread
+  Instruction: br i1 %cmp, label %if.then, label %lor.lhs.false, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc:814:58 | Function: log_max_spins_when_waiting_in_user_thread
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: log_write_to_file_requests_are_frequent
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: log_write_to_file_requests_are_frequent
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: log_write_to_file_requests_are_frequent
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: std::chrono::duration
+  Controlled Function: log_write_to_file_requests_are_frequent
+
+Implicit Control Flow:
+
+----------------------------------------

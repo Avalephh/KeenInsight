@@ -1,0 +1,17 @@
+Global Variable: System_variables.54
+Explicit Data Flow (6):
+  Instruction: %1 = load i64, i64* %max_seeks_for_key, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:145:55 | Function: find_cost_for_ref
+  Instruction: %conv = uitofp i64 %1 to double, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:145:40 | Function: find_cost_for_ref
+  Instruction: store double %conv, double* %ref.tmp, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:145:33 | Function: find_cost_for_ref
+  Instruction: %call = call dereferenceable(8) double* @_ZSt3minIdERKT_S2_S2_(double* dereferenceable(8) %num_rows.addr, double* dereferenceable(8) %ref.tmp), !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:145:14 | Function: find_cost_for_ref
+  Instruction: %2 = load double, double* %call, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:145:14 | Function: find_cost_for_ref
+  Instruction: store double %2, double* %num_rows.addr, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:145:12 | Function: find_cost_for_ref
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

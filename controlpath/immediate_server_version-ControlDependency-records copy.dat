@@ -1,0 +1,50 @@
+Global Variable: System_variables.122
+Explicit Data Flow (31):
+  Instruction: store i32 999999, i32* %immediate_server_version, align 8, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1690:43 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %immediate_server_version = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables25, i32 0, i32 122, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1690:18 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %immediate_server_version = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables26, i32 0, i32 122, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:576:53 | Function: Trans_delegate::before_commit
+  Instruction: store i32* %immediate_server_version, i32** %immediate_server_version27, align 8, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:576:34 | Function: Trans_delegate::before_commit
+  Instruction: %immediate_server_version27 = getelementptr inbounds %struct.Trans_param, %struct.Trans_param* %param, i32 0, i32 19, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:576:9 | Function: Trans_delegate::before_commit
+  Instruction: %3 = load i32, i32* %immediate_server_version, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc:35:25 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: %cmp = icmp eq i32 %3, 999999, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc:35:50 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: br i1 %cmp, label %lor.end, label %lor.rhs, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc:35:78 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: %5 = load i32, i32* %immediate_server_version3, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc:36:25 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: %cmp4 = icmp uge i32 %5, 80018, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc:36:50 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: %6 = phi i1 [ true, %entry ], [ %cmp4, %lor.rhs ] | Location: :0:0 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: ret i1 %6, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_inbound_func_indexes.cc:35:3 | Function: cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: %call2 = call zeroext i1 @_ZN2cs4util36ColumnFilterInboundFunctionalIndexes16is_filter_neededERK3THDP5TABLEPK9table_def(%class.THD* dereferenceable(13520) %4, %struct.TABLE* %5, %class.table_def* %6), !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_factory.h:90:16 | Function: cs::util::ColumnFilterFactory::is_filter_needed
+  Instruction: store i1 %call2, i1* %retval, align 1, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_factory.h:90:9 | Function: cs::util::ColumnFilterFactory::is_filter_needed
+  Instruction: %10 = load i1, i1* %retval, align 1, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_factory.h:100:3 | Function: cs::util::ColumnFilterFactory::is_filter_needed
+  Instruction: ret i1 %10, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/column_filters/column_filter_factory.h:100:3 | Function: cs::util::ColumnFilterFactory::is_filter_needed
+  Instruction: %call = call zeroext i1 @_ZN2cs4util19ColumnFilterFactory16is_filter_neededERK3THDP5TABLEPK9table_defNS1_16ColumnFilterTypeE(%class.THD* dereferenceable(13520) %0, %struct.TABLE* %1, %class.table_def* %2, i32 %3), !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/replicated_columns_view.cc:62:7 | Function: cs::util::ReplicatedColumnsView::add_filter_if_needed
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/changestreams/misc/replicated_columns_view.cc:62:7 | Function: cs::util::ReplicatedColumnsView::add_filter_if_needed
+  Instruction: store i32 %64, i32* %immediate_server_version80, align 8, !dbg !1255397 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13371:43 | Function: Gtid_log_event::do_apply_event
+  Instruction: %immediate_server_version80 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables79, i32 0, i32 122, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13371:18 | Function: Gtid_log_event::do_apply_event
+  Instruction: %54 = load i32, i32* %immediate_server_version, align 8, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:495:36 | Function: table_def::compatible_with
+  Instruction: call void @_Z33decimal_numeric_version_to_stringB5cxx11j(%"class.std::__cxx11::basic_string"* sret %ref.tmp48, i32 %54), !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:494:17 | Function: table_def::compatible_with
+  Instruction: %1 = load i32, i32* %immediate_server_version, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:1431:24 | Function: is_immediate_server_gipk_ready
+  Instruction: %cmp = icmp ne i32 %1, 999999, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:1431:49 | Function: is_immediate_server_gipk_ready
+  Instruction: br i1 %cmp, label %land.rhs, label %land.end, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:1431:77 | Function: is_immediate_server_gipk_ready
+  Instruction: %3 = load i32, i32* %immediate_server_version2, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:1432:24 | Function: is_immediate_server_gipk_ready
+  Instruction: %cmp3 = icmp uge i32 %3, 80030, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:1432:49 | Function: is_immediate_server_gipk_ready
+  Instruction: %4 = phi i1 [ false, %entry ], [ %cmp3, %land.rhs ], !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:0:0 | Function: is_immediate_server_gipk_ready
+  Instruction: ret i1 %4, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:1431:3 | Function: is_immediate_server_gipk_ready
+  Instruction: %call = call zeroext i1 @_Z30is_immediate_server_gipk_readyR3THD(%class.THD* dereferenceable(13520) %0), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:796:7 | Function: table_def::compute_source_table_gipk_info
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:796:7 | Function: table_def::compute_source_table_gipk_info
+
+Implicit Data Flow (2):
+  Instruction: %6 = phi i1 [ true, %entry ], [ %cmp4, %lor.rhs ] | Location: :0:0cs::util::ColumnFilterInboundFunctionalIndexes::is_filter_needed
+  Instruction: %4 = phi i1 [ false, %entry ], [ %cmp3, %land.rhs ], !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_utility.cc:0:0is_immediate_server_gipk_ready
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: cs::util::ColumnFilterFactory::create_filter
+  Controlled Function: std::vector
+  Controlled Function: std::unique_ptr
+  Controlled Function: Table_columns_view
+  Controlled Function: std::unique_ptr
+  Controlled Function: table_def::size
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,217 @@
+Global Variable: System_variables.121
+Explicit Data Flow (29):
+  Instruction: %119 = load i32, i32* %original_server_version, align 4, !dbg !1255503 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:7862:26 | Function: add_functional_index_to_create_list
+  Instruction: %call108 = invoke zeroext i1 @_ZL58is_not_slave_or_master_sorts_functional_index_columns_lastj(i32 %119)
+          to label %invoke.cont107 unwind label %lpad82, !dbg !1255504 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:7861:7 | Function: add_functional_index_to_create_list
+  Instruction: br i1 %call108, label %if.then109, label %if.else, !dbg !1255505 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:7861:7 | Function: add_functional_index_to_create_list
+  Instruction: %173 = load i32, i32* %original_server_version, align 4, !dbg !1256066 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:14789:30 | Function: prepare_fields_and_keys
+  Instruction: %call175 = invoke zeroext i1 @_ZL58is_not_slave_or_master_sorts_functional_index_columns_lastj(i32 %173)
+          to label %invoke.cont174 unwind label %lpad41, !dbg !1256067 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:14788:11 | Function: prepare_fields_and_keys
+  Instruction: br i1 %call175, label %if.then176, label %if.else178, !dbg !1256068 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:14787:11 | Function: prepare_fields_and_keys
+  Instruction: %3 = load i32, i32* %original_server_version, align 4, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:108:27 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: %cmp = icmp eq i32 %3, 999999, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:108:51 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: br i1 %cmp, label %lor.end, label %lor.rhs, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:108:79 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: %5 = load i32, i32* %original_server_version2, align 4, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:109:27 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: %cmp3 = icmp ult i32 %5, 80016, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:109:51 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: %6 = phi i1 [ true, %land.rhs ], [ %cmp3, %lor.rhs ] | Location: :0:0 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: %7 = phi i1 [ false, %entry ], [ %6, %lor.end ], !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:0:0 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: ret i1 %7, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:106:3 | Function: is_slave_with_master_without_check_constraints_support
+  Instruction: %22 = load i32, i32* %original_server_version, align 4, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1702:57 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: store i32 %22, i32* %trx_original_server_version, align 4, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1702:12 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %23 = load i32, i32* %trx_original_server_version, align 4, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1710:7 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %cmp43 = icmp eq i32 %23, 999999, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1710:35 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: br i1 %cmp43, label %if.then44, label %if.else53, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1710:7 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: store i32 0, i32* %trx_original_server_version, align 4, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1717:35 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %36 = load i32, i32* %trx_original_server_version, align 4, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1730:35 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: invoke void @_ZN14Gtid_log_eventC1EP3THDbllbyyjj(%class.Gtid_log_event* %gtid_event, %class.THD* %29, i1 zeroext %call58, i64 %31, i64 %32, i1 zeroext %call60, i64 %34, i64 %35, i32 %36, i32 %37)
+          to label %invoke.cont61 unwind label %lpad, !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1727:18 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: store i32 999999, i32* %original_server_version55, align 4, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1725:44 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %original_server_version55 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables54, i32 0, i32 121, !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1725:20 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %original_server_version = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables24, i32 0, i32 121, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:575:52 | Function: Trans_delegate::before_commit
+  Instruction: store i32* %original_server_version, i32** %original_server_version25, align 8, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:575:33 | Function: Trans_delegate::before_commit
+  Instruction: %original_server_version25 = getelementptr inbounds %struct.Trans_param, %struct.Trans_param* %param, i32 0, i32 18, !dbg !1255371 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:575:9 | Function: Trans_delegate::before_commit
+  Instruction: store i32 %59, i32* %original_server_version76, align 4, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13370:42 | Function: Gtid_log_event::do_apply_event
+  Instruction: %original_server_version76 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables75, i32 0, i32 121, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13370:18 | Function: Gtid_log_event::do_apply_event
+
+Implicit Data Flow (2):
+  Instruction: %6 = phi i1 [ true, %land.rhs ], [ %cmp3, %lor.rhs ] | Location: :0:0is_slave_with_master_without_check_constraints_support
+  Instruction: %7 = phi i1 [ false, %entry ], [ %6, %lor.end ], !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_check_constraint.cc:0:0is_slave_with_master_without_check_constraints_support
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: List_iterator
+  Controlled Function: List
+  Controlled Function: List
+  Controlled Function: Key_part_spec::set_name_and_prefix_length
+  Controlled Function: List_STL_Iterator
+  Controlled Function: List_STL_Iterator
+  Controlled Function: base_list_iterator::is_before_first
+  Controlled Function: __assert_fail
+  Controlled Function: List_iterator
+  Controlled Function: List_STL_Iterator
+  Controlled Function: std::vector
+  Controlled Function: alter_column_name_default_or_visibility
+  Controlled Function: std::vector
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: std::vector
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Mem_root_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Mem_root_array
+  Controlled Function: List_iterator
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: List_iterator
+  Controlled Function: warn_on_deprecated_float_auto_increment
+  Controlled Function: my_error
+  Controlled Function: Prealloced_array
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: void std::sort
+  Controlled Function: my_error
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: check_if_field_used_by_generated_column_or_default
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: check_if_field_used_by_partitioning_func
+  Controlled Function: get_sql_field_charset
+  Controlled Function: operator new
+  Controlled Function: List_iterator
+  Controlled Function: Create_field::is_gcol
+  Controlled Function: adjust_generated_invisible_primary_key_column_position
+  Controlled Function: my_error
+  Controlled Function: List
+  Controlled Function: List_iterator
+  Controlled Function: Create_field::is_gcol
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: my_error
+  Controlled Function: operator delete
+  Controlled Function: check_if_field_used_by_generated_column_or_default
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: List_iterator
+  Controlled Function: Prealloced_array
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: check_if_field_used_by_partitioning_func
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: List_iterator
+  Controlled Function: my_error
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: is_not_slave_or_master_sorts_functional_index_columns_last
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Prealloced_array
+  Controlled Function: base_list::clear
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Prealloced_array
+  Controlled Function: transfer_preexisting_foreign_keys
+  Controlled Function: Create_field::is_gcol
+  Controlled Function: List_iterator
+  Controlled Function: KEY_CREATE_INFO::KEY_CREATE_INFO
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: my_error
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: Prealloced_array
+  Controlled Function: base_list::swap
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: Alter_index_visibility::name
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Prealloced_array
+  Controlled Function: my_error
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Field::type_can_have_key_part
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Alter_index_visibility::name
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Field::type_can_have_key_part
+  Controlled Function: my_error
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: operator new
+  Controlled Function: operator new
+  Controlled Function: my_error
+  Controlled Function: Prealloced_array
+  Controlled Function: __assert_fail
+  Controlled Function: Key_spec** std::copy
+  Controlled Function: List
+  Controlled Function: Key_part_spec::Key_part_spec
+  Controlled Function: List
+  Controlled Function: to_lex_cstring
+  Controlled Function: Prealloced_array
+  Controlled Function: Key_part_spec::Key_part_spec
+  Controlled Function: operator delete
+  Controlled Function: operator delete
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: blob_length_by_type
+  Controlled Function: Alter_index_visibility::name
+  Controlled Function: operator new
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: to_lex_cstring
+  Controlled Function: Alter_index_visibility::is_visible
+  Controlled Function: Key_spec::Key_spec
+  Controlled Function: my_error
+  Controlled Function: operator delete
+  Controlled Function: THD::is_binlog_applier
+  Controlled Function: binlog_cache_data::is_trx_cache
+  Controlled Function: binlog_cache_data::may_have_sbr_stmts
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: binlog_cache_data::get_byte_position
+  Controlled Function: Binlog_event_writer::is_checksum_enabled
+  Controlled Function: Gtid_log_event::~Gtid_log_event
+  Controlled Function: binlog_cache_data::get_event_counter
+  Controlled Function: Gtid_log_event::set_trx_length_by_cache_size
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::get_byte_position
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::get_event_counter
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Binlog_event_writer::is_checksum_enabled
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Gtid_log_event::get_event_length
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Log_event::write
+  Controlled Function: MYSQL_BIN_LOG::write_cache
+  Controlled Function: Gtid_log_event::~Gtid_log_event
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: binlog::Context::monitoring_context
+  Controlled Function: binlog::monitoring::Context::transaction_compression
+  Controlled Function: binlog_cache_data::get_compression_type
+  Controlled Function: binlog_cache_data::get_compressed_size
+  Controlled Function: binlog_cache_data::get_decompressed_size
+  Controlled Function: binlog::monitoring::Transaction_compression::update
+
+Implicit Control Flow:
+
+----------------------------------------

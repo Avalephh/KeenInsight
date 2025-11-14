@@ -1,0 +1,122 @@
+Global Variable: System_variables.115
+Explicit Data Flow (24):
+  Instruction: %10 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6632:22 | Function: open_secondary_engine_tables
+  Instruction: %cmp6 = icmp eq i64 %10, 2, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6632:43 | Function: open_secondary_engine_tables
+  Instruction: br i1 %cmp6, label %if.then7, label %if.end8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_base.cc:6630:7 | Function: open_secondary_engine_tables
+  Instruction: %9 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3094:17 | Function: THD::is_secondary_storage_engine_eligible
+  Instruction: %cmp11 = icmp eq i64 %9, 0, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3094:38 | Function: THD::is_secondary_storage_engine_eligible
+  Instruction: br i1 %cmp11, label %if.then12, label %if.end13, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3094:7 | Function: THD::is_secondary_storage_engine_eligible
+  Instruction: %75 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255481 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:742:27 | Function: Sql_cmd_dml::execute
+  Instruction: %cmp106 = icmp eq i64 %75, 0, !dbg !1255482 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:742:48 | Function: Sql_cmd_dml::execute
+  Instruction: br i1 %cmp106, label %if.then107, label %if.else116, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:742:7 | Function: Sql_cmd_dml::execute
+  Instruction: %83 = load i64, i64* %use_secondary_engine123, align 8, !dbg !1255503 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:751:35 | Function: Sql_cmd_dml::execute
+  Instruction: %cmp124 = icmp ne i64 %83, 2, !dbg !1255504 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:751:56 | Function: Sql_cmd_dml::execute
+  Instruction: br i1 %cmp124, label %land.lhs.true125, label %if.end136, !dbg !1255505 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:752:44 | Function: Sql_cmd_dml::execute
+  Instruction: %2 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:370:27 | Function: set_external_engine_fail_reason
+  Instruction: %cmp = icmp ne i64 %2, 2, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:370:48 | Function: set_external_engine_fail_reason
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end5, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:370:75 | Function: set_external_engine_fail_reason
+  Instruction: %11 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:461:22 | Function: validate_use_secondary_engine
+  Instruction: %cmp8 = icmp eq i64 %11, 2, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:461:43 | Function: validate_use_secondary_engine
+  Instruction: br i1 %cmp8, label %land.lhs.true, label %if.end46, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:461:70 | Function: validate_use_secondary_engine
+  Instruction: %6 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:363:27 | Function: get_secondary_engine_fail_reason
+  Instruction: %cmp3 = icmp eq i64 %6, 2, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:363:48 | Function: get_secondary_engine_fail_reason
+  Instruction: br i1 %cmp3, label %if.then, label %if.end, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:361:7 | Function: get_secondary_engine_fail_reason
+  Instruction: %6 = load i64, i64* %use_secondary_engine, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:398:27 | Function: set_secondary_engine_fail_reason
+  Instruction: %cmp3 = icmp eq i64 %6, 2, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:398:48 | Function: set_secondary_engine_fail_reason
+  Instruction: br i1 %cmp3, label %if.then, label %if.end, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:396:7 | Function: set_secondary_engine_fail_reason
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: THD::set_secondary_engine_optimization
+  Controlled Function: mysql_thread_set_secondary_engine
+  Controlled Function: mysql_statement_set_secondary_engine
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: has_external_table
+  Controlled Function: my_error
+  Controlled Function: Strict_error_handler::~Strict_error_handler
+  Controlled Function: validate_use_secondary_engine
+  Controlled Function: Ignore_error_handler::~Ignore_error_handler
+  Controlled Function: has_external_table
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: external_engine_fail_reason
+  Controlled Function: std::atomic
+  Controlled Function: set_external_engine_fail_reason
+  Controlled Function: __assert_fail
+  Controlled Function: _db_keyword_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::clear_current_query_costs
+  Controlled Function: _db_doprnt_
+  Controlled Function: base_ilist
+  Controlled Function: __assert_fail
+  Controlled Function: get_secondary_engine_fail_reason
+  Controlled Function: __assert_fail
+  Controlled Function: strlen
+  Controlled Function: Sql_cmd_dml::is_empty_query
+  Controlled Function: THD::save_current_query_costs
+  Controlled Function: reset_statement_timer
+  Controlled Function: _db_keyword_
+  Controlled Function: __assert_fail
+  Controlled Function: has_external_table
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: __assert_fail
+  Controlled Function: Strict_error_handler::~Strict_error_handler
+  Controlled Function: Ignore_error_handler::~Ignore_error_handler
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: set_external_engine_fail_reason
+  Controlled Function: set_secondary_engine_fail_reason
+  Controlled Function: THD::save_current_query_costs
+  Controlled Function: THD::update_previous_found_rows
+  Controlled Function: _db_keyword_
+  Controlled Function: reset_statement_timer
+  Controlled Function: unlikely
+  Controlled Function: has_external_table
+  Controlled Function: validate_use_secondary_engine
+  Controlled Function: external_engine_fail_reason
+  Controlled Function: Strict_error_handler::~Strict_error_handler
+  Controlled Function: set_external_engine_fail_reason
+  Controlled Function: Ignore_error_handler::~Ignore_error_handler
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_keyword_
+  Controlled Function: std::atomic
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::clear_current_query_costs
+  Controlled Function: _db_doprnt_
+  Controlled Function: base_ilist
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: get_secondary_engine_fail_reason
+  Controlled Function: Sql_cmd_dml::is_empty_query
+  Controlled Function: strlen
+  Controlled Function: THD::save_current_query_costs
+  Controlled Function: reset_statement_timer
+  Controlled Function: _db_keyword_
+  Controlled Function: __assert_fail
+  Controlled Function: has_external_table
+  Controlled Function: __assert_fail
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: Strict_error_handler::~Strict_error_handler
+  Controlled Function: Ignore_error_handler::~Ignore_error_handler
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: set_external_engine_fail_reason
+  Controlled Function: set_secondary_engine_fail_reason
+  Controlled Function: THD::save_current_query_costs
+  Controlled Function: THD::update_previous_found_rows
+  Controlled Function: _db_keyword_
+  Controlled Function: reset_statement_timer
+  Controlled Function: unlikely
+  Controlled Function: get_secondary_engine_fail_reason
+  Controlled Function: strlen
+  Controlled Function: find_and_set_offload_fail_reason
+  Controlled Function: my_error
+  Controlled Function: set_fail_reason_and_raise_error
+
+Implicit Control Flow:
+
+----------------------------------------

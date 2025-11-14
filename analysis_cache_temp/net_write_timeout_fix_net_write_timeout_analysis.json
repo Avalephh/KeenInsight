@@ -1,0 +1,7 @@
+{
+  "param_name": "net_write_timeout",
+  "function_name": "fix_net_write_timeout",
+  "analysis": "<需要提供函数>\n无需给出其他函数的具体实现，因为提供的代码片段已经足够分析fix_net_write_timeout的行为。\n\n<思考过程> \n1. 参数通过控制关键函数对数据库性能的影响：\n    - net_write_timeout通过设置超时值影响fix_net_write_timeout，从而影响数据库性能。\n    - 机制：当调用fix_net_write_timeout时，如果不是全局持久化设置，该函数将检查当前协议是否为经典协议。如果是经典协议，则调用my_net_set_write_timeout函数设置NET结构体的write_timeout值，并可能对底层网络I/O对象应用超时设置。当net_write_timeout值变化时，该值将直接影响网络操作等待超时的长短。 \n    - 数据库性能影响：设置较低的net_write_timeout值可能导致较短的写操作超时时间，如果网络延迟但是请求仍需要更多时间写入，会导致更多超时错误。相反，较高的值可能会在网络性能不佳时长时间等待写操作完成。这可能会影响用户请求的响应时间和服务器的资源利用率。\n\n<火焰图采样分析与调优方向>\n2. 基于fix_net_write_timeout执行状态和相关函数片段给出net_write_timeout优化建议：\n    - 如果涉及到[其他函数]，除了监控fix_net_write_timeout之外，还需监控my_net_set_write_timeout与vio_timeout，因为它们直接执行使用或应用超时值的变更。\n    - 可以对fix_net_write_timeout以及my_net_set_write_timeout和vio_timeout的火焰图进行监控，以观测它们的执行耗时和调用频率。如果fix_net_write_timeout频繁出现或出现较高的等待时间，可能说明当前设置的net_write_timeout较低，需要增加以减少超时错误。如果没什么耗时但网络响应还是慢，则可能还应检查网络配置和环境。",
+  "code_snippets": "static bool fix_net_write_timeout(sys_var *self, THD *thd, enum_var_type type) {\n  if (!self->is_global_persist(type)) {\n    // net_read_timeout is a specific property for the classic protocols\n    if (!thd->is_classic_protocol()) {\n      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));\n      return true;\n    }\n    my_net_set_write_timeout(thd->get_protocol_classic()->get_net(),\n                             thd->variables.net_write_timeout);\n  }\n  return false;\n}",
+  "timestamp": "2025-07-18T12:21:40.899816"
+}

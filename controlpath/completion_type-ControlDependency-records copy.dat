@@ -1,0 +1,167 @@
+Global Variable: System_variables.71
+Explicit Data Flow (16):
+  Instruction: %1114 = load i64, i64* %completion_type, align 8, !dbg !1257728 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4284:28 | Function: mysql_execute_command
+  Instruction: %cmp1890 = icmp eq i64 %1114, 1, !dbg !1257729 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4284:44 | Function: mysql_execute_command
+  Instruction: br i1 %cmp1890, label %land.rhs1891, label %land.end1894, !dbg !1257730 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4284:49 | Function: mysql_execute_command
+  Instruction: %1122 = load i64, i64* %completion_type1901, align 8, !dbg !1257743 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4287:28 | Function: mysql_execute_command
+  Instruction: %cmp1902 = icmp eq i64 %1122, 2, !dbg !1257744 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4287:44 | Function: mysql_execute_command
+  Instruction: br i1 %cmp1902, label %land.rhs1903, label %land.end1906, !dbg !1257745 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4287:49 | Function: mysql_execute_command
+  Instruction: %1148 = load i64, i64* %completion_type1947, align 8, !dbg !1257789 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4308:28 | Function: mysql_execute_command
+  Instruction: %cmp1948 = icmp eq i64 %1148, 1, !dbg !1257790 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4308:44 | Function: mysql_execute_command
+  Instruction: br i1 %cmp1948, label %land.rhs1949, label %land.end1952, !dbg !1257791 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4308:49 | Function: mysql_execute_command
+  Instruction: %1156 = load i64, i64* %completion_type1960, align 8, !dbg !1257804 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4311:28 | Function: mysql_execute_command
+  Instruction: %cmp1961 = icmp eq i64 %1156, 2, !dbg !1257805 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4311:44 | Function: mysql_execute_command
+  Instruction: br i1 %cmp1961, label %land.rhs1962, label %land.end1965, !dbg !1257806 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:4311:49 | Function: mysql_execute_command
+  Instruction: store i64 %call35, i64* %completion_type, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:389:34 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %completion_type = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables36, i32 0, i32 71, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:389:18 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %completion_type = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables4, i32 0, i32 71, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:4000:18 | Function: set_slave_thread_options
+  Instruction: store i64 0, i64* %completion_type, align 8, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:4000:34 | Function: set_slave_thread_options
+
+Implicit Data Flow (8):
+  Instruction: %1117 = phi i1 [ false, %lor.rhs1888 ], [ %cmp1893, %land.rhs1891 ], !dbg !1257734 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:0:0mysql_execute_command
+  Instruction: %1118 = phi i1 [ true, %cond.end1885 ], [ %1117, %land.end1894 ] | Location: :0:0mysql_execute_command
+  Instruction: %1125 = phi i1 [ false, %lor.rhs1899 ], [ %cmp1905, %land.rhs1903 ], !dbg !1257734 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:0:0mysql_execute_command
+  Instruction: %1126 = phi i1 [ true, %lor.end1895 ], [ %1125, %land.end1906 ] | Location: :0:0mysql_execute_command
+  Instruction: %1151 = phi i1 [ false, %lor.rhs1945 ], [ %cmp1951, %land.rhs1949 ], !dbg !1257795 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:0:0mysql_execute_command
+  Instruction: %1152 = phi i1 [ true, %cond.end1941 ], [ %1151, %land.end1952 ] | Location: :0:0mysql_execute_command
+  Instruction: %1159 = phi i1 [ false, %lor.rhs1958 ], [ %cmp1964, %land.rhs1962 ], !dbg !1257795 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:0:0mysql_execute_command
+  Instruction: %1160 = phi i1 [ true, %lor.end1953 ], [ %1159, %land.end1965 ] | Location: :0:0mysql_execute_command
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: std::atomic
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::atomic
+  Controlled Function: Reprepare_observer::is_invalidated
+  Controlled Function: is_explainable_query
+  Controlled Function: Reprepare_observer::can_retry
+  Controlled Function: __assert_fail
+  Controlled Function: unlikely
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: stmt_causes_implicit_commit
+  Controlled Function: std::atomic
+  Controlled Function: unlikely
+  Controlled Function: std::atomic
+  Controlled Function: THD::reset_query_for_display
+  Controlled Function: std::atomic
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: __assert_fail
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_statement_locks
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: binlog_gtid_end_transaction
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: std::atomic
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::atomic
+  Controlled Function: Reprepare_observer::is_invalidated
+  Controlled Function: is_explainable_query
+  Controlled Function: Reprepare_observer::can_retry
+  Controlled Function: __assert_fail
+  Controlled Function: unlikely
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: stmt_causes_implicit_commit
+  Controlled Function: std::atomic
+  Controlled Function: unlikely
+  Controlled Function: std::atomic
+  Controlled Function: THD::reset_query_for_display
+  Controlled Function: std::atomic
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: __assert_fail
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_statement_locks
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: binlog_gtid_end_transaction
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: std::atomic
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::atomic
+  Controlled Function: Reprepare_observer::is_invalidated
+  Controlled Function: is_explainable_query
+  Controlled Function: Reprepare_observer::can_retry
+  Controlled Function: __assert_fail
+  Controlled Function: unlikely
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: stmt_causes_implicit_commit
+  Controlled Function: std::atomic
+  Controlled Function: unlikely
+  Controlled Function: std::atomic
+  Controlled Function: THD::reset_query_for_display
+  Controlled Function: std::atomic
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: __assert_fail
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_statement_locks
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: binlog_gtid_end_transaction
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: std::atomic
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::atomic
+  Controlled Function: Reprepare_observer::is_invalidated
+  Controlled Function: is_explainable_query
+  Controlled Function: Reprepare_observer::can_retry
+  Controlled Function: __assert_fail
+  Controlled Function: unlikely
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: stmt_causes_implicit_commit
+  Controlled Function: std::atomic
+  Controlled Function: unlikely
+  Controlled Function: std::atomic
+  Controlled Function: THD::reset_query_for_display
+  Controlled Function: std::atomic
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: __assert_fail
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_statement_locks
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: binlog_gtid_end_transaction
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

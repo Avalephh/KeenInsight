@@ -1,0 +1,248 @@
+Global Variable: System_variables.127
+Explicit Data Flow (28):
+  Instruction: %7 = load i8, i8* %require_row_format, align 4, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:472:43 | Function: check_and_report_require_row_format_violation
+  Instruction: %tobool3 = trunc i8 %7 to i1, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:472:43 | Function: check_and_report_require_row_format_violation
+  Instruction: %cond = phi i1 [ %call, %invoke.cont ], [ %tobool3, %cond.false2 ], !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:470:22 | Function: check_and_report_require_row_format_violation
+  Instruction: %frombool = zext i1 %cond to i8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:470:8 | Function: check_and_report_require_row_format_violation
+  Instruction: store i8 %frombool, i8* %perform_check, align 1, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:470:8 | Function: check_and_report_require_row_format_violation
+  Instruction: %8 = load i8, i8* %perform_check, align 1, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:473:8 | Function: check_and_report_require_row_format_violation
+  Instruction: %tobool5 = trunc i8 %8 to i1, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:473:8 | Function: check_and_report_require_row_format_violation
+  Instruction: br i1 %tobool5, label %if.end, label %if.then, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:473:7 | Function: check_and_report_require_row_format_violation
+  Instruction: %2 = load i8, i8* %require_row_format, align 4, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7548:42 | Function: check_set_require_row_format
+  Instruction: %tobool = trunc i8 %2 to i1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7548:42 | Function: check_set_require_row_format
+  Instruction: %conv = zext i1 %tobool to i64, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7548:27 | Function: check_set_require_row_format
+  Instruction: store i64 %conv, i64* %previous_val, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7548:12 | Function: check_set_require_row_format
+  Instruction: %7 = load i64, i64* %previous_val, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7553:7 | Function: check_set_require_row_format
+  Instruction: %tobool1 = icmp ne i64 %7, 0, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7553:7 | Function: check_set_require_row_format
+  Instruction: br i1 %tobool1, label %land.lhs.true, label %if.end21, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7553:20 | Function: check_set_require_row_format
+  Instruction: %9 = load i64, i64* %previous_val, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7553:30 | Function: check_set_require_row_format
+  Instruction: %cmp = icmp ne i64 %8, %9, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7553:27 | Function: check_set_require_row_format
+  Instruction: br i1 %cmp, label %if.then, label %if.end21, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:7553:7 | Function: check_set_require_row_format
+  Instruction: %162 = load i8, i8* %require_row_format, align 4, !dbg !1255473 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4550:25 | Function: Query_log_event::do_apply_event
+  Instruction: %tobool189 = trunc i8 %162 to i1, !dbg !1255473 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4550:25 | Function: Query_log_event::do_apply_event
+  Instruction: br i1 %tobool189, label %if.end198, label %if.then190, !dbg !1255474 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4550:9 | Function: Query_log_event::do_apply_event
+  Instruction: %31 = load i8, i8* %require_row_format, align 4, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:5470:36 | Function: Format_description_log_event::do_apply_event
+  Instruction: %tobool23 = trunc i8 %31 to i1, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:5470:36 | Function: Format_description_log_event::do_apply_event
+  Instruction: br i1 %tobool23, label %if.else, label %if.then24, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:5470:9 | Function: Format_description_log_event::do_apply_event
+  Instruction: store i8 %frombool109, i8* %require_row_format, align 4, !dbg !1255497 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7070:39 | Function: handle_slave_sql
+  Instruction: %require_row_format = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 127, !dbg !1255496 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7070:20 | Function: handle_slave_sql
+  Instruction: %require_row_format = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 127, !dbg !1255421 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6036:18 | Function: handle_slave_worker
+  Instruction: store i8 %frombool118, i8* %require_row_format, align 4, !dbg !1255422 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6036:37 | Function: handle_slave_worker
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_error
+  Controlled Function: THD::security_context
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: THD::security_context
+  Controlled Function: my_error
+  Controlled Function: THD::security_context
+  Controlled Function: THD::security_context
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: THD::security_context
+  Controlled Function: my_error
+  Controlled Function: THD::security_context
+  Controlled Function: THD::set_time
+  Controlled Function: Rpl_thd_context::post_filters_actions
+  Controlled Function: THD::set_query
+  Controlled Function: std::function
+  Controlled Function: THD::set_query_for_display
+  Controlled Function: Scope_guard
+  Controlled Function: std::vector
+  Controlled Function: next_query_id
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: THD::set_query_id
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::query
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_keyword_
+  Controlled Function: ignored_error_code
+  Controlled Function: unexpected_error_code
+  Controlled Function: my_error
+  Controlled Function: String::String
+  Controlled Function: clear_all_errors
+  Controlled Function: ER_THD
+  Controlled Function: THD::is_error
+  Controlled Function: uint2korr
+  Controlled Function: my_tz_find
+  Controlled Function: my_locale_by_number
+  Controlled Function: THD::query
+  Controlled Function: get_charset
+  Controlled Function: String::~String
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: String::c_ptr
+  Controlled Function: my_printf_error
+  Controlled Function: get_charset
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::is_error
+  Controlled Function: uint2korr
+  Controlled Function: set_slave_thread_default_charset
+  Controlled Function: String::~String
+  Controlled Function: my_error
+  Controlled Function: Query_log_event::detach_temp_tables_worker
+  Controlled Function: THD::set_catalog
+  Controlled Function: THD::is_error
+  Controlled Function: get_charset
+  Controlled Function: Scope_guard
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: longlong10_to_str
+  Controlled Function: get_charset
+  Controlled Function: THD::set_db
+  Controlled Function: gtid_pre_statement_checks
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: my_error
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: uint2korr
+  Controlled Function: longlong10_to_str
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: _db_pargs_
+  Controlled Function: get_charset
+  Controlled Function: my_error
+  Controlled Function: _db_pargs_
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: _db_enabled_
+  Controlled Function: strlen
+  Controlled Function: _db_enabled_
+  Controlled Function: THD::update_charset
+  Controlled Function: __assert_fail
+  Controlled Function: strlen
+  Controlled Function: THD::set_invoker
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: _db_doprnt_
+  Controlled Function: __assert_fail
+  Controlled Function: _db_doprnt_
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: THD::set_query
+  Controlled Function: ER_THD
+  Controlled Function: Rpl_thd_context::post_filters_actions
+  Controlled Function: Rpl_thd_context::post_filters_actions
+  Controlled Function: ignored_error_code
+  Controlled Function: mysql_thread_set_secondary_engine
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: Parser_state::Parser_state
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: concurrency_error_code
+  Controlled Function: THD::query
+  Controlled Function: inline_mysql_end_statement
+  Controlled Function: THD::db
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: std::function
+  Controlled Function: THD::query
+  Controlled Function: Rpl_filter::db_ok
+  Controlled Function: concurrency_error_code
+  Controlled Function: ignored_error_code
+  Controlled Function: Parser_state::init
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: THD::reset_rewritten_query
+  Controlled Function: MEM_ROOT::ClearForReuse
+  Controlled Function: is_atomic_ddl
+  Controlled Function: concurrency_error_code
+  Controlled Function: _db_pargs_
+  Controlled Function: is_silent_error
+  Controlled Function: THD::is_fatal_error
+  Controlled Function: Parser_state::~Parser_state
+  Controlled Function: __assert_fail
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: _db_enabled_
+  Controlled Function: Diagnostics_area::reset_diagnostics_area
+  Controlled Function: ignored_error_code
+  Controlled Function: THD::is_error
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: _db_doprnt_
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::db
+  Controlled Function: ignored_error_code
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: THD::db
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::db
+  Controlled Function: print_slave_db_safe
+  Controlled Function: _db_keyword_
+  Controlled Function: Diagnostics_area::mysql_errno
+  Controlled Function: THD::query
+  Controlled Function: THD::rewritten_query
+  Controlled Function: THD::charset
+  Controlled Function: ignored_error_code
+  Controlled Function: ignored_error_code
+  Controlled Function: clear_all_errors
+  Controlled Function: THD::query
+  Controlled Function: String::length
+  Controlled Function: inline_mysql_start_statement
+  Controlled Function: std::atomic
+  Controlled Function: strcmp
+  Controlled Function: Query_logger::general_log_write
+  Controlled Function: THD::enter_stage
+  Controlled Function: ER_THD_NONCONST
+  Controlled Function: ER_THD
+  Controlled Function: strcmp
+  Controlled Function: THD::rewritten_query
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: ER_THD_NONCONST
+  Controlled Function: Error_log_throttle::log
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: THD::get_transaction
+  Controlled Function: String::ptr
+  Controlled Function: sql_digest_state::reset
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: THD::rewritten_query
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Log_event::get_type_str
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: String::length
+  Controlled Function: clear_all_errors
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: print_slave_db_safe
+  Controlled Function: THD::get_stmt_da
+  Controlled Function: Query_logger::general_log_write
+  Controlled Function: Diagnostics_area::message_text
+  Controlled Function: std::atomic
+  Controlled Function: THD::update_slow_query_status
+  Controlled Function: String::String
+  Controlled Function: log_slow_statement
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: THD::query
+  Controlled Function: String::~String
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: std::basic_string_view
+  Controlled Function: String::append
+  Controlled Function: Rpl_filter::get_rewrite_db_statistics
+  Controlled Function: ER_THD
+  Controlled Function: Rpl_filter_statistics::increase_counter
+  Controlled Function: String::c_ptr
+  Controlled Function: String::~String
+  Controlled Function: close_temporary_tables
+  Controlled Function: cleanup_load_tmpdir
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

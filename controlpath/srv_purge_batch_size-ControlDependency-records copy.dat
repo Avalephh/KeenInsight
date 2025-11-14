@@ -1,0 +1,35 @@
+Global Variable: srv_purge_batch_size
+Explicit Data Flow (18):
+  Instruction: %29 = load i64, i64* @srv_purge_batch_size, align 8, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3144:35 | Function: srv_purge_coordinator_thread
+  Instruction: %call66 = call i64 @_Z9trx_purgemmb(i64 1, i64 %29, i1 zeroext false), !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3144:22 | Function: srv_purge_coordinator_thread
+  Instruction: %30 = load i64, i64* @srv_purge_batch_size, align 8, !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3157:17 | Function: srv_purge_coordinator_thread
+  Instruction: %cmp67 = icmp ule i64 %30, 20, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3157:38 | Function: srv_purge_coordinator_thread
+  Instruction: br i1 %cmp67, label %cond.true, label %cond.false, !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3157:17 | Function: srv_purge_coordinator_thread
+  Instruction: %31 = load i64, i64* @srv_purge_batch_size, align 8, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3157:59 | Function: srv_purge_coordinator_thread
+  Instruction: %cond = phi i64 [ %31, %cond.true ], [ 20, %cond.false ], !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3157:17 | Function: srv_purge_coordinator_thread
+  Instruction: %call68 = call i64 @_Z9trx_purgemmb(i64 1, i64 %cond, i1 zeroext true), !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3156:7 | Function: srv_purge_coordinator_thread
+  Instruction: %43 = load i64, i64* @srv_purge_batch_size, align 8, !dbg !1255405 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2952:34 | Function: srv_do_purge
+  Instruction: %call57 = call i64 @_Z9trx_purgemmb(i64 %42, i64 %43, i1 zeroext %tobool56), !dbg !1255407 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:2952:9 | Function: srv_do_purge
+  Instruction: %77 = load i64, i64* @srv_purge_batch_size, align 8, !dbg !1255422 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:371:31 | Function: trx_purge_add_update_undo_to_history
+  Instruction: %mul = mul i64 %76, %77, !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:371:29 | Function: trx_purge_add_update_undo_to_history
+  Instruction: %cmp32 = icmp ugt i64 %75, %mul, !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:370:42 | Function: trx_purge_add_update_undo_to_history
+  Instruction: br i1 %cmp32, label %if.then33, label %if.end34, !dbg !1255425 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:370:9 | Function: trx_purge_add_update_undo_to_history
+  Instruction: %12 = load i64, i64* @srv_purge_batch_size, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2327:58 | Function: trx_purge_dml_delay
+  Instruction: %mul = mul i64 %11, %12, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2327:56 | Function: trx_purge_dml_delay
+  Instruction: %cmp1 = icmp ugt i64 %10, %mul, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2326:65 | Function: trx_purge_dml_delay
+  Instruction: br i1 %cmp1, label %if.then, label %if.end14, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0purge.cc:2326:7 | Function: trx_purge_dml_delay
+
+Implicit Data Flow (1):
+  Instruction: %cond = phi i64 [ %31, %cond.true ], [ 20, %cond.false ], !dbg !1255400 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc:3157:17srv_purge_coordinator_thread
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: trx_purge
+  Controlled Function: srv_wake_purge_thread_if_not_active
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: monitor_set
+
+Implicit Control Flow:
+
+----------------------------------------

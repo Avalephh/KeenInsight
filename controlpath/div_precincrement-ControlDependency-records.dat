@@ -1,0 +1,28 @@
+Global Variable: System_variables.50
+Explicit Data Flow (17):
+  Instruction: %1 = load i64, i64* %div_precincrement, align 8, !dbg !1255435 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2458:37 | Function: Item_func_div::resolve_type
+  Instruction: %conv = trunc i64 %1 to i32, !dbg !1255433 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2458:22 | Function: Item_func_div::resolve_type
+  Instruction: store i32 %conv, i32* %m_prec_increment, align 4, !dbg !1255437 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2458:20 | Function: Item_func_div::resolve_type
+  Instruction: %m_prec_increment = getelementptr inbounds %class.Item_func_div_base.66676, %class.Item_func_div_base.66676* %2, i32 0, i32 1, !dbg !1255436 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2458:3 | Function: Item_func_div::resolve_type
+  Instruction: %m_prec_increment41 = getelementptr inbounds %class.Item_func_div_base.66676, %class.Item_func_div_base.66676* %38, i32 0, i32 1, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2431:44 | Function: Item_func_div::result_precision
+  Instruction: %39 = load i32, i32* %m_prec_increment41, align 4, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2431:44 | Function: Item_func_div::result_precision
+  Instruction: %add42 = add i32 %conv40, %39, !dbg !1255455 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2431:42 | Function: Item_func_div::result_precision
+  Instruction: store i32 %add42, i32* %ref.tmp36, align 4, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2431:24 | Function: Item_func_div::result_precision
+  Instruction: %call44 = call dereferenceable(4) i32* @_ZSt3minIjERKT_S2_S2_(i32* dereferenceable(4) %ref.tmp36, i32* dereferenceable(4) %ref.tmp43), !dbg !1255457 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2431:14 | Function: Item_func_div::result_precision
+  Instruction: %5 = load i64, i64* %div_precincrement, align 8, !dbg !1255409 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:2231:35 | Function: Item_sum_avg::resolve_type
+  Instruction: %conv = trunc i64 %5 to i32, !dbg !1255407 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:2231:20 | Function: Item_sum_avg::resolve_type
+  Instruction: store i32 %conv, i32* %prec_increment, align 8, !dbg !1255411 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:2231:18 | Function: Item_sum_avg::resolve_type
+  Instruction: %prec_increment = getelementptr inbounds %class.Item_sum_avg.71810, %class.Item_sum_avg.71810* %this1, i32 0, i32 1, !dbg !1255410 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:2231:3 | Function: Item_sum_avg::resolve_type
+  Instruction: %prec_increment2 = getelementptr inbounds %class.Item_sum_avg.71810, %class.Item_sum_avg.71810* %5, i32 0, i32 1, !dbg !1255407 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.h:1323:55 | Function: Item_sum_avg::Item_sum_avg
+  Instruction: %6 = load i32, i32* %prec_increment2, align 8, !dbg !1255407 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.h:1323:55 | Function: Item_sum_avg::Item_sum_avg
+  Instruction: store i32 %6, i32* %prec_increment, align 8, !dbg !1255405 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.h:1323:34 | Function: Item_sum_avg::Item_sum_avg
+  Instruction: %prec_increment = getelementptr inbounds %class.Item_sum_avg.71810, %class.Item_sum_avg.71810* %this1, i32 0, i32 1, !dbg !1255405 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.h:1323:34 | Function: Item_sum_avg::Item_sum_avg
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

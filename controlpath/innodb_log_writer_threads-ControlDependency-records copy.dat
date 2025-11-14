@@ -1,0 +1,16 @@
+Global Variable: srv_log_writer_threads
+Explicit Data Flow (3):
+  Instruction: %0 = load i8, i8* @srv_log_writer_threads, align 1, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1104:7 | Function: log_control_writer_threads
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1104:7 | Function: log_control_writer_threads
+  Instruction: br i1 %tobool, label %if.then, label %if.else, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1104:7 | Function: log_control_writer_threads
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: log_resume_writer_threads
+  Controlled Function: log_pause_writer_threads
+
+Implicit Control Flow:
+
+----------------------------------------

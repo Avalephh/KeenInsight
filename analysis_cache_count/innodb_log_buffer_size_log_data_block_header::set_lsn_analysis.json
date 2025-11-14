@@ -1,0 +1,7 @@
+{
+  "param_name": "innodb_log_buffer_size",
+  "function_name": "Log_data_block_header::set_lsn",
+  "analysis": "<需要提供函数>\nset_lsn, flush_log\n\n<思考过程>\n1. 参数通过控制关键函数对数据库性能的影响：\n    - innodb_log_buffer_size 通过日志缓存空间的分配机制影响 Log_data_block_header::set_lsn，进而产生对写日志性能的影响。\n    - 机制：innodb_log_buffer_size 确定了事务提交前可以缓存的日志量。在调用 Log_data_block_header::set_lsn 时，根据分配的日志缓冲大小安排日志写入顺序。如果该缓冲区设置过小，可能导致日志写入频繁，影响 set_lsn 的响应性能。\n    - 数据库性能影响：较小的 innodb_log_buffer_size 可能导致日志频繁写入磁盘，从而增加 I/O 操作，降低数据库的整体性能。增大该参数大小可以减缓日志写入频率，提高写入性能，尤其是较大事务场景中。\n\n<火焰图采样分析与调优方向>\n2. 基于 Log_data_block_header::set_lsn 执行状态和相关函数片段给出 innodb_log_buffer_size 优化建议：\n    - 如果涉及到[其他函数]，需监控 flush_log 函数，该函数负责日志的刷盘操作，其频繁调用可能指示 innodb_log_buffer_size 过小。\n    - 如何根据 Log_data_block_header::set_lsn 和 flush_log 的火焰图采样率，推荐 innodb_log_buffer_size 调整的方向（升高或降低）和依据：如果 flush_log 的火焰图显示频繁调用且耗时，建议升高 innodb_log_buffer_size 以减少日志刷盘频率，从而提高数据库写入性能。如果 set_lsn 或 flush_log 的执行时间和采样率较低，且当前性能表现良好，则不建议调整该参数。",
+  "code_snippets": "static void log_calc_buf_size(log_t &log) {\n  ut_a(srv_log_buffer_size >= INNODB_LOG_BUFFER_SIZE_MIN);\n  ut_a(srv_log_buffer_size <= INNODB_LOG_BUFFER_SIZE_MAX);\n\n  log.buf_size = srv_log_buffer_size;\n\n  /* The following update has to be the last operation during resize\n  procedure of log buffer. That's because since this moment, possibly\n  new concurrent writes for higher sn will start (which were waiting\n  for free space in the log buffer). */\n\n  log.buf_size_sn = log_translate_lsn_to_sn(log.buf_size);\n}",
+  "timestamp": "2025-07-28T03:00:16.131376"
+}

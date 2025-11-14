@@ -1,0 +1,77 @@
+Global Variable: srv_LRU_scan_depth
+Explicit Data Flow (18):
+  Instruction: %10 = load i64, i64* @srv_LRU_scan_depth, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1772:19 | Function: buf_flush_LRU_list_batch
+  Instruction: %add6 = add i64 %10, %11, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1772:38 | Function: buf_flush_LRU_list_batch
+  Instruction: %cmp7 = icmp ult i64 %9, %add6, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1772:17 | Function: buf_flush_LRU_list_batch
+  Instruction: br i1 %cmp7, label %land.rhs, label %land.end, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1772:55 | Function: buf_flush_LRU_list_batch
+  Instruction: %9 = load i64, i64* @srv_LRU_scan_depth, align 8, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1717:56 | Function: buf_free_from_unzip_LRU_list_batch
+  Instruction: %cmp8 = icmp ult i64 %8, %9, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1717:54 | Function: buf_free_from_unzip_LRU_list_batch
+  Instruction: br i1 %cmp8, label %land.rhs, label %land.end, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:1717:75 | Function: buf_free_from_unzip_LRU_list_batch
+  Instruction: %4 = load i64, i64* @srv_LRU_scan_depth, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2252:24 | Function: buf_flush_LRU_list
+  Instruction: %cmp3 = icmp ugt i64 %3, %4, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2252:22 | Function: buf_flush_LRU_list
+  Instruction: br i1 %cmp3, label %if.then4, label %if.else, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2252:7 | Function: buf_flush_LRU_list
+  Instruction: %6 = load i64, i64* @srv_LRU_scan_depth, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2255:46 | Function: buf_flush_LRU_list
+  Instruction: store i64 %6, i64* %ref.tmp, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2255:27 | Function: buf_flush_LRU_list
+  Instruction: %call6 = call dereferenceable(8) i64* @_ZSt3minImERKT_S2_S2_(i64* dereferenceable(8) %ref.tmp, i64* dereferenceable(8) %scan_depth), !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2255:18 | Function: buf_flush_LRU_list
+  Instruction: %8 = load i64, i64* @srv_LRU_scan_depth, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0lru.cc:1058:61 | Function: buf_LRU_free_from_unzip_LRU_list
+  Instruction: %cmp7 = icmp ult i64 %7, %8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0lru.cc:1058:59 | Function: buf_LRU_free_from_unzip_LRU_list
+  Instruction: %9 = phi i1 [ true, %land.rhs ], [ %cmp7, %lor.rhs ] | Location: :0:0 | Function: buf_LRU_free_from_unzip_LRU_list
+  Instruction: %10 = phi i1 [ false, %land.lhs.true ], [ false, %for.cond ], [ %9, %lor.end ], !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0lru.cc:0:0 | Function: buf_LRU_free_from_unzip_LRU_list
+  Instruction: br i1 %10, label %for.body, label %for.end, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0lru.cc:1057:3 | Function: buf_LRU_free_from_unzip_LRU_list
+
+Implicit Data Flow (2):
+  Instruction: %13 = phi i1 [ false, %land.lhs.true5 ], [ false, %land.lhs.true ], [ false, %for.cond ], [ %cmp8, %land.rhs ], !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:0:0
+  Instruction: %12 = phi i1 [ false, %land.lhs.true7 ], [ false, %land.lhs.true ], [ false, %while.cond ], [ %cmp10, %land.rhs ], !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:0:0
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: PolicyMutex
+  Controlled Function: unlikely
+  Controlled Function: PolicyMutex
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_page_get_mutex
+  Controlled Function: PolicyMutex
+  Controlled Function: monitor_inc_value_cumulative
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: buf_flush_ready_for_replace
+  Controlled Function: monitor_inc_value_cumulative
+  Controlled Function: buf_flush_ready_for_flush
+  Controlled Function: PolicyMutex
+  Controlled Function: unlikely
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: PolicyMutex
+  Controlled Function: PolicyMutex
+  Controlled Function: buf_flush_page_and_try_neighbors
+  Controlled Function: PolicyMutex
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: PolicyMutex
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_get_withdraw_depth
+  Controlled Function: buf_page_get_mutex
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: PolicyMutex
+  Controlled Function: unsigned long const& std::min
+  Controlled Function: unsigned long const& std::min
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: buf_block_get_state
+  Controlled Function: unlikely
+  Controlled Function: monitor_inc_value_cumulative
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_LRU_free_page
+  Controlled Function: PolicyMutex
+
+Implicit Control Flow:
+
+----------------------------------------

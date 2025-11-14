@@ -1,0 +1,15 @@
+Global Variable: System_variables.59
+Explicit Data Flow (4):
+  Instruction: %5 = load i64, i64* %trans_prealloc_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1133:55 | Function: THD::init_query_mem_roots
+  Instruction: call void @_ZN15Transaction_ctx22init_mem_root_defaultsEmm(%class.Transaction_ctx* %call, i64 %4, i64 %5), !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1132:22 | Function: THD::init_query_mem_roots
+  Instruction: %6 = load i64, i64* %trans_prealloc_size, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:4015:24 | Function: fix_trans_mem_root
+  Instruction: call void @_ZN15Transaction_ctx22init_mem_root_defaultsEmm(%class.Transaction_ctx* %call1, i64 %4, i64 %6), !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:4013:29 | Function: fix_trans_mem_root
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

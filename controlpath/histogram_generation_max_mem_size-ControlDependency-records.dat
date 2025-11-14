@@ -1,0 +1,25 @@
+Global Variable: System_variables.25
+Explicit Data Flow (12):
+  Instruction: %227 = load i64, i64* %histogram_generation_max_mem_size, align 8, !dbg !1255621 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1429:42 | Function: histograms::update_histogram
+  Instruction: %conv247 = uitofp i64 %227 to double, !dbg !1255619 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1429:27 | Function: histograms::update_histogram
+  Instruction: %div = fdiv double %conv247, %conv248, !dbg !1255623 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1429:76 | Function: histograms::update_histogram
+  Instruction: store double %div, double* %rows_in_memory, align 8, !dbg !1255618 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1429:10 | Function: histograms::update_histogram
+  Instruction: %233 = load double, double* %rows_in_memory, align 8, !dbg !1255636 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1442:30 | Function: histograms::update_histogram
+  Instruction: %div255 = fdiv double %233, %conv254, !dbg !1255638 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1442:45 | Function: histograms::update_histogram
+  Instruction: %mul = fmul double %div255, 1.000000e+02, !dbg !1255639 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1442:61 | Function: histograms::update_histogram
+  Instruction: store double %mul, double* %sample_percentage, align 8, !dbg !1255635 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1442:10 | Function: histograms::update_histogram
+  Instruction: %call258 = invoke dereferenceable(8) double* @_ZSt3minIdERKT_S2_S2_(double* dereferenceable(8) %sample_percentage, double* dereferenceable(8) %ref.tmp256)
+          to label %invoke.cont257 unwind label %lpad242, !dbg !1255641 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1443:23 | Function: histograms::update_histogram
+  Instruction: store double %235, double* %sample_percentage, align 8, !dbg !1255642 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1443:21 | Function: histograms::update_histogram
+  Instruction: %236 = load double, double* %sample_percentage, align 8, !dbg !1255643 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1446:40 | Function: histograms::update_histogram
+  Instruction: %call260 = invoke zeroext i1 @_ZN10histogramsL15fill_value_mapsERKSt6vectorIP5Field19Stateless_allocatorIS2_NS_23Histogram_psi_key_allocE15My_free_functorEEdPK5TABLERSt3mapItSt10unique_ptrINS_14Value_map_baseESt14default_deleteISF_EESt4lessItES3_ISt4pairIKtSI_ES4_S5_EE(%"class.std::vector.1060"* dereferenceable(24) %resolved_fields, double %236, %struct.TABLE* %237, %"class.std::map.152"* dereferenceable(48) %value_maps)
+          to label %invoke.cont259 unwind label %lpad242, !dbg !1255646 | Location: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc:1446:7 | Function: histograms::update_histogram
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

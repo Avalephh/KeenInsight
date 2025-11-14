@@ -1,0 +1,245 @@
+Global Variable: srv_rollback_segments
+Explicit Data Flow (65):
+  Instruction: %0 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0mon.cc:1572:21 | Function: srv_mon_get_rseg_size
+  Instruction: store i64 %0, i64* %cur_rsegs, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0mon.cc:1572:9 | Function: srv_mon_get_rseg_size
+  Instruction: %6 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21389:7 | Function: innodb_rollback_segments_update
+  Instruction: %cmp = icmp eq i64 %6, %7, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21389:29 | Function: innodb_rollback_segments_update
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21389:7 | Function: innodb_rollback_segments_update
+  Instruction: %18 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:1113:50 | Function: srv_undo_tablespace_create
+  Instruction: %call30 = invoke zeroext i1 @_Z31trx_rseg_init_rollback_segmentsjm(i32 %17, i64 %18)
+          to label %invoke.cont29 unwind label %lpad, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:1113:8 | Function: srv_undo_tablespace_create
+  Instruction: %278 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1256163 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2236:3 | Function: srv_start
+  Instruction: %cmp863 = icmp ugt i64 %278, 0, !dbg !1256163 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2236:3 | Function: srv_start
+  Instruction: %conv864 = zext i1 %cmp863 to i32, !dbg !1256163 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2236:3 | Function: srv_start
+  Instruction: %cmp865 = icmp eq i32 0, %conv864, !dbg !1256163 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2236:3 | Function: srv_start
+  Instruction: %call867 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp865)
+          to label %invoke.cont866 unwind label %lpad, !dbg !1256163 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2236:3 | Function: srv_start
+  Instruction: br i1 %call867, label %if.then868, label %if.end870, !dbg !1256166 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2236:3 | Function: srv_start
+  Instruction: %279 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1256170 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2237:3 | Function: srv_start
+  Instruction: %cmp874 = icmp ule i64 %279, 128, !dbg !1256170 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2237:3 | Function: srv_start
+  Instruction: %conv875 = zext i1 %cmp874 to i32, !dbg !1256170 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2237:3 | Function: srv_start
+  Instruction: %cmp876 = icmp eq i32 0, %conv875, !dbg !1256170 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2237:3 | Function: srv_start
+  Instruction: %call878 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp876)
+          to label %invoke.cont877 unwind label %lpad, !dbg !1256170 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2237:3 | Function: srv_start
+  Instruction: br i1 %call878, label %if.then879, label %if.end881, !dbg !1256173 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2237:3 | Function: srv_start
+  Instruction: %280 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1256176 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2243:42 | Function: srv_start
+  Instruction: %call885 = invoke zeroext i1 @_Z33trx_rseg_adjust_rollback_segmentsm(i64 %280)
+          to label %invoke.cont884 unwind label %lpad, !dbg !1256178 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0start.cc:2243:8 | Function: srv_start
+  Instruction: %call174 = invoke dereferenceable(8) i64* @_ZSt3minImERKT_S2_S2_(i64* dereferenceable(8) @srv_rollback_segments, i64* dereferenceable(8) %ref.tmp172)
+          to label %invoke.cont173 unwind label %lpad115, !dbg !1255518 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0rseg.cc:926:11 | Function: trx_rseg_add_rollback_segments
+  Instruction: %call200 = invoke dereferenceable(8) i64* @_ZSt3minImERKT_S2_S2_(i64* dereferenceable(8) @srv_rollback_segments, i64* dereferenceable(8) %ref.tmp198)
+          to label %invoke.cont199 unwind label %lpad115, !dbg !1255534 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0rseg.cc:934:11 | Function: trx_rseg_add_rollback_segments
+  Instruction: %3 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1144:36 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: store i64 %3, i64* %target_rollback_segments, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1144:9 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %19 = load i64, i64* %target_rollback_segments, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1158:20 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %mul = mul i64 %19, %20, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1158:45 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %rem = urem i64 %18, %mul, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1158:17 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: store i64 %rem, i64* %window, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1157:11 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %21 = load i64, i64* %window, align 8, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1159:25 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %rem6 = urem i64 %21, %22, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1159:32 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: store i64 %rem6, i64* %spaces_slot, align 8, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1159:11 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %27 = load i64, i64* %spaces_slot, align 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1164:35 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %call7 = call %"struct.undo::Tablespace"* @_ZN4undo11Tablespaces2atEm(%"class.undo::Tablespaces"* %26, i64 %27), !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1164:32 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: store %"struct.undo::Tablespace"* %call7, %"struct.undo::Tablespace"** %undo_space, align 8, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1164:16 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %28 = load %"struct.undo::Tablespace"*, %"struct.undo::Tablespace"** %undo_space, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1172:10 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %call8 = call zeroext i1 @_ZN4undo10Tablespace18is_active_no_latchEv(%"struct.undo::Tablespace"* %28), !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1172:22 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %30 = load %"struct.undo::Tablespace"*, %"struct.undo::Tablespace"** %undo_space, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %call12 = call %class.Rsegs* @_ZN4undo10Tablespace5rsegsEv(%"struct.undo::Tablespace"* %30), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %call13 = call i64 @_ZN5Rsegs4sizeEv(%class.Rsegs* %call12), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %cmp14 = icmp ule i64 %29, %call13, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %conv15 = zext i1 %cmp14 to i32, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %cmp16 = icmp eq i32 0, %conv15, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %call17 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp16), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: br i1 %call17, label %if.then18, label %if.end19, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %23 = load i64, i64* %window, align 8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1160:23 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %div = udiv i64 %23, %24, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1160:30 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: store i64 %div, i64* %rseg_slot, align 8, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1160:11 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %29 = load i64, i64* %target_rollback_segments, align 8, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1177:5 | Function: get_next_redo_rseg_from_undo_spaces
+  Instruction: %0 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1198:31 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: store i64 %0, i64* %n_rollback_segments, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1198:9 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: %1 = load i64, i64* %n_rollback_segments, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1212:3 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: %cmp = icmp ule i64 %1, %call, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1212:3 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1212:3 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1212:3 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: %call2 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1212:3 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: br i1 %call2, label %if.then, label %if.end, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1212:3 | Function: get_next_redo_rseg_from_trx_sys
+  Instruction: %0 = load i64, i64* @srv_rollback_segments, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1246:31 | Function: get_next_temp_rseg
+  Instruction: store i64 %0, i64* %n_rollback_segments, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1246:9 | Function: get_next_temp_rseg
+  Instruction: %1 = load i64, i64* %n_rollback_segments, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1248:3 | Function: get_next_temp_rseg
+  Instruction: %cmp = icmp ule i64 %1, %call, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1248:3 | Function: get_next_temp_rseg
+  Instruction: %conv = zext i1 %cmp to i32, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1248:3 | Function: get_next_temp_rseg
+  Instruction: %cmp1 = icmp eq i32 0, %conv, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1248:3 | Function: get_next_temp_rseg
+  Instruction: %call2 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp1), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1248:3 | Function: get_next_temp_rseg
+  Instruction: br i1 %call2, label %if.then, label %if.end, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/trx/trx0trx.cc:1248:3 | Function: get_next_temp_rseg
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: trx_rseg_adjust_rollback_segments
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: PolicyMutex
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: mtr_t::~mtr_t
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: trx_rseg_adjust_rollback_segments
+  Controlled Function: srv_undo_tablespaces_mark_construction_done
+  Controlled Function: srv_init_abort_low
+  Controlled Function: undo::Tablespaces::s_lock
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: mtr_t::~mtr_t
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: undo::Tablespace::is_empty
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: undo::Tablespace::set_active
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: IB_thread create_detached_thread
+  Controlled Function: trx_purge_state
+  Controlled Function: IB_thread::operator=
+  Controlled Function: IB_thread::~IB_thread
+  Controlled Function: IB_thread::start
+  Controlled Function: unlikely
+  Controlled Function: fil_encryption_rotate
+  Controlled Function: IB_thread create_detached_thread
+  Controlled Function: IB_thread::operator=
+  Controlled Function: IB_thread::~IB_thread
+  Controlled Function: IB_thread::start
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::info::info
+  Controlled Function: IB_thread create_detached_thread
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: IB_thread::operator=
+  Controlled Function: IB_thread::~IB_thread
+  Controlled Function: IB_thread::start
+  Controlled Function: os_event_set
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: Tablespace::get_sum_of_sizes
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: fsp_header_get_tablespace_size
+  Controlled Function: SysTablespace::can_auto_extend_last_file
+  Controlled Function: clone_files_recovery
+  Controlled Function: SysTablespace::can_auto_extend_last_file
+  Controlled Function: log_get_lsn
+  Controlled Function: ib::info::info
+  Controlled Function: ib::error::error
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: ib::error::~error
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: srv_init_abort_low
+  Controlled Function: ib::error::~error
+  Controlled Function: srv_init_abort_low
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: mtr_t::~mtr_t
+  Controlled Function: trx_rseg_adjust_rollback_segments
+  Controlled Function: srv_undo_tablespaces_mark_construction_done
+  Controlled Function: srv_init_abort_low
+  Controlled Function: undo::Tablespaces::s_lock
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: mtr_t::~mtr_t
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: undo::Tablespace::is_empty
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: undo::Tablespace::set_active
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: IB_thread create_detached_thread
+  Controlled Function: trx_purge_state
+  Controlled Function: IB_thread::operator=
+  Controlled Function: IB_thread::~IB_thread
+  Controlled Function: IB_thread::start
+  Controlled Function: unlikely
+  Controlled Function: fil_encryption_rotate
+  Controlled Function: IB_thread create_detached_thread
+  Controlled Function: IB_thread::operator=
+  Controlled Function: IB_thread::~IB_thread
+  Controlled Function: IB_thread::start
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ib::info::info
+  Controlled Function: IB_thread create_detached_thread
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: IB_thread::operator=
+  Controlled Function: IB_thread::~IB_thread
+  Controlled Function: IB_thread::start
+  Controlled Function: os_event_set
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: Tablespace::get_sum_of_sizes
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: fsp_header_get_tablespace_size
+  Controlled Function: SysTablespace::can_auto_extend_last_file
+  Controlled Function: clone_files_recovery
+  Controlled Function: SysTablespace::can_auto_extend_last_file
+  Controlled Function: log_get_lsn
+  Controlled Function: ib::info::info
+  Controlled Function: ib::error::error
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: ib::error::~error
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::error
+  Controlled Function: ib::error::~error
+  Controlled Function: srv_init_abort_low
+  Controlled Function: ib::error::~error
+  Controlled Function: srv_init_abort_low
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: undo::Tablespace::get_active
+  Controlled Function: undo::Tablespaces::s_unlock
+  Controlled Function: std::__atomic_base
+  Controlled Function: unlikely
+  Controlled Function: undo::Tablespaces::at
+  Controlled Function: undo::Tablespace::is_active_no_latch
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: undo::Tablespace::rsegs
+  Controlled Function: Rsegs::size
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Rsegs::s_lock
+  Controlled Function: Rsegs::at
+  Controlled Function: Rsegs::s_unlock
+  Controlled Function: std::__atomic_base
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: Rsegs::at
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: fsp_is_system_temporary
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+
+Implicit Control Flow:
+
+----------------------------------------

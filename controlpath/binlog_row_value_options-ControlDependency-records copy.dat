@@ -1,0 +1,44 @@
+Global Variable: System_variables.68
+Explicit Data Flow (22):
+  Instruction: %12 = load i64, i64* %binlog_row_value_options, align 8, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1461:25 | Function: check_binlog_row_image
+  Instruction: %cmp8 = icmp ne i64 %12, 0, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1461:50 | Function: check_binlog_row_image
+  Instruction: br i1 %cmp8, label %if.then9, label %if.end13, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1458:9 | Function: check_binlog_row_image
+  Instruction: %23 = load i64, i64* %binlog_row_value_options, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1397:25 | Function: binlog_format_check
+  Instruction: %cmp30 = icmp ne i64 %23, 0, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1397:50 | Function: binlog_format_check
+  Instruction: br i1 %cmp30, label %if.then31, label %if.end33, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1394:9 | Function: binlog_format_check
+  Instruction: %3 = load i64, i64* %binlog_row_value_options, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7553:23 | Function: TABLE::setup_partial_update
+  Instruction: %and = and i64 %3, 1, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7553:48 | Function: TABLE::setup_partial_update
+  Instruction: %cmp = icmp ne i64 %and, 0, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7553:72 | Function: TABLE::setup_partial_update
+  Instruction: br i1 %cmp, label %land.lhs.true, label %land.end, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7553:77 | Function: TABLE::setup_partial_update
+  Instruction: %11 = load i64, i64* %binlog_row_value_options15, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7558:3 | Function: TABLE::setup_partial_update
+  Instruction: %and16 = and i64 %11, 1, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7558:3 | Function: TABLE::setup_partial_update
+  Instruction: %cmp17 = icmp ne i64 %and16, 0, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7558:3 | Function: TABLE::setup_partial_update
+  Instruction: %conv18 = zext i1 %cmp17 to i32, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7558:3 | Function: TABLE::setup_partial_update
+  Instruction: call void (i8*, ...) @_Z11_db_doprnt_PKcz(i8* getelementptr inbounds ([145 x i8], [145 x i8]* @.str.147.20292, i64 0, i64 0), i32 %conv13, i32 %conv18, i32 %conv20, i32 %conv25, i32 %conv27, i32 %call28), !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:7558:3 | Function: TABLE::setup_partial_update
+  Instruction: %10 = load i64, i64* %binlog_row_value_options, align 8, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11200:38 | Function: THD::binlog_update_row
+  Instruction: call void @_ZN12_GLOBAL__N_115Row_data_memoryC2EP5TABLEPKhS4_y(%"class.(anonymous namespace)::Row_data_memory"* %row_data, %struct.TABLE* %7, i8* %8, i8* %9, i64 %10), !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11199:19 | Function: THD::binlog_update_row
+  Instruction: %24 = load i64, i64* %binlog_row_value_options13, align 8, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11211:49 | Function: THD::binlog_update_row
+  Instruction: %call15 = invoke i64 @_Z8pack_rowP5TABLEPK9MY_BITMAPPhPKh19enum_row_image_typey(%struct.TABLE* %19, %struct.MY_BITMAP* %21, i8* %22, i8* %23, i32 2, i64 %24)
+          to label %invoke.cont14 unwind label %lpad, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:11209:29 | Function: THD::binlog_update_row
+  Instruction: %1 = load i64, i64* %binlog_row_value_options, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:12523:27 | Function: Update_rows_log_event::get_update_rows_event_type
+  Instruction: %cmp = icmp ne i64 %1, 0, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:12523:52 | Function: Update_rows_log_event::get_update_rows_event_type
+  Instruction: br i1 %cmp, label %cond.true, label %cond.false, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:12523:8 | Function: Update_rows_log_event::get_update_rows_event_type
+
+Implicit Data Flow (2):
+  Instruction: %8 = phi i1 [ false, %land.lhs.true6 ], [ false, %land.lhs.true2 ], [ false, %land.lhs.true ], [ false, %entry ], [ %tobool9, %land.rhs ], !dbg !1255279 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:0:0TABLE::setup_partial_update
+  Instruction: %cond1 = phi i32 [ 39, %cond.true ], [ %cond, %cond.false ], !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:12523:8Update_rows_log_event::get_update_rows_event_type
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: MYSQL_BIN_LOG::is_open
+  Controlled Function: THD::is_current_stmt_binlog_format_row
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,75 @@
+Global Variable: System_variables.131
+Explicit Data Flow (42):
+  Instruction: %1 = load i64, i64* %terminology_use_previous, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:574:19 | Function: THD::proc_info
+  Instruction: %conv = trunc i64 %1 to i32, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:573:7 | Function: THD::proc_info
+  Instruction: store i32 %conv, i32* %version, align 4, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:572:56 | Function: THD::proc_info
+  Instruction: %2 = load i32, i32* %version, align 4, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:575:3 | Function: THD::proc_info
+  Instruction: invoke void (i8*, ...) @_Z11_db_doprnt_PKcz(i8* getelementptr inbounds ([36 x i8], [36 x i8]* @.str.23.9404, i64 0, i64 0), i32 %2)
+          to label %invoke.cont5 unwind label %lpad, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:575:3 | Function: THD::proc_info
+  Instruction: %7 = load i32, i32* %version, align 4, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:576:28 | Function: THD::proc_info
+  Instruction: %cmp6 = icmp ne i32 %7, 0, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:576:36 | Function: THD::proc_info
+  Instruction: br i1 %cmp6, label %if.then7, label %if.end45, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:576:7 | Function: THD::proc_info
+  Instruction: %18 = load i32, i32* %version, align 4, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:581:7 | Function: THD::proc_info
+  Instruction: %cmp24 = icmp sle i32 %18, %19, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:581:7 | Function: THD::proc_info
+  Instruction: br i1 %cmp24, label %cond.true, label %cond.false, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:581:7 | Function: THD::proc_info
+  Instruction: %27 = load i32, i32* %version, align 4, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:592:9 | Function: THD::proc_info
+  Instruction: %cmp41 = icmp sle i32 %27, %28, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:592:17 | Function: THD::proc_info
+  Instruction: br i1 %cmp41, label %if.then42, label %if.end44, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:592:9 | Function: THD::proc_info
+  Instruction: %1 = load i64, i64* %terminology_use_previous, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:258:19 | Function: Command_names::translate[abi:cxx11]
+  Instruction: %conv = trunc i64 %1 to i32, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:257:7 | Function: Command_names::translate[abi:cxx11]
+  Instruction: store i32 %conv, i32* %version, align 4, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:256:56 | Function: Command_names::translate[abi:cxx11]
+  Instruction: %2 = load i32, i32* %version, align 4, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:259:7 | Function: Command_names::translate[abi:cxx11]
+  Instruction: %cmp = icmp ne i32 %2, 0, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:259:15 | Function: Command_names::translate[abi:cxx11]
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:259:49 | Function: Command_names::translate[abi:cxx11]
+  Instruction: %3 = load i32, i32* %version, align 4, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:259:52 | Function: Command_names::translate[abi:cxx11]
+  Instruction: %cmp1 = icmp sle i32 %3, 1, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:259:60 | Function: Command_names::translate[abi:cxx11]
+  Instruction: br i1 %cmp1, label %if.then, label %if.end, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:259:7 | Function: Command_names::translate[abi:cxx11]
+  Instruction: %4 = load i64, i64* %terminology_use_previous, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:714:33 | Function: thd_get_current_thd_terminology_use_previous
+  Instruction: %conv = trunc i64 %4 to i32, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:714:10 | Function: thd_get_current_thd_terminology_use_previous
+  Instruction: store i32 %conv, i32* %retval, align 4, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:714:3 | Function: thd_get_current_thd_terminology_use_previous
+  Instruction: %5 = load i32, i32* %retval, align 4, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:715:1 | Function: thd_get_current_thd_terminology_use_previous
+  Instruction: ret i32 %5, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:715:1 | Function: thd_get_current_thd_terminology_use_previous
+  Instruction: %call = call i32 @thd_get_current_thd_terminology_use_previous(), !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:233:23 | Function: terminology_use_previous::is_older_required
+  Instruction: %conv = zext i32 %call to i64, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:233:23 | Function: terminology_use_previous::is_older_required
+  Instruction: store i64 %conv, i64* %i_n_c, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:233:15 | Function: terminology_use_previous::is_older_required
+  Instruction: %0 = load i64, i64* %i_n_c, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:234:10 | Function: terminology_use_previous::is_older_required
+  Instruction: %cmp = icmp ne i64 %0, 0, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:234:16 | Function: terminology_use_previous::is_older_required
+  Instruction: br i1 %cmp, label %land.rhs, label %land.end, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:234:21 | Function: terminology_use_previous::is_older_required
+  Instruction: %1 = load i64, i64* %i_n_c, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:234:24 | Function: terminology_use_previous::is_older_required
+  Instruction: %cmp2 = icmp ule i64 %1, %conv1, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:234:30 | Function: terminology_use_previous::is_older_required
+  Instruction: %3 = phi i1 [ false, %entry ], [ %cmp2, %land.rhs ], !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:0:0 | Function: terminology_use_previous::is_older_required
+  Instruction: ret i1 %3, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:234:3 | Function: terminology_use_previous::is_older_required
+  Instruction: %call = invoke zeroext i1 @_ZN24terminology_use_previous17is_older_requiredENS_26enum_compatibility_versionE(i32 %1)
+          to label %invoke.cont unwind label %lpad, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_instr_class.cc:228:7 | Function: PFS_instr_name::str
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_instr_class.cc:227:7 | Function: PFS_instr_name::str
+  Instruction: %call = call zeroext i1 @_ZN24terminology_use_previous17is_older_requiredENS_26enum_compatibility_versionE(i32 %1), !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_instr_class.cc:235:7 | Function: PFS_instr_name::length
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/pfs_instr_class.cc:234:7 | Function: PFS_instr_name::length
+
+Implicit Data Flow (2):
+  Instruction: %cond-lvalue = phi [4 x i8]* [ @.str.25.9405, %cond.true ], [ @.str.26.9406, %cond.false ], !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:581:7THD::proc_info
+  Instruction: %3 = phi i1 [ false, %entry ], [ %cmp2, %land.rhs ], !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/perfschema/terminology_use_previous.cc:0:0terminology_use_previous::is_older_required
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: terminology_use_previous::lookup
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_doprnt_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

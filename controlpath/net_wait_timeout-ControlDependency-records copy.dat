@@ -1,0 +1,34 @@
+Global Variable: System_variables.39
+Explicit Data Flow (18):
+  Instruction: %174 = load i64, i64* %net_wait_timeout, align 8, !dbg !1255494 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:857:51 | Function: prepare_new_connection_state
+  Instruction: %conv233 = trunc i64 %174 to i32, !dbg !1255492 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:857:36 | Function: prepare_new_connection_state
+  Instruction: invoke void @_Z23my_net_set_read_timeoutP3NETj(%struct.NET* %172, i32 %conv233)
+          to label %invoke.cont234 unwind label %lpad153, !dbg !1255495 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:857:7 | Function: prepare_new_connection_state
+  Instruction: %12 = load i64, i64* %net_wait_timeout, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1338:47 | Function: do_command
+  Instruction: %conv = trunc i64 %12 to i32, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1338:32 | Function: do_command
+  Instruction: invoke void @_Z23my_net_set_read_timeoutP3NETj(%struct.NET* %10, i32 %conv)
+          to label %invoke.cont10 unwind label %lpad, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:1338:3 | Function: do_command
+  Instruction: %1 = load i64, i64* %net_wait_timeout, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:119:25 | Function: thd_get_net_wait_timeout
+  Instruction: ret i64 %1, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_api.cc:119:3 | Function: thd_get_net_wait_timeout
+  Instruction: %call56 = invoke i64 @_Z24thd_get_net_wait_timeoutP3THD(%class.THD* %58)
+          to label %invoke.cont55 unwind label %lpad, !dbg !1255430 | Location: /root/LLVM/mysql-8.0.36/sql-common/net_serv.cc:1404:44 | Function: net_read_raw_loop
+  Instruction: invoke void @_ZNSt7__cxx119to_stringEm(%"class.std::__cxx11::basic_string"* sret %timeout, i64 %call56)
+          to label %invoke.cont57 unwind label %lpad, !dbg !1255431 | Location: /root/LLVM/mysql-8.0.36/sql-common/net_serv.cc:1404:29 | Function: net_read_raw_loop
+  Instruction: store i64 %8, i64* %net_wait_timeout, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc:3608:37 | Function: server_mpvio_update_thd
+  Instruction: %net_wait_timeout = getelementptr inbounds %struct.System_variables.48070, %struct.System_variables.48070* %variables2, i32 0, i32 39, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc:3608:20 | Function: server_mpvio_update_thd
+  Instruction: %6 = load i64, i64* %net_wait_timeout, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:865:39 | Function: Trans_delegate::trans_begin
+  Instruction: store i64 %6, i64* %hold_timeout, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:865:22 | Function: Trans_delegate::trans_begin
+  Instruction: %hold_timeout = getelementptr inbounds %struct.Trans_param, %struct.Trans_param* %param, i32 0, i32 17, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:865:9 | Function: Trans_delegate::trans_begin
+  Instruction: %12 = load i64, i64* %net_wait_timeout, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:669:42 | Function: mysql_clone_get_command
+  Instruction: %conv = trunc i64 %12 to i32, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:669:27 | Function: mysql_clone_get_command
+  Instruction: invoke void @_ZL16set_idle_timeoutP3NETj(%struct.NET* %10, i32 %conv)
+          to label %invoke.cont8 unwind label %lpad, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:669:5 | Function: mysql_clone_get_command
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

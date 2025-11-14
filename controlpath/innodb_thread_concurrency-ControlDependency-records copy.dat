@@ -1,0 +1,113 @@
+Global Variable: srv_thread_concurrency
+Explicit Data Flow (58):
+  Instruction: %57 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255544 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1815:21 | Function: log_sys_init
+  Instruction: store i64 %57, i64* %ref.tmp144, align 8, !dbg !1255545 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1815:15 | Function: log_sys_init
+  Instruction: invoke void @_ZN2ib5errorC2IJymyRPKcEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured140, i32 13092, i64* dereferenceable(8) %ref.tmp141, i64* dereferenceable(8) %ref.tmp144, i64* dereferenceable(8) %ref.tmp145, i8** dereferenceable(8) @INNODB_PARAMETERS_MSG)
+          to label %invoke.cont148 unwind label %lpad13, !dbg !1255550 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1813:5 | Function: log_sys_init
+  Instruction: %0 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1111:7 | Function: log_concurrency_margin
+  Instruction: %add = add i64 %0, 10, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1111:30 | Function: log_concurrency_margin
+  Instruction: store i64 %add, i64* %max_total_threads, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1110:16 | Function: log_concurrency_margin
+  Instruction: %3 = load i64, i64* %max_total_threads, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1143:37 | Function: log_concurrency_margin
+  Instruction: %mul1 = mul i64 %2, %3, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1143:35 | Function: log_concurrency_margin
+  Instruction: store i64 %mul1, i64* %margin, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1143:8 | Function: log_concurrency_margin
+  Instruction: %4 = load i64, i64* %margin, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1148:10 | Function: log_concurrency_margin
+  Instruction: %add2 = add i64 %4, 4096, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1148:10 | Function: log_concurrency_margin
+  Instruction: store i64 %add2, i64* %margin, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1148:10 | Function: log_concurrency_margin
+  Instruction: %6 = load i64, i64* %margin, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1152:10 | Function: log_concurrency_margin
+  Instruction: %add5 = add i64 %6, %call, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1152:10 | Function: log_concurrency_margin
+  Instruction: store i64 %add5, i64* %margin, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1152:10 | Function: log_concurrency_margin
+  Instruction: %8 = load i64, i64* %margin, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1167:7 | Function: log_concurrency_margin
+  Instruction: %cmp = icmp ugt i64 %8, %9, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1167:14 | Function: log_concurrency_margin
+  Instruction: br i1 %cmp, label %if.then, label %if.else, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1167:7 | Function: log_concurrency_margin
+  Instruction: store i64 %10, i64* %margin, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1168:12 | Function: log_concurrency_margin
+  Instruction: %13 = load i64, i64* %margin, align 8, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1174:10 | Function: log_concurrency_margin
+  Instruction: ret i64 %13, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1174:3 | Function: log_concurrency_margin
+  Instruction: %call3 = call i64 @_Z22log_concurrency_marginmRb(i64 %4, i8* dereferenceable(1) %is_safe), !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1183:23 | Function: log_update_concurrency_margin
+  Instruction: store i64 %call3, i64* %margin, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1183:14 | Function: log_update_concurrency_margin
+  Instruction: %7 = load i64, i64* %margin, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1185:32 | Function: log_update_concurrency_margin
+  Instruction: store i64 %7, i64* %__i.addr.i, align 8 | Location: :0:0 | Function: log_update_concurrency_margin
+  Instruction: %10 = load i64, i64* %__i.addr.i, align 8, !dbg !1255316 | Location: /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/atomic_base.h:397:26 | Function: log_update_concurrency_margin
+  Instruction: store i64 %10, i64* %.atomictmp.i, align 8, !dbg !1255317 | Location: /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/atomic_base.h:397:2 | Function: log_update_concurrency_margin
+  Instruction: %11 = load i64, i64* %.atomictmp.i, align 8, !dbg !1255317 | Location: /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/atomic_base.h:397:2 | Function: log_update_concurrency_margin
+  Instruction: store atomic i64 %11, i64* %_M_i.i monotonic, align 8, !dbg !1255317 | Location: /usr/lib/gcc/x86_64-linux-gnu/9/../../../../include/c++/9/bits/atomic_base.h:397:2 | Function: log_update_concurrency_margin
+  Instruction: %18 = load i64, i64* %margin, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1188:3 | Function: log_update_concurrency_margin
+  Instruction: call void @_Z11monitor_set12monitor_id_tlbb(i32 210, i64 %18, i1 zeroext true, i1 zeroext true), !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0chkp.cc:1188:3 | Function: log_update_concurrency_margin
+  Instruction: %call123 = invoke i64 @_Z22log_concurrency_marginmRb(i64 %call121, i8* dereferenceable(1) %is_concurrency_margin_safe)
+          to label %invoke.cont122 unwind label %lpad13, !dbg !1255499 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1783:3 | Function: log_sys_init
+  Instruction: %call132 = invoke i64 @_Z22log_concurrency_marginmRb(i64 %call130, i8* dereferenceable(1) %is_concurrency_margin_safe)
+          to label %invoke.cont131 unwind label %lpad13, !dbg !1255523 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc:1796:7 | Function: log_sys_init
+  Instruction: call void @_ZN2ib4infoC2IJRmEEEiDpOT_(%"class.ib::info"* %agg.tmp.ensured, i32 13095, i64* dereferenceable(8) @srv_thread_concurrency), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:21860:3 | Function: innodb_thread_concurrency_update
+  Instruction: %0 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1875:29 | Function: innobase_srv_conc_enter_innodb
+  Instruction: %conv = trunc i64 %0 to i32, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1875:29 | Function: innobase_srv_conc_enter_innodb
+  Instruction: %cmp = icmp slt i32 %call, %conv, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1874:50 | Function: innobase_srv_conc_enter_innodb
+  Instruction: ret i1 %cmp, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1874:13 | Function: innobase_srv_conc_enter_innodb
+  Instruction: %call3 = call zeroext i1 @_ZZL30innobase_srv_conc_enter_innodbP14row_prebuilt_tENKUlvE_clEv(%struct.PSI_instr* %cond), !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0ut.ic:132:11 | Function: bool ut::wait_for
+  Instruction: %lnot = xor i1 %call3, true, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0ut.ic:132:10 | Function: bool ut::wait_for
+  Instruction: br i1 %lnot, label %while.body, label %while.end, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0ut.ic:132:3 | Function: bool ut::wait_for
+  Instruction: %3 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1863:7 | Function: innobase_srv_conc_enter_innodb
+  Instruction: %tobool = icmp ne i64 %3, 0, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1863:7 | Function: innobase_srv_conc_enter_innodb
+  Instruction: br i1 %tobool, label %if.then2, label %if.end17, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:1863:7 | Function: innobase_srv_conc_enter_innodb
+  Instruction: %2 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:123:9 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %cmp1 = icmp eq i64 %2, 0, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:123:32 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: br i1 %cmp1, label %if.then2, label %if.end7, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:123:9 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %27 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:134:18 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %conv9 = trunc i64 %27 to i32, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:134:18 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %cmp10 = icmp slt i32 %26, %conv9, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:133:59 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: br i1 %cmp10, label %if.then11, label %if.end34, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:133:9 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %42 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:139:32 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %conv13 = trunc i64 %42 to i32, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:139:32 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %cmp14 = icmp sle i32 %41, %conv13, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:139:20 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: br i1 %cmp14, label %if.then15, label %if.end32, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:139:11 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %6 = load i64, i64* @srv_thread_concurrency, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:244:8 | Function: srv_conc_force_enter_innodb
+  Instruction: %tobool4 = icmp ne i64 %6, 0, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:244:8 | Function: srv_conc_force_enter_innodb
+  Instruction: br i1 %tobool4, label %if.end6, label %if.then5, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:244:7 | Function: srv_conc_force_enter_innodb
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: std::chrono::_V2::steady_clock::now
+  Controlled Function: std::common_type
+  Controlled Function: std::chrono::duration
+  Controlled Function: bool std::chrono::operator
+  Controlled Function: bool std::chrono::operator>
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: innobase_srv_conc_enter_innodb
+  Controlled Function: thd_is_replication_slave_thread
+  Controlled Function: srv_conc_enter_innodb
+  Controlled Function: get_srv_replication_delay
+  Controlled Function: std::chrono::duration
+  Controlled Function: bool ut::wait_for
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: srv_enter_innodb_with_tickets
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: std::operator&
+  Controlled Function: trx_is_interrupted
+  Controlled Function: __clang_call_terminate
+  Controlled Function: srv_enter_innodb_with_tickets
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: std::operator&
+  Controlled Function: trx_is_interrupted
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: srv_enter_innodb_with_tickets
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::chrono::duration
+  Controlled Function: void std::this_thread::sleep_for
+  Controlled Function: trx_is_interrupted
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::operator&
+  Controlled Function: __clang_call_terminate
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+
+Implicit Control Flow:
+
+----------------------------------------

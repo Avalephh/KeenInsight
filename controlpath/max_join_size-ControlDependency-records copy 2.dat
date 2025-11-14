@@ -1,0 +1,23 @@
+Global Variable: System_variables.19
+Explicit Data Flow (7):
+  Instruction: %114 = load i64, i64* %max_join_size, align 8, !dbg !1255625 | Location: /root/LLVM/mysql-8.0.36/sql/sql_union.cc:1155:46 | Function: Query_expression::optimize
+  Instruction: %conv289 = uitofp i64 %114 to double, !dbg !1255623 | Location: /root/LLVM/mysql-8.0.36/sql/sql_union.cc:1155:31 | Function: Query_expression::optimize
+  Instruction: %cmp290 = fcmp ogt double %call287, %conv289, !dbg !1255626 | Location: /root/LLVM/mysql-8.0.36/sql/sql_union.cc:1154:68 | Function: Query_expression::optimize
+  Instruction: br i1 %cmp290, label %if.then291, label %if.end293, !dbg !1255627 | Location: /root/LLVM/mysql-8.0.36/sql/sql_union.cc:1150:7 | Function: Query_expression::optimize
+  Instruction: %4 = load i64, i64* %max_join_size, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3038:11 | Function: fix_max_join_size
+  Instruction: %cmp = icmp eq i64 %4, -1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3038:25 | Function: fix_max_join_size
+  Instruction: br i1 %cmp, label %if.then, label %if.else, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3038:7 | Function: fix_max_join_size
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_error
+  Controlled Function: Change_current_query_block::~Change_current_query_block
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Change_current_query_block::~Change_current_query_block
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+
+Implicit Control Flow:
+
+----------------------------------------

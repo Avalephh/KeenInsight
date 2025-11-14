@@ -1,0 +1,117 @@
+Global Variable: srv_sync_array_size
+Explicit Data Flow (67):
+  Instruction: %1 = load i64, i64* @srv_sync_array_size, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:944:3 | Function: sync_array_init
+  Instruction: %cmp3 = icmp ugt i64 %1, 0, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:944:3 | Function: sync_array_init
+  Instruction: %conv4 = zext i1 %cmp3 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:944:3 | Function: sync_array_init
+  Instruction: %cmp5 = icmp eq i32 0, %conv4, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:944:3 | Function: sync_array_init
+  Instruction: %call6 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp5), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:944:3 | Function: sync_array_init
+  Instruction: br i1 %call6, label %if.then7, label %if.end8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:944:3 | Function: sync_array_init
+  Instruction: %3 = load i64, i64* @srv_sync_array_size, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:947:21 | Function: sync_array_init
+  Instruction: store i64 %3, i64* @sync_array_size, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:947:19 | Function: sync_array_init
+  Instruction: %4 = load i64, i64* @sync_array_size, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:62 | Function: sync_array_get
+  Instruction: %rem = urem i64 %call, %4, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:60 | Function: sync_array_get
+  Instruction: %arrayidx1 = getelementptr inbounds %struct.sync_array_t*, %struct.sync_array_t** %3, i64 %rem, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:7 | Function: sync_array_get
+  Instruction: %5 = load %struct.sync_array_t*, %struct.sync_array_t** %arrayidx1, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:7 | Function: sync_array_get
+  Instruction: store %struct.sync_array_t* %5, %struct.sync_array_t** %retval, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:48:3 | Function: sync_array_get
+  Instruction: %6 = load %struct.sync_array_t*, %struct.sync_array_t** %retval, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:50:1 | Function: sync_array_get
+  Instruction: ret %struct.sync_array_t* %6, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:50:1 | Function: sync_array_get
+  Instruction: %call = call %struct.sync_array_t* @_ZL14sync_array_getv(), !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:61:16 | Function: sync_array_get_and_reserve_cell
+  Instruction: store %struct.sync_array_t* %call, %struct.sync_array_t** %sync_arr, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:61:14 | Function: sync_array_get_and_reserve_cell
+  Instruction: %9 = load %struct.sync_array_t*, %struct.sync_array_t** %sync_arr, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:62:37 | Function: sync_array_get_and_reserve_cell
+  Instruction: %call2 = call %struct.sync_cell_t* @_Z23sync_array_reserve_cellP12sync_array_tPvmN2ut8LocationE(%struct.sync_array_t* %9, i8* %10, i64 %11, i8* %16, i64 %18), !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:62:13 | Function: sync_array_get_and_reserve_cell
+  Instruction: %0 = load i64, i64* @sync_array_size, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:44:7 | Function: sync_array_get
+  Instruction: %cmp = icmp ule i64 %0, 1, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:44:23 | Function: sync_array_get
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:44:7 | Function: sync_array_get
+  Instruction: %5 = load i64, i64* @sync_array_size, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:57:25 | Function: sync_array_get_and_reserve_cell
+  Instruction: %cmp = icmp ult i64 %4, %5, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:57:23 | Function: sync_array_get_and_reserve_cell
+  Instruction: br i1 %cmp, label %land.rhs, label %land.end, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:57:41 | Function: sync_array_get_and_reserve_cell
+  Instruction: %1 = load i64, i64* @sync_array_size, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:281:25 | Function: sync_array_detect_deadlock
+  Instruction: %cmp = icmp ult i64 %0, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:281:23 | Function: sync_array_detect_deadlock
+  Instruction: br i1 %cmp, label %for.body, label %for.end45, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:281:3 | Function: sync_array_detect_deadlock
+  Instruction: %1 = load i64, i64* @sync_array_size, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:776:25 | Function: sync_arr_wake_threads_if_sema_free
+  Instruction: %cmp = icmp ult i64 %0, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:776:23 | Function: sync_arr_wake_threads_if_sema_free
+  Instruction: br i1 %cmp, label %for.body, label %for.end, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:776:3 | Function: sync_arr_wake_threads_if_sema_free
+  Instruction: %1 = load i64, i64* @sync_array_size, align 8, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:861:19 | Function: sync_array_print_long_waits
+  Instruction: %cmp = icmp ult i64 %0, %1, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:861:17 | Function: sync_array_print_long_waits
+  Instruction: br i1 %cmp, label %for.body, label %for.end, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:861:3 | Function: sync_array_print_long_waits
+  Instruction: %5 = load i64, i64* @sync_array_size, align 8, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:950:43 | Function: sync_array_init
+  Instruction: call void @_ZN2ut5CountC2Em(%union.anon.0* %agg.tmp21, i64 %5), !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:950:33 | Function: sync_array_init
+  Instruction: %9 = load i64, i64* @sync_array_size, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:952:41 | Function: sync_array_init
+  Instruction: %div = udiv i64 %sub, %9, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:952:39 | Function: sync_array_init
+  Instruction: %add = add i64 1, %div, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:952:21 | Function: sync_array_init
+  Instruction: store i64 %add, i64* %n_slots, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:952:9 | Function: sync_array_init
+  Instruction: %call35 = call %struct.sync_array_t* @_ZN2ut11new_withkeyI12sync_array_tJRmEEEPT_NS_16PSI_memory_key_tEDpOT0_(i32 %13, i64* dereferenceable(8) %n_slots), !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:956:9 | Function: sync_array_init
+  Instruction: %11 = load i64, i64* @sync_array_size, align 8, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:954:25 | Function: sync_array_init
+  Instruction: %cmp25 = icmp ult i64 %10, %11, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:954:23 | Function: sync_array_init
+  Instruction: br i1 %cmp25, label %for.body, label %for.end, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:954:3 | Function: sync_array_init
+  Instruction: %1 = load i64, i64* @sync_array_size, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:962:25 | Function: sync_array_close
+  Instruction: %cmp = icmp ult i64 %0, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:962:23 | Function: sync_array_close
+  Instruction: br i1 %cmp, label %for.body, label %for.end, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:962:3 | Function: sync_array_close
+  Instruction: %1 = load i64, i64* @sync_array_size, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:973:25 | Function: sync_array_print
+  Instruction: %cmp = icmp ult i64 %0, %1, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:973:23 | Function: sync_array_print
+  Instruction: br i1 %cmp, label %for.body, label %for.end, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/sync/sync0arr.cc:973:3 | Function: sync_array_print
+  Instruction: %5 = load i64, i64* @sync_array_size, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:57:25 | Function: sync_array_get_and_reserve_cell
+  Instruction: %cmp = icmp ult i64 %4, %5, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:57:23 | Function: sync_array_get_and_reserve_cell
+  Instruction: br i1 %cmp, label %land.rhs, label %land.end, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:57:41 | Function: sync_array_get_and_reserve_cell
+  Instruction: %0 = load i64, i64* @sync_array_size, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:44:7 | Function: sync_array_get
+  Instruction: %cmp = icmp ule i64 %0, 1, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:44:23 | Function: sync_array_get
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:44:7 | Function: sync_array_get
+  Instruction: %4 = load i64, i64* @sync_array_size, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:62 | Function: sync_array_get
+  Instruction: %rem = urem i64 %call, %4, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:60 | Function: sync_array_get
+  Instruction: %arrayidx1 = getelementptr inbounds %struct.sync_array_t*, %struct.sync_array_t** %3, i64 %rem, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:7 | Function: sync_array_get
+  Instruction: %5 = load %struct.sync_array_t*, %struct.sync_array_t** %arrayidx1, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:49:7 | Function: sync_array_get
+  Instruction: store %struct.sync_array_t* %5, %struct.sync_array_t** %retval, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:48:3 | Function: sync_array_get
+  Instruction: %6 = load %struct.sync_array_t*, %struct.sync_array_t** %retval, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:50:1 | Function: sync_array_get
+  Instruction: ret %struct.sync_array_t* %6, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:50:1 | Function: sync_array_get
+  Instruction: %call = call %struct.sync_array_t* @_ZL14sync_array_getv.80271(), !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:61:16 | Function: sync_array_get_and_reserve_cell
+  Instruction: store %struct.sync_array_t* %call, %struct.sync_array_t** %sync_arr, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:61:14 | Function: sync_array_get_and_reserve_cell
+  Instruction: %9 = load %struct.sync_array_t*, %struct.sync_array_t** %sync_arr, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:62:37 | Function: sync_array_get_and_reserve_cell
+  Instruction: %call2 = call %struct.sync_cell_t* @_Z23sync_array_reserve_cellP12sync_array_tPvmN2ut8LocationE(%struct.sync_array_t* %9, i8* %10, i64 %11, i8* %16, i64 %18), !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:62:13 | Function: sync_array_get_and_reserve_cell
+
+Implicit Data Flow (2):
+  Instruction: %8 = phi i1 [ false, %for.cond ], [ %cmp1, %land.rhs ], !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:0:0
+  Instruction: %8 = phi i1 [ false, %for.cond ], [ %cmp1, %land.rhs ], !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/include/sync0arr.ic:0:0
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::Count::Count
+  Controlled Function: sync_array_t** ut::new_arr_withkey
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: sync_array_t* ut::new_withkey
+  Controlled Function: counter_indexer_t
+  Controlled Function: sync_array_get
+  Controlled Function: sync_array_reserve_cell
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: rw_lock_debug_mutex_enter
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: sync_array_get_nth_cell
+  Controlled Function: unlikely
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: unlikely
+  Controlled Function: rw_lock_debug_mutex_exit
+  Controlled Function: PolicyMutex
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: sync_array_detect_deadlock
+  Controlled Function: sync_array_wake_threads_if_sema_free_low
+  Controlled Function: void mutex_enter_inline
+  Controlled Function: sync_array_print_long_waits_low
+  Controlled Function: PolicyMutex
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: ut::make_psi_memory_key
+  Controlled Function: sync_array_t* ut::new_withkey
+  Controlled Function: sync_array_free
+  Controlled Function: sync_array_print_info
+  Controlled Function: sync_array_get
+  Controlled Function: sync_array_reserve_cell
+  Controlled Function: counter_indexer_t
+
+Implicit Control Flow:
+
+----------------------------------------

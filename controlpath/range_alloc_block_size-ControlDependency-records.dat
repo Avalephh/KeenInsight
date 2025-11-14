@@ -1,0 +1,41 @@
+Global Variable: System_variables.55
+Explicit Data Flow (20):
+  Instruction: %309 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255937 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:9852:53 | Function: make_join_query_block
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root, i32 %307, i64 %309)
+          to label %invoke.cont478 unwind label %lpad344, !dbg !1255933 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:9851:24 | Function: make_join_query_block
+  Instruction: %360 = load i64, i64* %range_alloc_block_size535, align 8, !dbg !1256010 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:9882:53 | Function: make_join_query_block
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root533, i32 %358, i64 %360)
+          to label %invoke.cont536 unwind label %lpad522, !dbg !1256006 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:9881:24 | Function: make_join_query_block
+  Instruction: %186 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255697 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:2382:49 | Function: test_if_skip_sort_order
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root, i32 %184, i64 %186)
+          to label %invoke.cont228 unwind label %lpad220, !dbg !1255693 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:2381:20 | Function: test_if_skip_sort_order
+  Instruction: %315 = load i64, i64* %range_alloc_block_size378, align 8, !dbg !1255927 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:2497:45 | Function: test_if_skip_sort_order
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root376, i32 %313, i64 %315)
+          to label %invoke.cont379 unwind label %lpad365, !dbg !1255923 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:2496:16 | Function: test_if_skip_sort_order
+  Instruction: %32 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:2888:47 | Function: can_switch_from_ref_to_range
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root, i32 %30, i64 %32)
+          to label %invoke.cont25 unwind label %lpad24, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:2887:18 | Function: can_switch_from_ref_to_range
+  Instruction: %17 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:6204:43 | Function: get_quick_record_count
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root, i32 %15, i64 %17)
+          to label %invoke.cont8 unwind label %lpad, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc:6203:14 | Function: get_quick_record_count
+  Instruction: %165 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255610 | Location: /root/LLVM/mysql-8.0.36/sql/sql_update.cc:523:45 | Function: Sql_cmd_update::update_single_table
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root, i32 %163, i64 %165)
+          to label %invoke.cont174 unwind label %lpad164, !dbg !1255606 | Location: /root/LLVM/mysql-8.0.36/sql/sql_update.cc:522:16 | Function: Sql_cmd_update::update_single_table
+  Instruction: %23 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/partition_pruning.cc:286:33 | Function: prune_partitions
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %alloc, i32 %21, i64 %23)
+          to label %invoke.cont30 unwind label %lpad29, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/partition_pruning.cc:285:12 | Function: prune_partitions
+  Instruction: %204 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255725 | Location: /root/LLVM/mysql-8.0.36/sql/sql_delete.cc:426:45 | Function: Sql_cmd_delete::delete_from_single_table
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %temp_mem_root, i32 %202, i64 %204)
+          to label %invoke.cont265 unwind label %lpad255, !dbg !1255721 | Location: /root/LLVM/mysql-8.0.36/sql/sql_delete.cc:425:16 | Function: Sql_cmd_delete::delete_from_single_table
+  Instruction: %7 = load i64, i64* %range_alloc_block_size, align 8, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/ref_row_iterators.cc:481:33 | Function: DynamicRangeIterator::DynamicRangeIterator
+  Instruction: invoke void @_ZN8MEM_ROOTC2Ejm(%struct.MEM_ROOT* %m_mem_root, i32 %5, i64 %7)
+          to label %invoke.cont unwind label %lpad, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/iterators/ref_row_iterators.cc:480:7 | Function: DynamicRangeIterator::DynamicRangeIterator
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

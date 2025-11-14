@@ -1,0 +1,90 @@
+Global Variable: srv_max_dirty_pages_pct_lwm
+Explicit Data Flow (18):
+  Instruction: %71 = load double, double* @srv_max_dirty_pages_pct_lwm, align 8, !dbg !1255477 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4858:39 | Function: innodb_init_params
+  Instruction: %cmp182 = fcmp olt double %70, %71, !dbg !1255478 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4858:37 | Function: innodb_init_params
+  Instruction: br i1 %cmp182, label %if.then183, label %if.end190, !dbg !1255479 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:4858:7 | Function: innodb_init_params
+  Instruction: %6 = load double, double* @srv_max_dirty_pages_pct_lwm, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:20250:16 | Function: innodb_max_dirty_pages_pct_update
+  Instruction: %cmp = fcmp olt double %5, %6, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:20250:14 | Function: innodb_max_dirty_pages_pct_update
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc:20250:7 | Function: innodb_max_dirty_pages_pct_update
+  Instruction: %1 = load double, double* @srv_max_dirty_pages_pct_lwm, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2485:3 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %cmp1 = fcmp ole double %1, %2, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2485:3 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %conv = zext i1 %cmp1 to i32, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2485:3 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %cmp2 = icmp eq i32 0, %conv, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2485:3 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %call3 = call zeroext i1 @_Z8unlikelyb(i1 zeroext %cmp2), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2485:3 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: br i1 %call3, label %if.then4, label %if.end5, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2485:3 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %3 = load double, double* @srv_max_dirty_pages_pct_lwm, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2487:7 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %cmp6 = fcmp oeq double %3, 0.000000e+00, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2487:35 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: br i1 %cmp6, label %if.then7, label %if.else, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2487:7 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %7 = load double, double* @srv_max_dirty_pages_pct_lwm, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2496:27 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: %cmp11 = fcmp oge double %6, %7, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2496:24 | Function: Adaptive_flush::get_pct_for_dirty
+  Instruction: br i1 %cmp11, label %if.then12, label %if.end14, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc:2496:14 | Function: Adaptive_flush::get_pct_for_dirty
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: basename_index
+  Controlled Function: log_message
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: unsigned long const& std::max
+  Controlled Function: basename_index
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: log_message
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innodb_log_checksums_func_update
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::warn::~warn
+  Controlled Function: innobase_commit_concurrency_init_default
+  Controlled Function: ib::info::info
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::info::~info
+  Controlled Function: ib::info::~info
+  Controlled Function: os_is_o_direct_supported
+  Controlled Function: unlikely
+  Controlled Function: strlen
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: page_size_t::page_size_t
+  Controlled Function: ib::warn::warn
+  Controlled Function: page_size_t::copy_from
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: Tablespace::set_space_id
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: fsp_flags_init
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: fsp_flags_set_sdi
+  Controlled Function: ib::warn::~warn
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: Tablespace::set_name
+  Controlled Function: Tablespace::set_path
+  Controlled Function: fsp_flags_init
+  Controlled Function: Tablespace::set_flags
+  Controlled Function: innodb_buffer_pool_size_init
+  Controlled Function: innodb_undo_tablespaces_deprecate
+  Controlled Function: innodb_redo_log_capacity_init
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: buf_pool_size_align
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+  Controlled Function: ut_dbg_assertion_failed
+
+Implicit Control Flow:
+
+----------------------------------------

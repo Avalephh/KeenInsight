@@ -476,10 +476,12 @@ Hyperparameter configuration:"""
             """Check if all values in a dictionary are within their respective allowable ranges."""
             adjusted_dict = {}
             for key in ranges_dict:
-                if key in d:
+                if key in d and key in default_dict:
                     adjusted_dict[key] = is_within_range(d[key], ranges_dict[key], default_dict[key])
-                else:
+                elif key in default_dict:
                     adjusted_dict[key] = default_dict[key]
+                else:
+                    continue
             return adjusted_dict
 
         def filter_dicts_by_ranges(dict_list, ranges_dict, default_dict):

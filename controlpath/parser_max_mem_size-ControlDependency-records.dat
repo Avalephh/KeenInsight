@@ -1,0 +1,16 @@
+Global Variable: System_variables.44
+Explicit Data Flow (4):
+  Instruction: %43 = load i64, i64* %parser_max_mem_size, align 8, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:7128:50 | Function: parse_sql
+  Instruction: invoke void @_ZN8MEM_ROOT16set_max_capacityEm(%struct.MEM_ROOT* %41, i64 %43)
+          to label %invoke.cont40 unwind label %lpad39, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:7128:18 | Function: parse_sql
+  Instruction: %11 = load i64, i64* %parser_max_mem_size, align 8, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:6994:58 | Function: Parser_oom_handler::handle_condition
+  Instruction: call void (i32, i32, ...) @_Z8my_erroriiz(i32 3170, i32 0, i64 %11, i8* getelementptr inbounds ([20 x i8], [20 x i8]* @.str.294.14918, i64 0, i64 0), i8* %call), !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:6993:11 | Function: Parser_oom_handler::handle_condition
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

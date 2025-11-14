@@ -1,0 +1,15 @@
+Global Variable: System_variables.137
+Explicit Data Flow (4):
+  Instruction: %17331 = load i64, i64* %explain_format, align 8, !dbg !1279519 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14014:81 | Function: MYSQLparse
+  Instruction: store i64 %17331, i64* %explain_format_type25208, align 8, !dbg !1279522 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14014:62 | Function: MYSQLparse
+  Instruction: %explain_format_type25208 = getelementptr inbounds %struct.anon.637, %struct.anon.637* %explain_options_type25207, i32 0, i32 0, !dbg !1279521 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14014:42 | Function: MYSQLparse
+  Instruction: %explain_format_type25234 = getelementptr inbounds %struct.anon.637, %struct.anon.637* %explain_options_type25233, i32 0, i32 0, !dbg !1279555 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14024:44 | Function: MYSQLparse
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

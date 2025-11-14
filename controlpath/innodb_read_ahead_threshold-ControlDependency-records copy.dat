@@ -1,0 +1,78 @@
+Global Variable: srv_read_ahead_threshold
+Explicit Data Flow (8):
+  Instruction: %3 = load i64, i64* @srv_read_ahead_threshold, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:347:8 | Function: buf_read_ahead_linear
+  Instruction: %tobool = icmp ne i64 %3, 0, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:347:8 | Function: buf_read_ahead_linear
+  Instruction: br i1 %tobool, label %if.end, label %if.then, !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:347:7 | Function: buf_read_ahead_linear
+  Instruction: %31 = load i64, i64* @srv_read_ahead_threshold, align 8, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:414:52 | Function: buf_read_ahead_linear
+  Instruction: %sub35 = sub i64 64, %31, !dbg !1255418 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:414:50 | Function: buf_read_ahead_linear
+  Instruction: %conv36 = trunc i64 %sub35 to i32, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:414:47 | Function: buf_read_ahead_linear
+  Instruction: store i32 %conv36, i32* %ref.tmp, align 4, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:414:24 | Function: buf_read_ahead_linear
+  Instruction: %call38 = call dereferenceable(4) i32* @_ZSt3minIjERKT_S2_S2_(i32* dereferenceable(4) %ref.tmp, i32* dereferenceable(4) %read_ahead_area37), !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0rea.cc:414:15 | Function: buf_read_ahead_linear
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: ibuf_bitmap_page
+  Controlled Function: trx_sys_hdr_page
+  Controlled Function: page_id_t::space
+  Controlled Function: fil_space_acquire_silent
+  Controlled Function: fil_space_release
+  Controlled Function: std::__atomic_base
+  Controlled Function: page_id_t::page_no
+  Controlled Function: unsigned int const& std::min
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: buf_page_hash_get_s_locked
+  Controlled Function: buf_page_hash_get_s_locked
+  Controlled Function: buf_page_is_accessed
+  Controlled Function: std::chrono::time_point
+  Controlled Function: bool std::chrono::operator==
+  Controlled Function: buf_page_get_state
+  Controlled Function: ut_dbg_assertion_failed
+  Controlled Function: buf_page_is_accessed
+  Controlled Function: bool std::chrono::operator==
+  Controlled Function: fil_page_get_prev
+  Controlled Function: fil_page_get_next
+  Controlled Function: rw_lock_s_unlock
+  Controlled Function: page_id_t::page_no
+  Controlled Function: buf_page_is_accessed
+  Controlled Function: bool std::chrono::operator
+  Controlled Function: page_id_t::page_no
+  Controlled Function: page_id_t::page_no
+  Controlled Function: rw_lock_s_unlock
+  Controlled Function: buf_page_is_accessed
+  Controlled Function: std::chrono::time_point
+  Controlled Function: bool std::chrono::operator!=
+  Controlled Function: page_id_t::page_no
+  Controlled Function: buf_page_is_accessed
+  Controlled Function: rw_lock_s_unlock
+  Controlled Function: os_aio_simulated_put_read_threads_to_sleep
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: ibuf_bitmap_page
+  Controlled Function: os_aio_simulated_wake_handler_threads
+  Controlled Function: buf_read_page_low
+  Controlled Function: buf_LRU_stat_inc_io
+  Controlled Function: std::__atomic_base
+  Controlled Function: ib::warn::warn
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: page_id_t::space
+  Controlled Function: ib::warn::~warn
+  Controlled Function: page_id_t::space
+  Controlled Function: page_id_t::page_no
+  Controlled Function: _db_doprnt_
+  Controlled Function: page_id_t::page_id_t
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::logger& ib::logger::operator
+  Controlled Function: ib::warn::~warn
+
+Implicit Control Flow:
+
+----------------------------------------
