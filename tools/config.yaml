@@ -1,0 +1,18 @@
+database:
+  host: "127.0.0.1"
+  port: 5432
+  user: "test"
+  password: "test1234"
+  db_name: "test"
+
+sysbench:
+  threads: 40
+  time: 10  # seconds (shorter for testing)
+  tables: 10
+  table_size: 10000
+
+api:
+  base_url: "http://localhost:8080"
+
+postgresql:
+  log_path: "/opt/homebrew/var/log/postgresql@18.log"

@@ -1,0 +1,287 @@
+basePath: /api/v1
+definitions:
+  handler.PrepareResponse:
+    properties:
+      statistics:
+        additionalProperties: true
+        type: object
+      status:
+        type: string
+      task_id:
+        type: string
+      total_statements:
+        type: integer
+      total_transactions:
+        type: integer
+    type: object
+  handler.ReportResponse:
+    properties:
+      avg_latency_ms:
+        type: number
+      duration:
+        type: string
+      executed_stmts:
+        type: integer
+      failed_stmts:
+        type: integer
+      success_rate:
+        type: number
+      success_stmts:
+        type: integer
+      task_id:
+        type: string
+      total_statements:
+        type: integer
+      total_transactions:
+        type: integer
+    type: object
+  handler.RunResponse:
+    properties:
+      status:
+        example: running
+        type: string
+      task_id:
+        example: task-12345
+        type: string
+    type: object
+  response.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: This is a database replay tool API server.
+  title: RUC DB Replay API
+  version: "1.0"
+paths:
+  /replay/prepare:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传采集日志文件和目标数据库连接信息，解析日志并存储
+      parameters:
+      - description: Database Host
+        in: formData
+        name: db_host
+        required: true
+        type: string
+      - description: Database Port
+        in: formData
+        name: db_port
+        required: true
+        type: integer
+      - description: Database User
+        in: formData
+        name: db_user
+        required: true
+        type: string
+      - description: Database Password
+        in: formData
+        name: db_pass
+        required: true
+        type: string
+      - description: Database Name
+        in: formData
+        name: db_name
+        required: true
+        type: string
+      - description: PgAudit Log File
+        in: formData
+        name: log_file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.PrepareResponse'
+              type: object
+      summary: 准备回放环境
+      tags:
+      - Replay
+  /replay/progress:
+    get:
+      consumes:
+      - application/json
+      description: 查询回放任务的当前进度
+      parameters:
+      - description: Task ID
+        in: query
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取回放进度
+      tags:
+      - Replay
+  /replay/report:
+    get:
+      consumes:
+      - application/json
+      description: 查询回放任务的执行报告
+      parameters:
+      - description: Task ID
+        in: query
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.ReportResponse'
+              type: object
+      summary: 获取回放报告
+      tags:
+      - Replay
+  /replay/run:
+    post:
+      consumes:
+      - application/json
+      description: 开始回放任务，返回任务状态
+      parameters:
+      - description: Task ID returned from prepare
+        in: query
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/handler.RunResponse'
+              type: object
+      summary: 启动流量回放
+      tags:
+      - Replay
+  /replay/statements:
+    get:
+      consumes:
+      - application/json
+      description: 分页获取任务的SQL语句
+      parameters:
+      - description: Task ID
+        in: query
+        name: task_id
+        required: true
+        type: string
+      - default: 0
+        description: Offset
+        in: query
+        name: offset
+        type: integer
+      - default: 100
+        description: Limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取SQL语句列表
+      tags:
+      - Replay
+  /replay/task:
+    get:
+      consumes:
+      - application/json
+      description: 查询任务的详细信息
+      parameters:
+      - description: Task ID
+        in: query
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取任务详情
+      tags:
+      - Replay
+  /replay/transactions:
+    get:
+      consumes:
+      - application/json
+      description: 获取任务的所有事务
+      parameters:
+      - description: Task ID
+        in: query
+        name: task_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取事务列表
+      tags:
+      - Replay
+  /replay/tx/statements:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定事务的所有SQL语句
+      parameters:
+      - description: Task ID
+        in: query
+        name: task_id
+        required: true
+        type: string
+      - description: Transaction ID
+        in: query
+        name: tx_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      summary: 获取事务的SQL语句
+      tags:
+      - Replay
+swagger: "2.0"
