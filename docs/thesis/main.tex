@@ -1,0 +1,238 @@
+%*********************************************************************
+% 中国人民大学硕士毕业论文模板
+% Copyright 2022 Ruoyang Guo, Pan Du
+% 2020/06/06 v1.0 beta
+%
+%本文编写的依据是中国人民大学教务处2018年修订的《研究生毕业论文（设计）指导手册》
+%本文的给出例子是在Qiu Renxiang本科毕业论文，Pan Du 硕士论文模版上进行改造。
+%本文基本满足手册中对硕士论文的格式要求，并自动生成图表目录并编号，引用和目录也都具有超链接
+% 重要提示：
+%   1. 请确保使用 UTF-8 编码保存
+%   2. 请使用 XeLaTeX编译
+%   3. 修改、使用、发布本文档请务必遵循 LaTeX Project Public License
+%   4. 不需要的注释可以尽情删除
+%*********************************************************************
+\documentclass[12pt,UTF8,twoside]{ctexart}
+
+\usepackage{amsthm}
+\newtheoremstyle{mystyle}{}{}{\upshape}{}{\bfseries}{:}{.5em}{}
+\theoremstyle{mystyle}
+\newtheorem{theorem}{定理}
+\newtheorem{definition}{定义}
+\newtheorem{property}{性质}
+\newtheorem{lemma}{引理}
+
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{amsthm,amsmath,amssymb}
+\usepackage{amsmath}
+\usepackage{amssymb,amsfonts}
+\usepackage{algpseudocode}
+\usepackage{float}
+\usepackage{cite}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{geometry}
+\usepackage{appendix}
+\usepackage{hyperref}
+\usepackage{enumerate}
+\usepackage{threeparttable}
+\usepackage{fancyhdr}
+\usepackage{setspace}
+\usepackage[T1]{fontenc}
+%\usepackage{mathptmx}%Times New Roman字体
+\usepackage{titletoc}
+\usepackage{fontspec}
+\usepackage{pdfpages}
+\usepackage{tikz}
+\usetikzlibrary{chains, positioning, shapes.multipart}
+\usepackage{etoolbox}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{array}
+\usepackage{titlesec}
+%\usepackage{subfigure}
+\usepackage{diagbox}
+\usepackage{bbm}
+% \usepackage{algorithm}
+% \usepackage{algorithmicx}
+% \usepackage{algorithmic}
+% \usepackage{algorithm2e}
+% \usepackage[ruled]{algorithm2e}                                     %算法排版样式1
+% \usepackage[ruled,vlined]{algorithm2e}                          %算法排版样式2
+% \usepackage[linesnumbered,boxed]{algorithm2e} 
+
+
+%pam
+\usepackage{bm}
+\usepackage[ruled,linesnumbered]{algorithm2e}
+\usepackage{subfig}
+\usepackage{makecell}
+\usepackage{bibspacing}
+\setlength{\bibspacing}{0\baselineskip}
+
+\usepackage{fancyhdr}
+\usepackage{afterpage}
+\newcommand\myemptypage{
+    \null
+    \thispagestyle{empty}
+    \addtocounter{page}{-1}
+    \newpage
+    }
+    
+\newcommand{\eref}[1]{(\ref{#1})}
+%pam
+
+
+%图表目录重定义
+%\renewcommand {\thetable} {\thesection{}.\arabic{table}}
+%\renewcommand {\thefigure} {\thesection{}.\arabic{figure}}
+
+\renewcommand {\thetable} {\thesection{}-\arabic{table}}
+\renewcommand {\thefigure} {\thesection{}-\arabic{figure}}
+\DeclareCaptionLabelSeparator{twospace}{\ ~}  
+\captionsetup{labelsep=twospace}
+
+
+\renewcommand{\algorithmicrequire}{\textbf{输入:}}  
+\renewcommand{\algorithmicensure}{\textbf{输出:}}  
+\floatname{algorithm}{算法}
+
+
+\renewcommand{\KwIn}{\textbf{输入:}}  
+\renewcommand{\KwOut}{\textbf{输出:}}  
+\renewcommand{\algorithmcfname}{算法}
+
+
+
+%博士学生毕业论文要求纵向打印，页边距的要求为：
+%上（T）：45mm
+%下（B）：40mm
+% 左（L）：35mm
+% 右（R）：30mm
+% 装订线（T）：0.5 cm
+% 装订线位置（T）：左
+
+\geometry{a4paper,left = 3.5cm,right = 3cm,top = 4.5cm,bottom= 4cm}
+\geometry{textheight=21.2cm,textwidth=14.5cm}
+
+
+% 页眉：学校标志（教务处主页提供下载）：
+% 高度为0.98 cm，宽度为4.13 cm，居中放置。
+% 页码采用10.5号宋体字，居中放置，格式为：第1页。
+
+\pagestyle{empty}
+\lhead{}
+\chead{}
+\rhead{}
+\lfoot{}
+\rfoot{}
+
+%目录和引用超链接
+\hypersetup{
+colorlinks=true,
+linkcolor=black,
+citecolor=black
+}
+
+\begin{document}
+
+\newcommand\dunderline[3][-1pt]{{%
+  \setbox0=\hbox{#3}
+  \ooalign{\copy0\cr\rule[\dimexpr#1-#2\relax]{\wd0}{#2}}}}
+
+
+%添加封面
+\include{textfiles/Cover}
+
+%%添加摘要
+\include{textfiles/0abstract}
+
+% \myemptypage
+
+%%添加目录
+\newpage
+\setcounter{page}{1}
+\pagenumbering{arabic}
+\pagestyle{fancy}
+% \pagestyle{empty}
+\lhead{}
+\chead{}
+\rhead{}
+\lfoot{}
+\rfoot{}
+\fancyfoot[LO, RE]{}
+\fancyfoot[OR, LE]{\footnotesize \thepage}
+\setlength{\topskip}{0pt}
+\renewcommand\contentsname{目\ 录}
+\renewcommand\listfigurename{图\ 目\ 录}
+\renewcommand\listtablename{表\ 目\ 录}
+\tableofcontents
+\newpage
+\listoffigures
+\listoftables
+\newpage
+
+% \myemptypage
+
+
+% \fancyfoot[C]{\songti 第\thepage 页}
+\setcounter{page}{1}
+\pagenumbering{arabic}
+\pagestyle{fancy}
+\renewcommand{\headrulewidth}{.5pt}
+\lhead{}
+\chead{基于数据库审计日志的流量回放系统的设计与实现}
+\rhead{}
+\lfoot{}
+\rfoot{}
+\fancyfoot[LO, RE]{}
+\fancyfoot[OR, LE]{\footnotesize \thepage}
+% \rfoot{\footnotesize \thepage }
+% 按照自然段依次排列，每段起行空两格，回行顶格。12号宋体字，（重点文句，12号宋体字，加粗），倍行距20pt。
+%正文、注释双面打印，编排页码，自第1页起，设置页眉。
+%大标题(第1章)       黑体小二号（18pt），占六行（按宋体小四号计）居中
+\titleformat{\section}[block]{\centering\heiti\LARGE\bfseries}{第\arabic{section}章}{1em}{}[]
+\titlespacing{\section}{0pt}{27pt}{27pt}
+%一级节标题（1.1）    黑体小三号（14pt），占四行（按宋体小四号计）顶头
+\titleformat{\subsection}[block]{\heiti\Large}{\arabic{section}.\arabic{subsection}}{1em}{}[]
+\titlespacing{\subsection}{0pt}{17pt}{17pt}
+%二级节标题（1.1.1）  黑体小四号（12pt），占两行（按宋体小四号计）顶头
+\titleformat{\subsubsection}[block]{\heiti\large}{\arabic{section}.\arabic{subsection}.\arabic{subsubsection}}{1em}{}[]
+\titlespacing{\subsubsection}{0pt}{6pt}{6pt}
+%倍间距20pt
+\setlength{\baselineskip}{20pt}
+
+\input{textfiles/1introduction}
+\input{textfiles/2Related_work}
+\input{textfiles/3FirstResearch}
+\input{textfiles/4SecondResearch}
+\input{textfiles/5ThirdResearch}
+\input{textfiles/6Conclusion}
+\input{textfiles/Summary}
+
+%%参考文献
+\newpage
+\addcontentsline{toc}{section}{参考文献}
+\bibliographystyle{unsrt}
+\bibliography{REF/references.bib}
+
+\input{textfiles/7Acknowledgement}
+
+
+\newpage
+\addcontentsline{toc}{section}{攻读硕士期间发表学术论文情况}
+\section*{攻读硕士期间发表学术论文情况}
+
+\noindent[1] XXXXXXXXXX.
+
+
+% %% 添加附录
+%\appendix
+%\include{textfiles/附录}
+
+\end{document}
+

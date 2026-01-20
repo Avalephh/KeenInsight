@@ -1,0 +1,385 @@
+\newpage
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\section{关键技术及实现}
+\subsection{流量采集}
+流量采集是数据库流量回放系统的首要环节，其核心任务是从源数据库（Source Database）获取真实的业务访问流量，并将其转换为系统可处理的、结构化的中间数据。生产环境中的数据库类型和日志格式多种多样，例如 PostgreSQL 的 \texttt{pgaudit} 审计日志、MySQL 的通用查询日志（General Query Log）或慢查询日志（Slow Query Log）、以及各类商业数据库的专有审计格式等。不同日志的记录时间、事务标识、语句与参数的格式均存在显著差异。
+
+为了构建一个具备良好通用性与可扩展性的回放系统，本设计在流量采集模块并未与任何特定的日志格式进行强行绑定，而是采用了一种基于统一中间数据结构的解耦设计方案。该方案的核心思想是定义一个标准的、与具体数据库无关的 SQL 事件模型，我们称之为“回放单元”（Replay Unit）。任何类型的数据库日志，只要能够通过相应的解析器（Parser）转换为这个统一的事件流，即可无缝接入本回放系统的核心引擎。
+
+\subsubsection{统一中间数据结构}
+为了屏蔽底层不同数据库日志格式的异构性，我们抽象并定义了“回放单元”（Replay Unit）作为系统内部流转的核心数据结构。该结构封装了单条 SQL 语句在源数据库执行时的完整上下文信息，是进行时间同步、事务重组和一致性校验的基础。其关键字段定义如下：
+\begin{itemize}
+    \item \textbf{会话标识（Session ID）:} 用于唯一标识一个用户会话或数据库连接。在并发回放时，系统会为每个独立的会话标识分配一个工作线程，以模拟真实的并发场景。
+    \item \textbf{事务 ID（Virtual Transaction ID）:} 用于标识一个数据库事务。同一事务内的所有 SQL 语句共享同一个虚拟事务 ID。这是保证回放时事务一致性的关键。对于不支持事务或日志中无明确事务标识的数据库，系统会根据会话和时间戳信息模拟生成事务边界。
+    \item \textbf{语句执行时间戳（Timestamp）:} 精确记录原始 SQL 语句的执行开始时刻。该时间戳是实现按原始时间间隔回放（Time-aware Replay）和计算回放速率（Speed Factor）的依据。
+    \item \textbf{SQL 语句原文（Raw SQL）:} 包含参数占位符（如 \texttt{\$1}, \texttt{?}）的原始 SQL 文本。
+    \item \textbf{SQL 参数（Parameters）:} 与 SQL 语句原文对应的参数值列表。在回放执行前，系统会将参数填充回语句原文，重构出完整的可执行 SQL。
+\end{itemize}
+
+\subsubsection{插件化的解析器架构}
+基于上述统一数据结构，本系统设计了一个标准化的解析器接口（Parser Interface），我们称之为 \texttt{Replay-Base}。任何需要接入本回放系统的新数据库类型，开发者只需围绕其日志格式，实现该接口即可。这种“插件式”的架构极大地增强了系统的灵活性和可扩展性。
+
+\texttt{Replay-Base} 接口的核心职责是接收原始的日志流（Log Stream）作为输入，经过解析、转换和重组，最终输出一个符合“回放单元”标准的结构化数据序列。图 \ref{fig:parser-architecture} 展示了这种插件化的解析器架构。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/parser-architecture}
+    \caption{插件化的流量采集架构}
+    \label{fig:parser-architecture}
+\end{figure}
+
+如图所示，核心回放引擎（Replay Engine）不直接与任何具体日志格式打交道，它消费的是标准化的“回放单元”流。这使得核心引擎可以专注于回放调度、并发控制、事务管理和差异比对等核心逻辑，而将日志格式的适配工作下沉到各个独立的解析器插件中，实现了关注点分离（Separation of Concerns）。
+
+
+\subsubsection{实现案例：pgaudit 日志解析器}
+\label{sssec:pgaudit-parser}
+作为本系统插件化解析器架构 (\texttt{Replay-Base}) 的原型验证与核心实现，我们首先开发了针对 PostgreSQL \texttt{pgaudit} 扩展日志的解析器。选择 \texttt{pgaudit} 是因为它能够提供详尽的、面向会话的审计信息，其日志内容已经包含了构建“回放单元”所需的大部分关键字段，是理想的流量回放数据源。
+
+\paragraph{日志格式分析}
+\texttt{pgaudit} 能够以 CSV (Comma-Separated Values) 格式记录日志，一条典型的 DML 操作日志行如代码清单 \ref{lst:pgaudit-log} 所示。其中包含了审计时间戳、会话标识、事务 ID (\texttt{xid})、SQL 语句原文以及参数列表等核心信息。然而，其格式并非完全规整：首先，日志前缀由 PostgreSQL 内核添加，格式不固定；最后，参数以字符串形式嵌入在最后一个字段中，需要二次解析。
+
+\begin{lstlisting}[
+    language=bash, 
+    caption={pgaudit 日志行示例}, 
+    label={lst:pgaudit-log},
+    basicstyle=\footnotesize\ttfamily, % 1. 缩小字体，使用等宽字体
+    breaklines=true,                   % 2. 开启自动换行 (核心修复)
+    breakatwhitespace=false,           % 3. 允许在非空格处换行(日志常常由逗号连接，无空格)
+    postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space} % 4. (可选) 换行处显示一个小箭头
+]
+2023-11-20 14:25:10.150 CST,[34567],user=app,db=prod,client=[local],655b1e4e.870f,2,LOG:  AUDIT: SESSION,3,1,WRITE,UPDATE,TABLE,public.orders,"UPDATE public.orders SET status = $1 WHERE id = $2","parameters: $1 = 'shipped', $2 = '1001'"
+\end{lstlisting}
+
+\paragraph{核心解析算法}
+针对上述日志特点，解析器 (\texttt{pgaudit\_parser.go}) 的设计核心在于健壮性与准确性，其工作流程被抽象为一套多阶段处理算法，如算法 \ref{alg:pgaudit-parsing} 所示。
+
+
+\begin{algorithm}[htbp]
+    \caption{\texttt{pgaudit} 日志解析与回放单元生成算法}
+    \label{alg:pgaudit-parsing}
+    
+    \SetKwInOut{KwIn}{输入}
+    \SetKwInOut{KwOut}{输出}
+
+    \KwIn{原始日志行字符串 \texttt{logLine}}
+    \KwOut{结构化的“回放单元”对象 \texttt{replayUnit} 或 \texttt{nil}}
+
+    % 算法主体
+    \texttt{auditContent} $\leftarrow$ 通过正则表达式 \texttt{AUDIT: (.*)} 从 \texttt{logLine} 中提取审计主体内容\;
+    
+    \If{\texttt{auditContent} 为空}{
+        \Return \texttt{nil} \tcp*[r]{非 pgaudit 审计日志，跳过}
+    }
+    
+    \texttt{fields} $\leftarrow$ 对 \texttt{auditContent} 执行 CSV 解析，得到字段数组\;
+    \texttt{context} $\leftarrow$ 从 \texttt{fields} 中提取会话 ID、事务 ID (\texttt{xid}) 等上下文信息\;
+    \texttt{rawSQL} $\leftarrow$ 从 \texttt{fields} 中获取 SQL 语句模板\;
+    \texttt{paramStr} $\leftarrow$ 从 \texttt{fields} 中获取参数字符串 (如 \texttt{"parameters: \$1=..."})\;
+    
+    \eIf{\texttt{paramStr} 非空}{
+        \texttt{paramMap} $\leftarrow$ 调用 \textbf{参数解析与映射子程序}(\texttt{paramStr})\;
+        \texttt{finalSQL} $\leftarrow$ 调用 \textbf{参数化查询重构子程序}(\texttt{rawSQL}, \texttt{paramMap})\;
+    }{
+        \texttt{finalSQL} $\leftarrow$ \texttt{rawSQL}\;
+    }
+    
+    \texttt{replayUnit} $\leftarrow$ 实例化“回放单元”，填充 \texttt{finalSQL} 及 \texttt{context} 等信息\;
+    \Return \texttt{replayUnit}\;
+    
+\end{algorithm}
+
+该算法的关键环节设计如下：
+\begin{itemize}
+    \item \textbf{字段提取与格式兼容性：} 算法首先通过正则表达式定位到 \texttt{AUDIT:} 关键字，剥离不相关的日志前缀，有效隔离了上游日志系统的格式变化。在解析 CSV 字段时，本实现并未依赖固定的列索引来获取 \texttt{vxid} 等关键信息，而是通过遍历字段并匹配 `vxid:` 等特征前缀来定位，从而兼容了不同 \texttt{pgaudit} 版本或配置下字段顺序可能不一致的问题，体现了设计的健壮性。
+
+    \item \textbf{参数化查询重构 (Parameterized Query Reconstruction)：} 这是确保 SQL 能够被正确回放的核心步骤。由于 \texttt{pgaudit} 将语句模板与参数分离，解析器必须精确地将二者重新组合。
+    \begin{enumerate}
+        \item \textbf{参数解析与映射：} 首先，对 "parameters: $1 = 'val1', $2 = 'val2'" 这样的字符串进行二次解析，提取出占位符与实际值之间的映射关系，存入一个哈希表（Map）中，例如 `{$1: "'val1'", $2: "'val2'"}`。此过程需要正确处理包含逗号、引号等特殊字符的参数值。
+        \item \textbf{逆序替换策略：} 在进行字符串替换时，一个关键的设计是采用\textbf{逆序替换}策略。即从编号最大的占位符（如 \texttt{\$10}）开始，依次替换到 \texttt{\$1}。此举是为了避免在替换 \texttt{\$1} 时，错误地修改了 \texttt{\$10} 的前缀，从而保证了替换的准确性。
+    \end{enumerate}
+
+    \item \textbf{事务归属判定：} 解析器从日志中提取的事务 ID (\texttt{xid})，如 `3/1`，是保证事务一致性回放的基石。该 ID 被完整地存入“回放单元”对象中。后续的回放调度器 (\texttt{Replayer}) 将依据此 ID 对所有 SQL 语句进行分组，确保所有同属于一个 \texttt{xid} 的操作被同一个工作线程按序执行，并被包裹在同一个数据库事务中，从而在目标端精确复现源端的事务边界。
+\end{itemize}
+
+综上所述，\texttt{pgaudit} 解析器的实现不仅成功地将一种具体的日志格式适配到了本系统的统一数据模型，更在实现过程中通过灵活的字段匹配、健壮的参数重构算法等设计，验证了插件化架构的可行性与优势，为后续接入更多异构数据源提供了坚实的实践基础和可复用的设计模式。
+
+\subsection{流量处理}
+在数据库审计日志（Audit Log）经过初步解析后，系统得到的是一个由离散日志条目构成的、在全局视角下可能乱序的流。此阶段的核心任务是将这些离散条目重组为具有事务原子性（Atomicity）的、可供回放引擎消费的中间表示（Intermediate Representation, IR）。本节将详细阐述流量处理的形式化定义、多级重组机制、核心算法及为回放性能设计的高效存储结构。
+
+\subsubsection{问题定义与形式化描述}
+流量处理过程可被形式化地描述为一个从原始日志流到结构化事务集的映射。
+
+\textbf{定义 1 (解析日志流, Parsed Log Stream)}
+设解析后的日志流为 $S_{log}$，它是一个按时间戳粗略排序的日志条目序列：
+\begin{equation}
+    S_{log} = \langle l_1, l_2, \dots, l_N \rangle
+\end{equation}
+其中，每个日志条目 $l_i$ 是一个多元组，包含了执行该操作所需的核心信息：
+\begin{equation}
+    l_i = (ts_i, sid_i, xid_i, op_i, sql_i, \dots)
+\end{equation}
+式中，$ts_i$ 为语句执行的精确时间戳，$sid_i$ 为会话标识符（Session ID），$xid_i$ 为事务标识符（Transaction ID），$op_i$ 为操作类型（如 \texttt{SELECT}, \texttt{INSERT}, \texttt{BEGIN}），$sql_i$ 为具体的 SQL 语句文本。
+
+\textbf{定义 2 (可回放事务, Replayable Transaction)}
+一个可回放事务 $T_j$ 是一个严格有序的操作序列，该序列在逻辑上构成一个不可分割的工作单元，满足 ACID (Atomicity, Consistency, Isolation, Durability) 特性。
+\begin{equation}
+    T_j = \langle l_{j,1}, l_{j,2}, \dots, l_{j,m} \rangle, \quad \text{s.t.} \quad \forall k \in [1, m-1], ts_{j,k} \le ts_{j,k+1}
+\end{equation}
+
+\textbf{定义 3 (会话, Session)}
+一个会话 $C_k$ 是由单个客户端连接产生的所有事务的集合。在理想情况下，一个会话内的所有操作在时间上是连续的，且事务之间不会交叉。
+\begin{equation}
+    C_k = \{ T_j \mid \forall l \in T_j, l.sid = k \}
+\end{equation}
+
+因此，流量处理的目标就是实现一个函数 $\mathcal{F}$，将输入的 $S_{log}$ 转化为一个由若干可回放事务组成的集合 $\mathcal{T}_{replay}$：
+\begin{equation}
+    \mathcal{F}: S_{log} \rightarrow \mathcal{T}_{replay} = \{ T_1, T_2, \dots, T_M \}
+\end{equation}
+
+\subsubsection{多级流量重组机制}
+由于数据库系统的高并发特性，来自不同会话乃至同一会话内不同事务的日志条目在 $S_{log}$ 中是交错（Interleaved）出现的。为还原其原始的逻辑执行顺序，我们设计了一个两阶段的重组机制。
+
+\paragraph{第一阶段：会话分流 (Session Sharding)}
+此阶段的目标是将全局乱序的日志流 $S_{log}$ 切分为多个内部有序的会话流。利用日志条目中的 $sid$ 作为分片键（Shard Key），我们可以将所有日志条目分配到对应的会话桶中。
+\begin{equation}
+    S_{log} = \bigcup_{k \in \text{SessionIDs}} S_k, \quad \text{其中} \quad S_k = \{ l \in S_{log} \mid l.sid = k \}
+\end{equation}
+在每个会话流 $S_k$ 内部，所有日志条目严格按照其时间戳 $ts$ 进行排序。这一步将全局的并发问题降解为多个独立的、串行的会话内事务重组问题，极大地简化了后续处理的复杂性。此过程可通过哈希分发（Hash Dispatching）在 $O(N)$ 时间复杂度内完成，其中 $N$ 是日志总条目数。
+
+\paragraph{第二阶段：事务上下文重构 (Transaction Reconstruction)}
+在每个有序的会话流 $S_k$ 中，我们需要根据 $xid$ 进一步重构出原子性的事务。pgaudit \cite{pgaudit} 提供的 $xid$ 保证了在同一个事务内的所有语句拥有相同的标识符。重构过程主要依据 \texttt{BEGIN}, \texttt{COMMIT}, \texttt{ROLLBACK} 等事务控制语言（Transaction Control Language, TCL）语句作为显式边界。
+\begin{itemize}
+    \item \textbf{显式事务}: 以 \texttt{BEGIN} 开始，以 \texttt{COMMIT} 或 \texttt{ROLLBACK} 结束。所有具有相同 $xid$ 且位于这两个边界之间的语句构成一个事务。
+    \item \textbf{隐式事务 (Autocommit)}: 对于未被显式 \texttt{BEGIN} 包裹的 DML 或 DDL 语句，通常被视为单语句事务。
+    \item \textbf{长事务与未提交事务}: 在流式处理中，一个事务可能跨越多个处理批次（Batch）。此外，由于异常（如客户端连接中断），某些事务可能没有对应的 \texttt{COMMIT} 或 \texttt{ROLLBACK} 记录。对于这类“悬挂”事务，本系统默认将其视为已回滚（Rolled Back），以保证目标数据库状态的一致性。
+\end{itemize}
+
+\subsubsection{基于哈希映射的流式事务重组算法}
+为了高效地处理大规模日志流，我们设计了一种基于哈希映射的单遍流式事务重组算法（详见算法 \ref{alg:tx_reconstruction}）。该算法为每个会话流独立执行，利用一个哈希映射来维护当前所有活跃事务的上下文，从而避免了代价高昂的排序和扫描操作。
+
+\begin{algorithm}[H]
+    \caption{流式事务重组算法}
+    \label{alg:tx_reconstruction}
+
+    \SetKwInOut{KwIn}{输入}
+    \SetKwInOut{KwOut}{输出}
+    
+    \KwIn{会话日志流 $S_k = \langle l_1, l_2, \dots, l_p \rangle$ (按时间戳排序)}
+    \KwOut{已完成的事务集合 $\mathcal{T}_{complete}$}
+    
+    \BlankLine
+    $\mathcal{T}_{complete} \leftarrow \emptyset$\;
+    $M_{active} \leftarrow \text{new HashMap()}$ \tcp*{Key: xid, Value: Transaction object}
+    
+    \ForEach{$l_i \in S_k$}{
+        $xid \leftarrow l_i.xid$\;
+        
+        \If{$xid \notin M_{active}$}{
+            $M_{active}[vtxid] \leftarrow \text{new Transaction}(xid)$\;
+        }
+        
+        $T_{current} \leftarrow M_{active}[xid]$\;
+        $T_{current}.\text{addStatement}(l_i)$\;
+        
+        \If{$l_i.op = \texttt{'COMMIT'} \lor l_i.op = \texttt{'ROLLBACK'}$}{
+            $T_{current}.\text{setStatus}(l_i.op)$\;
+            $\mathcal{T}_{complete}.\text{add}(T_{current})$\;
+            $M_{active}.\text{remove}(vtxid)$\;
+        }
+    }
+    
+    \tcp{处理流结束时仍未提交的事务}
+    \ForEach{$xid \in M_{active}.\text{keys}()$}{
+        $T_{hanging} \leftarrow M_{active}[xid]$\;
+        $T_{hanging}.\text{setStatus}(\texttt{'IMPLICIT\_ROLLBACK'})$\;
+        $\mathcal{T}_{complete}.\text{add}(T_{hanging})$\;
+    }
+    
+    \Return{$\mathcal{T}_{complete}$}\;
+\end{algorithm}
+
+该算法的时间复杂度为 $O(P)$，其中 $P$ 是会话流中的日志条目数。哈希映射 $M_{active}$ 的使用使得对任意活跃事务的访问时间复杂度为均摊 $O(1)$。空间复杂度则取决于同一时刻活跃事务的最大数量，即 $O(\text{max\_concurrent\_txns})$。
+
+\subsubsection{高效持久化存储设计}
+将重组后的事务持久化是实现“一次解析，多次回放”的关键。传统的文本格式（如 JSON 或 SQL 脚本）存在解析开销大、存储空间占用多等问题，不适用于高性能回放场景。为此，我们设计了一种面向回放的二进制存储格式。
+
+\paragraph{二进制数据布局 (Binary Layout)}
+文件由三部分组成：文件头、稀疏索引区和数据区。
+\begin{itemize}
+    \item \textbf{文件头 (Header)}: 包含魔数（Magic Number）、版本号、索引区偏移量、事务总数等元信息。
+    \item \textbf{数据区 (Data Blocks)}: 连续存储每个事务的数据块。每个事务块内部结构如图\ref{fig:storage_structure}所示：
+    其中，事务头包含 `xid`、`start\_timestamp`、`end\_timestamp` 和语句数量。语句数据 `Stmt Data` 采用 Protocol Buffers \cite{protobuf} 或类似方案进行序列化，以实现跨语言兼容性和高压缩率。
+    \item \textbf{稀疏索引区 (Sparse Index Area)}: 为了支持回放时按时间点快速跳转（Seeking），我们构建了一个基于时间戳的稀疏索引。该索引并非记录每个事务的偏移量，而是每隔 $k$ 个事务或 $\Delta t$ 时间间隔记录一个索引项。每个索引项是一个二元组 `(timestamp, offset)`，表示某个事务的开始时间及其在文件中的字节偏移。
+\end{itemize}
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/storage_structure}
+    \caption{事务日志存储结构示意图}
+    \label{fig:storage_structure}
+\end{figure}
+
+\paragraph{支持快速预取 (Prefetching)}
+这种存储结构对回放时的 I/O 优化十分友好。当回放引擎需要从时间点 $t_{start}$ 开始回放时，它可以通过二分查找在稀疏索引区快速定位到不大于 $t_{start}$ 的最大时间戳对应的偏移量，然后从该位置开始顺序扫描。同时，基于回放速率和平均事务大小，回放引擎可以估算未来的 I/O 需求，并利用 I/O 多路复用（I/O Multiplexing）技术（如 \texttt{io\_uring} \cite{iouring}异步地预取后续数据块到内存页缓存（Page Cache）中，从而将磁盘 I/O 延迟隐藏在计算周期之后，实现吞吐量的最大化。
+
+\subsection{流量回放引擎的设计与实现}
+\label{sec:replay_engine}
+流量回放引擎是本系统的核心执行单元，其核心职责在于精确地模拟原始数据库负载。引擎的设计目标不仅是复现SQL序列，更在于重建原始系统的并发行为、事务边界以及时序特征。本节将从并发模型、时序控制、执行监控等多个维度，详细阐述回放引擎的设计哲学与实现细节。
+
+\subsubsection{并发模型与会话隔离}
+原始数据库负载由大量并发的客户端会话（Session）构成，每个会话都具有独立的连接上下文与事务状态。为精确模拟此种并发模式，本系统采用了基于协程（Coroutine）的并发模型，将原始日志中的每一个会SH会话ID（Session ID）映射至一个独立的执行协程。这种“每会话一协程”的架构，天然地实现了执行上下文的隔离，避免了状态污染。
+
+具体而言，引擎在启动时，首先将已解析的中间表示（Intermediate Representation, IR）按会话ID进行分组。随后，为每个会话ID创建一个专职的“会话工作者”（Session Worker）协程。为了防止因原始日志中瞬时并发会话数过高而耗尽系统资源，我们引入了基于信号量（Semaphore）的线程池（Thread Pool）管理机制。该机制限制了同时处于活跃状态的协程数量，形成了一个大小可控的并发执行池，如公式 \ref{eq:concurrency} 所示。
+
+\begin{equation}
+\label{eq:concurrency}
+N_{active\_workers} \le N_{max\_workers}
+\end{equation}
+
+其中，$N_{active\_workers}$ 代表当前活跃的协程数量，$N_{max\_workers}$ 是系统配置的最大并发数。当一个会话的所有SQL语句执行完毕后，其对应的协程会释放信号量，允许等待队列中的新会话协程启动。这种设计在保证高并发模拟能力的同时，兼顾了系统的稳定性与资源利用率 \cite{GoConcurrencyPatterns}。
+
+\subsubsection{事务一致性与时序对齐}
+数据库操作的正确性高度依赖于事务的原子性、一致性、隔离性和持久性（ACID）\cite{ACIDProperties}。本系统通过对事务ID（Transaction ID, XID）的精细处理，确保了回放过程中的事务一致性。在解析阶段，属于同一后端事务的SQL语句被赋予了相同的XID。在回放时，同一会话工作者协程内部的SQL序列会严格按照XID进行分组，并依据其在事务内的序号（Sequence in Transaction）顺序执行。这种机制保证了多语句事务的完整性，即使这些语句在原始日志文件中并非物理连续。
+
+除了逻辑上的事务一致性，时间上的同步性也是高保真回放的关键。我们设计了一种“时序对齐算法”（Temporal Alignment Algorithm）来控制SQL语句的执行节奏。该算法的核心思想是，在回放过程中复现原始SQL语句之间的时间间隔（Delta Time）。
+
+我们定义以下变量：
+\begin{itemize}
+    \item $T_{original\_start}$: 原始日志记录的起始时间戳。
+    \item $T_{replay\_start}$: 本次回放任务的实际启动时间。
+    \item $T_{original}(s_i)$: 语句 $s_i$ 在原始日志中的时间戳。
+\end{itemize}
+
+对于任意待执行的语句 $s_i$，其在原始负载中的相对时间偏移 $\Delta T_{original}(s_i)$ 计算如下：
+\begin{equation}
+\Delta T_{original}(s_i) = T_{original}(s_i) - T_{original\_start}
+\end{equation}
+
+为了支持变速回放（例如，用于压力测试的加速回放或用于问题复现的慢速回放），我们引入了“时间缩放因子”（Time Scaling Factor, $\alpha$）。当 $\alpha=1$ 时为原速回放，$\alpha<1$ 为加速回放，$\alpha>1$ 为减速回放。语句 $s_i$ 在回放过程中的目标执行时间 $T_{target}(s_i)$ 由下式确定：
+
+\begin{equation}
+T_{target}(s_i) = T_{replay\_start} + \Delta T_{original}(s_i) \times \alpha
+\end{equation}
+
+会话工作者在执行语句 $s_i$ 之前，需要计算并等待一段时长 $T_{wait}$，以确保其执行时刻能够对齐目标时间。
+
+\begin{equation}
+\label{eq:wait_time}
+T_{wait} = T_{target}(s_i) - T_{now}
+\end{equation}
+
+其中 $T_{now}$ 为当前系统时间。通过该算法，回放引擎能够以可控的速率，精确复现原始负载的时间动态。
+
+\subsubsection{执行状态的无锁监控}
+在回放过程中，对关键性能指标（KPIs）的实时监控至关重要。为避免监控本身对回放性能产生干扰，我们设计了一套开销极低的非阻塞（Non-blocking）埋点机制。该机制主要利用了Go语言提供的原子操作（Atomic Operations）来实现对核心计数器的无锁更新。
+
+每个会话工作者在执行完一条SQL语句后，会原子地增加“已执行语句总数”、“成功数”、“失败数”等全局计数器。对于需要记录详细信息的场景，如执行错误或结果差异，我们将结构化信息推送至一个有界（Bounded）的内存通道（Channel）中，由一个独立的协程异步地进行消费和持久化。这种生产者-消费者模式将数据记录的I/O延迟与主回放逻辑解耦，确保了监控的低侵入性。
+
+\subsubsection{核心调度算法}
+回放引擎的核心调度逻辑可由算法 \ref{alg:replay_scheduler} 和 \ref{alg:session_worker} 描述。算法 \ref{alg:replay_scheduler} 负责全局的初始化与协程分发，而算法 \ref{alg:session_worker} 则描述了单个会话工作者的内部执行循环。
+
+\begin{algorithm}[H]
+\caption{Replay Scheduling Algorithm}
+\label{alg:replay_scheduler}
+\SetKwInOut{KwIn}{输入}
+\SetKwInOut{KwOut}{输出}
+\SetKwFunction{FMain}{ReplayScheduler}
+\SetKwFunction{FGroup}{GroupStatementsBySession}
+\SetKwFunction{FGo}{go}
+\SetKwFunction{FRun}{SessionWorker}
+\KwIn{
+    $S$: 全局有序的SQL语句序列 (IR) \\
+    $N_{max}$: 最大并发工作者数量 \\
+    $\alpha$: 时间缩放因子
+}
+\KwOut{回放执行报告}
+\BlankLine
+\FMain{$S, N_{max}, \alpha$}:\\
+    $T_{replay\_start} \leftarrow \text{CurrentTime()}$\;
+    $SessionMap \leftarrow$ \FGroup{$S$}\;
+    $WorkerPool \leftarrow \text{NewSemaphore}(N_{max})$\;
+    \ForEach{($SessionID, Stmts$) in $SessionMap$}{
+        $WorkerPool.\textbf{Acquire()}$\;
+        \FGo \FRun{$SessionID, Stmts, T_{replay\_start}, \alpha, WorkerPool$}\;
+    }
+    \textbf{wait} for all workers to finish\;
+    $Report \leftarrow \text{GenerateReport()}$\;
+    \Return{$Report$}\;
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Session Worker Algorithm}
+\label{alg:session_worker}
+\SetKwInOut{KwIn}{输入}
+\SetKwInOut{KwOut}{输出}
+\SetKwFunction{FMain}{SessionWorker}
+\SetKwFunction{FConnect}{DB.Connect}
+\SetKwFunction{FExec}{DB.Execute}
+\SetKwFunction{FWait}{WaitUntil}
+\SetKwFunction{FRecord}{RecordStats}
+\KwIn{
+    $SessionID$: 会话ID \\
+    $Stmts$: 该会话的SQL语句序列 \\
+    $T_{replay\_start}$: 回放起始时间 \\
+    $\alpha$: 时间缩放因子 \\
+    $Pool$: 工作者信号量池
+}
+\BlankLine
+\FMain{$SessionID, Stmts, T_{replay\_start}, \alpha, Pool$}:\\
+    \textbf{defer} $Pool.\textbf{Release()}$\;
+    $DB \leftarrow$ \FConnect{target\_database}\;
+    \If{$DB$ is not connected}{
+        \FRecord{all statements in $Stmts$ as failed}\;
+        \Return\;
+    }
+    \ForEach{$s_i$ in $Stmts$}{
+        $T_{target} \leftarrow T_{replay\_start} + (s_i.Timestamp - T_{original\_start}) \times \alpha$\;
+        \FWait{$T_{target}$}\;
+        \tcp{处理事务边界，根据 $s_i.VxID$ 决定是否 BEGIN/COMMIT/ROLLBACK}
+        $status, result \leftarrow$ \FExec{$s_i.SQL$}\;
+        \FRecord{$status, result, s_i.OriginalResult$}\;
+    }
+\end{algorithm}
+
+\subsection{回放评估与报告生成}
+\label{sec:evaluation}
+回放任务的终点并非是执行的结束，而是生成一份详尽的、可量化的评估报告。该报告从正确性、性能和负载特征三个维度，对回放行为与原始负载进行对比分析，为系统优化、容量规划和故障诊断提供数据支持。
+
+\subsubsection{多维度评估指标体系}
+我们构建了一个三位一体的评估指标体系，力求全面地衡量回放质量。
+
+\textbf{1. 正确性度量 (Correctness Metrics)}:
+正确性是回放的首要目标。我们关注回放产生的结果与原始日志记录的一致性，定义了“差异”（Divergence）来量化不一致的程度。
+\begin{itemize}
+    \item \textbf{执行状态差异 ($D_{state}$)}: 原始成功的SQL在回放时失败，或原始失败的SQL在回放时成功，以及两者均失败但错误码（SQLSTATE）不同。
+    \item \textbf{影响行数差异 ($D_{rows}$)}: 对于`INSERT`, `UPDATE`, `DELETE`等DML操作，回放后影响的行数与原始记录不符。
+\end{itemize}
+
+\textbf{2. 性能度量 (Performance Metrics)}:
+性能指标用于评估目标数据库在模拟负载下的表现。
+\begin{itemize}
+    \item \textbf{吞吐量 (Throughput)}: 以每秒查询数（Queries Per Second, QPS）或每秒事务数（Transactions Per Second, TPS）衡量。
+    \item \textbf{响应时间 (Latency)}: 统计所有SQL语句执行的平均（Avg）、最大（Max）、最小（Min）以及关键百分位（如P99, P99.9）的延迟。通过对相似SQL模板（SQL Template）的延迟进行聚合分析，可以定位慢查询的根源 \cite{SQLFingerprinting}。
+\end{itemize}
+
+\textbf{3. 负载特征度量 (Load Profile Metrics)}:
+此维度关注回放负载在宏观上是否复现了原始负载的模式。
+\begin{itemize}
+    \item \textbf{QPS曲线拟合度}: 通过对比回放过程中的QPS时间序列曲线与原始负载的QPS曲线（若可获得），使用均方根误差（Root Mean Square Error, RMSE）等统计方法评估两条曲线的相似度。
+\end{itemize}
+
+\subsubsection{回放保真度分析}
+为了给出一个关于回放质量的顶层、概括性的评价，我们提出了“回放保真度”（Replay Fidelity, $F$）的概念。它衡量了回放过程在多大程度上精确地复现了原始行为。一个基础的保真度计算公式如下：
+
+\begin{equation}
+\label{eq:fidelity}
+F = \left(1 - \frac{\sum_{i} w_i \cdot D_i}{N_{total}}\right) \times 100\%
+\end{equation}
+
+其中，$N_{total}$ 是总执行语句数，$D_i$ 是第 $i$ 类差异（如 $D_{state}$, $D_{rows}$）的数量，$w_i$ 是该类差异的权重。例如，执行状态的差异通常比影响行数的差异更为严重，因此可以赋予更高的权重。一个接近100\%的保真度得分，意味着回放任务高质量地完成了其模拟目标。
+
+\subsection{本章小结}
+\label{sec:chapter_summary}
+本章详细阐述了数据库流量回放系统的核心技术与实现方案。我们首先介绍了如何将异构的数据库审计日志解析并转换为结构化的中间表示（IR），为后续处理奠定了数据基础。接着，重点设计并实现了一个高并发、高保真的流量回放引擎。该引擎通过“每会话一协程”的并发模型实现了会话隔离，利用基于虚拟事务ID的机制保证了事务一致性，并独创性地提出了“时序对齐算法”以实现可控速的精确时间线模拟。同时，一套非阻塞的监控机制确保了在回放过程中对系统状态的低侵入式度量。最后，我们定义了一套涵盖正确性、性能与负载特征的多维度评估体系，并提出了“回放保真度”的概念，为量化评估回放质量提供了理论依据。本章所论述的关键技术，共同构成了一个从数据解析、流量复现到结果评估的完整闭环，为实现工业级的数据库流量回放提供了坚实的工程实践。

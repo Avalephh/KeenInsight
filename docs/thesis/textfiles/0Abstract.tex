@@ -1,0 +1,69 @@
+\newpage
+\pagestyle{fancy}
+\fancyhead{}
+\renewcommand\headrulewidth{0pt}
+\fancyfoot{}
+\lfoot{}
+\rfoot{}
+% \rfoot{\footnotesize \thepage }
+\renewcommand{\abstractname}{\textbf{\Large \heiti 摘要}}
+\setlength{\topskip}{90pt}
+\renewenvironment{abstract}{%
+    \par
+    \noindent\mbox{}\hfill{\bfseries \abstractname}\hfill\mbox{}\par
+    \vskip 2.5ex}{\par\vskip 2.5ex} 
+%中文摘要及关键词放在扉页一、外文摘要及关键词放在扉二，页码编排为Ⅰ，Ⅱ，设置页眉
+\begin{abstract}
+\setlength{\baselineskip}{20pt}
+\vspace{30pt}
+内容简述：
+
+\textbf{1.}
+工作1。
+
+\textbf{2.}
+工作2。
+
+\textbf{3.}
+工作3。
+
+
+\textbf{\textbf{\heiti 关键词：}}XXX；XXX；XXX
+
+\end{abstract}
+\setcounter{page}{1}
+\pagenumbering{Roman}
+\fancyfoot[LO, RE]{}
+\fancyfoot[OR, LE]{\footnotesize \thepage}
+% \rfoot{\footnotesize \thepage}
+\newpage
+
+\newcommand{\enabstractname}{\textbf{\Large Abstract}}
+\setlength{\topskip}{90pt}
+\newenvironment{enabstract}{%
+    \par
+    \noindent\mbox{}\hfill{\bfseries \enabstractname}\hfill\mbox{}\par
+    \vskip 2.5ex}{\par\vskip 2.5ex}  
+\begin{enabstract}
+\setlength{\baselineskip}{20pt}
+\vspace{30pt}
+Contribution.
+
+\textbf{1.}
+My Work1.
+
+\textbf{2.}
+My Work2.
+
+\textbf{3.}
+My Work3.
+
+\textbf{Keywords：}XXX; XXX; XXX
+
+\end{enabstract}
+
+
+
+
+
+

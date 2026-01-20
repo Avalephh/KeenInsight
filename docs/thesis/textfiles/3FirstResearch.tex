@@ -1,0 +1,195 @@
+\newpage
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\section{系统总体设计}
+
+本章将在需求分析的基础上，对数据库流量回放系统的整体架构、功能模块、性能指标及底层数据存储进行详细设计。系统旨在构建一个高效、准确且可视化的流量回放平台，核心目标是实现对 PostgreSQL 等数据库审计日志的深度解析，并在目标数据库环境中高保真地重放业务流量，同时通过自动化的差异比对机制验证执行结果的一致性。
+
+\subsection{功能需求分析}
+
+通过对数据库测试与验证场景的深入剖析，本系统将核心功能划分为日志处理、流量控制、差异检测与报告生成四大逻辑单元，各单元协同工作以实现完整的闭环测试。
+
+首先，\textbf{日志解析与预处理 (Log Parsing)} 模块是系统的入口。系统目前已内置对 PgAudit 格式审计日志的支持，能够上传并解析大规模日志文件，从中精准提取时间戳、Session ID、事务 ID、SQL 语句及绑定参数等关键元数据。针对参数化查询，解析引擎会自动识别 \$1、\$2 等占位符并填充实际参数值，将非结构化的日志重组为可执行的标准 SQL 语句。同时，为了保证业务逻辑的完整性，系统会依据事务 ID（Transaction ID）对 SQL 进行分组，确保原子性操作在回放时不会被打散。
+
+其次，\textbf{流量回放控制 (Replay Control)} 模块负责模拟真实的业务负载。系统利用 Go 语言的 Goroutine 机制，根据日志中的 Session ID 建立独立的 Worker 线程，以还原原始应用的高并发连接行为。回放引擎具备灵活的速度调节能力，支持通过倍速因子（SpeedFactor）实现慢速排查（如 0.5x）或全速压测（FastMode）。在一致性保障方面，引擎严格遵守原始日志的事务边界，自动补全可能缺失的 BEGIN 或 COMMIT 语句。此外，系统对外暴露 HTTP API 接口，支持对回放任务全生命周期的管理，包括创建、启动、优雅停止以及实时进度和状态的查询。
+
+在此基础上，\textbf{结果校验与差异检测 (Divergence Detection)} 模块构成了系统的质量防线。系统会实时捕获每条 SQL 在目标数据库执行后的状态码（State Code）和影响行数（Rows Affected），并与原始日志记录进行逐条比对。一旦发现“执行报错”或“影响行数不一致”等情况，系统将自动标记为差异，并记录详细的异常信息以便后续分析。
+
+最后，\textbf{报告生成 (Reporting)} 模块负责任务的总结输出。当回放任务结束后，系统将自动化生成多维度的分析报告，涵盖总耗时、TPS（每秒事务数）、成功率、平均延迟等核心指标，并附带详细的差异统计数据。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{images/use_case_diagram}
+    \caption{数据库流量回放系统用例图}
+    \label{fig:use_case}
+\end{figure}
+
+\subsection{性能需求分析}
+
+为满足大规模生产环境流量的回放需求，确保系统在高负载下的稳定性和准确性，本设计对非功能性指标提出了明确要求。
+
+在\textbf{吞吐量与延迟}方面，系统依托 Go 语言的高并发特性，设计目标为支持数万级 QPS 的流量解析与分发，防止回放端成为性能瓶颈。解析引擎与回放引擎的内部处理延迟需严格控制在毫秒级别，以确保在高倍速回放场景下指令发送的及时性与精准度。
+
+在\textbf{资源控制与稳定性}方面，鉴于生产日志文件通常达到 GB 级别，系统必须采用流式读取（Streaming）或分批处理机制，坚决避免一次性加载导致的内存溢出（OOM）。同时，系统支持设置最大并发 Worker 数量作为熔断保护，防止在回放极端高并发日志时耗尽回放服务器的资源，确保系统的健壮性。
+
+\subsection{系统架构}
+
+系统采用经典的分层架构设计（Layered Architecture），自上而下划分为接入层、服务层、核心逻辑层与数据持久层。层级之间遵循低耦合原则，通过清晰的接口定义进行交互。
+
+\textbf{接入层 (Web/API Layer)} 基于 Gin 框架构建 RESTful API，作为系统的对外门户。它主要负责接收用户的任务指令，进行参数校验，并统一返回 JSON 格式的响应结果。其中，\texttt{internal/handler} 包定义了 \texttt{ReplayHandler}，用于处理具体的业务路由。
+
+\textbf{服务层 (Service Layer)} 位于 \texttt{internal/service}，承担业务逻辑编排的角色。它负责协调解析器与回放器的工作流，管理任务从 Preparing、Running 到 Completed 的状态机转换，并处理异步任务的生命周期。
+
+\textbf{核心逻辑层 (Core Logic Layer)} 包含两个核心引擎：\textbf{Parser Engine} 和 \textbf{Replayer Engine}。\texttt{PgAuditParser} 利用高效的正则引擎处理文本日志，生成内部的 SQL 对象；而 \texttt{Replayer} 则维护 Worker 池，内置速率控制器（Rate Limiter）和差异检测逻辑。
+
+\textbf{数据层 (Data/Repository Layer)} 基于 GORM 框架实现元数据的持久化。\texttt{internal/repository} 封装了对持久化存储的 CRUD 操作，而 \textbf{Target DB Adapter} 则负责与被测目标数据库建立物理连接并执行 SQL。
+
+% 插入架构图占位符
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.9\textwidth]{images/architecture_diagram}
+    \caption{系统总体逻辑架构图}
+    \label{fig:architecture}
+\end{figure}
+
+\subsection{数据库设计}
+
+\subsubsection{设计原则与选型}
+本系统选用 PostgreSQL 作为核心存储引擎。PostgreSQL 不仅支持标准的 SQL 规范，具备优秀的 ACID 事务特性，还提供了强大的 JSONB 数据类型支持，能够高效存储和查询非结构化的审计日志元数据。
+
+数据库设计遵循第三范式（3NF）原则，以减少数据冗余并保证数据的一致性。同时，考虑到流量回放场景下存在海量日志数据的写入与聚合查询需求，针对核心查询字段（如 \texttt{task\_id}、\texttt{sql\_id}、\texttt{round}）建立了必要的 B-Tree 索引，以提升检索性能。所有主键 ID 均采用 UUID 标准（36位字符），以确保在分布式环境下的唯一性。
+
+\subsubsection{实体关系图（ER图）}
+系统核心实体包括任务（Task）、流量基线（Traffic Baseline）、回放明细（Replay Detail）、回放轮次总览（Replay Summary）以及聚合分析（Replay Aggregation）。其中，任务表作为核心父表，与其他子表通过 \texttt{task\_id} 形成一对多的关联关系。系统的实体关系图（Entity-Relationship Diagram）如图 \ref{fig:er_diagram} 所示。
+
+\begin{figure}[htbp]
+    \centering
+    % 请将生成的ER图导出为PDF或EPS后替换此处的文件名
+    \includegraphics[width=0.9\textwidth]{images/er_diagram_placeholder.pdf} 
+    \caption{流量回放系统数据库ER图}
+    \label{fig:er_diagram}
+\end{figure}
+
+\subsubsection{物理表结构定义}
+根据系统需求分析，详细的物理表结构设计如下：
+
+% 表1：任务信息表
+\begin{table}[htbp]
+    \centering
+    \caption{任务信息表 (t\_task\_info)}
+    \label{tab:task_info}
+    \begin{tabular}{l l p{6cm}}
+        \toprule
+        \textbf{字段名} & \textbf{数据类型} & \textbf{描述} \\
+        \midrule
+        task\_id & CHAR(36) & \textbf{主键}，任务全局唯一标识 (UUID) \\
+        dst\_ip & VARCHAR(255) & 下游目标数据库 IP 地址 \\
+        dst\_port & INT & 下游目标数据库端口 \\
+        dst\_user & VARCHAR(64) & 连接用户名 \\
+        dst\_pass & VARCHAR(255) & 连接密码 (加密存储) \\
+        status & SMALLINT & 任务状态 (0:未开始, 1:进行中, 2:完成, 3:失败) \\
+        create\_time & DATETIME & 任务创建时间 \\
+        update\_time & DATETIME & 任务最后更新时间 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+表 \ref{tab:task_info} 用于存储回放任务的配置信息与生命周期状态。
+
+% 表2：流量基线数据表
+\begin{table}[htbp]
+    \centering
+    \caption{流量基线数据表 (t\_traffic\_baseline)}
+    \label{tab:traffic_baseline}
+    \begin{tabular}{l l p{6cm}}
+        \toprule
+        \textbf{字段名} & \textbf{数据类型} & \textbf{描述} \\
+        \midrule
+        id & BIGINT & \textbf{主键}，自增 ID \\
+        task\_id & CHAR(36) & \textbf{外键}，关联任务 ID，索引字段 \\
+        sql\_id & VARCHAR(64) & SQL 唯一标识，索引字段 \\
+        exec\_timestamp & BIGINT & 原始执行时间戳 (ms) \\
+        session\_id & VARCHAR(64) & 原始会话 ID \\
+        sql\_text & TEXT & 原始 SQL 文本 \\
+        db\_name & VARCHAR(64) & 目标数据库名 \\
+        user\_name & VARCHAR(64) & 执行用户名 \\
+        tx\_id & VARCHAR(64) & 事务 ID \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+表 \ref{tab:traffic_baseline} 存储了解析后的审计日志数据，作为流量回放的基准输入。为了加快检索速度，对 \texttt{task\_id} 和 \texttt{sql\_id} 建立了联合索引。
+
+% 表3：回放明细表
+\begin{table}[htbp]
+    \centering
+    \caption{回放明细表 (t\_replay\_detail)}
+    \label{tab:replay_detail}
+    \begin{tabular}{l l p{6cm}}
+        \toprule
+        \textbf{字段名} & \textbf{数据类型} & \textbf{描述} \\
+        \midrule
+        id & BIGINT & \textbf{主键}，自增 ID \\
+        task\_id & CHAR(36) & \textbf{外键}，关联任务 ID \\
+        round & INT & 回放轮次 \\
+        sql\_id & VARCHAR(64) & 关联的 SQL 标识 \\
+        rows\_affected & BIGINT & 影响行数 \\
+        rows\_returned & BIGINT & 返回行数 \\
+        rows\_scanned & BIGINT & 扫描行数 \\
+        exec\_duration & DECIMAL(10,3) & 执行时长 (ms) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+表 \ref{tab:replay_detail} 记录了每一条 SQL 在目标库回放时的具体执行指标，索引包含 (\texttt{task\_id}, \texttt{round}, \texttt{sql\_id})。
+
+% 表4：回放轮次总览表
+\begin{table}[htbp]
+    \centering
+    \caption{回放轮次总览表 (t\_replay\_summary)}
+    \label{tab:replay_summary}
+    \begin{tabular}{l l p{6cm}}
+        \toprule
+        \textbf{字段名} & \textbf{数据类型} & \textbf{描述} \\
+        \midrule
+        id & BIGINT & \textbf{主键}，自增 ID \\
+        task\_id & CHAR(36) & \textbf{外键}，关联任务 ID \\
+        round & INT & 回放轮次 \\
+        total\_duration & BIGINT & 总耗时 (ms) \\
+        total\_stmts & INT & 总语句数 \\
+        tx\_count & INT & 事务数 \\
+        success\_cnt & INT & 成功回放数 \\
+        error\_cnt & INT & 错误数 \\
+        qps & DECIMAL(10,2) & 每秒查询率 (QPS) \\
+        tps & DECIMAL(10,2) & 每秒事务率 (TPS) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+表 \ref{tab:replay_summary} 用于宏观展示某一轮次回放的整体性能指标，便于进行不同轮次间的性能对比。
+
+% 表5：回放聚合分析表
+\begin{table}[htbp]
+    \centering
+    \caption{回放聚合分析表 (t\_replay\_aggregation)}
+    \label{tab:replay_aggregation}
+    \begin{tabular}{l l p{6cm}}
+        \toprule
+        \textbf{字段名} & \textbf{数据类型} & \textbf{描述} \\
+        \midrule
+        id & BIGINT & \textbf{主键}，自增 ID \\
+        task\_id & CHAR(36) & \textbf{外键}，关联任务 ID \\
+        round & INT & 回放轮次 \\
+        sql\_digest & VARCHAR(64) & SQL 指纹 (Hash)，索引字段 \\
+        sql\_template & TEXT & SQL 模版 (参数脱敏后) \\
+        avg\_latency & DECIMAL(10,3) & 平均耗时 (ms) \\
+        p95\_latency & DECIMAL(10,3) & P95 耗时 (ms) \\
+        p99\_latency & DECIMAL(10,3) & P99 耗时 (ms) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+表 \ref{tab:replay_aggregation} 按照 SQL 指纹维度对回放数据进行聚合，用于分析慢查询及特定类型 SQL 的性能表现。
+\subsection{本章小结}
+
+本章详细阐述了数据库流量回放系统的总体设计方案。首先从日志解析、回放控制、差异校验三个维度明确了功能需求；其次确定了高并发、低延迟的性能目标；接着提出了基于 Go 语言的分层架构设计；最后给出了基于 GORM 的核心数据库表结构设计。该方案为后续的核心实现提供了坚实的架构指导。
