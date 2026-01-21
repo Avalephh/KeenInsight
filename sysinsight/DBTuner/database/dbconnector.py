@@ -46,13 +46,15 @@ class MysqlConnector(DBConnector):
                                            passwd=self.dbpasswd,
                                            db=self.dbname,
                                            port=self.dbport,
-                                           unix_socket=self.sock)
+                                           unix_socket=self.sock,
+                                           auth_plugin='mysql_native_password')
         else:
             conn = mysql.connector.connect(host=self.dbhost,
                                            user=self.dbuser,
                                            passwd=self.dbpasswd,
                                            db=self.dbname,
-                                           port=self.dbport)
+                                           port=self.dbport,
+                                           auth_plugin='mysql_native_password')
         return conn
 
     def close_db(self):
@@ -97,13 +99,15 @@ class PostgresqlConnector(DBConnector):
                                     password=self.dbpasswd,
                                     database=self.dbname,
                                     port=self.dbport,
-                                    unix_socket=self.sock)
+                                    unix_socket=self.sock,
+                                    auth_plugin='mysql_native_password')
         else:
             conn = psycopg2.connect(host=self.dbhost,
                                     user=self.dbuser,
                                     password=self.dbpasswd,
                                     database=self.dbname,
-                                    port=self.dbport)
+                                    port=self.dbport,
+                                    auth_plugin='mysql_native_password')
         return conn
 
     def close_db(self):

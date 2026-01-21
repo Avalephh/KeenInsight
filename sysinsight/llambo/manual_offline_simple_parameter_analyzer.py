@@ -7,7 +7,7 @@ import datetime
 import json
 from function_find import find_function_location, extract_function_from_file
 
-openai.api_key = "sk-SjBd9xxBM6PnAA5SB510E9Bd197a46758325438dD9D068D0"
+openai.api_key = "sk-56iJn1M0lHeFNs6KFcB732EdD3A149479218D7456e3cB3C3"
 
 openai.api_base = "https://api.gpt.ge/v1"
 

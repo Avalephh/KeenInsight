@@ -48,40 +48,17 @@ def change_value(config):
             
     return config
 
-# def initial_knobs(knob_config,num):
-#     knob_details = initialize_knobs(knob_config,num)
-#     start_knobs = {}
-#     # print(knob_details)
-#     for name, value in knob_details.items():
-#         if not value['type'] == "combination":
-#             start_knobs[name] = value['startValue']
-#         else:
-#             knobL = name.strip().split('|')
-#             valueL = value['default'].strip().split('|')
-#             for i in range(0, len(knobL)):
-#                 start_knobs[knobL[i]] = int(valueL[i])
-#     return start_knobs
 
-
-def DBTune(config):
+def DBTune(config_file,config):
     
     change_config = change_value(config)
     
     
-    # return config, {
-    #     "score": 1.00,
-    #     "generalization_score": 1.00
-    # }
+    staticFile = "/home/sysinsight/DBTuner/utils/paramater_association_library.json"
+    codeFoder = '/home/sysinsight/library/extractCode'
     
-    # init_cnf = '/root/AI4DB/hzt/DBTuner/mysql_init.cnf'
-    # target_cnf = '/root/AI4DB/hzt/DBTuner/mysql.cnf'
-    # rewrite_cnf(config, init_cnf, target_cnf)
-    # json_file_path = '/root/AI4DB/hzt/DBTuner/utils/148_default_matched_functions.json'
-    staticFile = "/root/sysinsight-main/DBTuner/utils/paramater_association_library.json"
-    codeFoder = '/root/sysinsight-main/library/extractCode'
-    
-    db_config = '/root/sysinsight-main/DBTuner/config_test.ini'
-    args_db, args_tune = parse_args(db_config)
+    # db_config = '/home/sysinsight/DBTuner/config_test.ini'
+    args_db, args_tune = parse_args(config_file)
 
     if args_db['db'] == 'mysql':
         db = MysqlDB(args_db)
@@ -89,9 +66,6 @@ def DBTune(config):
         db = PostgresqlDB(args_db)
 
     env = DBEnv(args_db, args_tune, db)
-    # knobs = initial_knobs(args_db['knob_config_file'], int(args_db['knob_num']))
-    # print(knobs)
-    # timeout, external_metrics, internal_metrics,function_file = env.step_GP_data(change_config)
     timeout, external_metrics, internal_metrics, resource, function_file,keyFunction_file = env.step_GP_sysinght(knobs=change_config, collect_resource=True)
 
     # 保留规则维护时需要的文件格式
@@ -123,7 +97,7 @@ def DBTune(config):
         "function_file": function_file
     }
      # 定义保存文件的路径
-    json_file = f"rule_collect_results_{args_db['workload']}.json"
+    json_file = f"sysinsight_front/tune_results_{args_tune['task_id']}.json"
     # 如果文件不存在，则创建新文件，并写入初始的列表结构
     if not os.path.exists(json_file):
         with open(json_file, 'w') as f:
@@ -135,19 +109,6 @@ def DBTune(config):
         data.append(result_data)  # 将新结果添加到列表中
         f.seek(0)  # 重置文件指针到文件开始
         json.dump(data, f, indent=4)  # 将数据写回文件，格式化输出
-    
-
-    
-
-
-    # metrics_dict = {
-    #     "tps": external_metrics[0],
-    #     "lat": external_metrics[1],
-    #     "qps": external_metrics[2],
-    #     "tpsVar": external_metrics[3],
-    #     "latVar": external_metrics[4],
-    #     "qpsVar": external_metrics[5]
-    # }
     
     if args_db['workload']=='sysbench' or args_db['workload']=='tpcc':
         metrics_dict = {

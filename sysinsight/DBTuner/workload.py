@@ -5,7 +5,7 @@ SYSBENCH_WORKLOAD = {
     'name': 'sysbench',
     'type': 'read',
     # bash run_sysbench.sh write localhost 3318 root ''  theads table   32 150 output.log sbtest
-    'cmd': 'bash {} {} {} {} {} "" {} {} {} {} {} {} {}'
+    'cmd': 'bash {} {} {} {} {} {} {} {} {} {} {} {} {}'
 }
 
 
@@ -38,4 +38,3 @@ TPCC_WORKLOAD = {
     # bash run_job.sh queries_list.txt query_dir output.log MYSQL_SOCK
     'cmd': 'bash {} {} {} {} {} {}'
 }
-

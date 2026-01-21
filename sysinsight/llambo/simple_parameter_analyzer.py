@@ -7,7 +7,7 @@ import datetime
 import json
 from .function_find import find_function_location, extract_function_from_file
 
-openai.api_key = "sk-SjBd9xxBM6PnAA5SB510E9Bd197a46758325438dD9D068D0c"
+openai.api_key = "sk-56iJn1M0lHeFNs6KFcB732EdD3A149479218D7456e3cB3C3"
 
 openai.base_url = "https://api.gpt.ge/v1/"
 openai.default_headers = {"x-foo": "true"}
@@ -89,7 +89,7 @@ class SimpleParameterAnalyzer:
         except Exception as e:
             self.logger.error(f"保存缓存失败: {str(e)}")
 
-    def extract_instructions_by_param(self, param_name, function_name=None, base_path="/root/sysinsight-main/controlpath"):  # hzttodo
+    def extract_instructions_by_param(self, param_name, function_name=None, base_path="/home/sysinsight/controlpath"):  # hzttodo
         #print("name is" , param_name, function_name)
         # 首先检查缓存
         cached_result = self._check_cache(param_name, function_name)

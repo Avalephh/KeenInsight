@@ -248,13 +248,10 @@ class LLAMBO:
                 # 打印推荐时间统计（不包含评估环节）
                 print(f'-------[推荐配置时间] 本次耗时: {current_recommend_time:.4f}秒, 平均耗时: {self.average_recommendation_time:.4f}秒-------------')
                 
-                
+                # TODO 评估参数性能，
                 sel_candidate_point, sel_candidate_fval, keyFunction_file, config_, resource = self._evaluate_config(sel_candidate_point)
 
-                # hzy add
-                # keyFunctions_list = read_function_names(keyFunction_file)
-                
-                json_file = "/root/sysinsight-main/DBTuner/utils/paramater_association_library.json"
+                json_file = "/home/sysinsight/DBTuner/utils/paramater_association_library.json"
                 function_to_knob = get_knob_in_keyFunctions(keyFunction_file, json_file)
                 print("function_to_knob: ", function_to_knob)
                 
@@ -333,7 +330,7 @@ class LLAMBO:
                         new_value = change['new_value']
                         for rule1 in selected_rules:
                             rule = process_rule_catagory(rule1)
-                            print("rule: ",rule)
+                            # print("rule: ",rule)
                             for knob_info in rule['knob']:
                                 # print("knob_info: ",knob_info)
                                 if knob_info['name'] == knob_name:
@@ -363,45 +360,6 @@ class LLAMBO:
                                             matched_rule_set.add(rule1)
                                             matched_rules.append(rule1)
                                             processed_matched_rules.append(rule)
-                # if selected_rules:
-                #     # 查看现在的参数改变情况是否符合规则中的参数配置，并且tps变化是否符合规则
-                #     matched_rules = []
-                #     processed_matched_rules = []
-                #     matched_rule_set = set() 
-                #     old_performance = self.observed_fvals.iloc[-1]["score"]
-                #     new_performance = sel_candidate_fval["score"].values[0]
-                #     performance_change = (new_performance - old_performance) / old_performance * 100
-                #     print("performance change: ", performance_change)
-                #     for change in rule_config_change:
-                #         knob_name = change['knob']
-                #         old_value = change['old_value']
-                #         new_value = change['new_value']
-                #         for rule1 in selected_rules:
-                #             rule = process_rule_catagory(rule1)
-                #             for knob_info in rule['knob']:
-                #                 if knob_info['name'] == knob_name:
-                #                     # old_value = self.promptlib.config[key]
-                #                     old_value_norm = knob_normalize(defaultFile,knob_name,old_value)
-                #                     new_value_norm = knob_normalize(defaultFile,knob_name,new_value)
-                #                     change_amount = new_value_norm - old_value_norm
-                #                     lower_bound = knob_info['lower_bound']
-                #                     upper_bound = knob_info['upper_bound']
-                #                     # print("change_amount : ",change_amount)
-                #                     # print("key:{} old_value:{} new_value:{}, change_amount: {}",knob_name, old_value, new_value, change_amount)
-                #                     if (lower_bound <= change_amount <= upper_bound) or (lower_bound == -float("inf") and change_amount <= upper_bound) or (upper_bound == -float("inf") and change_amount > lower_bound):      
-                #                         if rule['performance']['lower_bound'] <= performance_change <= rule['performance']['upper_bound']:
-                #                             #  匹配到规则
-                #                             # TODO 记录下每次匹配到的规则，以及更改的值 -- 4950 -> 4951查看一下
-                #                             rule = updateMetric_useful(rule)
-                #                             print("rule matched.")
-                #                         else:
-                #                             # 没有匹配到规则
-                #                             rule = updateMetric_useless(rule)
-                #                             print("rule not matched.")
-                #                         if rule1 not in matched_rule_set:
-                #                             matched_rule_set.add(rule1)
-                #                             matched_rules.append(rule1)
-                #                             processed_matched_rules.append(rule)
                                             
                     update_rule_file(globalRules, processed_matched_rules, rule_file)
                     # 记录当前调用匹配到的规则（使用字符串列表）
