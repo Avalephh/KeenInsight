@@ -13,7 +13,7 @@ import time
 
 # 规则挖掘数据总数
 TOTAL_NUM = 2080
-DEFAULT_KNOB_VALUES_PATH = "/root/sysinsight-main/DBTuner/knobspace/gptuner_target_knobs.json"  
+DEFAULT_KNOB_VALUES_PATH = "/home/sysinsight/DBTuner/knobspace/gptuner_target_knobs.json"  
 
 MEMORY_KNOBS = [
     'tmp_table_size', 'max_heap_table_size', 'query_prealloc_size',
@@ -417,20 +417,69 @@ def parse_knob_or_function(item, item_type):
     raise ValueError("无法解析项: {}".format(item))
 
 # 函数不标准化，直接提取函数值
-def get_function_value(function_list,file_path):
+# def get_function_value(function_list,file_path):
     
+#     # 读取文件内容
+#     with open(file_path, 'r') as file:
+#         lines = file.readlines()
+        
+#     value_rate = {}
+#     for line in lines[1:]:  # 跳过标题行
+#         parts = line.split()
+#         function_name = parts[0]
+        
+#         if function_name in function_list:
+#             sampling_rate = float(parts[1])    
+#             value_rate[function_name] = sampling_rate
+    
+#     return value_rate
+def get_function_value(function_list, file_path):
+    """
+    从文件中读取函数采样率
+    
+    Args:
+        function_list: 需要查找的函数名列表
+        file_path: 数据文件路径
+        
+    Returns:
+        字典，key为函数名，value为采样率
+    """
     # 读取文件内容
     with open(file_path, 'r') as file:
         lines = file.readlines()
-        
+    
     value_rate = {}
     for line in lines[1:]:  # 跳过标题行
-        parts = line.split()
-        function_name = parts[0]
-        
-        if function_name in function_list:
-            sampling_rate = float(parts[1])    
-            value_rate[function_name] = sampling_rate
+        # 尝试多种分隔符：首先尝试制表符，然后尝试多个空格
+        if '\t' in line:
+            parts = line.strip().split('\t')
+        else:
+            # 如果使用制表符分割后只有1部分，尝试按多个空格分割
+            parts = line.strip().split()
+            
+        if len(parts) < 2:
+            continue  # 跳过不完整的行
+            
+        # 函数名是除最后一个字段外的所有内容
+        # 因为数据格式可能是: 函数名 采样率 其他字段...
+        # 采样率是倒数第三个字段
+        if len(parts) >= 3:
+            # 数据格式: 函数名 采样率 其他字段...
+            function_name = parts[0]
+            try:
+                sampling_rate = float(parts[1])
+                value_rate[function_name] = sampling_rate
+            except (ValueError, IndexError):
+                # 如果转换失败，尝试其他方式
+                continue
+        else:
+            # 如果只有两个字段，直接使用
+            function_name = parts[0]
+            try:
+                sampling_rate = float(parts[1])
+                value_rate[function_name] = sampling_rate
+            except (ValueError, IndexError):
+                continue
     
     return value_rate
 

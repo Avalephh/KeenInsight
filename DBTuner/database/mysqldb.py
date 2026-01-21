@@ -172,7 +172,7 @@ class MysqlDB:
                         disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
 
             start_cmd = '{} --defaults-file={}'.format(self.mysqld, self.mycnf)
-            wrapped_cmd = 'echo $$; exec ' + start_cmd
+            wrapped_cmd = 'echo $$; exec ' + start_cmd 
             _, start_stdout, _ = ssh.exec_command(wrapped_cmd)
             self.pid = int(start_stdout.readline())
 
@@ -201,31 +201,31 @@ class MysqlDB:
 
         count = 0
         start_sucess = True
-        logger.info('wait for connection')
+        print('wait for connection')
         error, db_conn = None, None
         while True:
             try:
                 dbc = MysqlConnector(**self.connection_info)
                 db_conn = dbc.conn
                 if db_conn.is_connected():
-                    logger.info('Connected to MySQL db')
+                    print('Connected to MySQL db')
                     db_conn.close()
                     break
             except Exception as result:
                 if count > 30:
-                    logger.info(result)
+                    print(result)
                 pass
 
             time.sleep(1)
             count = count + 1
             if count > 600:
                 start_sucess = False
-                logger.info("can not connect to DB")
+                print("can not connect to DB")
                 break
 
-        logger.info('finish {} seconds waiting for connection'.format(count))
-        logger.info('{} --defaults-file={}'.format(self.mysqld, self.mycnf))
-        logger.info('mysql is up')
+        print('finish {} seconds waiting for connection'.format(count))
+        print('{} --defaults-file={}'.format(self.mysqld, self.mycnf))
+        print('mysql is up')
         return start_sucess
 
     def reinitdb_magic(self):
@@ -283,7 +283,7 @@ class MysqlDB:
         knobs_rdsL = self._gen_config_file(knobs)
         sucess = self._start_mysqld()
         try:
-            logger.info('sleeping for {} seconds after restarting mysql'.format(RESTART_WAIT_TIME))
+            print('sleeping for {} seconds after restarting mysql'.format(RESTART_WAIT_TIME))
             time.sleep(RESTART_WAIT_TIME)
             db_conn = MysqlConnector(**self.connection_info)
             sql1 = 'SHOW VARIABLES LIKE "innodb_log_file_size";'

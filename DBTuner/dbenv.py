@@ -32,6 +32,7 @@ class DBEnv:
     def __init__(self, args, args_tune, db):
         self.db = db
         self.args = args
+        self.args_tune = args_tune
         self.workload = self.get_workload()
         self.log_path = "./log"
         self.num_metrics = self.db.num_metrics
@@ -475,47 +476,24 @@ class DBEnv:
 
         # start Benchmark
         benchmark_timeout = False
-        # cmd, filename = self.get_benchmark_cmd()
-        # print(cmd)
-        
-        print("11111")
+        cmd, filename = self.get_benchmark_cmd()
+        print(cmd)
+        print("sysbench")
         print("**********************************")
-        perf_output_dir = 'perf_data'  # Define a unified folder for perf data
+        perf_output_dir = f"perf_data_{self.args_tune['task_id']}"   # Define a unified folder for perf data
         os.makedirs(perf_output_dir, exist_ok=True)
-
         timestamp = int(time.time())
         output_file = 'sysbench_run_{}.out'.format(timestamp)
-        # output_file = os.path.join(perf_output_dir, output_file)
-        cmd = [
-            "sysbench",
-            "--mysql-host=localhost",
-            "--mysql-port=3306",
-            "--mysql-user=root",
-            "--mysql-password=Dbiir@500",
-            "--mysql-db=sbtest",
-            "--range-size=100",
-            "--events=0",
-            "--table-size=6000000",
-            "--tables=100",
-            # "--warmup-time=10",
-            "--threads=32",
-            "--report-interval=1",
-            "--time=60",
-            "--db-driver=mysql",
-            "--db-ps-mode=disable",
-            "oltp_read_write",
-            f"run > {output_file}"
-        ] 
-        cmd = " ".join(cmd) 
-        print("cmd: ", cmd)
         print("[{}] benchmark start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+        # TODO 流量回放，获取tps、latency的接口
         p_benchmark = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                                     close_fds=True)
         # collect perf data
         perf_file = os.path.join(perf_output_dir, f'perf_data_{timestamp}.data')
-        # Perf command to collect performance data, specifying the output file
-        # time.sleep(10)
-        pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
+        try:
+            pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e}")
         perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 50" 
         print(perf_cmd)
         time.sleep(5)
@@ -524,13 +502,8 @@ class DBEnv:
                                     close_fds=True)
         p_runperf.wait()
         p_benchmark.wait()
-
         
-        filename = output_file
-
         print("**********************************")
-
-        # try:
         outs, errs = p_benchmark.communicate(timeout=TIMEOUT_TIME)
         print(errs)
         print(outs)
@@ -539,9 +512,6 @@ class DBEnv:
             print("[{}] benchmark finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
         else:
             print("run benchmark get error {}".format(ret_code))
-        # except subprocess.TimeoutExpired:
-        #     #benchmark_timeout = True
-        #     print("[{}] benchmark timeout!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
         outs, errs = p_runperf.communicate(timeout=TIMEOUT_TIME)
         print("collect perf data: ")
         print(errs)
@@ -563,20 +533,19 @@ class DBEnv:
         im.join()
         
         # transfer perf data to perf txt
-        flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
+        flamegraph_dir = os.path.expanduser("/home/RUC/FlameGraph") 
         stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
         print(stackcollapse_script)
         
         perf_txt = os.path.join(perf_output_dir, f'perf_{timestamp}.txt')
-        # perf_script_cmd = f"perf script -i {perf_file} > {perf_txt}"
         perf_script_cmd = f"perf script -i {perf_file} | {stackcollapse_script} > {perf_txt}"
         p_perf_script = subprocess.Popen(perf_script_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
                                     close_fds=True)
         p_perf_script.wait()    
         outs, errs = p_perf_script.communicate(timeout=TIMEOUT_TIME)
         print("generate perf script: ")
-        print(errs)
-        print(outs) 
+        print("outs: ", outs)
+        print("errs: ", errs) 
         ret_code2 = p_perf_script.poll()
         if ret_code2 == 0:
             print("[{}] perf script generation finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
@@ -589,30 +558,12 @@ class DBEnv:
             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = rm.get_monitor_data_avg()
         else:
             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = 0, 0, 0, 0, 0
-
+        # TODO 接口
         external_metrics = self.get_external_metrics(filename)
         internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
         logger.info('internal metrics: {}.'.format(list(internal_metrics)))
-
-        # Judge tps value
-        # rw
-        DEFAULT_TPS = 1507.88
-        # wo
-        # DEFAULT_TPS = 7963.36 
-        # innodb_redo_log_capacity=200M
-        # DEFAULT_TPS = 6741.12
-        FLOUCTUATION_PERCENTAGE = 0.05  # 5%
-        LOW_THRESHOLD = DEFAULT_TPS * (1 - FLOUCTUATION_PERCENTAGE)  # 
-        HIGH_THRESHOLD = DEFAULT_TPS * (1 + FLOUCTUATION_PERCENTAGE) # 
-        result_flag = 0
-        if external_metrics[0] > HIGH_THRESHOLD:
-            result_flag = 3
-        elif external_metrics[0] < LOW_THRESHOLD:
-            result_flag = 1
-        else:
-            result_flag = 2
         
-        # result_flag = 2
+        result_flag = 1
         function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
 
         return benchmark_timeout, external_metrics, internal_metrics, (
@@ -636,7 +587,7 @@ class DBEnv:
         cmd, filename = self.get_benchmark_cmd()
         print("cmd: ",cmd)
         
-        perf_output_dir = 'perf_data'  # Define a unified folder for perf data
+        perf_output_dir = f"perf_data_{self.args_tune['task_id']}"  # Define a unified folder for perf data
         os.makedirs(perf_output_dir, exist_ok=True)
         timestamp = int(time.time())
         
@@ -690,7 +641,7 @@ class DBEnv:
         im.join()
         
         # transfer perf data to perf txt
-        flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
+        flamegraph_dir = os.path.expanduser("/home/RUC/FlameGraph") 
         stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
         print(stackcollapse_script)
         
@@ -721,294 +672,12 @@ class DBEnv:
         internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
         logger.info('internal metrics: {}.'.format(list(internal_metrics)))
 
-        # Judge tps value
-        DEFAULT_LAT = 50
-        FLOUCTUATION_PERCENTAGE = 0.05  # 5%
-        LOW_THRESHOLD = DEFAULT_LAT * (1 - FLOUCTUATION_PERCENTAGE)  # 1872.8449
-        HIGH_THRESHOLD = DEFAULT_LAT * (1 + FLOUCTUATION_PERCENTAGE) # 2067.8799
-        result_flag = 0
-        if external_metrics[1] > HIGH_THRESHOLD:
-            result_flag = 1
-        elif external_metrics[1] < LOW_THRESHOLD:
-            result_flag = 3
-        else:
-            result_flag = 2
-        # result_flag = 2
+        result_flag = 3
         function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
 
         return benchmark_timeout, external_metrics, internal_metrics, (
             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory, dirty_pages, hit_ratio, page_data), function_range
     
-    # benchbase
-    # def get_states_expe_tpch(self, collect_resource=0):
-    #     # start Internal Metrics Collection
-    #     internal_metrics = Manager().list()
-    #     im = mp.Process(target=self.db.get_internal_metrics,
-    #                     args=(internal_metrics, BENCHMARK_RUNNING_TIME, BENCHMARK_WARMING_TIME))
-    #     self.db.set_im_alive(True)
-    #     im.start()
-    #     # start Benchmark
-    #     benchmark_timeout = False
-    #     perf_output_dir = 'perf_data'  # Define a unified folder for perf data
-    #     os.makedirs(perf_output_dir, exist_ok=True)
-    #     timestamp = int(time.time())
-        
-    #     # TODO: benchbase
-    #     result_path = "./optimization_results/temp_results"
-    #     benchmark_path = "/root/benchbase/target/benchbase-mysql"
-    #     for filename in os.listdir(result_path):
-    #         print(f"REMOVE {filename}")
-    #         filepath = os.path.join(result_path, filename)
-    #         os.remove(filepath)
-        
-    #     with open(os.path.join(result_path, "out.txt"), 'w') as output_file:
-    #         process = subprocess.Popen(
-    #             ['java', '-jar', 'benchbase.jar', '-b', 'tpch', 
-    #             "-c", "config/mysql/sample_tpch_config.xml", 
-    #             "--create=false", "--clear=false", "--load=false", '--execute=true', 
-    #             "-d", '/root/sysinsight-main/optimization_results/temp_results'],
-    #             cwd=benchmark_path,
-    #             stdout=output_file
-    #         )
-    #         # collect perf data
-    #         perf_file = os.path.join(perf_output_dir, f'perf_data_{timestamp}.data')
-    #         pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
-    #         perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 55" 
-    #         print(perf_cmd)
-    #         time.sleep(5)
-    #         print("[{}] perf data collection start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #         p_runperf = subprocess.Popen(perf_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                                     close_fds=True)
-    #         process.wait()
-    #         p_runperf.wait()
-
-    #     # try:
-    #     outs, errs = process.communicate(timeout=TIMEOUT_TIME)
-    #     print(errs)
-    #     print(outs)
-    #     ret_code = process.poll()
-    #     if ret_code == 0:
-    #         print("[{}] benchmark finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("run benchmark get error {}".format(ret_code))
-    #     # except subprocess.TimeoutExpired:
-    #     #     #benchmark_timeout = True
-    #     #     print("[{}] benchmark timeout!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     outs, errs = p_runperf.communicate(timeout=TIMEOUT_TIME)
-    #     print("collect perf data: ")
-    #     print(errs)
-    #     print(outs)
-    #     ret_code1 = p_runperf.poll()
-    #     if ret_code1 == 0:
-    #         print("[{}] perf data collection finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("perf data collection get error {}".format(ret_code1))
-
-    #     # terminate Benchmark
-    #     if not self.remote_mode:
-    #         subprocess.Popen(self.db.clear_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                         close_fds=True)
-    #         print("[{}] clear processlist".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-
-    #     # stop Internal Metrics Collection
-    #     self.db.set_im_alive(False)
-    #     im.join()
-        
-    #     # transfer perf data to perf txt
-    #     flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
-    #     stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
-    #     print(stackcollapse_script)
-        
-    #     perf_txt = os.path.join(perf_output_dir, f'perf_{timestamp}.txt')
-    #     # perf_script_cmd = f"perf script -i {perf_file} > {perf_txt}"
-    #     perf_script_cmd = f"perf script -i {perf_file} | {stackcollapse_script} > {perf_txt}"
-    #     p_perf_script = subprocess.Popen(perf_script_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                                 close_fds=True)
-    #     p_perf_script.wait()    
-    #     outs, errs = p_perf_script.communicate(timeout=TIMEOUT_TIME)
-    #     print("generate perf script: ")
-    #     print(errs)
-    #     print(outs) 
-    #     ret_code2 = p_perf_script.poll()
-    #     if ret_code2 == 0:
-    #         print("[{}] perf script generation finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("perf script generation get error {}".format(ret_code2))
-
-    #     # stop Resource Monition (if activated)
-    #     collect_resource = False
-    #     if collect_resource:
-    #         if self.remote_mode:
-    #             # send Benchmark-Finish msg to remote Resource Monitor Process
-    #             clientDB_conn.send('benchmark_finished')
-    #             # receive remote Monitor Data
-    #             monitor_data = clientDB_conn.recv()
-    #             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = monitor_data
-    #             # close connection
-    #             clientDB_conn.close()
-
-    #         # else:
-    #             # rm.terminate()
-    #             # cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = rm.get_monitor_data_avg()
-    #     else:
-    #         cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = 0, 0, 0, 0, 0
-
-    #     external_metrics = self.get_metric_benchbase()
-    #     internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
-    #     logger.info('internal metrics: {}.'.format(list(internal_metrics)))
-
-    #     # Judge tps value
-    #     DEFAULT_LAT = 50
-    #     FLOUCTUATION_PERCENTAGE = 0.05  # 5%
-    #     LOW_THRESHOLD = DEFAULT_LAT * (1 - FLOUCTUATION_PERCENTAGE)  # 1872.8449
-    #     HIGH_THRESHOLD = DEFAULT_LAT * (1 + FLOUCTUATION_PERCENTAGE) # 2067.8799
-    #     result_flag = 0
-    #     if external_metrics[1] > HIGH_THRESHOLD:
-    #         result_flag = 1
-    #     elif external_metrics[1] < LOW_THRESHOLD:
-    #         result_flag = 3
-    #     else:
-    #         result_flag = 2
-    #     # result_flag = 2
-    #     function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
-
-    #     return benchmark_timeout, external_metrics, internal_metrics, function_range
-    # benchbase
-    # def get_states_expe_tpcc(self, collect_resource=0):
-    #     # start Internal Metrics Collection
-    #     internal_metrics = Manager().list()
-    #     im = mp.Process(target=self.db.get_internal_metrics,
-    #                     args=(internal_metrics, BENCHMARK_RUNNING_TIME, BENCHMARK_WARMING_TIME))
-    #     self.db.set_im_alive(True)
-    #     im.start()
-
-    #     # start Benchmark
-    #     benchmark_timeout = False
-    #     # cmd, filename = self.get_benchmark_cmd()
-    #     # print(cmd)
-    #     perf_output_dir = 'perf_data'  # Define a unified folder for perf data
-    #     os.makedirs(perf_output_dir, exist_ok=True)
-
-    #     timestamp = int(time.time())
-    #     # TODO: benchbase
-    #     result_path = "./optimization_results/temp_results"
-    #     benchmark_path = "/root/benchbase/target/benchbase-mysql"
-    #     for filename in os.listdir(result_path):
-    #         print(f"REMOVE {filename}")
-    #         filepath = os.path.join(result_path, filename)
-    #         os.remove(filepath)
-        
-    #     with open(os.path.join(result_path, "out.txt"), 'w') as output_file:
-    #         process = subprocess.Popen(
-    #             ['java', '-jar', 'benchbase.jar', '-b', 'tpcc', 
-    #             "-c", "config/mysql/sample_tpcc_config.xml", 
-    #             "--create=false", "--clear=false", "--load=false", '--execute=true', 
-    #             "-d", '/root/sysinsight-main/optimization_results/temp_results'],
-    #             cwd=benchmark_path,
-    #             stdout=output_file
-    #         )
-    #         # collect perf data
-    #         perf_file = os.path.join(perf_output_dir, f'perf_data_{timestamp}.data')
-    #         pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
-    #         perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 55" 
-    #         print(perf_cmd)
-    #         time.sleep(5)
-    #         print("[{}] perf data collection start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #         p_runperf = subprocess.Popen(perf_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                                     close_fds=True)
-    #         process.wait()
-    #         p_runperf.wait()
-    #     # try:
-    #     outs, errs = process.communicate(timeout=TIMEOUT_TIME)
-    #     print(errs)
-    #     print(outs)
-    #     ret_code = process.poll()
-    #     if ret_code == 0:
-    #         print("[{}] benchmark finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("run benchmark get error {}".format(ret_code))
-    #     outs, errs = p_runperf.communicate(timeout=TIMEOUT_TIME)
-    #     print("collect perf data: ")
-    #     print(errs)
-    #     print(outs)
-    #     ret_code1 = p_runperf.poll()
-    #     if ret_code1 == 0:
-    #         print("[{}] perf data collection finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("perf data collection get error {}".format(ret_code1))
-
-    #     # terminate Benchmark
-    #     if not self.remote_mode:
-    #         subprocess.Popen(self.db.clear_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                         close_fds=True)
-    #         print("[{}] clear processlist".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-
-    #     # stop Internal Metrics Collection
-    #     self.db.set_im_alive(False)
-    #     im.join()
-        
-    #     # transfer perf data to perf txt
-    #     flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
-    #     stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
-    #     print(stackcollapse_script)
-        
-    #     perf_txt = os.path.join(perf_output_dir, f'perf_{timestamp}.txt')
-    #     # perf_script_cmd = f"perf script -i {perf_file} > {perf_txt}"
-    #     perf_script_cmd = f"perf script -i {perf_file} | {stackcollapse_script} > {perf_txt}"
-    #     p_perf_script = subprocess.Popen(perf_script_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                                 close_fds=True)
-    #     p_perf_script.wait()    
-    #     outs, errs = p_perf_script.communicate(timeout=TIMEOUT_TIME)
-    #     print("generate perf script: ")
-    #     print(errs)
-    #     print(outs) 
-    #     ret_code2 = p_perf_script.poll()
-    #     if ret_code2 == 0:
-    #         print("[{}] perf script generation finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("perf script generation get error {}".format(ret_code2))
-
-    #     # stop Resource Monition (if activated)
-    #     collect_resource = False
-    #     if collect_resource:
-    #         if self.remote_mode:
-    #             # send Benchmark-Finish msg to remote Resource Monitor Process
-    #             clientDB_conn.send('benchmark_finished')
-    #             # receive remote Monitor Data
-    #             monitor_data = clientDB_conn.recv()
-    #             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = monitor_data
-    #             # close connection
-    #             clientDB_conn.close()
-
-    #         # else:
-    #             # rm.terminate()
-    #             # cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = rm.get_monitor_data_avg()
-    #     else:
-    #         cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = 0, 0, 0, 0, 0
-
-    #     # external_metrics = self.get_external_metrics(filename)
-    #     # tpcc TODO: 注释
-    #     external_metrics = self.get_metric_benchbase()
-    #     internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
-    #     logger.info('internal metrics: {}.'.format(list(internal_metrics)))
-
-    #     # Judge tps value
-    #     # rw
-    #     DEFAULT_TPS = 117
-    #     FLOUCTUATION_PERCENTAGE = 0.05  # 5%
-    #     LOW_THRESHOLD = DEFAULT_TPS * (1 - FLOUCTUATION_PERCENTAGE)  # 
-    #     HIGH_THRESHOLD = DEFAULT_TPS * (1 + FLOUCTUATION_PERCENTAGE) # 
-    #     result_flag = 0
-    #     if external_metrics[0] > HIGH_THRESHOLD:
-    #         result_flag = 3
-    #     elif external_metrics[0] < LOW_THRESHOLD:
-    #         result_flag = 1
-    #     else:
-    #         result_flag = 2
-    #     # result_flag = 2
-    #     function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
-    #     return benchmark_timeout, external_metrics, internal_metrics, function_range
-     
      
     def get_states_expe_tpcc(self, collect_resource=0):
         # start Internal Metrics Collection
@@ -1024,13 +693,13 @@ class DBEnv:
         # start Benchmark
         benchmark_timeout = False
         
-        perf_output_dir = 'perf_data'  # Define a unified folder for perf data
+        perf_output_dir = f"perf_data_{self.args_tune['task_id']}"   # Define a unified folder for perf data
         os.makedirs(perf_output_dir, exist_ok=True)
 
         timestamp = int(time.time())
         # TODO: benchbase
         result_path = "./optimization_results/temp_results"
-        benchmark_path = "/root/benchbase/target/benchbase-mysql"
+        benchmark_path = "/home/benchbase/target/benchbase-mysql"
         for filename in os.listdir(result_path):
             print(f"REMOVE {filename}")
             filepath = os.path.join(result_path, filename)
@@ -1041,7 +710,7 @@ class DBEnv:
                 ['java', '-jar', 'benchbase.jar', '-b', 'tpcc', 
                 "-c", "config/mysql/sample_tpcc_config.xml", 
                 "--create=false", "--clear=false", "--load=false", '--execute=true', 
-                "-d", '/root/sysinsight-main/optimization_results/temp_results'],
+                "-d", '/home/sysinsight/optimization_results/temp_results'],
                 cwd=benchmark_path,
                 stdout=output_file
             )
@@ -1110,7 +779,7 @@ class DBEnv:
         im.join()
         
         # transfer perf data to perf txt
-        flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
+        flamegraph_dir = os.path.expanduser("/home/RUC/FlameGraph") 
         stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
         print(stackcollapse_script)
         
@@ -1151,149 +820,7 @@ class DBEnv:
         return benchmark_timeout, external_metrics, internal_metrics, (
             cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory, dirty_pages, hit_ratio, page_data), function_range
         
-    # def get_states_expe_tpcc(self, collect_resource=0):
-    #     # start Internal Metrics Collection
-    #     internal_metrics = Manager().list()
-    #     im = mp.Process(target=self.db.get_internal_metrics,
-    #                     args=(internal_metrics, BENCHMARK_RUNNING_TIME, BENCHMARK_WARMING_TIME))
-    #     self.db.set_im_alive(True)
-    #     im.start()
-
-    #     # start Resource Monition (if activated)
-    #     if collect_resource:
-    #         rm = ResourceMonitor(self.db.pid, 1, BENCHMARK_WARMING_TIME, BENCHMARK_RUNNING_TIME)
-    #         rm.run()
-        
-    #     # start Benchmark
-    #     benchmark_timeout = False
-    #     # cmd, filename = self.get_benchmark_cmd()
-    #     # print(cmd)
-    #     perf_output_dir = 'perf_data'  # Define a unified folder for perf data
-    #     os.makedirs(perf_output_dir, exist_ok=True)
-
-    #     timestamp = int(time.time())
-    #     tpcc_output_file = 'tpcc_log_{}.out'.format(timestamp)
-    #     cmd = [
-    #         "/usr/local/tpcc-mysql/tpcc_start",
-    #         "-h127.0.0.1",
-    #         "-P3306",
-    #         "-dtpcc",
-    #         "-uroot",
-    #         "-pDbiir@500",
-    #         "-w5",
-    #         "-c32",
-    #         "-r20",
-    #         "-l60",
-    #     ]
-    #     cmd = " ".join(cmd) 
-    #     print("cmd: ", cmd)
-    #     print("[{}] benchmark start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-        
-    #     # tpcc TODO: 注释
-    #     with open(tpcc_output_file, "w") as logfile:
-    #         # 执行命令并保存输出到日志文件
-    #         p_benchmark = subprocess.Popen(cmd, shell=True, stderr=subprocess.STDOUT, stdout=logfile,
-    #                                 close_fds=True)
-            
-    #         # collect perf data
-    #         perf_file = os.path.join(perf_output_dir, f'perf_data_{timestamp}.data')
-    #         pgrep_result = subprocess.check_output("pgrep -nx mysqld", shell=True).decode().strip()
-    #         perf_cmd = f"perf record -F 300 -p {pgrep_result} -g -o {perf_file} -- sleep 55" 
-    #         print(perf_cmd)
-    #         time.sleep(25)
-    #         print("[{}] perf data collection start!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #         p_runperf = subprocess.Popen(perf_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                                     close_fds=True)
-    #         p_benchmark.wait()
-    #         p_runperf.wait()
-    #     filename = tpcc_output_file
-    #     # try:
-    #     outs, errs = p_benchmark.communicate(timeout=TIMEOUT_TIME)
-    #     print(errs)
-    #     print(outs)
-    #     ret_code = p_benchmark.poll()
-    #     if ret_code == 0:
-    #         print("[{}] benchmark finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("run benchmark get error {}".format(ret_code))
-    #     # except subprocess.TimeoutExpired:
-    #     #     #benchmark_timeout = True
-    #     #     print("[{}] benchmark timeout!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     outs, errs = p_runperf.communicate(timeout=TIMEOUT_TIME)
-    #     print("collect perf data: ")
-    #     print(errs)
-    #     print(outs)
-    #     ret_code1 = p_runperf.poll()
-    #     if ret_code1 == 0:
-    #         print("[{}] perf data collection finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("perf data collection get error {}".format(ret_code1))
-
-    #     # terminate Benchmark
-    #     if not self.remote_mode:
-    #         subprocess.Popen(self.db.clear_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                         close_fds=True)
-    #         print("[{}] clear processlist".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-
-    #     # stop Internal Metrics Collection
-    #     self.db.set_im_alive(False)
-    #     im.join()
-        
-    #     # transfer perf data to perf txt
-    #     flamegraph_dir = os.path.expanduser("/root/RUC/FlameGraph") 
-    #     stackcollapse_script = os.path.join(flamegraph_dir, "stackcollapse-perf.pl")  # 确保这个脚本存在
-    #     print(stackcollapse_script)
-        
-    #     perf_txt = os.path.join(perf_output_dir, f'perf_{timestamp}.txt')
-    #     # perf_script_cmd = f"perf script -i {perf_file} > {perf_txt}"
-    #     perf_script_cmd = f"perf script -i {perf_file} | {stackcollapse_script} > {perf_txt}"
-    #     p_perf_script = subprocess.Popen(perf_script_cmd, shell=True, stderr=subprocess.STDOUT, stdout=subprocess.PIPE,
-    #                                 close_fds=True)
-    #     p_perf_script.wait()    
-    #     outs, errs = p_perf_script.communicate(timeout=TIMEOUT_TIME)
-    #     print("generate perf script: ")
-    #     print(errs)
-    #     print(outs) 
-    #     ret_code2 = p_perf_script.poll()
-    #     if ret_code2 == 0:
-    #         print("[{}] perf script generation finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
-    #     else:
-    #         print("perf script generation get error {}".format(ret_code2))
-
-    #     # stop Resource Monition (if activated)
-    #     if collect_resource:
-    #         rm.terminate()
-    #         cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = rm.get_monitor_data_avg()
-    #     else:
-    #         cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory = 0, 0, 0, 0, 0
-
-    #     # external_metrics = self.get_external_metrics(filename)
-    #     # tpcc TODO: 注释
-    #     external_metrics = self.get_tpcc_metrics(filename)
-        
-    #     internal_metrics, dirty_pages, hit_ratio, page_data = self.db._post_handle(internal_metrics)
-    #     logger.info('internal metrics: {}.'.format(list(internal_metrics)))
-
-    #     # Judge tps value
-    #     # rw
-    #     DEFAULT_TPS = 1507.88
-    #     FLOUCTUATION_PERCENTAGE = 0.05  # 5%
-    #     LOW_THRESHOLD = DEFAULT_TPS * (1 - FLOUCTUATION_PERCENTAGE)  # 
-    #     HIGH_THRESHOLD = DEFAULT_TPS * (1 + FLOUCTUATION_PERCENTAGE) # 
-    #     result_flag = 0
-    #     if external_metrics[0] > HIGH_THRESHOLD:
-    #         result_flag = 3
-    #     elif external_metrics[0] < LOW_THRESHOLD:
-    #         result_flag = 1
-    #     else:
-    #         result_flag = 2
-        
-    #     # result_flag = 2
-    #     function_range = self.get_perf_function_range(external_metrics[0],result_flag,perf_txt)
-
-    #     return benchmark_timeout, external_metrics, internal_metrics, (
-    #          cpu, avg_read_io, avg_write_io, avg_virtual_memory, avg_physical_memory, dirty_pages, hit_ratio, page_data), function_range
- 
+    
     def get_perf_function_range(self,tps_value, result_flag, filename=''):
     
         if not filename:
@@ -1347,11 +874,11 @@ class DBEnv:
 
         # 生成输出文件名
         base, ext = os.path.splitext(filename)
-        result_suffix = {1: "bad", 2: "normal", 3: "good"}.get(result_flag, "counts")
+        result_suffix = {1: "sysbench", 2: "tpcc", 3: "tpch"}.get(result_flag, "counts")
         output_filename = f"{base}_counts_{result_suffix}.txt"
 
         try:
-            with open(output_filename, 'w') as out:
+            with open(output_filename, 'w') as out: 
                 out.write("Cycles\tFunction\tSampling Rate (%)\tAbsolute Count\n")
                 for function_name, _ in sorted_functions:
                     count = function_counts[function_name]
@@ -1478,7 +1005,6 @@ class DBEnv:
         if self.args['workload'] == 'tpcc':
             # print(self.reinit)
             if self.reinit:
-                # print("****************7777")
                 print('reinitializing db begin')
                 self.db.reinitdb_magic()
                 print('db reinitialized')
@@ -1505,6 +1031,7 @@ class DBEnv:
         else:
             print("*********************************")
             flag = self.db.apply_knobs_offline(knobs)
+            print("oooooo")
 
         if not flag:
             if self.reinit:
@@ -1517,6 +1044,7 @@ class DBEnv:
         # s = self.get_states(collect_resource=collect_resource)
         # s = self.get_states_expe(collect_resource=collect_resource)
         method_name = f"get_states_expe_{self.args['workload']}"
+        print(method_name)
         method = getattr(self, method_name, None)  # 从 self 获取方法
         if callable(method):  
             s = method(collect_resource=collect_resource)
@@ -1562,7 +1090,6 @@ class DBEnv:
         #     logger.info('clean binlog success!')
         #     print("[{}] clean binlog finished!".format(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
             
-
         if s is None:
             if self.reinit:
                 logger.info('reinitializing db begin')
@@ -1580,7 +1107,7 @@ class DBEnv:
                                 external_metrics[5], list(internal_metrics))
 
          # compare function_range_name file and default file
-        normal_file = f"/root/sysinsight-main/DBTuner/collectData/function_normal_{self.args['workload']}.csv"
+        normal_file = f"/home/sysinsight/DBTuner/collectData/function_normal_{self.args['workload']}.csv"
         # out_of_function_file,sorted_out_of_range_functions = self.compare_file(function_range_name,default_file)
         out_of_function_file_sample_rate,sorted_out_of_range_functions_sample_rate = self.compare_file_sample_rate(function_range_name,normal_file)
 
@@ -1749,3 +1276,23 @@ class DBEnv:
         lat = average_latency/1000000
         return [throughput,lat,-1,-1,-1,-1]
         
+# ################keenInsight#####################  
+
+    # def get_states_expe(self, collect_resource=0):
+    #     # start Internal Metrics Collection
+    #     internal_metrics = Manager().list()
+    #     im = mp.Process(target=self.db.get_internal_metrics,
+    #                     args=(internal_metrics, BENCHMARK_RUNNING_TIME, BENCHMARK_WARMING_TIME))
+    #     self.db.set_im_alive(True)
+    #     im.start()
+        
+    #     # # start Resource Monition (if activated)
+    #     if collect_resource:
+    #         rm = ResourceMonitor(self.db.pid, 1, BENCHMARK_WARMING_TIME, BENCHMARK_RUNNING_TIME)
+    #         rm.run()
+        
+    #     # start Benchmark
+    #     benchmark_timeout = False
+        
+    #     perf_output_dir = f"perf_data_{self.args_tune['task_id']}"
+    #     os.makedirs(perf_output_dir, exist_ok=True)

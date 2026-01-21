@@ -10,7 +10,7 @@ else
     run_script="oltp_read_write"
 fi
 
-${SYSBENCH_BIN} ${run_script} \
+sysbench\
         --mysql-host=$2 \
         --mysql-port=$3 \
         --mysql-user=$4 \
@@ -29,5 +29,6 @@ ${SYSBENCH_BIN} ${run_script} \
         --warmup-time=$8 \
         --threads=$9 \
         --time=${10} \
+        ${run_script} \
         --db-ps-mode=disable \
         run > ${11}

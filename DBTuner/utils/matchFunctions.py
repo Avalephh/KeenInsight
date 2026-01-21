@@ -253,8 +253,8 @@ def match_knob_functions(keyFile,staticFile):
     return uKnobs
 
 # 从keyFunctions中获取函数名和对应的参数
-def get_knob_in_keyFunctions(keyFile,staticFile):
-    keyFunctions_list = read_function_names(keyFile)
+def get_knob_in_keyFunctions(keyFile,staticFile,num_lines=400):
+    keyFunctions_list = read_function_names(keyFile, num_lines)
     static_functions = load_json(staticFile)
     function_to_knob = matchFunctions_knob(keyFunctions_list, static_functions)
     return function_to_knob
@@ -270,7 +270,7 @@ def getTopKnob(knob_list, top_k=5):
 
     
 if __name__ == '__main__':
-    json_file = "/root/sysinsight-main/DBTuner/utils/staticKnobs.json"  # 原始存储参数和函数的 JSON 文件
+    json_file = "/root/sysinsight/DBTuner/utils/staticKnobs.json"  # 原始存储参数和函数的 JSON 文件
     perf_file = "/root/AI4DB/function_sampling_148_default.csv"   # perf 文件
     output_file = "matched_functions.json"  # 保存匹配函数的输出 JSON 文件
 

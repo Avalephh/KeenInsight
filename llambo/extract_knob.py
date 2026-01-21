@@ -5,6 +5,7 @@ from DBTuner.utils.matchFunctions_shap import getShapFuncKnobs
 from DBTuner.utils.extractCode import extract_code_for_knob_from_json
 from DBTuner.utils.getRule import get_rules,group_rules_by_knob
 from DBTuner.utils.matchRule_revision import searchRule,read_rules_from_file
+from DBTuner.utils.getManualKnow import match_knob_info
 import time
 from .simple_parameter_analyzer import SimpleParameterAnalyzer
 
@@ -48,9 +49,12 @@ As a database parameter tuning expert, you should provide optimization recommend
     
 7. In the previous round of parameter configuration, the system resource usage was as follows: 
     {resource_usage}
+    
+8. The recommended values, recommended ranges and recommended mechanisms of the parameters in the manual are as follows:
+    {recommendation_section}
 
-8. Optimization Goals:
-    - Minimize Query Latency
+9. Optimization Goals:
+    {optimization_goal}
 
 Please don't recommend values that appear repeatedly.
 """
@@ -72,6 +76,13 @@ Please don't recommend values that appear repeatedly.
                 benchmark_section =  "- Benchmark tool: sysbench oltp-read-write;\n - Data scale: 100 tables, 6,000,000 rows each;\n - Concurrent threads: 50 threads;"
             else:
                 optimization_goal = 'Enhance the throughput of the system.'  # 默认值
+        elif 'workload_type' in self.task:
+            if self.task['workload_type'] == 'oltp':
+                optimization_goal = 'Enhance the throughput of the system.'
+                benchmark_section = "- Benchmark tool: sysbench oltp-read-write;\n - Data scale: 100 tables, 6,000,000 rows each;\n - Concurrent threads: 50 threads;"
+            elif self.task['workload_type'] == 'olap':
+                optimization_goal = 'Improve the query response speed of the system.'
+                benchmark_section = "- Benchmark tool: tpch;\n - Data scale: 2G;\n - Concurrent threads: 16 threads;"
         else:
             optimization_goal = 'Enhance the throughput of the system.'  
         
@@ -110,132 +121,6 @@ Please don't recommend values that appear repeatedly.
             file.write(str + '\n')
         return file_path
     
-    
-    # 创建 prompt
-    # def fill_placeholders(self, template, replacements):
-    #     # 替换简单信息
-    #     knobs = replacements["variable"]
-    #     # keyFunctions = replacements["keyFunction"]
-    #     knobs_str = ", ".join(knobs)
-    #     # keyFunctions_str = ", ".join(keyFunctions)
-    #     template = template.replace("{variable}", knobs_str)
-    #     # template = template.replace("{keyFunction}", keyFunctions_str)
-
-
-    #     dataflow = replacements["dataflow"]
-    #     uKnobs = replacements["uKnobs"]
-
-    #     # Build the new sections
-    #     dataflow_section = ""
-    #     code_section = ""
-    
-
-    #     for entry in uKnobs:
-    #         knob_name = entry["knob_name"]
-    #         data_flows = ", ".join(entry["data_flow_functions"])
-    #         control_flows = ", ".join(entry["control_flow_functions"])
-    #         if data_flows == "":
-    #             dataflow_section += f"Parameters {knob_name} affect control flow function {control_flows};\n"
-    #         elif control_flows == "":
-    #             dataflow_section += f"Parameters {knob_name} affect data flow function {data_flows};\n"        
-    #         else:
-    #             dataflow_section += f"Parameters {knob_name} affect the function for data flow {data_flows}, control flow function {control_flows};\n"
-
-    #     for entry in dataflow:
-    #       knob_name = entry["knob_name"]
-    #       for func_detail in entry["data_flow_functions_code"]:
-    #           function_name = func_detail["function"]
-    #           code_snippet = func_detail["code"]
-    #           code_section += f"Parameters {knob_name} affect the data flow function {function_name}, the corresponding code is:\n{code_snippet}\n"
-        
-    #     # Replace the sections in the template
-    #     template = template.replace("{dataflow_section}", dataflow_section.strip())
-    #     template = template.replace("{code_section}", code_section.strip())
-
-    #     # TODO:CTT: the keyFunction section
-    #     # keyFunction_with_change = replacements["keyFunctionWithChange"]
-    #     # keyFunction_section = ""
-    #     # for entry in keyFunction_with_change:
-    #     #     function_name = entry[0]
-    #     #     change = entry[1]
-    #     #     if(change == 0):
-    #     #         keyFunction_section += f"The bottleneck function {function_name} is called more times than perf with default parameter values;\n"
-    #     #     else:
-    #     #         keyFunction_section += f"The bottleneck function {function_name} iscalled less frequently than perf with default parameter values\n"
-        
-    #     # 2024.11.30
-    #     keyFunction_section = ""
-    #     bottleneck_functions = replacements["keyFunction"]
-    #     for entry in bottleneck_functions:
-    #         function_name = entry[0]
-    #         function_rate = entry[1]
-    #         change = entry[3]
-    #         if(change == 0):
-    #             keyFunction_section += f"The sampling rate of the bottleneck function {function_name} is {function_rate}, which is higher than the sampling rate of the default function;\n"
-    #         else:
-    #             keyFunction_section += f"The sampling rate of the bottleneck function {function_name} is {function_rate}, which is lower than the sampling rate of the default function;\n"
-            
-    #     template = template.replace("{keyFunction_section}", keyFunction_section.strip())
-        
-        
-    #     # TODO: 历史数据规则
-    #     rule_section = ""
-    #     searchRule = replacements.get("searchRule", [])
-    #     rulebase_list = replacements.get("rulebase", [])
-    #     if searchRule and rulebase_list:
-    #         # 开始构建规则段
-    #         rule_section += f"The rules retrieved for the historical data are {searchRule}, which means \n "
-            
-    #         for ruleBase in rulebase_list:
-    #             ajustKnobs = ruleBase.get('ajustKnobs', {})
-    #             processed_rule = ruleBase.get('processed_rule', {})
-    #             if not ajustKnobs and not processed_rule:
-    #                 print("No knobs to adjust or processed rule is empty, skipping further processing.")
-    #                 continue  # 如果都为空，跳过当前循环
-                
-    #             # 处理function采样率
-    #             function_conditions = []
-    #             if 'function' in processed_rule and processed_rule['function']:
-    #                 for fun_info in processed_rule['function']:
-    #                     function_name = fun_info['name']  # 假设每个function有'name'字段
-    #                     function_conditions.append(f"when the sampling rate of function {function_name} is in the range of [{fun_info['lower_bound']}, {fun_info['upper_bound']}] (according to max-min normalization)")
-                
-    #             # 处理knob的配置变化
-    #             knob_conditions = []
-    #             if 'knob' in processed_rule and processed_rule['knob']:
-    #                 for knob_info in processed_rule['knob']:
-    #                     knob_name = knob_info['name']  # 假设每个knob有'name'字段
-    #                     knob_conditions.append(f"the configuration value of parameter {knob_name} should be within the variation range of [{knob_info['lower_bound']}, {knob_info['upper_bound']}] (according to max-min normalization)")
-                
-    #             # 组合function和knob的条件
-    #             if function_conditions:
-    #                 rule_section += ", and ".join(function_conditions) + ", "
-                
-    #             if knob_conditions:
-    #                 rule_section += ", and ".join(knob_conditions) + ", "
-                
-    #             # 处理TPS的提高效果
-    #             if 'tps' in processed_rule:
-    #                 tps_increase = processed_rule['tps']  # 假设有'tps'字段，表示TPS提高幅度
-    #                 tps_lower_bound = tps_increase['lower_bound']
-    #                 tps_upper_bound = tps_increase['upper_bound']
-    #                 rule_section += f"mysql performance tps will increase {tps_lower_bound}% ~ {tps_upper_bound}%. According to this rule, parameters in the rule are modified, "
-                
-    #             # 输出调整的knob信息
-    #             for config, value in ajustKnobs.items():
-    #                 rule_section += f"the parameter {config} and corresponding value are {value}. \n "
-    #     else:
-    #         rule_section += f"No rules matched to historical data."       
-    #             # 打印或记录每条规则的构建结果
-    #             # print(rule_section)
-
-            
-    #     template = template.replace("{rule_section}", rule_section.strip())
-        
-    #     print("********************************************************************************\n")
-    #     print(template)
-    #     print("********************************************************************************\n")
-    #     return template
     def find_key_for_knob(self, knob):
         for key, params in self.store_csv_func_to_knob.items():
             if knob in params:
@@ -244,7 +129,7 @@ Please don't recommend values that appear repeatedly.
     
     def fill_placeholders(self, template, replacements):
         
-        # add resource
+        # 资源信息
         resource_usage=""
         resource = replacements["resource"]
         resource_usage = (
@@ -258,8 +143,7 @@ Please don't recommend values that appear repeatedly.
 
         template = template.replace("{resource_usage}", resource_usage)
         
-        
-        # 替换简单信息
+        # 参数信息
         knobs = replacements["variable"]
         # 初始化参数分析器
         analyzer = SimpleParameterAnalyzer()
@@ -294,8 +178,6 @@ Please don't recommend values that appear repeatedly.
         # Build the new sections
         dataflow_section = ""
         code_section = ""
-    
-
         for entry in uKnobs:
             knob_name = entry["knob_name"]
             data_flows = ", ".join(entry["data_flow_functions"])
@@ -307,19 +189,11 @@ Please don't recommend values that appear repeatedly.
             else:
                 dataflow_section += f"Parameters {knob_name} affect the function for data flow {data_flows}, control flow function {control_flows};\n"
 
-        # for entry in dataflow:
-        #   knob_name = entry["knob_name"]
-        #   for func_detail in entry["data_flow_functions_code"]:
-        #       function_name = func_detail["function"]
-        #       code_snippet = func_detail["code"]
-        #       code_section += f"Parameters {knob_name} affect the data flow function {function_name}, the corresponding code is:\n{code_snippet}\n"
-        
-        # Replace the sections in the template
         # TODO no code
         template = template.replace("{dataflow_section}", dataflow_section.strip())
         # template = template.replace("{code_section}", code_section.strip())
         
-        # 2024.11.30
+        # 函数信息
         keyFunction_section = ""
         bottleneck_functions = replacements["keyFunction"]
         for entry in bottleneck_functions:
@@ -334,16 +208,13 @@ Please don't recommend values that appear repeatedly.
         # TODO no function
         template = template.replace("{keyFunction_section}", keyFunction_section.strip())
         
-        
         # TODO: 历史数据规则
         rule_section = ""
         searchRule = replacements.get("searchRule", [])
         rulebase_list = replacements.get("rulebase", [])
-        print("rulebase_list: ", rulebase_list)
+        # print("rulebase_list: ", rulebase_list)
         if searchRule and rulebase_list:
             # # 开始构建规则段
-            # rule_section += f"The rules retrieved for the historical data are {searchRule}, which means \n "
-            # rule_section += f"The rules retrieved for the historical data are as follows: \n "
             rule_section += f"Based on the rules obtained from the historical data, you are advised to adjust the following: \n "
             
             for ajustKnobs in rulebase_list:
@@ -355,6 +226,24 @@ Please don't recommend values that appear repeatedly.
 
         # # TODO no rule
         template = template.replace("{rule_section}", rule_section.strip())
+        
+        # TODO 语料信息
+        recommendation_section = ""
+        # 从文件中找到参数对应的推荐值等信息
+        for knob in knobs:
+            print(knob)
+            knob_info = match_knob_info(knob)
+            if knob_info:
+                recommendation_section += f"Parameter: {knob}\n"
+                recommendation_section += f"  - Recommended Values: {', '.join(map(str, knob_info.get('suggested_values', [])))}\n"
+                recommendation_section += f"  - Recommended Range: [{knob_info.get('min_value', '')}, {knob_info.get('max_value', '')}]\n"
+                if knob_info.get('special_value') is not None:
+                    recommendation_section += f"  - Special Value: {knob_info.get('special_value')}\n"
+                recommendation_section += "\n"
+        
+        template = template.replace("{recommendation_section}", recommendation_section.strip())
+        
+        
         
         print("88988********************************************************************************\n")
         print(template)
@@ -374,33 +263,9 @@ Please don't recommend values that appear repeatedly.
     def update(self):
 
         change_config = self.change_value(self.config)
-        staticFile = "/root/sysinsight-main/DBTuner/utils/paramater_association_library.json"
-        codeFoder = '/root/sysinsight-main/library/extractCode'
+        staticFile = "/home/sysinsight/DBTuner/utils/paramater_association_library.json"
+        codeFoder = '/home/sysinsight/library/extractCode'
         
-        print("ddddd: ",self.resource)
-        
-
-        # keyFunctions_list = read_function_names(self.keyFunction_file)
-        # uKnobs = []
-        # uKnobs = match_knob_functions(self.keyFunction_file, staticFile)
-
-        # knob_names = [item['knob_name'] for item in uKnobs]
-        # dataflow_values = [str(value) for item in uKnobs for value in item.values()]
-        # dataflow = ' '.join(dataflow_values)
-
-        # dataflow_code = []
-        # dataflow_code = extract_code_for_knob_from_json(uKnobs, codeFoder, change_config)
-
-        # self.hyperparameters = knob_names
-
-        # TODO:CTT: Update the keyfunction with change
-        # keyFunctions_list_with_change = read_function_names_with_change(self.keyFunction_file)
-
-        # top 5 knobs
-        # function_to_knob = get_knob_in_keyFunctions(self.keyFunction_file, staticFile)
-        # top_knobs = getTopKnob(function_to_knob, 5)
-        # top_param_names = [param for param, count in top_knobs]
-
         # 2024.11.30
         bkFunctions_list, updateKnobs, csv_func_to_knob = find_top_and_matched_functions(self.keyFunction_file, staticFile)
         updateKnobs_names = [item['knob_name'] for item in updateKnobs]
@@ -423,41 +288,14 @@ Please don't recommend values that appear repeatedly.
         self.store_bkFunctions_list = bkFunctions_list
         self.store_updateKnobs = updateKnobs
         self.store_csv_func_to_knob = csv_func_to_knob
-        #print("hzt666777", self.store_csv_func_to_knob)
         
         # TODO: 接入规则 2025.2.14
         # 检索要调整参数的规则列表
         # 规则库
         # rule_file = '/root/sysinsight-main/HisRule/gptuner_update_rule_tpch_runtime_144_0.1.txt'
-        rule_file = '/root/sysinsight-main/HisRule/rule_mysql_tpcc_update_rule_revision.txt'
-        defaultKnob_file = '/root/sysinsight-main/DBTuner/knobspace/gptuner_target_knobs.json'
+        rule_file = '/home/sysinsight/HisRule/mysql_sysbench_update_rule_revision.txt'
+        defaultKnob_file = '/home/sysinsight/DBTuner/knobspace/gptuner_target_knobs.json'
         # ruleFunctionRaneg_file = '/root/RUC/DBTune/scripts/rule/function_range_tpch_gptuner.csv'
-        
-        # function_names_list = [item[0] for item in bkFunctions_list]
-        # print("219219function_names_list: ",function_names_list)
-        # matched_rules = get_rules(rule_file, function_names_list)
-        
-        # rulebase_list=[]
-        # selected_rules=[]
-        # if matched_rules:
-        #     selected_rules = group_rules_by_knob(matched_rules)
-        #     for rule in selected_rules:
-        #         # rule = ",".join(matched_rules[0]) # 仅返回一条规则
-        #         ajustKnobs, processed_rule = searchRule(defaultKnob_file,rule,self.config,self.keyFunction_file,ruleFunctionRaneg_file)
-        #         print("214214 ajustKnobs: ",ajustKnobs)
-        #         print("214214 processed_rule: ",processed_rule)
-        #         if ajustKnobs and processed_rule: 
-        #             rulebase={}
-        #             rulebase['ajustKnobs'] = ajustKnobs
-        #             rulebase['processed_rule'] = processed_rule
-        #             # 汇总需要调整的参数
-        #             for key in ajustKnobs:
-        #                 if key not in updateKnobs_names:
-        #                     updateKnobs_names.append(key)
-        #             rulebase_list.append(rulebase)
-                
-        # print('rulebase_list: ', rulebase_list)
-        # print("updateKnobs_names: ",updateKnobs_names)
         
         # 逐条规则验证
         # 开始时间
@@ -469,13 +307,7 @@ Please don't recommend values that appear repeatedly.
         for rule in globalRules:
             # ajustKnobs, processed_rule = searchRule(defaultKnob_file,rule,self.config,self.keyFunction_file,ruleFunctionRaneg_file)
             ajustKnobs, processed_rule = searchRule(defaultKnob_file,rule,self.config,self.keyFunction_file)
-            # print("214214 ajustKnobs: ",ajustKnobs)
-            # print("214214 processed_rule: ",processed_rule)
             if ajustKnobs and processed_rule: 
-                # rulebase={}
-                # rulebase['ajustKnobs'] = ajustKnobs
-                # rulebase['processed_rule'] = processed_rule
-                # rulebase_list.append(rulebase)
                 # 汇总需要调整的参数
                 for key in ajustKnobs:
                     if key not in updateKnobs_names:
@@ -498,17 +330,12 @@ Please don't recommend values that appear repeatedly.
         dataflow_code_1 = []
         dataflow_code_1 = extract_code_for_knob_from_json(updateKnobs, codeFoder, change_config)
         # print(dataflow_code_1)
-
+        
         self.replacements = {
-            # "variable": knob_names,
             "variable": updateKnobs_names,
-            # "keyFunction": keyFunctions_list,
             "keyFunction": bkFunctions_list,
-            # "uKnobs": uKnobs,
             "uKnobs": updateKnobs,
             "dataflow": dataflow_code_1,
-            # "code": dataflow_code
-            # "keyFunctionWithChange": keyFunctions_list_with_change
             "searchRule": selected_rules,
             "rulebase": rulebase_list,
             "resource": self.resource
@@ -516,8 +343,8 @@ Please don't recommend values that appear repeatedly.
 
     def transfer_rule(self):
         # rule_file = '/root/sysinsight-main/HisRule/gptuner_update_rule_tpch_runtime_144_0.1.txt'
-        rule_file = '/root/sysinsight-main/HisRule/rule_mysql_tpcc_update_rule_revision.txt'
-        defaultKnob_file = '/root/sysinsight-main/DBTuner/knobspace/gptuner_target_knobs.json'
+        rule_file = '/home/sysinsight/HisRule/rule_mysql_tpcc_update_rule_revision.txt'
+        defaultKnob_file = '/home/sysinsight/DBTuner/knobspace/gptuner_target_knobs.json'
         # ruleFunctionRaneg_file = '/root/RUC/DBTune/scripts/rule/function_range_tpch_gptuner.csv'
         
         print("transfer_rule ing...")
@@ -533,11 +360,6 @@ Please don't recommend values that appear repeatedly.
         globalRules = read_rules_from_file(rule_file)
         selected_rules = self.replacements.get("searchRule", [])
         return selected_rules, globalRules, defaultKnob_file,rule_file,memory_knobs
-        
-        # 分组
-        # selected_rules = self.replacements.get("searchRule", [])
-        # processed_selected_rules = self.replacements.get("processed_rule", [])
-        # return selected_rules, processed_selected_rules, defaultKnob_file
         
 if __name__ == "__main__":
     directory_path = "../perf_data/"

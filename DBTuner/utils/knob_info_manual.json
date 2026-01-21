@@ -1,0 +1,604 @@
+[
+  {
+    "parameter": "binlog_group_commit_sync_delay",
+    "min_value": "0 ms",
+    "max_value": "1000000 ms",
+    "suggested_values": [
+      "0 ms"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "binlog_group_commit_sync_no_delay_count",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "10000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "binlog_row_image",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "full",
+      "minimal",
+      "noblob"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "div_precision_increment",
+    "min_value": "0",
+    "max_value": "30",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "general_log",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1",
+      "0"
+    ],
+    "special_value": "0 or 'OFF', and 1 or 'ON'"
+  },
+  {
+    "parameter": "host_cache_size",
+    "min_value": "128",
+    "max_value": "65536",
+    "suggested_values": [
+      "128",
+      "65536"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_adaptive_hash_index_parts",
+    "min_value": "1",
+    "max_value": "512",
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_adaptive_max_sleep_delay",
+    "min_value": "10000 microseconds",
+    "max_value": null,
+    "suggested_values": [
+      "150000 microseconds"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_autoextend_increment",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "8 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_buffer_pool_chunk_size",
+    "min_value": null,
+    "max_value": "128 MB",
+    "suggested_values": [
+      "2 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_buffer_pool_dump_pct",
+    "min_value": "1",
+    "max_value": "100",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_buffer_pool_size",
+    "min_value": "10.5 GB",
+    "max_value": "12 GB",
+    "suggested_values": [
+      "10.5 GB",
+      "12 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_change_buffer_max_size",
+    "min_value": "0",
+    "max_value": "50",
+    "suggested_values": [
+      "25"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_change_buffering",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "all",
+      "none",
+      "inserts",
+      "deletes",
+      "changes",
+      "purges"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_compression_failure_threshold_pct",
+    "min_value": "5",
+    "max_value": "50",
+    "suggested_values": [
+      "5",
+      "50"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_compression_pad_pct_max",
+    "min_value": "0",
+    "max_value": "50",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_concurrency_tickets",
+    "min_value": "100",
+    "max_value": "5000",
+    "suggested_values": [
+      "100",
+      "5000"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_dedicated_server",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "ON"
+    ],
+    "special_value": 1
+  },
+  {
+    "parameter": "innodb_disable_sort_file_cache",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0",
+      "1"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_doublewrite",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1",
+      "0"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_doublewrite_batch_size",
+    "min_value": null,
+    "max_value": "1200",
+    "suggested_values": [
+      "127"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_doublewrite_files",
+    "min_value": "1",
+    "max_value": "127",
+    "suggested_values": [
+      "1",
+      "127"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_doublewrite_pages",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_flush_sync",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "ON",
+      "OFF"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_ft_total_cache_size",
+    "min_value": null,
+    "max_value": "800 MB",
+    "suggested_values": [
+      "800 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_log_file_size",
+    "min_value": null,
+    "max_value": "4 GB",
+    "suggested_values": [
+      "15.5 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_log_files_in_group",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_log_spin_cpu_abs_lwm",
+    "min_value": "0",
+    "max_value": "100",
+    "suggested_values": [
+      "80"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_log_spin_cpu_pct_hwm",
+    "min_value": "0",
+    "max_value": "100",
+    "suggested_values": [
+      "50"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_log_wait_for_flush_spin_hwm",
+    "min_value": null,
+    "max_value": "4294967295",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_log_write_ahead_size",
+    "min_value": "512 bytes",
+    "max_value": "32 KB",
+    "suggested_values": [
+      "512 bytes",
+      "4 KB",
+      "32 KB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_lru_scan_depth",
+    "min_value": "1024",
+    "max_value": "4096",
+    "suggested_values": [
+      "2048",
+      "4096"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_max_dirty_pages_pct",
+    "min_value": "0",
+    "max_value": "100",
+    "suggested_values": [
+      "90"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_max_dirty_pages_pct_lwm",
+    "min_value": "0",
+    "max_value": "100",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_max_undo_log_size",
+    "min_value": null,
+    "max_value": "31 GB",
+    "suggested_values": [
+      "4 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_online_alter_log_max_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "128 MB"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_page_cleaners",
+    "min_value": null,
+    "max_value": "64",
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_purge_batch_size",
+    "min_value": "1",
+    "max_value": "5000",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_purge_rseg_truncate_frequency",
+    "min_value": "1",
+    "max_value": "128",
+    "suggested_values": [
+      "128"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_random_read_ahead",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0",
+      "1"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "innodb_read_ahead_threshold",
+    "min_value": "0",
+    "max_value": "64",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_spin_wait_delay",
+    "min_value": "0",
+    "max_value": "1000000",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_stats_transient_sample_pages",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "innodb_thread_concurrency",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "join_buffer_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "128 KB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "key_cache_block_size",
+    "min_value": "1024",
+    "max_value": "16384",
+    "suggested_values": [
+      "1024",
+      "2048",
+      "4096",
+      "8192",
+      "16384"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "log_output",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "FILE",
+      "TABLE",
+      "NONE"
+    ],
+    "special_value": "NONE"
+  },
+  {
+    "parameter": "max_heap_table_size",
+    "min_value": "16 MB",
+    "max_value": "15 GB",
+    "suggested_values": [
+      "16 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_relay_log_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "max_user_connections",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "net_write_timeout",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "60 s"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "open_files_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "5000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "query_prealloc_size",
+    "min_value": "8192",
+    "max_value": null,
+    "suggested_values": [
+      "8192"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "range_optimizer_max_mem_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1.5 MB"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "relay_log_space_limit",
+    "min_value": null,
+    "max_value": "884 GB",
+    "suggested_values": [
+      "80 GB"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "rpl_read_size",
+    "min_value": "1",
+    "max_value": "4294967295",
+    "suggested_values": [
+      "8192"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "rpl_stop_slave_timeout",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "31536000 s"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "slave_allow_batching",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1",
+      "0"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "slave_parallel_type",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "DATABASE",
+      "LOGICAL_CLOCK"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "sort_buffer_size",
+    "min_value": "32 KB",
+    "max_value": "4 GB",
+    "suggested_values": [
+      "256 KB",
+      "1 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "stored_program_definition_cache",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "256",
+      "512"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "table_open_cache",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "tablespace_definition_cache",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "256"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "temptable_max_ram",
+    "min_value": null,
+    "max_value": "3 GB",
+    "suggested_values": [
+      "3 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "thread_cache_size",
+    "min_value": null,
+    "max_value": "100",
+    "suggested_values": [
+      "10"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "tmp_table_size",
+    "min_value": null,
+    "max_value": "32 MB",
+    "suggested_values": [
+      "16 MB"
+    ],
+    "special_value": null
+  }
+]
