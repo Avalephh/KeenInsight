@@ -443,13 +443,21 @@ class ReplayCompareRunner:
             print(f"Error: PostgreSQL log file not found: {self.pg_log_path}")
             return 0
         
+        # 支持 Unix 时间戳 (float) 和 标准时间格式
+        start_ts = start_time.timestamp()
+        end_ts = end_time.timestamp()
+        
         start_str = start_time.strftime('%Y-%m-%d %H:%M:%S')
         end_str = end_time.strftime('%Y-%m-%d %H:%M:%S')
         
         count = 0
         matched_lines = []
         
-        time_pattern = re.compile(r'time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
+        # 匹配 standard stderr format: time=2023-01-01 12:00:00
+        time_pattern_std = re.compile(r'time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
+        # 匹配 CSV/Unix format: user,db,1768995830.784,...
+        # assuming timestamp is the 3rd field, but let's be more loose: find a large float early in the line
+        time_pattern_unix = re.compile(r'^[^,]+,[^,]+,(\d{10}\.\d+)')
         
         print(f"Reading log file (this may take a moment)...")
         
@@ -460,23 +468,45 @@ class ReplayCompareRunner:
         print(f"Estimated lines to scan: {estimated_lines}")
         
         try:
-            cmd = f"tail -n {estimated_lines} '{self.pg_log_path}' | grep 'user={username}' | grep 'AUDIT:'"
+            # 简化 grep，只查找 AUDIT:，不强制 user=username 因为格式可能是 csv
+            # 用户名过滤在 Python 中通过简单字符串检查进行 (CSV格式 user 在行首)
+            cmd = f"tail -n {estimated_lines} '{self.pg_log_path}' | grep 'AUDIT:'"
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=120)
             lines = result.stdout.strip().split('\n') if result.stdout.strip() else []
             
-            print(f"Found {len(lines)} audit log lines for user {username}")
+            print(f"Found {len(lines)} audit log candidates (before filtering)")
             
             for line in lines:
                 if not line.strip():
                     continue
-                    
-                match = time_pattern.search(line)
+                
+                # Filter by username if it appears in the line (simple check)
+                if username and username not in line:
+                    continue
+
+                # Check Timestamp
+                matched = False
+                
+                # Try Unix timestamp first (observed format)
+                match = time_pattern_unix.search(line)
                 if match:
-                    log_time_str = match.group(1)
-                    
-                    if start_str <= log_time_str <= end_str:
-                        matched_lines.append(line)
-                        count += 1
+                    try:
+                        ts = float(match.group(1))
+                        if start_ts - 1 <= ts <= end_ts + 1: # Add 1s buffer
+                            matched_lines.append(line)
+                            count += 1
+                            matched = True
+                    except:
+                        pass
+                
+                if not matched:
+                    # Try Standard format
+                    match = time_pattern_std.search(line)
+                    if match:
+                        log_time_str = match.group(1)
+                        if start_str <= log_time_str <= end_str:
+                            matched_lines.append(line)
+                            count += 1
             
             print(f"Matched {count} lines in time range")
             
@@ -518,6 +548,12 @@ class ReplayCompareRunner:
             r'session=(\S+)\s+tx=(\d+)\s+LOG:\s+AUDIT:\s+\w+,\d+,\d+,(\w+),(\w+),.*?,(.+)$'
         )
         
+        # CSV-like format observed: user,db,timestamp,sqlstate,session_id,vxid,query_id/txid? LOG: AUDIT: ...
+        # Example: test,test,1768995830.784,00000,6970bbec.c0c0,28/296,-5454431914034686354 LOG:  AUDIT: ...
+        pattern_csv = re.compile(
+            r'^[^,]+,[^,]+,(\d+\.\d+),[^,]+,([^,]+),([^,]+),[^ ]+ LOG:\s+AUDIT:\s+\w+,\d+,\d+,(\w+),(\w+),.*?,(.+)$'
+        )
+        
         # 时间戳匹配
         time_pattern = re.compile(r'time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?)')
         
@@ -538,50 +574,65 @@ class ReplayCompareRunner:
                     sql_part = None
                     timestamp = None
                     
-                    # 尝试匹配时间戳
-                    time_match = time_pattern.search(line)
-                    if time_match:
+                    # 尝试 CSV 格式
+                    match = pattern_csv.search(line)
+                    if match:
                         try:
-                            ts_str = time_match.group(1)
-                            # 如果包含微秒，截断或解析
-                            if '.' in ts_str:
-                                dt = datetime.strptime(ts_str.split('.')[0], '%Y-%m-%d %H:%M:%S')
-                                # 可以加上微秒支持，但为了绘图秒级聚合足够了
-                                timestamp = dt
-                            else:
-                                timestamp = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
+                            ts_float = float(match.group(1))
+                            timestamp = datetime.fromtimestamp(ts_float)
                         except:
                             pass
-                    
-                    # 尝试匹配主格式 (xid vxid)
-                    match = pattern_main.search(line)
-                    if match:
-                        session_id = match.group(1)
-                        # xid = match.group(2)
+                        
+                        session_id = match.group(2)
                         vxid = match.group(3)
                         sql_type = match.group(4)
                         operation = match.group(5)
                         sql_part = match.group(6)
                     else:
-                        # 尝试 vxid tx 格式
-                        match = pattern_vxid_tx.search(line)
+                        # 尝试标准格式
+                        
+                        # 尝试匹配时间戳
+                        time_match = time_pattern.search(line)
+                        if time_match:
+                            try:
+                                ts_str = time_match.group(1)
+                                if '.' in ts_str:
+                                    dt = datetime.strptime(ts_str.split('.')[0], '%Y-%m-%d %H:%M:%S')
+                                    timestamp = dt
+                                else:
+                                    timestamp = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
+                            except:
+                                pass
+                        
+                        # 尝试匹配主格式 (xid vxid)
+                        match = pattern_main.search(line)
                         if match:
                             session_id = match.group(1)
-                            vxid = match.group(2)
-                            # tx = match.group(3)
+                            # xid = match.group(2)
+                            vxid = match.group(3)
                             sql_type = match.group(4)
                             operation = match.group(5)
                             sql_part = match.group(6)
                         else:
-                            # 尝试只有 tx 格式
-                            match = pattern_tx_only.search(line)
+                            # 尝试 vxid tx 格式
+                            match = pattern_vxid_tx.search(line)
                             if match:
                                 session_id = match.group(1)
-                                tx = match.group(2)
-                                vxid = f"tx/{tx}"  # 生成虚拟 vxid
-                                sql_type = match.group(3)
-                                operation = match.group(4)
-                                sql_part = match.group(5)
+                                vxid = match.group(2)
+                                # tx = match.group(3)
+                                sql_type = match.group(4)
+                                operation = match.group(5)
+                                sql_part = match.group(6)
+                            else:
+                                # 尝试只有 tx 格式
+                                match = pattern_tx_only.search(line)
+                                if match:
+                                    session_id = match.group(1)
+                                    tx = match.group(2)
+                                    vxid = f"tx/{tx}"  # 生成虚拟 vxid
+                                    sql_type = match.group(3)
+                                    operation = match.group(4)
+                                    sql_part = match.group(5)
                     
                     if not match:
                         parse_errors += 1
@@ -612,9 +663,10 @@ class ReplayCompareRunner:
                                 sql = parts[0]
                     
                     if session_id and vxid and sql:
+                        sql = sql.replace('""', '"') # Unescape CSV quotes if needed
+                        
                         sql_preview = sql[:100] if len(sql) > 100 else sql
                         # 生成一个标识符用于匹配（操作类型 + SQL 模板）
-                        # 移除参数值，保留 SQL 结构
                         sql_key = f"{operation}:{sql[:200]}"
                         results.append({
                             'session_id': session_id,
@@ -1264,79 +1316,97 @@ class ReplayCompareRunner:
         ax2.legend(loc='upper right')
         ax2.grid(True, alpha=0.3)
         
-        # SQL Throughput 对比图
+        # QPS Comparison Graph
         ax3 = axes[2]
         
-        def get_throughput(log_file):
+        def get_qps_data(log_file):
             if not log_file or not os.path.exists(log_file):
-                return None, None, None
+                return None, None
             
             # 使用已有的 parse_audit_log_file 方法
             entries = self.parse_audit_log_file(log_file)
             if not entries:
-                return None, None, None
+                return None, None
                 
             # 过滤有效时间戳
             valid_entries = [e for e in entries if e.get('timestamp')]
             if not valid_entries:
-                return None, None, None
+                return None, None
                 
             # 按时间排序
             valid_entries.sort(key=lambda x: x['timestamp'])
             
             start_time = valid_entries[0]['timestamp']
+            end_time = valid_entries[-1]['timestamp']
             
             # 按秒聚合
-            data = {} # second -> {'READ': 0, 'WRITE': 0}
+            data = {} # second -> count
             
             for e in valid_entries:
                 delta = (e['timestamp'] - start_time).total_seconds()
                 if delta < 0: delta = 0
                 sec = int(delta)
                 
-                if sec not in data:
-                    data[sec] = {'READ': 0, 'WRITE': 0}
-                
-                # 根据 sql_type 判断读写
-                sql_type = e.get('sql_type', 'MISC')
-                op = e.get('operation', '')
-                
-                if sql_type in ['READ'] or op in ['SELECT', 'COPY']:
-                    data[sec]['READ'] += 1
-                elif sql_type in ['WRITE'] or op in ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']:
-                    data[sec]['WRITE'] += 1
+                data[sec] = data.get(sec, 0) + 1
             
             if not data:
-                return None, None, None
+                return None, None
                 
             secs = sorted(data.keys())
-            max_sec = secs[-1]
+            max_sec = secs[-1] if secs else 0
             # 填充每一秒
             time_axis = list(range(max_sec + 1))
-            reads = [data.get(s, {}).get('READ', 0) for s in time_axis]
-            writes = [data.get(s, {}).get('WRITE', 0) for s in time_axis]
+            qps = [data.get(s, 0) for s in time_axis]
             
-            return time_axis, reads, writes
+            return time_axis, qps
 
-        # 绘制 Original Throughput
+        # 绘制 QPS 对比
         orig_log = self.test_result.get('files', {}).get('audit_log')
-        if orig_log:
-            t, r, w = get_throughput(orig_log)
-            if t:
-                ax3.plot(t, r, 'b--', linewidth=1.5, label='Original Read/s', alpha=0.7)
-                ax3.plot(t, w, 'b-', linewidth=1.5, label='Original Write/s', alpha=0.7)
-        
-        # 绘制 Replay Throughput
         replay_log = self.test_result.get('files', {}).get('replay_audit_log')
-        if replay_log:
-            t, r, w = get_throughput(replay_log)
-            if t:
-                ax3.plot(t, r, 'r--', linewidth=1.5, label='Replay Read/s', alpha=0.7)
-                ax3.plot(t, w, 'r-', linewidth=1.5, label='Replay Write/s', alpha=0.7)
+        
+        has_orig_qps = False
+        if orig_log:
+            t_orig, qps_orig = get_qps_data(orig_log)
+            if t_orig:
+                # 计算滑动平均以更清晰展示趋势
+                window_size = 5
+                if len(qps_orig) > window_size:
+                    qps_smooth = []
+                    for i in range(len(qps_orig)):
+                        start_idx = max(0, i - window_size // 2)
+                        end_idx = min(len(qps_orig), i + window_size // 2 + 1)
+                        qps_smooth.append(sum(qps_orig[start_idx:end_idx]) / (end_idx - start_idx))
+                    ax3.plot(t_orig, qps_smooth, 'b-', linewidth=1.5, label='Original QPS (Smoothed)', alpha=0.9)
+                    ax3.plot(t_orig, qps_orig, 'b.', markersize=2, alpha=0.2) # 原始点
+                else:
+                    ax3.plot(t_orig, qps_orig, 'b-', linewidth=1.5, label='Original QPS', alpha=0.9)
                 
-        ax3.set_title('SQL Throughput Trend (Read vs Write)', fontsize=12)
+                avg_orig_qps = sum(qps_orig) / len(qps_orig) if qps_orig else 0
+                ax3.axhline(y=avg_orig_qps, color='b', linestyle=':', alpha=0.5, label=f'Avg Original: {avg_orig_qps:.1f}')
+                has_orig_qps = True
+
+        if replay_log:
+            t_replay, qps_replay = get_qps_data(replay_log)
+            if t_replay:
+                # 计算滑动平均
+                window_size = 5
+                if len(qps_replay) > window_size:
+                    qps_smooth = []
+                    for i in range(len(qps_replay)):
+                        start_idx = max(0, i - window_size // 2)
+                        end_idx = min(len(qps_replay), i + window_size // 2 + 1)
+                        qps_smooth.append(sum(qps_replay[start_idx:end_idx]) / (end_idx - start_idx))
+                    ax3.plot(t_replay, qps_smooth, 'r-', linewidth=1.5, label='Replay QPS (Smoothed)', alpha=0.9)
+                    ax3.plot(t_replay, qps_replay, 'r.', markersize=2, alpha=0.2) # 原始点
+                else:
+                    ax3.plot(t_replay, qps_replay, 'r-', linewidth=1.5, label='Replay QPS', alpha=0.9)
+                    
+                avg_replay_qps = sum(qps_replay) / len(qps_replay) if qps_replay else 0
+                ax3.axhline(y=avg_replay_qps, color='r', linestyle=':', alpha=0.5, label=f'Avg Replay: {avg_replay_qps:.1f}')
+                
+        ax3.set_title('QPS Comparison (Queries Per Second)', fontsize=12)
         ax3.set_xlabel('Time (s)')
-        ax3.set_ylabel('Operations / sec')
+        ax3.set_ylabel('QPS')
         ax3.legend(loc='upper right')
         ax3.grid(True, alpha=0.3)
         
