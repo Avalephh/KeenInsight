@@ -69,7 +69,7 @@ type PrepareRequest struct {
 // PrepareResult 准备结果
 type PrepareResult struct {
 	TaskID          string                 `json:"task_id"`
-	Status          string                 `json:"status"`
+	Status          int                    `json:"status"` // int
 	TotalStatements int64                  `json:"total_statements"`
 	TotalTx         int64                  `json:"total_transactions"`
 	Statistics      map[string]interface{} `json:"statistics"`
@@ -77,31 +77,30 @@ type PrepareResult struct {
 
 // Prepare 准备回放任务
 func (s *ReplayService) Prepare(req *PrepareRequest) (*PrepareResult, error) {
-	taskID := uuid.New().String()
+	strTaskID := uuid.New().String()
 
 	logger.Log.Info("Starting prepare task",
-		zap.String("task_id", taskID),
+		zap.String("task_id", strTaskID),
 		zap.String("log_file", req.LogFileName),
 		zap.Int64("file_size", req.LogFileSize))
 
 	// 1. 保存上传的日志文件
-	logFilePath := filepath.Join(s.uploadDir, fmt.Sprintf("%s_%s", taskID, req.LogFileName))
+	logFilePath := filepath.Join(s.uploadDir, fmt.Sprintf("%s_%s", strTaskID, req.LogFileName))
 	if err := s.saveUploadedFile(req.LogFile, logFilePath); err != nil {
 		return nil, fmt.Errorf("failed to save log file: %w", err)
 	}
 
-	// 2. 创建任务记录
-	task := &model.ReplayTask{
-		ID:             taskID,
-		Status:         "preparing",
-		TargetHost:     req.DBHost,
-		TargetPort:     req.DBPort,
-		TargetUser:     req.DBUser,
-		TargetPassword: req.DBPassword,
-		TargetDatabase: req.DBName,
-		LogFilePath:    logFilePath,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+	// 2. 创建任务记录 (Use TaskInfo)
+	task := &model.TaskInfo{
+		TaskID:      strTaskID,
+		Status:      model.TaskStatusPreparing,
+		DstIP:       req.DBHost,
+		DstPort:     req.DBPort,
+		DstUser:     req.DBUser,
+		DstPass:     req.DBPassword,
+		LogFilePath: logFilePath,
+		CreateTime:  time.Now(),
+		UpdateTime:  time.Now(),
 	}
 
 	if err := s.repo.CreateTask(task); err != nil {
@@ -109,13 +108,12 @@ func (s *ReplayService) Prepare(req *PrepareRequest) (*PrepareResult, error) {
 	}
 
 	// 3. 流式解析并入库
-	// 每 2000 条语句批量入库一次
 	batchSize := 2000
 
-	callback := func(statements []*model.SQLStatement, transactions map[string]*model.Transaction) error {
+	callback := func(units []*parser.ReplayUnit, transactions map[string]*model.Transaction) error {
 		// 批量保存语句
-		if len(statements) > 0 {
-			if err := s.repo.BatchCreateStatements(statements, batchSize); err != nil {
+		if len(units) > 0 {
+			if err := s.repo.BatchCreateStatements(units, batchSize); err != nil {
 				return fmt.Errorf("failed to batch create statements: %w", err)
 			}
 		}
@@ -124,11 +122,8 @@ func (s *ReplayService) Prepare(req *PrepareRequest) (*PrepareResult, error) {
 		if len(transactions) > 0 {
 			txList := make([]*model.Transaction, 0, len(transactions))
 			for _, t := range transactions {
-				// 创建副本并重置 ID，防止 GORM 复用 ID 导致主键冲突
-				// 我们希望依靠 (task_id, vxid) 的唯一索引来进行 Upsert
-				txCopy := *t
-				txCopy.ID = 0
-				txList = append(txList, &txCopy)
+				t.TaskID = strTaskID
+				txList = append(txList, t)
 			}
 			if err := s.repo.BatchCreateTransactions(txList, batchSize); err != nil {
 				return fmt.Errorf("failed to batch create transactions: %w", err)
@@ -137,39 +132,36 @@ func (s *ReplayService) Prepare(req *PrepareRequest) (*PrepareResult, error) {
 		return nil
 	}
 
-	parseResult, err := s.parser.ParseStream(logFilePath, taskID, batchSize, callback)
+	parseResult, err := s.parser.ParseStream(logFilePath, strTaskID, batchSize, callback)
 	if err != nil {
-		task.Status = "failed"
-		task.ErrorMessage = err.Error()
+		task.Status = model.TaskStatusFailed
 		s.repo.UpdateTask(task)
 		// 清理已插入的数据
-		s.repo.DeleteTaskData(taskID)
+		s.repo.DeleteTaskData(strTaskID)
 		return nil, fmt.Errorf("failed to parse log file: %w", err)
 	}
 
-	// 4. 更新任务状态和统计信息
-	task.TotalStatements = parseResult.ParsedLines
-	task.TotalTx = int64(len(parseResult.Transactions))
-	task.Status = "ready"
-	task.UpdatedAt = time.Now()
+	// 4. 更新任务状态
+	task.Status = model.TaskStatusReady
+	task.UpdateTime = time.Now()
 
 	if err := s.repo.UpdateTask(task); err != nil {
 		return nil, fmt.Errorf("failed to update task: %w", err)
 	}
 
 	// 5. 获取统计信息
-	statistics, _ := s.repo.GetTaskStatistics(taskID)
+	statistics, _ := s.repo.GetTaskStatistics(strTaskID)
 
 	logger.Log.Info("Prepare task completed",
-		zap.String("task_id", taskID),
-		zap.Int64("statements", task.TotalStatements),
-		zap.Int64("transactions", task.TotalTx))
+		zap.String("task_id", strTaskID),
+		zap.Int64("statements", parseResult.TotalLines),
+		zap.Int("transactions", len(parseResult.Transactions)))
 
 	return &PrepareResult{
-		TaskID:          taskID,
+		TaskID:          strTaskID,
 		Status:          task.Status,
-		TotalStatements: task.TotalStatements,
-		TotalTx:         task.TotalTx,
+		TotalStatements: parseResult.ParsedLines,
+		TotalTx:         int64(len(parseResult.Transactions)),
 		Statistics:      statistics,
 	}, nil
 }
@@ -187,7 +179,7 @@ func (s *ReplayService) saveUploadedFile(src io.Reader, dstPath string) error {
 }
 
 // GetTask 获取任务信息
-func (s *ReplayService) GetTask(taskID string) (*model.ReplayTask, error) {
+func (s *ReplayService) GetTask(taskID string) (*model.TaskInfo, error) {
 	return s.repo.GetTask(taskID)
 }
 
@@ -197,51 +189,61 @@ func (s *ReplayService) GetTaskStatistics(taskID string) (map[string]interface{}
 }
 
 // GetStatementsByTask 获取任务的SQL语句
-func (s *ReplayService) GetStatementsByTask(taskID string, offset, limit int) ([]*model.SQLStatement, error) {
+func (s *ReplayService) GetStatementsByTask(taskID string, offset, limit int) ([]*model.TrafficBaseline, error) {
 	return s.repo.GetStatementsByTaskPaginated(taskID, offset, limit)
 }
 
-// GetTransactionsByTask 获取任务的事务
+// GetTransactionsByTask 获取任务的事务列表
 func (s *ReplayService) GetTransactionsByTask(taskID string) ([]*model.Transaction, error) {
 	return s.repo.GetTransactionsByTask(taskID)
 }
 
 // GetStatementsByTx 获取事务的SQL语句
-func (s *ReplayService) GetStatementsByTx(taskID string, txID int64) ([]*model.SQLStatement, error) {
-	return s.repo.GetStatementsByTx(taskID, txID)
+func (s *ReplayService) GetStatementsByTx(taskID string, txID int64) ([]*model.TrafficBaseline, error) {
+	return s.repo.GetStatementsByTx(taskID, fmt.Sprintf("%d", txID))
 }
 
-// GetProgress 获取回放进度
-func (s *ReplayService) GetProgress(taskID string) (*model.ReplayProgress, error) {
-	return s.repo.GetProgress(taskID)
+// GetProgress 获取回放进度 (In-Memory or Transient)
+type ReplayProgressDTO struct {
+	TaskID             string    `json:"task_id"`
+	TotalStatements    int64     `json:"total_statements"`
+	ExecutedStatements int64     `json:"executed_statements"`
+	SuccessCount       int64     `json:"success_count"`
+	FailureCount       int64     `json:"failure_count"`
+	StartTime          time.Time `json:"start_time"`
+	LastUpdateTime     time.Time `json:"last_update_time"`
+	CurrentTxID        string    `json:"current_tx_id"` // Added back for UI
+}
+
+func (s *ReplayService) GetProgress(taskID string) (*ReplayProgressDTO, error) {
+	s.mu.RLock()
+	replayer, ok := s.replayers[taskID]
+	s.mu.RUnlock()
+
+	if ok && replayer.IsRunning() {
+		stats := replayer.GetStats()
+		return &ReplayProgressDTO{
+			TaskID:             taskID,
+			TotalStatements:    stats.TotalStatements,
+			ExecutedStatements: stats.ExecutedStatements,
+			SuccessCount:       stats.SuccessCount,
+			FailureCount:       stats.FailureCount,
+			StartTime:          stats.StartTime,
+			LastUpdateTime:     stats.LastUpdateTime,
+			// CurrentTxID:        stats.CurrentTxID, // Assuming stats has it
+		}, nil
+	}
+
+	return nil, fmt.Errorf("replay not running for task %s", taskID)
 }
 
 // GetReport 获取回放报告
-func (s *ReplayService) GetReport(taskID string) (*model.ReplayReport, error) {
-	report, err := s.repo.GetReport(taskID)
-	if err != nil {
-		return nil, err
-	}
-
-	// 获取错误列表
-	errors, _ := s.repo.GetErrorsByTask(taskID, 100)
-	report.Errors = make([]model.ReplayError, len(errors))
-	for i, e := range errors {
-		report.Errors[i] = *e
-	}
-
-	// 获取差异列表
-	divergences, _ := s.repo.GetDivergencesByTask(taskID, 100)
-	report.Divergences = make([]model.ReplayDivergence, len(divergences))
-	for i, d := range divergences {
-		report.Divergences[i] = *d
-	}
-
-	return report, nil
+func (s *ReplayService) GetReport(taskID string) (*model.ReplaySummary, error) {
+	return s.repo.GetReport(taskID)
 }
 
 // GetDivergencesPaginated 分页获取差异记录
-func (s *ReplayService) GetDivergencesPaginated(taskID string, offset, limit int) ([]*model.ReplayDivergence, error) {
+func (s *ReplayService) GetDivergencesPaginated(taskID string, offset, limit int) ([]*model.ReplayDetail, error) {
 	return s.repo.GetDivergencesByTaskPaginated(taskID, offset, limit)
 }
 
@@ -252,6 +254,7 @@ type ReplayOptions struct {
 	SpeedFactor float64 `json:"speed_factor"` // 回放速度因子
 	MaxWorkers  int     `json:"max_workers"`  // 最大并发数
 	FastMode    bool    `json:"fast_mode"`    // 快速模式
+	TargetDB    string  `json:"target_db"`    // Target Database Name
 }
 
 // StartReplay 启动回放
@@ -262,8 +265,8 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 		return fmt.Errorf("task not found: %w", err)
 	}
 
-	if task.Status != "ready" && task.Status != "completed" {
-		return fmt.Errorf("task is not ready, current status: %s", task.Status)
+	if task.Status != model.TaskStatusReady && task.Status != model.TaskStatusCompleted {
+		return fmt.Errorf("task is not ready, current status: %d", task.Status)
 	}
 
 	// 检查是否已有运行中的回放器
@@ -292,14 +295,18 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 
 	// 创建回放配置
 	config := replay.ReplayConfig{
-		Host:        task.TargetHost,
-		Port:        task.TargetPort,
-		User:        task.TargetUser,
-		Password:    task.TargetPassword,
-		Database:    task.TargetDatabase,
+		Host:        task.DstIP,
+		Port:        task.DstPort, // int
+		User:        task.DstUser,
+		Password:    task.DstPass,
+		Database:    opts.TargetDB, // Pass via Options
 		SpeedFactor: opts.SpeedFactor,
 		MaxWorkers:  opts.MaxWorkers,
 		FastMode:    opts.FastMode,
+	}
+
+	if config.Database == "" {
+		config.Database = "postgres" // default
 	}
 
 	if config.SpeedFactor < 0 {
@@ -310,21 +317,10 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 	replayer := replay.NewReplayer(config, statements)
 
 	// 更新任务状态
-	now := time.Now()
-	task.Status = "running"
-	task.StartedAt = &now
+	task.Status = model.TaskStatusRunning
 	if err := s.repo.UpdateTask(task); err != nil {
 		return fmt.Errorf("failed to update task status: %w", err)
 	}
-
-	// 创建进度记录
-	progress := &model.ReplayProgress{
-		TaskID:          taskID,
-		TotalStatements: int64(len(statements)),
-		StartTime:       now,
-		LastUpdateTime:  now,
-	}
-	s.repo.CreateProgress(progress)
 
 	// 保存回放器
 	s.mu.Lock()
@@ -333,8 +329,7 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 
 	// 启动回放
 	if err := replayer.Start(context.Background()); err != nil {
-		task.Status = "failed"
-		task.ErrorMessage = err.Error()
+		task.Status = model.TaskStatusFailed
 		s.repo.UpdateTask(task)
 		return fmt.Errorf("failed to start replay: %w", err)
 	}
@@ -356,63 +351,43 @@ func (s *ReplayService) monitorReplayCompletion(taskID string, replayer *replay.
 		return
 	}
 
-	now := time.Now()
-	task.Status = "completed"
-	task.CompletedAt = &now
+	task.Status = model.TaskStatusCompleted
 	s.repo.UpdateTask(task)
 
 	// 生成报告
 	report := replayer.GenerateReport()
 	report.TaskID = taskID
-	report.TotalTx = task.TotalTx
 
 	// 保存报告
 	s.repo.CreateReport(report)
 
-	// 保存错误记录
-	for _, e := range report.Errors {
-		errRecord := &model.ReplayError{
-			TaskID:    taskID,
-			TxID:      e.TxID,
-			StmtID:    e.StmtID,
-			SQL:       e.SQL,
-			Error:     e.Error,
-			Timestamp: e.Timestamp,
-		}
-		s.repo.CreateError(errRecord)
-	}
-
 	// 保存差异记录
-	divergences := make([]*model.ReplayDivergence, len(report.Divergences))
-	for i, d := range report.Divergences {
-		divergences[i] = &model.ReplayDivergence{
-			TaskID:               taskID,
-			StmtID:               d.StmtID,
-			TxID:                 d.TxID,
-			SessionID:            d.SessionID,
-			SQL:                  d.SQL,
-			DivergenceType:       d.DivergenceType,
-			OriginalRowsAffected: d.OriginalRowsAffected,
-			ReplayRowsAffected:   d.ReplayRowsAffected,
-			OriginalState:        d.OriginalState,
-			ReplayState:          d.ReplayState,
-			OriginalError:        d.OriginalError,
-			ReplayError:          d.ReplayError,
-			Timestamp:            d.Timestamp,
+	// replayer.GetStats().Divergences is in memory.
+	stats := replayer.GetStats()
+	if len(stats.Divergences) > 0 {
+		// Need generic slice conversion
+		divergences := make([]*model.ReplayDetail, len(stats.Divergences))
+		for i, d := range stats.Divergences {
+			divergences[i] = &model.ReplayDetail{
+				TaskID:         taskID,
+				SQLID:          d.SQLID,
+				RowsAffected:   d.RowsAffected,
+				ExecDuration:   d.ExecDuration,
+				DivergenceType: d.DivergenceType,
+				State:          d.State,
+				ErrorMessage:   d.ErrorMessage,
+				Round:          1,
+			}
 		}
-	}
-	if len(divergences) > 0 {
 		s.repo.BatchCreateDivergences(divergences, 100)
 	}
 
 	logger.Log.Info("Replay completed",
 		zap.String("task_id", taskID),
-		zap.Int64("executed", report.ExecutedStmts),
-		zap.Int64("success", report.SuccessStmts),
-		zap.Int64("failed", report.FailedStmts),
-		zap.Int64("divergences", report.DivergenceCount),
-		zap.Int64("rows_diff", report.RowsAffectedDiff),
-		zap.Int64("error_diff", report.ErrorStateDiff))
+		zap.Int("executed", int(report.SuccessCnt+report.ErrorCnt)),
+		zap.Int("success", report.SuccessCnt),
+		zap.Int("failed", report.ErrorCnt),
+		zap.Float64("fidelity", report.ReplayFidelity))
 
 	// 清理回放器
 	s.mu.Lock()
@@ -435,43 +410,11 @@ func (s *ReplayService) StopReplay(taskID string) error {
 	// 更新任务状态
 	task, err := s.repo.GetTask(taskID)
 	if err == nil {
-		now := time.Now()
-		task.Status = "stopped"
-		task.CompletedAt = &now
+		task.Status = model.TaskStatusStopped
 		s.repo.UpdateTask(task)
 	}
 
 	return nil
-}
-
-// GetReplayProgress 获取实时回放进度
-func (s *ReplayService) GetReplayProgress(taskID string) (*model.ReplayProgress, error) {
-	s.mu.RLock()
-	replayer, ok := s.replayers[taskID]
-	s.mu.RUnlock()
-
-	if ok && replayer.IsRunning() {
-		// 从运行中的回放器获取实时进度
-		stats := replayer.GetStats()
-		progress := &model.ReplayProgress{
-			TaskID:             taskID,
-			TotalStatements:    stats.TotalStatements,
-			ExecutedStatements: stats.ExecutedStatements,
-			SuccessCount:       stats.SuccessCount,
-			FailureCount:       stats.FailureCount,
-			CurrentTxID:        stats.CurrentTxID,
-			StartTime:          stats.StartTime,
-			LastUpdateTime:     stats.LastUpdateTime,
-		}
-
-		// 更新数据库中的进度
-		s.repo.UpdateProgress(progress)
-
-		return progress, nil
-	}
-
-	// 从数据库获取最后的进度
-	return s.repo.GetProgress(taskID)
 }
 
 // IsReplayRunning 检查回放是否正在运行

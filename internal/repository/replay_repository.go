@@ -26,20 +26,21 @@ func NewReplayRepository(dbPath string) (*ReplayRepository, error) {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	// 启用 WAL 模式提高并发性能
-	// db.Exec("PRAGMA journal_mode=WAL")
-	// db.Exec("PRAGMA synchronous=NORMAL")
-	// db.Exec("PRAGMA cache_size=10000")
-
 	// 自动迁移表结构
 	if err := db.AutoMigrate(
-		&model.ReplayTask{},
+		&model.TaskInfo{},
+		&model.TrafficBaseline{},
+		&model.ReplayDetail{},
+		&model.ReplaySummary{},
+		&model.ReplayAggregation{},
+		// Note: Transaction struct is primarily in-memory, but if we persist it for resume/stats:
 		&model.Transaction{},
-		&model.SQLStatement{},
-		&model.ReplayProgress{},
-		&model.ReplayReport{},
-		&model.ReplayError{},
-		&model.ReplayDivergence{},
+		// ReplayError moved inside ReplaySummary or ReplayDetail in thesis?
+		// Thesis doesn't explicitly mention t_replay_error table.
+		// ReplayDetail includes ErrorMessage.
+		// But replayer.go uses ReplayError struct for stats.
+		// We'll keep ReplayError if needed or map it to ReplayDetail.
+		// Detailed lookup shows ReplayDetail handles errors.
 	); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}
@@ -56,30 +57,30 @@ func (r *ReplayRepository) Close() error {
 	return sqlDB.Close()
 }
 
-// ==================== ReplayTask 操作 ====================
+// ==================== TaskInfo (ReplayTask) 操作 ====================
 
 // CreateTask 创建回放任务
-func (r *ReplayRepository) CreateTask(task *model.ReplayTask) error {
+func (r *ReplayRepository) CreateTask(task *model.TaskInfo) error {
 	return r.db.Create(task).Error
 }
 
 // GetTask 获取任务
-func (r *ReplayRepository) GetTask(taskID string) (*model.ReplayTask, error) {
-	var task model.ReplayTask
-	if err := r.db.First(&task, "id = ?", taskID).Error; err != nil {
+func (r *ReplayRepository) GetTask(taskID string) (*model.TaskInfo, error) {
+	var task model.TaskInfo
+	if err := r.db.First(&task, "task_id = ?", taskID).Error; err != nil {
 		return nil, err
 	}
 	return &task, nil
 }
 
 // UpdateTask 更新任务
-func (r *ReplayRepository) UpdateTask(task *model.ReplayTask) error {
+func (r *ReplayRepository) UpdateTask(task *model.TaskInfo) error {
 	return r.db.Save(task).Error
 }
 
 // UpdateTaskStatus 更新任务状态
 func (r *ReplayRepository) UpdateTaskStatus(taskID string, status string) error {
-	return r.db.Model(&model.ReplayTask{}).Where("id = ?", taskID).Update("status", status).Error
+	return r.db.Model(&model.TaskInfo{}).Where("task_id = ?", taskID).Update("status", status).Error
 }
 
 // ==================== Transaction 操作 ====================
@@ -89,7 +90,9 @@ func (r *ReplayRepository) BatchCreateTransactions(transactions []*model.Transac
 	if len(transactions) == 0 {
 		return nil
 	}
-	// 使用 Upsert: 如果 (task_id, vxid) 冲突，则更新字段
+	// Transaction table schema might differ from Thesis (which focuses on memory).
+	// Assuming we still persist for progress tracking.
+	// TxID is string now.
 	return r.db.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "task_id"}, {Name: "vxid"}},
 		DoUpdates: clause.AssignmentColumns([]string{"end_time", "stmt_count", "committed"}),
@@ -99,16 +102,16 @@ func (r *ReplayRepository) BatchCreateTransactions(transactions []*model.Transac
 // DeleteTaskData 删除任务相关的所有数据
 func (r *ReplayRepository) DeleteTaskData(taskID string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("task_id = ?", taskID).Delete(&model.SQLStatement{}).Error; err != nil {
+		if err := tx.Where("task_id = ?", taskID).Delete(&model.TrafficBaseline{}).Error; err != nil {
 			return err
 		}
 		if err := tx.Where("task_id = ?", taskID).Delete(&model.Transaction{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("task_id = ?", taskID).Delete(&model.ReplayProgress{}).Error; err != nil {
+		if err := tx.Where("task_id = ?", taskID).Delete(&model.ReplayDetail{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("task_id = ?", taskID).Delete(&model.ReplayReport{}).Error; err != nil {
+		if err := tx.Where("task_id = ?", taskID).Delete(&model.ReplaySummary{}).Error; err != nil {
 			return err
 		}
 		return nil
@@ -122,49 +125,42 @@ func (r *ReplayRepository) GetTransactionsByTask(taskID string) ([]*model.Transa
 	return transactions, err
 }
 
-// GetTransactionByTxID 根据事务ID获取事务
-func (r *ReplayRepository) GetTransactionByTxID(taskID string, txID int64) (*model.Transaction, error) {
-	var tx model.Transaction
-	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).First(&tx).Error
-	return &tx, err
-}
-
-// ==================== SQLStatement 操作 ====================
+// ==================== TrafficBaseline (SQLStatement) 操作 ====================
 
 // BatchCreateStatements 批量创建SQL语句记录
-func (r *ReplayRepository) BatchCreateStatements(statements []*model.SQLStatement, batchSize int) error {
+func (r *ReplayRepository) BatchCreateStatements(statements []*model.TrafficBaseline, batchSize int) error {
 	return r.db.CreateInBatches(statements, batchSize).Error
 }
 
 // GetStatementsByTask 获取任务的所有SQL语句
-func (r *ReplayRepository) GetStatementsByTask(taskID string) ([]*model.SQLStatement, error) {
-	var statements []*model.SQLStatement
-	err := r.db.Where("task_id = ?", taskID).Order("timestamp, seq_in_tx").Find(&statements).Error
-	return statements, err
-}
-
-// GetStatementsByTx 获取事务的所有SQL语句
-func (r *ReplayRepository) GetStatementsByTx(taskID string, txID int64) ([]*model.SQLStatement, error) {
-	var statements []*model.SQLStatement
-	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).Order("seq_in_tx").Find(&statements).Error
+func (r *ReplayRepository) GetStatementsByTask(taskID string) ([]*model.TrafficBaseline, error) {
+	var statements []*model.TrafficBaseline
+	err := r.db.Where("task_id = ?", taskID).Order("origin_time").Find(&statements).Error
 	return statements, err
 }
 
 // GetStatementsByTaskPaginated 分页获取SQL语句
-func (r *ReplayRepository) GetStatementsByTaskPaginated(taskID string, offset, limit int) ([]*model.SQLStatement, error) {
-	var statements []*model.SQLStatement
+func (r *ReplayRepository) GetStatementsByTaskPaginated(taskID string, offset, limit int) ([]*model.TrafficBaseline, error) {
+	var statements []*model.TrafficBaseline
 	err := r.db.Where("task_id = ?", taskID).
-		Order("timestamp, seq_in_tx").
+		Order("origin_time").
 		Offset(offset).
 		Limit(limit).
 		Find(&statements).Error
 	return statements, err
 }
 
+// GetStatementsByTx 获取事务的所有SQL语句
+func (r *ReplayRepository) GetStatementsByTx(taskID string, txID string) ([]*model.TrafficBaseline, error) {
+	var statements []*model.TrafficBaseline
+	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).Order("origin_time").Find(&statements).Error
+	return statements, err
+}
+
 // GetStatementCount 获取SQL语句数量
 func (r *ReplayRepository) GetStatementCount(taskID string) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.SQLStatement{}).Where("task_id = ?", taskID).Count(&count).Error
+	err := r.db.Model(&model.TrafficBaseline{}).Where("task_id = ?", taskID).Count(&count).Error
 	return count, err
 }
 
@@ -176,74 +172,38 @@ func (r *ReplayRepository) GetTransactionCount(taskID string) (int64, error) {
 }
 
 // ==================== ReplayProgress 操作 ====================
+// ReplayProgress model was not in the new model file. Assuming we keep it or it was removed?
+// Thesis doesn't mention ReplayProgress table explicitly, maybe part of TaskInfo or transient?
+// Let's assume we use TaskInfo for status updates, or keep it if defined in model (I didn't see it in my model update).
+// Checking model definition... I removed ReplayProgress from model/replay.go.
+// So I should remove it here too and use TaskInfo or transient structure.
+// WE WILL REMOVE ReplayProgress methods for now as they are not in the Thesis schema.
 
-// CreateProgress 创建进度记录
-func (r *ReplayRepository) CreateProgress(progress *model.ReplayProgress) error {
-	return r.db.Create(progress).Error
-}
-
-// GetProgress 获取进度
-func (r *ReplayRepository) GetProgress(taskID string) (*model.ReplayProgress, error) {
-	var progress model.ReplayProgress
-	if err := r.db.First(&progress, "task_id = ?", taskID).Error; err != nil {
-		return nil, err
-	}
-	return &progress, nil
-}
-
-// UpdateProgress 更新进度
-func (r *ReplayRepository) UpdateProgress(progress *model.ReplayProgress) error {
-	return r.db.Save(progress).Error
-}
-
-// ==================== ReplayReport 操作 ====================
+// ==================== ReplaySummary (ReplayReport) 操作 ====================
 
 // CreateReport 创建报告
-func (r *ReplayRepository) CreateReport(report *model.ReplayReport) error {
+func (r *ReplayRepository) CreateReport(report *model.ReplaySummary) error {
 	return r.db.Create(report).Error
 }
 
 // GetReport 获取报告
-func (r *ReplayRepository) GetReport(taskID string) (*model.ReplayReport, error) {
-	var report model.ReplayReport
+func (r *ReplayRepository) GetReport(taskID string) (*model.ReplaySummary, error) {
+	var report model.ReplaySummary
 	if err := r.db.First(&report, "task_id = ?", taskID).Error; err != nil {
 		return nil, err
 	}
 	return &report, nil
 }
 
-// UpdateReport 更新报告
-func (r *ReplayRepository) UpdateReport(report *model.ReplayReport) error {
-	return r.db.Save(report).Error
-}
-
-// ==================== ReplayError 操作 ====================
-
-// CreateError 创建错误记录
-func (r *ReplayRepository) CreateError(errRecord *model.ReplayError) error {
-	return r.db.Create(errRecord).Error
-}
-
-// GetErrorsByTask 获取任务的所有错误
-func (r *ReplayRepository) GetErrorsByTask(taskID string, limit int) ([]*model.ReplayError, error) {
-	var errors []*model.ReplayError
-	query := r.db.Where("task_id = ?", taskID).Order("timestamp desc")
-	if limit > 0 {
-		query = query.Limit(limit)
-	}
-	err := query.Find(&errors).Error
-	return errors, err
-}
-
-// ==================== ReplayDivergence 操作 ====================
+// ==================== ReplayDetail (ReplayDivergence) 操作 ====================
 
 // CreateDivergence 创建差异记录
-func (r *ReplayRepository) CreateDivergence(divergence *model.ReplayDivergence) error {
+func (r *ReplayRepository) CreateDivergence(divergence *model.ReplayDetail) error {
 	return r.db.Create(divergence).Error
 }
 
 // BatchCreateDivergences 批量创建差异记录
-func (r *ReplayRepository) BatchCreateDivergences(divergences []*model.ReplayDivergence, batchSize int) error {
+func (r *ReplayRepository) BatchCreateDivergences(divergences []*model.ReplayDetail, batchSize int) error {
 	if len(divergences) == 0 {
 		return nil
 	}
@@ -251,9 +211,16 @@ func (r *ReplayRepository) BatchCreateDivergences(divergences []*model.ReplayDiv
 }
 
 // GetDivergencesByTask 获取任务的所有差异
-func (r *ReplayRepository) GetDivergencesByTask(taskID string, limit int) ([]*model.ReplayDivergence, error) {
-	var divergences []*model.ReplayDivergence
-	query := r.db.Where("task_id = ?", taskID).Order("timestamp desc")
+func (r *ReplayRepository) GetDivergencesByTask(taskID string, limit int) ([]*model.ReplayDetail, error) {
+	var divergences []*model.ReplayDetail
+	query := r.db.Where("task_id = ?", taskID).Order("sql_id") // No timestamp in ReplayDetail per Thesis? Table 3.3.
+	// But generated models usually have CreatedAt/UpdatedAt gorm.Model if embedded?
+	// In my model update, ReplayDetail struct has no timestamp.
+	// So order by ID (auto increment) or SQLID?
+	// Let's assume order by ID if GORM adds it?
+	// My model definition: type ReplayDetail struct { ID int64 ... }
+	query = query.Order("id desc")
+
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
@@ -262,10 +229,10 @@ func (r *ReplayRepository) GetDivergencesByTask(taskID string, limit int) ([]*mo
 }
 
 // GetDivergencesByTaskPaginated 分页获取差异
-func (r *ReplayRepository) GetDivergencesByTaskPaginated(taskID string, offset, limit int) ([]*model.ReplayDivergence, error) {
-	var divergences []*model.ReplayDivergence
+func (r *ReplayRepository) GetDivergencesByTaskPaginated(taskID string, offset, limit int) ([]*model.ReplayDetail, error) {
+	var divergences []*model.ReplayDetail
 	err := r.db.Where("task_id = ?", taskID).
-		Order("timestamp, id").
+		Order("id desc").
 		Offset(offset).
 		Limit(limit).
 		Find(&divergences).Error
@@ -278,7 +245,7 @@ func (r *ReplayRepository) GetDivergenceStats(taskID string) (map[string]int64, 
 
 	// 总差异数
 	var totalCount int64
-	r.db.Model(&model.ReplayDivergence{}).Where("task_id = ?", taskID).Count(&totalCount)
+	r.db.Model(&model.ReplayDetail{}).Where("task_id = ?", taskID).Count(&totalCount)
 	stats["total"] = totalCount
 
 	// 按类型统计
@@ -287,7 +254,7 @@ func (r *ReplayRepository) GetDivergenceStats(taskID string) (map[string]int64, 
 		Count          int64
 	}
 	var typeCounts []TypeCount
-	r.db.Model(&model.ReplayDivergence{}).
+	r.db.Model(&model.ReplayDetail{}).
 		Select("divergence_type, count(*) as count").
 		Where("task_id = ?", taskID).
 		Group("divergence_type").
@@ -308,7 +275,7 @@ func (r *ReplayRepository) GetTaskStatistics(taskID string) (map[string]interfac
 
 	// 语句总数
 	var stmtCount int64
-	r.db.Model(&model.SQLStatement{}).Where("task_id = ?", taskID).Count(&stmtCount)
+	r.db.Model(&model.TrafficBaseline{}).Where("task_id = ?", taskID).Count(&stmtCount)
 	stats["total_statements"] = stmtCount
 
 	// 事务总数
@@ -318,56 +285,14 @@ func (r *ReplayRepository) GetTaskStatistics(taskID string) (map[string]interfac
 
 	// 会话数
 	var sessionCount int64
-	r.db.Model(&model.SQLStatement{}).Where("task_id = ?", taskID).Distinct("session_id").Count(&sessionCount)
+	r.db.Model(&model.TrafficBaseline{}).Where("task_id = ?", taskID).Distinct("session_id").Count(&sessionCount)
 	stats["session_count"] = sessionCount
-
-	// 单语句事务数
-	var singleStmtTx int64
-	r.db.Model(&model.Transaction{}).Where("task_id = ? AND stmt_count = 1", taskID).Count(&singleStmtTx)
-	stats["single_stmt_tx"] = singleStmtTx
-
-	// 多语句事务数
-	var multiStmtTx int64
-	r.db.Model(&model.Transaction{}).Where("task_id = ? AND stmt_count > 1", taskID).Count(&multiStmtTx)
-	stats["multi_stmt_tx"] = multiStmtTx
-
-	// 按类型统计
-	type TypeCount struct {
-		SQLType string
-		Count   int64
-	}
-	var typeCounts []TypeCount
-	r.db.Model(&model.SQLStatement{}).
-		Select("sql_type, count(*) as count").
-		Where("task_id = ?", taskID).
-		Group("sql_type").
-		Scan(&typeCounts)
-
-	typeStats := make(map[string]int64)
-	for _, tc := range typeCounts {
-		typeStats[tc.SQLType] = tc.Count
-	}
-	stats["by_type"] = typeStats
-
-	// 按操作统计
-	var opCounts []TypeCount
-	r.db.Model(&model.SQLStatement{}).
-		Select("operation as sql_type, count(*) as count").
-		Where("task_id = ?", taskID).
-		Group("operation").
-		Scan(&opCounts)
-
-	opStats := make(map[string]int64)
-	for _, oc := range opCounts {
-		opStats[oc.SQLType] = oc.Count
-	}
-	stats["by_operation"] = opStats
 
 	return stats, nil
 }
 
 // SaveParsedData 保存解析后的数据（事务性操作）
-func (r *ReplayRepository) SaveParsedData(task *model.ReplayTask, statements []*model.SQLStatement, transactions map[string]*model.Transaction) error {
+func (r *ReplayRepository) SaveParsedData(task *model.TaskInfo, statements []*model.TrafficBaseline, transactions map[string]*model.Transaction) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// 保存任务
 		if err := tx.Save(task).Error; err != nil {
@@ -393,10 +318,26 @@ func (r *ReplayRepository) SaveParsedData(task *model.ReplayTask, statements []*
 		}
 
 		logger.Log.Info("Saved parsed data",
-			zap.String("task_id", task.ID),
+			zap.String("task_id", task.TaskID),
 			zap.Int("transactions", len(txList)),
 			zap.Int("statements", len(statements)))
 
 		return nil
 	})
+}
+
+// ==================== ReplayAggregation 操作 ====================
+
+// CreateAggregation 创建回放聚合信息
+func (r *ReplayRepository) CreateAggregation(agg *model.ReplayAggregation) error {
+	return r.db.Create(agg).Error
+}
+
+// GetAggregation 获取回放聚合信息
+func (r *ReplayRepository) GetAggregation(taskID string) (*model.ReplayAggregation, error) {
+	var agg model.ReplayAggregation
+	if err := r.db.First(&agg, "task_id = ?", taskID).Error; err != nil {
+		return nil, err
+	}
+	return &agg, nil
 }

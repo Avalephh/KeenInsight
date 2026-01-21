@@ -2,156 +2,125 @@ package model
 
 import "time"
 
-// SQLStatement 单条 SQL 语句
-type SQLStatement struct {
-	ID           int64     `json:"id" gorm:"primaryKey;autoIncrement"`
-	TaskID       string    `json:"task_id" gorm:"index;not null"` // 任务ID
-	TxID         int64     `json:"tx_id" gorm:"index"`            // 事务ID (PostgreSQL xid)
-	VxID         string    `json:"vxid" gorm:"column:vxid;index"` // 虚拟事务ID (格式: procNumber/localXID，如 "4/12532")
-	SessionID    string    `json:"session_id" gorm:"index"`       // 会话ID
-	Timestamp    time.Time `json:"timestamp" gorm:"index"`        // 执行时间戳
-	Database     string    `json:"database"`                      // 数据库名
-	Username     string    `json:"username"`                      // 用户名
-	SQLType      string    `json:"sql_type"`                      // SQL类型: READ, WRITE, DDL, MISC
-	Operation    string    `json:"operation"`                     // 操作类型: SELECT, INSERT, UPDATE, DELETE, BEGIN, COMMIT...
-	SQL          string    `json:"sql" gorm:"type:text"`          // 完整SQL语句（参数已填充）
-	RowsAffected int       `json:"rows_affected"`                 // 影响行数
-	State        string    `json:"state"`                         // 执行状态码 (00000 = success)
-	SeqInTx      int       `json:"seq_in_tx"`                     // 在事务中的顺序
+// TaskStatus 任务状态枚举
+const (
+	TaskStatusPending   = 0 // 未开始
+	TaskStatusPreparing = 1 // 准备中
+	TaskStatusReady     = 2 // 就绪
+	TaskStatusRunning   = 3 // 进行中
+	TaskStatusCompleted = 4 // 完成
+	TaskStatusFailed    = 5 // 失败
+	TaskStatusStopped   = 6 // 停止
+)
+
+// TaskInfo 任务信息表 (t_task_info)
+type TaskInfo struct {
+	TaskID      string    `json:"task_id" gorm:"primaryKey;type:char(36)"`
+	DstIP       string    `json:"dst_ip" gorm:"column:dst_ip;type:varchar(255)"`
+	DstPort     int       `json:"dst_port" gorm:"column:dst_port;type:int"`
+	DstUser     string    `json:"dst_user" gorm:"column:dst_user;type:varchar(64)"`
+	DstPass     string    `json:"dst_pass" gorm:"column:dst_pass;type:varchar(255)"`
+	Status      int       `json:"status" gorm:"type:smallint"` // 0:Pending, 1:Preparing, 2:Ready, 3:Running, 4:Completed, 5:Failed, 6:Stopped
+	CreateTime  time.Time `json:"create_time"`
+	UpdateTime  time.Time `json:"update_time"`
+	LogFilePath string    `json:"log_file_path" gorm:"-"` // 辅助字段，不存库或根据实际情况调整
+	SpeedFactor float64   `json:"speed_factor" gorm:"-"`
+	MaxWorkers  int       `json:"max_workers" gorm:"-"`
 }
 
-// Transaction 事务信息（用于按事务组织 SQL）
+func (TaskInfo) TableName() string {
+	return "t_task_info"
+}
+
+// TrafficBaseline 流量基线数据表 (t_traffic_baseline)
+type TrafficBaseline struct {
+	ID            int64  `json:"id" gorm:"primaryKey;autoIncrement"`
+	TaskID        string `json:"task_id" gorm:"index:idx_task_sql;type:char(36)"`
+	SQLID         string `json:"sql_id" gorm:"index:idx_task_sql;type:varchar(64)"`
+	ExecTimestamp int64  `json:"exec_timestamp" gorm:"type:bigint"` // 原始执行时间戳 (ms)
+	SessionID     string `json:"session_id" gorm:"type:varchar(64)"`
+	SQLText       string `json:"sql_text" gorm:"type:text"`
+	DBName        string `json:"db_name" gorm:"type:varchar(64)"`
+	UserName      string `json:"user_name" gorm:"type:varchar(64)"`
+	TxID          string `json:"tx_id" gorm:"type:varchar(64)"` // 对应 thesis 的 tx_id (Stores PG vxid)
+	// 辅助字段
+	OriginTime time.Time `json:"origin_time" gorm:"-"`
+	SQLType    string    `json:"sql_type" gorm:"-"`
+	Operation  string    `json:"operation" gorm:"-"`
+	SeqInTx    int       `json:"seq_in_tx" gorm:"-"`
+}
+
+func (TrafficBaseline) TableName() string {
+	return "t_traffic_baseline"
+}
+
+// ReplayDetail 回放明细表 (t_replay_detail)
+type ReplayDetail struct {
+	ID           int64   `json:"id" gorm:"primaryKey;autoIncrement"`
+	TaskID       string  `json:"task_id" gorm:"index:idx_task_round_sql;type:char(36)"`
+	Round        int     `json:"round" gorm:"index:idx_task_round_sql"`
+	SQLID        string  `json:"sql_id" gorm:"index:idx_task_round_sql;type:varchar(64)"`
+	RowsAffected int64   `json:"rows_affected" gorm:"type:bigint"`
+	RowsReturned int64   `json:"rows_returned" gorm:"type:bigint"`
+	RowsScanned  int64   `json:"rows_scanned" gorm:"type:bigint"`
+	ExecDuration float64 `json:"exec_duration" gorm:"type:decimal(10,3)"`
+	// 辅助字段用于记录差异
+	DivergenceType string `json:"divergence_type" gorm:"-"`
+	ErrorMessage   string `json:"error_message" gorm:"-"`
+	State          string `json:"state" gorm:"-"`
+}
+
+func (ReplayDetail) TableName() string {
+	return "t_replay_detail"
+}
+
+// ReplaySummary 回放轮次总览表 (t_replay_summary)
+type ReplaySummary struct {
+	ID              int64   `json:"id" gorm:"primaryKey;autoIncrement"`
+	TaskID          string  `json:"task_id" gorm:"type:char(36)"`
+	Round           int     `json:"round"`
+	TotalDuration   int64   `json:"total_duration" gorm:"type:bigint"` // ms
+	TotalStmts      int     `json:"total_stmts"`
+	TxCount         int     `json:"tx_count"`
+	SuccessCnt      int     `json:"success_cnt"`
+	ErrorCnt        int     `json:"error_cnt"`
+	QPS             float64 `json:"qps" gorm:"type:decimal(10,2)"`
+	TPS             float64 `json:"tps" gorm:"type:decimal(10,2)"`
+	ReplayFidelity  float64 `json:"replay_fidelity" gorm:"type:decimal(5,4)"`
+	ExecSuccessRate float64 `json:"exec_success_rate" gorm:"type:decimal(5,4)"`
+	RowsMatchedRate float64 `json:"rows_matched_rate" gorm:"type:decimal(5,4)"`
+	ErrorRate       float64 `json:"error_rate" gorm:"type:decimal(5,4)"`
+}
+
+func (ReplaySummary) TableName() string {
+	return "t_replay_summary"
+}
+
+// ReplayAggregation 回放聚合分析表 (t_replay_aggregation)
+type ReplayAggregation struct {
+	ID          int64   `json:"id" gorm:"primaryKey;autoIncrement"`
+	TaskID      string  `json:"task_id" gorm:"index:idx_agg_task_round_digest;type:char(36)"`
+	Round       int     `json:"round" gorm:"index:idx_agg_task_round_digest"`
+	SQLDigest   string  `json:"sql_digest" gorm:"index:idx_agg_task_round_digest;type:varchar(64)"`
+	SQLTemplate string  `json:"sql_template" gorm:"type:text"`
+	AvgLatency  float64 `json:"avg_latency" gorm:"type:decimal(10,3)"`
+	P95Latency  float64 `json:"p95_latency" gorm:"type:decimal(10,3)"`
+	P99Latency  float64 `json:"p99_latency" gorm:"type:decimal(10,3)"`
+}
+
+func (ReplayAggregation) TableName() string {
+	return "t_replay_aggregation"
+}
+
+// Transaction 内存对象，用于事务重组
 type Transaction struct {
-	ID        int64     `json:"id" gorm:"primaryKey;autoIncrement"`
-	TaskID    string    `json:"task_id" gorm:"index:idx_task_vxid,unique;not null"`
-	TxID      int64     `json:"tx_id" gorm:"index"`
-	VxID      string    `json:"vxid" gorm:"column:vxid;index:idx_task_vxid,unique"` // 虚拟事务ID (格式: procNumber/localXID)
-	SessionID string    `json:"session_id" gorm:"index"`
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
-	StmtCount int       `json:"stmt_count"` // 语句数量
-	Committed bool      `json:"committed"`  // 是否已提交
-}
-
-// ReplayTask 回放任务
-type ReplayTask struct {
-	ID              string     `json:"id" gorm:"primaryKey"`
-	Status          string     `json:"status" gorm:"index"` // pending, preparing, ready, running, completed, failed
-	TargetHost      string     `json:"target_host"`
-	TargetPort      int        `json:"target_port"`
-	TargetUser      string     `json:"target_user"`
-	TargetPassword  string     `json:"target_password"`
-	TargetDatabase  string     `json:"target_database"`
-	LogFilePath     string     `json:"log_file_path"`
-	TotalStatements int64      `json:"total_statements"`
-	TotalTx         int64      `json:"total_tx"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	StartedAt       *time.Time `json:"started_at,omitempty"`
-	CompletedAt     *time.Time `json:"completed_at,omitempty"`
-	ErrorMessage    string     `json:"error_message,omitempty"`
-}
-
-// ReplayProgress 回放进度
-type ReplayProgress struct {
-	TaskID             string    `json:"task_id" gorm:"primaryKey"`
-	TotalStatements    int64     `json:"total_statements"`
-	ExecutedStatements int64     `json:"executed_statements"`
-	SuccessCount       int64     `json:"success_count"`
-	FailureCount       int64     `json:"failure_count"`
-	CurrentTxID        int64     `json:"current_tx_id"`
-	StartTime          time.Time `json:"start_time"`
-	LastUpdateTime     time.Time `json:"last_update_time"`
-}
-
-// ReplayReport 回放报告
-type ReplayReport struct {
-	TaskID          string  `json:"task_id" gorm:"primaryKey"`
-	TotalStatements int64   `json:"total_statements"`
-	TotalTx         int64   `json:"total_tx"`
-	ExecutedStmts   int64   `json:"executed_stmts"`
-	SuccessStmts    int64   `json:"success_stmts"`
-	FailedStmts     int64   `json:"failed_stmts"`
-	SkippedStmts    int64   `json:"skipped_stmts"`
-	SuccessRate     float64 `json:"success_rate"`
-	Duration        string  `json:"duration"`
-	DurationSeconds float64 `json:"duration_seconds"`
-	AvgLatencyMs    float64 `json:"avg_latency_ms"`
-	MaxLatencyMs    float64 `json:"max_latency_ms"`
-	MinLatencyMs    float64 `json:"min_latency_ms"`
-
-	// 详细统计
-	SessionCount int64 `json:"session_count"`
-	SingleStmtTx int64 `json:"single_stmt_tx"`
-	MultiStmtTx  int64 `json:"multi_stmt_tx"`
-
-	StartTime time.Time `json:"start_time"`
-	EndTime   time.Time `json:"end_time"`
-	// 差异统计
-	DivergenceCount  int64              `json:"divergence_count"`   // 总差异数
-	RowsAffectedDiff int64              `json:"rows_affected_diff"` // 影响行数不同的语句数
-	ErrorStateDiff   int64              `json:"error_state_diff"`   // 错误状态不同的语句数
-	DivergenceRate   float64            `json:"divergence_rate"`    // 差异率
-	Errors           []ReplayError      `json:"errors,omitempty" gorm:"-"`
-	Divergences      []ReplayDivergence `json:"divergences,omitempty" gorm:"-"`
-}
-
-// ReplayError 回放错误记录
-type ReplayError struct {
-	ID        int64     `json:"id" gorm:"primaryKey;autoIncrement"`
-	TaskID    string    `json:"task_id" gorm:"index"`
-	TxID      int64     `json:"tx_id"`
-	VxID      string    `json:"vxid"` // 虚拟事务ID
-	StmtID    int64     `json:"stmt_id"`
-	SQL       string    `json:"sql" gorm:"type:text"`
-	Error     string    `json:"error" gorm:"type:text"`
-	Timestamp time.Time `json:"timestamp"`
-}
-
-// ReplayDivergence 回放差异记录
-type ReplayDivergence struct {
-	ID                   int64     `json:"id" gorm:"primaryKey;autoIncrement"`
-	TaskID               string    `json:"task_id" gorm:"index"`
-	StmtID               int64     `json:"stmt_id" gorm:"index"`
-	TxID                 int64     `json:"tx_id"`
-	VxID                 string    `json:"vxid"` // 虚拟事务ID
-	SessionID            string    `json:"session_id"`
-	SQL                  string    `json:"sql" gorm:"type:text"`
-	DivergenceType       string    `json:"divergence_type"` // rows_affected, error_state, error_code
-	OriginalRowsAffected int       `json:"original_rows_affected"`
-	ReplayRowsAffected   int64     `json:"replay_rows_affected"`
-	OriginalState        string    `json:"original_state"` // 原始状态码 (00000 = success)
-	ReplayState          string    `json:"replay_state"`   // 回放状态码
-	OriginalError        string    `json:"original_error"` // 原始错误信息
-	ReplayError          string    `json:"replay_error"`   // 回放错误信息
-	Timestamp            time.Time `json:"timestamp"`
-}
-
-// TableName 指定表名
-func (SQLStatement) TableName() string {
-	return "sql_statements"
-}
-
-func (Transaction) TableName() string {
-	return "transactions"
-}
-
-func (ReplayTask) TableName() string {
-	return "replay_tasks"
-}
-
-func (ReplayProgress) TableName() string {
-	return "replay_progress"
-}
-
-func (ReplayReport) TableName() string {
-	return "replay_reports"
-}
-
-func (ReplayError) TableName() string {
-	return "replay_errors"
-}
-
-func (ReplayDivergence) TableName() string {
-	return "replay_divergences"
+	ID        int64  `json:"id" gorm:"primaryKey;autoIncrement"` // GORM needs ID for upsert
+	TaskID    string `json:"task_id" gorm:"index:idx_task_txid"` // Added for persistence
+	TxID      string `gorm:"index:idx_task_txid"`
+	SessionID string
+	StartTime time.Time
+	EndTime   time.Time
+	StmtCount int                `json:"stmt_count"` // Added for stats
+	Stmts     []*TrafficBaseline `gorm:"foreignKey:TxID;references:TxID"`
+	Committed bool
 }

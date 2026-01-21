@@ -14,65 +14,54 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 		expectNil    bool
 		expectError  bool
 		expectedSQL  string
-		expectedTxID int64
-		expectedVxID string
+		expectedTxID string
 		expectedType string
 		expectedOp   string
+		expectedQID  string
 	}{
 		{
-			name:         "INSERT with xid and vxid format",
-			line:         `user=test db=test time=2025-12-13 19:46:16.161 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/12532 LOG:  AUDIT: SESSION,28717,1,WRITE,INSERT,,,"INSERT INTO sbtest7 (id, k, c, pad) VALUES ($1, $2, $3, $4)","4992,5026,test-value,pad-data",1`,
+			name:         "INSERT with new CSV prefix (QID=0)",
+			line:         `test,test,1765626376.161,00000,693d5208.8382,4/12532,0 LOG:  AUDIT: SESSION,28717,1,WRITE,INSERT,,,"INSERT INTO sbtest7 (id, k, c, pad) VALUES ($1, $2, $3, $4)","4992,5026,test-value,pad-data",1`,
 			expectNil:    false,
 			expectError:  false,
 			expectedSQL:  "INSERT INTO sbtest7 (id, k, c, pad) VALUES (4992, 5026, 'test-value', 'pad-data')",
-			expectedTxID: 15723349,
-			expectedVxID: "4/12532",
+			expectedTxID: "4/12532",
 			expectedType: "WRITE",
 			expectedOp:   "INSERT",
+			expectedQID:  "", // Should use hash
 		},
 		{
-			name:         "INSERT with vxid tx format",
-			line:         `user=test db=test time=2025-12-09 22:03:41.664 CST state=00000 session=69382c1f.bd84 vxid=4/12532 tx=15723349 LOG:  AUDIT: SESSION,28717,1,WRITE,INSERT,,,"INSERT INTO sbtest7 (id, k, c, pad) VALUES ($1, $2, $3, $4)","4992,5026,test-value,pad-data",1`,
-			expectNil:    false,
-			expectError:  false,
-			expectedSQL:  "INSERT INTO sbtest7 (id, k, c, pad) VALUES (4992, 5026, 'test-value', 'pad-data')",
-			expectedTxID: 15723349,
-			expectedVxID: "4/12532",
-			expectedType: "WRITE",
-			expectedOp:   "INSERT",
-		},
-		{
-			name:         "SELECT statement with xid vxid format",
-			line:         `user=test db=test time=2025-12-13 19:46:16.161 CST state=00000 session=693d5208.8382 xid=0 vxid=4/690 LOG:  AUDIT: SESSION,1,1,READ,SELECT,,,"SELECT * FROM users WHERE id = $1","123",1`,
+			name:         "SELECT with new CSV prefix and valid QID",
+			line:         `test,test,1765626376.161,00000,693d5208.8382,4/690,123456789 LOG:  AUDIT: SESSION,1,1,READ,SELECT,,,"SELECT * FROM users WHERE id = $1","123",1`,
 			expectNil:    false,
 			expectError:  false,
 			expectedSQL:  "SELECT * FROM users WHERE id = 123",
-			expectedTxID: 0,
-			expectedVxID: "4/690",
+			expectedTxID: "4/690",
 			expectedType: "READ",
 			expectedOp:   "SELECT",
+			expectedQID:  "123456789",
 		},
 		{
-			name:         "BEGIN transaction with xid vxid",
-			line:         `user=test db=test time=2025-12-13 19:46:16.000 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/12534 LOG:  AUDIT: SESSION,28716,1,MISC,BEGIN,,,BEGIN,<not logged>,1`,
+			name:         "BEGIN transaction",
+			line:         `test,test,1765626376.000,00000,693d5208.8382,4/12534,0 LOG:  AUDIT: SESSION,28716,1,MISC,BEGIN,,,BEGIN,<not logged>,1`,
 			expectNil:    false,
 			expectError:  false,
 			expectedSQL:  "BEGIN",
-			expectedTxID: 15723349,
-			expectedVxID: "4/12534",
+			expectedTxID: "4/12534",
 			expectedType: "MISC",
 			expectedOp:   "BEGIN",
+			expectedQID:  "", // Hash
 		},
 		{
-			name:         "COMMIT transaction with vxid",
-			line:         `user=test db=test time=2025-12-13 19:46:16.300 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/12534 LOG:  AUDIT: SESSION,28719,1,MISC,COMMIT,,,COMMIT,<not logged>,1`,
+			name:         "COMMIT transaction",
+			line:         `test,test,1765626376.300,00000,693d5208.8382,4/12534,0 LOG:  AUDIT: SESSION,28719,1,MISC,COMMIT,,,COMMIT,<not logged>,1`,
 			expectNil:    false,
 			expectError:  false,
 			expectedSQL:  "COMMIT",
-			expectedTxID: 15723349,
-			expectedVxID: "4/12534",
+			expectedTxID: "4/12534",
 			expectedType: "MISC",
 			expectedOp:   "COMMIT",
+			expectedQID:  "", // Hash
 		},
 		{
 			name:        "Non-audit line",
@@ -112,11 +101,7 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 			}
 
 			if stmt.TxID != tc.expectedTxID {
-				t.Errorf("TxID mismatch: expected %d, got %d", tc.expectedTxID, stmt.TxID)
-			}
-
-			if stmt.VxID != tc.expectedVxID {
-				t.Errorf("VxID mismatch: expected %s, got %s", tc.expectedVxID, stmt.VxID)
+				t.Errorf("TxID mismatch: expected %s, got %s", tc.expectedTxID, stmt.TxID)
 			}
 
 			if stmt.SQLType != tc.expectedType {
@@ -127,8 +112,19 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 				t.Errorf("Operation mismatch: expected %s, got %s", tc.expectedOp, stmt.Operation)
 			}
 
-			if tc.expectedSQL != "" && stmt.SQL != tc.expectedSQL {
-				t.Errorf("SQL mismatch:\nexpected: %s\ngot:      %s", tc.expectedSQL, stmt.SQL)
+			if tc.expectedSQL != "" && stmt.SQLText != tc.expectedSQL {
+				t.Errorf("SQL mismatch:\nexpected: %s\ngot:      %s", tc.expectedSQL, stmt.SQLText)
+			}
+
+			if tc.expectedQID != "" {
+				if stmt.SQLID != tc.expectedQID {
+					t.Errorf("SQLID mismatch(should be QID): expected %s, got %s", tc.expectedQID, stmt.SQLID)
+				}
+			} else {
+				// We expect a hash
+				if stmt.SQLID == "" || stmt.SQLID == "0" {
+					t.Errorf("SQLID should be a hash, got empty or 0")
+				}
 			}
 		})
 	}
@@ -137,12 +133,12 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 func TestPgAuditParser_ParseWithVxID(t *testing.T) {
 	parser := NewPgAuditParser()
 
-	// 模拟带有 xid vxid 格式的完整日志内容（新格式）
-	logContent := `user=test db=test time=2025-12-13 19:46:16.000 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/100 LOG:  AUDIT: SESSION,28716,1,MISC,BEGIN,,,BEGIN,<not logged>,1
-user=test db=test time=2025-12-13 19:46:16.100 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/100 LOG:  AUDIT: SESSION,28717,1,READ,SELECT,,,"SELECT * FROM users WHERE id = $1","1",1
-user=test db=test time=2025-12-13 19:46:16.200 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/100 LOG:  AUDIT: SESSION,28718,1,WRITE,UPDATE,,,"UPDATE users SET name = $1 WHERE id = $2","new_name,1",1
-user=test db=test time=2025-12-13 19:46:16.300 CST state=00000 session=693d5208.8382 xid=15723349 vxid=4/100 LOG:  AUDIT: SESSION,28719,1,MISC,COMMIT,,,COMMIT,<not logged>,1
-user=test db=test time=2025-12-13 19:46:17.000 CST state=00000 session=693d5208.8383 xid=15723350 vxid=5/200 LOG:  AUDIT: SESSION,28720,1,READ,SELECT,,,"SELECT count(*) FROM orders",<not logged>,1`
+	// New CSV format log content
+	logContent := `test,test,1765626376.000,00000,693d5208.8382,4/100,0 LOG:  AUDIT: SESSION,28716,1,MISC,BEGIN,,,BEGIN,<not logged>,1
+test,test,1765626376.100,00000,693d5208.8382,4/100,55555 LOG:  AUDIT: SESSION,28717,1,READ,SELECT,,,"SELECT * FROM users WHERE id = $1","1",1
+test,test,1765626376.200,00000,693d5208.8382,4/100,66666 LOG:  AUDIT: SESSION,28718,1,WRITE,UPDATE,,,"UPDATE users SET name = $1 WHERE id = $2","new_name,1",1
+test,test,1765626376.300,00000,693d5208.8382,4/100,0 LOG:  AUDIT: SESSION,28719,1,MISC,COMMIT,,,COMMIT,<not logged>,1
+test,test,1765626377.000,00000,693d5208.8383,5/200,77777 LOG:  AUDIT: SESSION,28720,1,READ,SELECT,,,"SELECT count(*) FROM orders",<not logged>,1`
 
 	result, err := parser.Parse(strings.NewReader(logContent), "test-task")
 	if err != nil {
@@ -158,11 +154,11 @@ user=test db=test time=2025-12-13 19:46:17.000 CST state=00000 session=693d5208.
 		t.Errorf("ParsedLines mismatch: expected 5, got %d", result.ParsedLines)
 	}
 
-	if len(result.Statements) != 5 {
-		t.Errorf("Statements count mismatch: expected 5, got %d", len(result.Statements))
+	if len(result.Units) != 5 {
+		t.Errorf("Statements count mismatch: expected 5, got %d", len(result.Units))
 	}
 
-	// 验证事务数量 (应该有 2 个事务: vxid=4/100 和 vxid=5/200)
+	// 验证事务数量 (应该有 2 个事务: vxid=4/100 和 vxid=5/200 -> Now mapped to TxID)
 	if len(result.Transactions) != 2 {
 		t.Errorf("Transactions count mismatch: expected 2, got %d", len(result.Transactions))
 	}
@@ -170,7 +166,7 @@ user=test db=test time=2025-12-13 19:46:17.000 CST state=00000 session=693d5208.
 	// 验证事务 4/100 的语句数量
 	tx1 := result.Transactions["4/100"]
 	if tx1 == nil {
-		t.Fatal("Transaction with vxid=4/100 not found")
+		t.Fatal("Transaction with TxID=4/100 not found")
 	}
 	if tx1.StmtCount != 4 {
 		t.Errorf("Transaction 4/100 statement count mismatch: expected 4, got %d", tx1.StmtCount)
@@ -178,38 +174,37 @@ user=test db=test time=2025-12-13 19:46:17.000 CST state=00000 session=693d5208.
 	if !tx1.Committed {
 		t.Error("Transaction 4/100 should be marked as committed")
 	}
-	if tx1.VxID != "4/100" {
-		t.Errorf("Transaction VxID mismatch: expected 4/100, got %s", tx1.VxID)
+	if tx1.TxID != "4/100" {
+		t.Errorf("Transaction TxID mismatch: expected 4/100, got %s", tx1.TxID)
 	}
 
 	// 验证事务 5/200 的语句数量
 	tx2 := result.Transactions["5/200"]
 	if tx2 == nil {
-		t.Fatal("Transaction with vxid=5/200 not found")
+		t.Fatal("Transaction with TxID=5/200 not found")
 	}
 	if tx2.StmtCount != 1 {
 		t.Errorf("Transaction 5/200 statement count mismatch: expected 1, got %d", tx2.StmtCount)
 	}
 
-	// 验证语句的 VxID 被正确设置
-	for _, stmt := range result.Statements {
-		if stmt.VxID == "" {
-			t.Errorf("Statement should have VxID set, SQL: %s", stmt.SQL)
-		}
+	// Check QID extraction for specific statements
+	// Note: Units are in order of parsing
+	if result.Units[1].SQLID != "55555" {
+		t.Errorf("Expected SQLID 55555, got %s", result.Units[1].SQLID)
 	}
 }
 
-func TestPgAuditParser_TransactionGroupingByVxID(t *testing.T) {
+func TestPgAuditParser_TransactionGroupingByTxID(t *testing.T) {
 	parser := NewPgAuditParser()
 
-	// 测试同一个 vxid 的语句被正确分组到同一个事务中
-	logContent := `user=test db=test time=2025-12-09 22:03:40.000 CST state=00000 session=session1 vxid=3/100 tx=100 LOG:  AUDIT: SESSION,1,1,MISC,BEGIN,,,BEGIN,<not logged>,1
-user=test db=test time=2025-12-09 22:03:40.100 CST state=00000 session=session1 vxid=3/100 tx=100 LOG:  AUDIT: SESSION,2,1,WRITE,INSERT,,,"INSERT INTO t1 VALUES ($1)","1",1
-user=test db=test time=2025-12-09 22:03:40.200 CST state=00000 session=session1 vxid=3/100 tx=100 LOG:  AUDIT: SESSION,3,1,WRITE,INSERT,,,"INSERT INTO t1 VALUES ($1)","2",1
-user=test db=test time=2025-12-09 22:03:40.300 CST state=00000 session=session1 vxid=3/100 tx=100 LOG:  AUDIT: SESSION,4,1,MISC,COMMIT,,,COMMIT,<not logged>,1
-user=test db=test time=2025-12-09 22:03:41.000 CST state=00000 session=session1 vxid=3/101 tx=101 LOG:  AUDIT: SESSION,5,1,MISC,BEGIN,,,BEGIN,<not logged>,1
-user=test db=test time=2025-12-09 22:03:41.100 CST state=00000 session=session1 vxid=3/101 tx=101 LOG:  AUDIT: SESSION,6,1,WRITE,UPDATE,,,"UPDATE t1 SET v=$1 WHERE id=$2","new,1",1
-user=test db=test time=2025-12-09 22:03:41.200 CST state=00000 session=session1 vxid=3/101 tx=101 LOG:  AUDIT: SESSION,7,1,MISC,COMMIT,,,COMMIT,<not logged>,1`
+	// New CSV format log content
+	logContent := `test,test,1765626376.000,00000,session1,3/100,0 LOG:  AUDIT: SESSION,1,1,MISC,BEGIN,,,BEGIN,<not logged>,1
+test,test,1765626376.100,00000,session1,3/100,8888 LOG:  AUDIT: SESSION,2,1,WRITE,INSERT,,,"INSERT INTO t1 VALUES ($1)","1",1
+test,test,1765626376.200,00000,session1,3/100,8888 LOG:  AUDIT: SESSION,3,1,WRITE,INSERT,,,"INSERT INTO t1 VALUES ($1)","2",1
+test,test,1765626376.300,00000,session1,3/100,0 LOG:  AUDIT: SESSION,4,1,MISC,COMMIT,,,COMMIT,<not logged>,1
+test,test,1765626377.000,00000,session1,3/101,0 LOG:  AUDIT: SESSION,5,1,MISC,BEGIN,,,BEGIN,<not logged>,1
+test,test,1765626377.100,00000,session1,3/101,9999 LOG:  AUDIT: SESSION,6,1,WRITE,UPDATE,,,"UPDATE t1 SET v=$1 WHERE id=$2","new,1",1
+test,test,1765626377.200,00000,session1,3/101,0 LOG:  AUDIT: SESSION,7,1,MISC,COMMIT,,,COMMIT,<not logged>,1`
 
 	result, err := parser.Parse(strings.NewReader(logContent), "test-task")
 	if err != nil {
@@ -221,7 +216,7 @@ user=test db=test time=2025-12-09 22:03:41.200 CST state=00000 session=session1 
 		t.Errorf("Expected 2 transactions, got %d", len(result.Transactions))
 	}
 
-	// 验证第一个事务 (vxid=3/100)
+	// 验证第一个事务 (TxID=3/100)
 	tx1 := result.Transactions["3/100"]
 	if tx1 == nil {
 		t.Fatal("Transaction 3/100 not found")
@@ -230,7 +225,7 @@ user=test db=test time=2025-12-09 22:03:41.200 CST state=00000 session=session1 
 		t.Errorf("Transaction 3/100 should have 4 statements, got %d", tx1.StmtCount)
 	}
 
-	// 验证第二个事务 (vxid=3/101)
+	// 验证第二个事务 (TxID=3/101)
 	tx2 := result.Transactions["3/101"]
 	if tx2 == nil {
 		t.Fatal("Transaction 3/101 not found")
@@ -240,26 +235,26 @@ user=test db=test time=2025-12-09 22:03:41.200 CST state=00000 session=session1 
 	}
 
 	// 验证语句在事务内的顺序 (SeqInTx)
-	seqByVxID := make(map[string][]int)
-	for _, stmt := range result.Statements {
-		seqByVxID[stmt.VxID] = append(seqByVxID[stmt.VxID], stmt.SeqInTx)
+	seqByTxID := make(map[string][]int)
+	for _, stmt := range result.Units {
+		seqByTxID[stmt.TxID] = append(seqByTxID[stmt.TxID], stmt.SeqInTx)
 	}
 
 	// 事务 3/100 应该有序号 1, 2, 3, 4
-	if len(seqByVxID["3/100"]) != 4 {
+	if len(seqByTxID["3/100"]) != 4 {
 		t.Errorf("Transaction 3/100 should have 4 statements")
 	}
-	for i, seq := range seqByVxID["3/100"] {
+	for i, seq := range seqByTxID["3/100"] {
 		if seq != i+1 {
 			t.Errorf("Statement %d in transaction 3/100 has SeqInTx=%d, expected %d", i, seq, i+1)
 		}
 	}
 
 	// 事务 3/101 应该有序号 1, 2, 3
-	if len(seqByVxID["3/101"]) != 3 {
+	if len(seqByTxID["3/101"]) != 3 {
 		t.Errorf("Transaction 3/101 should have 3 statements")
 	}
-	for i, seq := range seqByVxID["3/101"] {
+	for i, seq := range seqByTxID["3/101"] {
 		if seq != i+1 {
 			t.Errorf("Statement %d in transaction 3/101 has SeqInTx=%d, expected %d", i, seq, i+1)
 		}
