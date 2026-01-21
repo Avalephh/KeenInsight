@@ -199,8 +199,8 @@ func (s *ReplayService) GetTransactionsByTask(taskID string) ([]*model.Transacti
 }
 
 // GetStatementsByTx 获取事务的SQL语句
-func (s *ReplayService) GetStatementsByTx(taskID string, txID int64) ([]*model.TrafficBaseline, error) {
-	return s.repo.GetStatementsByTx(taskID, fmt.Sprintf("%d", txID))
+func (s *ReplayService) GetStatementsByTx(taskID string, txID string) ([]*model.TrafficBaseline, error) {
+	return s.repo.GetStatementsByTx(taskID, txID)
 }
 
 // GetProgress 获取回放进度 (In-Memory or Transient)

@@ -94,7 +94,7 @@ func (r *ReplayRepository) BatchCreateTransactions(transactions []*model.Transac
 	// Assuming we still persist for progress tracking.
 	// TxID is string now.
 	return r.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "task_id"}, {Name: "vxid"}},
+		Columns:   []clause.Column{{Name: "task_id"}, {Name: "tx_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"end_time", "stmt_count", "committed"}),
 	}).CreateInBatches(transactions, batchSize).Error
 }
@@ -135,7 +135,7 @@ func (r *ReplayRepository) BatchCreateStatements(statements []*model.TrafficBase
 // GetStatementsByTask 获取任务的所有SQL语句
 func (r *ReplayRepository) GetStatementsByTask(taskID string) ([]*model.TrafficBaseline, error) {
 	var statements []*model.TrafficBaseline
-	err := r.db.Where("task_id = ?", taskID).Order("origin_time").Find(&statements).Error
+	err := r.db.Where("task_id = ?", taskID).Order("exec_timestamp").Find(&statements).Error
 	return statements, err
 }
 
@@ -143,7 +143,7 @@ func (r *ReplayRepository) GetStatementsByTask(taskID string) ([]*model.TrafficB
 func (r *ReplayRepository) GetStatementsByTaskPaginated(taskID string, offset, limit int) ([]*model.TrafficBaseline, error) {
 	var statements []*model.TrafficBaseline
 	err := r.db.Where("task_id = ?", taskID).
-		Order("origin_time").
+		Order("exec_timestamp").
 		Offset(offset).
 		Limit(limit).
 		Find(&statements).Error
@@ -153,7 +153,7 @@ func (r *ReplayRepository) GetStatementsByTaskPaginated(taskID string, offset, l
 // GetStatementsByTx 获取事务的所有SQL语句
 func (r *ReplayRepository) GetStatementsByTx(taskID string, txID string) ([]*model.TrafficBaseline, error) {
 	var statements []*model.TrafficBaseline
-	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).Order("origin_time").Find(&statements).Error
+	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).Order("exec_timestamp").Find(&statements).Error
 	return statements, err
 }
 
@@ -287,6 +287,69 @@ func (r *ReplayRepository) GetTaskStatistics(taskID string) (map[string]interfac
 	var sessionCount int64
 	r.db.Model(&model.TrafficBaseline{}).Where("task_id = ?", taskID).Distinct("session_id").Count(&sessionCount)
 	stats["session_count"] = sessionCount
+
+	// SQL类型分布 (by_type)
+	type TypeCount struct {
+		SQLType string `gorm:"column:sql_type"`
+		Count   int64  `gorm:"column:count"`
+	}
+	var typeCounts []TypeCount
+	r.db.Model(&model.TrafficBaseline{}).
+		Select("sql_type, count(*) as count").
+		Where("task_id = ?", taskID).
+		Group("sql_type").
+		Scan(&typeCounts)
+
+	byType := make(map[string]int64)
+	for _, tc := range typeCounts {
+		if tc.SQLType != "" {
+			byType[tc.SQLType] = tc.Count
+		}
+	}
+	stats["by_type"] = byType
+
+	// 操作类型分布 (by_operation)
+	type OpCount struct {
+		Operation string `gorm:"column:operation"`
+		Count     int64  `gorm:"column:count"`
+	}
+	var opCounts []OpCount
+	r.db.Model(&model.TrafficBaseline{}).
+		Select("operation, count(*) as count").
+		Where("task_id = ?", taskID).
+		Group("operation").
+		Scan(&opCounts)
+
+	byOperation := make(map[string]int64)
+	for _, oc := range opCounts {
+		if oc.Operation != "" {
+			byOperation[oc.Operation] = oc.Count
+		}
+	}
+	stats["by_operation"] = byOperation
+
+	// 单语句事务和多语句事务统计
+	type TxTypeCount struct {
+		StmtCount int64 `gorm:"column:stmt_count"`
+		TxCount   int64 `gorm:"column:tx_count"`
+	}
+	var singleStmtTx, multiStmtTx int64
+	var txTypeCounts []TxTypeCount
+	r.db.Model(&model.Transaction{}).
+		Select("stmt_count, count(*) as tx_count").
+		Where("task_id = ?", taskID).
+		Group("stmt_count").
+		Scan(&txTypeCounts)
+
+	for _, tc := range txTypeCounts {
+		if tc.StmtCount == 1 {
+			singleStmtTx = tc.TxCount
+		} else if tc.StmtCount > 1 {
+			multiStmtTx += tc.TxCount
+		}
+	}
+	stats["single_stmt_tx"] = singleStmtTx
+	stats["multi_stmt_tx"] = multiStmtTx
 
 	return stats, nil
 }

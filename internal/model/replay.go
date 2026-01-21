@@ -114,9 +114,9 @@ func (ReplayAggregation) TableName() string {
 
 // Transaction 内存对象，用于事务重组
 type Transaction struct {
-	ID        int64  `json:"id" gorm:"primaryKey;autoIncrement"` // GORM needs ID for upsert
-	TaskID    string `json:"task_id" gorm:"index:idx_task_txid"` // Added for persistence
-	TxID      string `gorm:"index:idx_task_txid"`
+	ID        int64  `json:"id" gorm:"primaryKey;autoIncrement"`       // GORM needs ID for upsert
+	TaskID    string `json:"task_id" gorm:"uniqueIndex:idx_task_txid"` // Added for persistence
+	TxID      string `gorm:"uniqueIndex:idx_task_txid"`
 	SessionID string
 	StartTime time.Time
 	EndTime   time.Time

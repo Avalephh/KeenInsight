@@ -362,26 +362,53 @@ func (h *ReplayHandler) GetTransactions(c *gin.Context) {
 		response.Error(c, response.CodeError, "task_id is required")
 		return
 	}
-	// Service method removed? Check replay_service.go
-	// In Step 103, GetTransactionsByTask is commented out /* ... */
-	// If UI needs it, I should uncomment it or remove this handler.
-	// Assuming UI needs it, let's assume service has it.
-	// Wait, I commented it out in Step 103?
-	// Checking Step 103... Yes: /* \n// Transaction related methods if needed by UI?\n// GetTransactionsByTask ...\n*/
-	// So I should remove this handler or uncomment in service.
-	// Given this is a Refactor, maybe better to remove unimplemented handler logic or restore service method.
-	// I will restore service method in next step if this fails to compile.
-	// For now, let's assume we remove this endpoint or return not implemented.
 
-	// Better: Uncomment GetTransactionsByTask in service. But I can't do that in this single file edit.
-	// I'll return Empty for now or Error.
-	response.Error(c, response.CodeError, "Not implemented in new model")
+	transactions, err := h.service.GetTransactionsByTask(taskID)
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"transactions": transactions,
+		"count":        len(transactions),
+	})
 }
 
 // GetTxStatements 获取事务的SQL语句
+// @Summary 获取事务的SQL语句
+// @Description 获取指定事务的所有SQL语句
+// @Tags Replay
+// @Accept json
+// @Produce json
+// @Param task_id query string true "Task ID"
+// @Param tx_id query string true "Transaction ID (e.g. 67/98)"
+// @Success 200 {object} response.Response
+// @Router /replay/tx/statements [get]
 func (h *ReplayHandler) GetTxStatements(c *gin.Context) {
-	// Similar issue, GetStatementsByTx was removed/commented.
-	response.Error(c, response.CodeError, "Not implemented in new model")
+	taskID := c.Query("task_id")
+	if taskID == "" {
+		response.Error(c, response.CodeError, "task_id is required")
+		return
+	}
+
+	txID := c.Query("tx_id")
+	if txID == "" {
+		response.Error(c, response.CodeError, "tx_id is required")
+		return
+	}
+
+	statements, err := h.service.GetStatementsByTx(taskID, txID)
+	if err != nil {
+		response.Error(c, response.CodeError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"statements": statements,
+		"tx_id":      txID,
+		"count":      len(statements),
+	})
 }
 
 // GetDivergences 获取差异列表
@@ -445,10 +472,38 @@ func (h *ReplayHandler) GetProgress(c *gin.Context) {
 			response.Error(c, response.CodeError, "task not found")
 			return
 		}
+
+		// When replay is not running, try to get stats from report or statistics
+		stats, _ := h.service.GetTaskStatistics(taskID)
+		totalStmts := int64(0)
+		executedStmts := int64(0)
+		successCount := int64(0)
+		failureCount := int64(0)
+
+		if v, ok := stats["total_statements"].(int64); ok {
+			totalStmts = v
+		}
+
+		// If task is completed, get stats from report
+		if task.Status == model.TaskStatusCompleted {
+			report, reportErr := h.service.GetReport(taskID)
+			if reportErr == nil {
+				executedStmts = int64(report.SuccessCnt + report.ErrorCnt)
+				successCount = int64(report.SuccessCnt)
+				failureCount = int64(report.ErrorCnt)
+			}
+		}
+
 		response.Success(c, gin.H{
-			"task_id": task.TaskID,
-			"status":  statusToString(task.Status), // Fixed
-			"message": "replay not running or started",
+			"task_id":             task.TaskID,
+			"status":              statusToString(task.Status),
+			"total_statements":    totalStmts,
+			"executed_statements": executedStmts,
+			"success_count":       successCount,
+			"failure_count":       failureCount,
+			"running":             false,
+			"percentage":          float64(100), // Completed or not started
+			"message":             "replay not running or started",
 		})
 		return
 	}
