@@ -73,9 +73,9 @@
           <el-button type="primary" @click="checkLoadConfig" class="primary-btn">确认选择</el-button>
           <el-button @click="resetLoadForm" class="secondary-btn">重置</el-button>
           <!-- 使用 isDev 变量而不是 import.meta.env.DEV -->
-          <el-button v-if="isDev" @click="testConnection" type="info" class="secondary-btn">
+          <!-- <el-button v-if="isDev" @click="testConnection" type="info" class="secondary-btn">
             测试连接
-          </el-button>
+          </el-button> -->
         </el-form-item>
       </el-form>
     </div>
@@ -91,7 +91,7 @@
       >
         <el-row :gutter="20">
           <el-col :span="8">
-            <el-form-item label="调优算法" prop="algorithm">
+            <!-- <el-form-item label="调优算法" prop="algorithm">
               <el-select 
                 v-model="tuneForm.algorithm" 
                 placeholder="请选择调优算法"
@@ -103,7 +103,7 @@
                 <el-option label="MBO" value="MBO"></el-option>
                 <el-option label="贝叶斯优化" value="BO"></el-option>
               </el-select>
-            </el-form-item>
+            </el-form-item> -->
             <el-form-item label="调优轮次" prop="rounds">
               <el-input-number 
                 v-model.number="tuneForm.rounds" 
@@ -182,14 +182,14 @@ const tuneFormRef = ref<FormInstance>()
 const loadForm = reactive({
   loadType: '',
   duration: 30,
-  threadNum: 10, // 虽然界面上隐藏了，但数据中保留，后端需要
+  threadNum: 32, 
   timeRange: [] as string[]
 })
 
 // 调优配置表单
 const tuneForm = reactive({
   tuneName: '',
-  algorithm: '',
+  // algorithm: 'SysInsight',
   rounds: 5,
   metrics: [] as string[],
   selectedParams: [] as string[],
@@ -216,9 +216,9 @@ const loadRules: FormRules = {
 }
 
 const tuneRules: FormRules = {
-  algorithm: [
-    { required: true, message: '请选择调优算法', trigger: 'change' }
-  ],
+  // algorithm: [
+  //   { required: true, message: '请选择调优算法', trigger: 'change' }
+  // ],
   rounds: [
     { required: true, message: '请输入调优轮次', trigger: 'blur' },
     { type: 'number', min: 1, max: 100, message: '轮次必须在1-100之间', trigger: 'blur' }
@@ -282,7 +282,7 @@ const submitTuneConfig = async () => {
       },
       tune: {
         tuneName: tuneForm.tuneName,
-        algorithm: tuneForm.algorithm,
+        // algorithm: tuneForm.algorithm,
         rounds: tuneForm.rounds,
         metrics: tuneForm.metrics
       }
@@ -292,10 +292,12 @@ const submitTuneConfig = async () => {
 
     // 调用后端API
     const response = await tuneAPI.setConfig(requestData)
+    // 压测一次展示数据到第二页
     
+
     if (response.code === 200) {
       ElMessage.success({
-        message: '配置提交成功，正在进入系统状态监控...',
+        message: '配置提交成功，正在评估系统...',
         duration: 2000
       })
 
@@ -352,7 +354,7 @@ const submitTuneConfig = async () => {
 const resetTuneForm = () => {
   tuneFormRef.value?.resetFields()
   tuneForm.tuneName = ''
-  tuneForm.algorithm = ''
+  // tuneForm.algorithm = ''
   tuneForm.rounds = 5
   tuneForm.metrics = []
   tuneForm.selectedParams = []
@@ -397,16 +399,16 @@ const resetTuneForm = () => {
 //   }
 // }
 
-// 测试后端连接（开发环境使用）
-const testConnection = async () => {
-  try {
-    const result = await tuneAPI.healthCheck()
-    ElMessage.success(`后端连接正常: ${result.status}`)
-  } catch (error) {
-    ElMessage.error('无法连接到后端服务')
-    console.error('连接测试失败:', error)
-  }
-}
+// // 测试后端连接（开发环境使用）
+// const testConnection = async () => {
+//   try {
+//     const result = await tuneAPI.healthCheck()
+//     ElMessage.success(`后端连接正常: ${result.status}`)
+//   } catch (error) {
+//     ElMessage.error('无法连接到后端服务')
+//     console.error('连接测试失败:', error)
+//   }
+// }
 
 // 组件挂载时恢复任务状态
 // onMounted(() => {

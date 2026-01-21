@@ -19,6 +19,5 @@ class SetConfigRequest(BaseModel):
     tune: Optional[TuneConfig] = None
 
 class StartTuneRequest(BaseModel):
-    taskId: str
     taskName: str
 

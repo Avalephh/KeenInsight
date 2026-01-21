@@ -3,6 +3,7 @@ import LoadSelect from '@/views/LoadSelect.vue'
 import SystemStatus from '@/views/SystemStatus.vue'
 import ExceptionAnalysis from '@/views/ExceptionAnalysis.vue'
 import KnobRecommend from '@/views/KnobRecommend.vue'
+import MultiKnobRecommend from '@/views/MultiKnobRecommend.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,6 +27,11 @@ const router = createRouter({
       path: '/knobrecommend',
       name: 'knob-recommend',
       component: KnobRecommend,
+    },
+    {
+      path: '/multiknobrecommend',
+      name: 'multi-knob-recommend',
+      component: MultiKnobRecommend,
     }
   ],
 })
