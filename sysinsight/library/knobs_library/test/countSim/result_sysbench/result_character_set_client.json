@@ -1,0 +1,31 @@
+[
+    {
+        "knob_name": "character_set_client",
+        "data_matched_functions": [
+            "mysql_audit_notify",
+            "mysql_execute_command",
+            "PTI_text_literal_text_string::itemize",
+            "Query_log_event::Query_log_event"
+        ],
+        "data_matched_count": 4,
+        "control_matched_functions": [
+            "stmt_has_updated_trans_table",
+            "well_formed_copy_nchars",
+            "String::append",
+            "THD::set_query",
+            "MEM_ROOT::ClearForReuse",
+            "xid_t::get_my_xid",
+            "String::mem_realloc",
+            "trans_has_updated_trans_table",
+            "THD::update_slow_query_status",
+            "THD::enter_stage",
+            "Diagnostics_area::reset_diagnostics_area",
+            "log_slow_statement",
+            "gtid_pre_statement_checks",
+            "ER_THD",
+            "Query_logger::general_log_write"
+        ],
+        "control_matched_count": 15,
+        "matched_count": 19
+    }
+]

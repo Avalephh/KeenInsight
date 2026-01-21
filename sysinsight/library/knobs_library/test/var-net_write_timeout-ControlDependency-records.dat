@@ -1,0 +1,24 @@
+Global Variable: System_variables.40
+Explicit Data Flow (11):
+  Instruction: %22 = load i64, i64* %net_write_timeout, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:719:22 | Function: login_connection
+  Instruction: invoke void %24(%class.Protocol_classic* %call25, i64 %22)
+          to label %invoke.cont29 unwind label %lpad, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:718:32 | Function: login_connection
+  Instruction: %5 = load i64, i64* %net_write_timeout, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3227:45 | Function: fix_net_write_timeout
+  Instruction: %conv = trunc i64 %5 to i32, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3227:30 | Function: fix_net_write_timeout
+  Instruction: call void @_Z24my_net_set_write_timeoutP3NETj(%struct.NET* %call4, i32 %conv), !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:3226:5 | Function: fix_net_write_timeout
+  Instruction: %7 = load i64, i64* %net_write_timeout6, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:354:40 | Function: mysql_clone_connect
+  Instruction: %conv7 = trunc i64 %7 to i32, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:354:25 | Function: mysql_clone_connect
+  Instruction: store i32 %conv7, i32* %net_write_timeout, align 4, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:354:23 | Function: mysql_clone_connect
+  Instruction: %20 = load i64, i64* %net_write_timeout, align 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:674:43 | Function: mysql_clone_get_command
+  Instruction: %conv15 = trunc i64 %20 to i32, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:674:28 | Function: mysql_clone_get_command
+  Instruction: invoke void @_ZL17set_write_timeoutP3NETj(%struct.NET* %18, i32 %conv15)
+          to label %invoke.cont16 unwind label %lpad, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc:674:5 | Function: mysql_clone_get_command
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

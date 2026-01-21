@@ -1,0 +1,18 @@
+[
+    {
+        "knob_name": "srv_fast_shutdown",
+        "data_matched_functions": [
+            "Clone_persist_gtid::periodic_write",
+            "srv_purge_coordinator_thread"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "trx_purge",
+            "Clone_persist_gtid::flush_gtids",
+            "os_event_set",
+            "srv_release_threads"
+        ],
+        "control_matched_count": 4,
+        "matched_count": 6
+    }
+]

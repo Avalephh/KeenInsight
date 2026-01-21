@@ -1,0 +1,67 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: MYSQL_BIN_LOG::Binlog_ofile::open_existing
+static std::unique_ptr<Binlog_ofile> open_existing(
+#ifdef HAVE_PSI_INTERFACE
+      PSI_file_key log_file_key,
+#endif
+      const char *binlog_name, myf flags) {
+    DBUG_TRACE;
+    std::unique_ptr<Rpl_encryption_header> header;
+    unsigned char magic[BINLOG_MAGIC_SIZE];
+
+    /* Open a simple istream to read the magic from the file */
+    IO_CACHE_istream istream;
+    if (istream.open(key_file_binlog, key_file_binlog_cache, binlog_name,
+                     MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size))
+      return nullptr;
+    if (istream.read(magic, BINLOG_MAGIC_SIZE) != BINLOG_MAGIC_SIZE)
+      return nullptr;
+
+    assert(Rpl_encryption_header::ENCRYPTION_MAGIC_SIZE == BINLOG_MAGIC_SIZE);
+    /* Identify the file type by the magic to get the encryption header */
+    if (memcmp(magic, Rpl_encryption_header::ENCRYPTION_MAGIC,
+               BINLOG_MAGIC_SIZE) == 0) {
+      header = Rpl_encryption_header::get_header(&istream);
+      if (header == nullptr) return nullptr;
+    } else if (memcmp(magic, BINLOG_MAGIC, BINLOG_MAGIC_SIZE) != 0) {
+      return nullptr;
+    }
+
+    /* Open the binlog_ofile */
+    std::unique_ptr<Binlog_ofile> ret_ofile(new Binlog_ofile);
+    if (ret_ofile->open(
+#ifdef HAVE_PSI_INTERFACE
+            log_file_key,
+#endif
+            binlog_name, flags, true)) {
+      return nullptr;
+    }
+
+    if (header != nullptr) {
+      /* Add the encryption stream on top of IO_CACHE */
+      std::unique_ptr<Binlog_encryption_ostream> encrypted_ostream(
+          new Binlog_encryption_ostream);
+      ret_ofile->m_encrypted_header_size = header->get_header_size();
+      encrypted_ostream->open(std::move(ret_ofile->m_pipeline_head),
+                              std::move(header));
+      ret_ofile->m_pipeline_head = std::move(encrypted_ostream);
+      ret_ofile->set_encrypted();
+    }
+    return ret_ofile;
+  }
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog_istream.cc
+Function: Binlog_ifile::open_file
+std::unique_ptr<Basic_seekable_istream> Binlog_ifile::open_file(
+    const char *file_name) {
+  IO_CACHE_istream *ifile = new IO_CACHE_istream;
+  if (ifile->open(key_file_binlog, key_file_binlog_cache, file_name,
+                  MYF(MY_WME | MY_DONT_CHECK_FILESIZE), rpl_read_size)) {
+    delete ifile;
+    return nullptr;
+  }
+  return std::unique_ptr<Basic_seekable_istream>(ifile);
+}
+

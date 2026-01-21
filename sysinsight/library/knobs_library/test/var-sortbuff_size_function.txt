@@ -1,0 +1,575 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/range_optimizer.cc
+Function: get_best_disjunct_quick
+  Helper function for get_best_disjunct_quick(), dealing with the case of
+  creating a ROR union. Returns nullptr if either an error occurred, or if the
+  ROR union was found to be more expensive than read_cost (which is presumably
+  the cost for the index merge plan).
+ */
+static AccessPath *get_ror_union_path(
+    THD *thd, RANGE_OPT_PARAM *param, TABLE *table,
+    bool index_merge_intersect_allowed, const MY_BITMAP *needed_fields,
+    SEL_IMERGE *imerge, const double read_cost, bool force_index_merge,
+    Bounds_checked_array<AccessPath *> roru_read_plans,
+    AccessPath **range_scans, Opt_trace_object *trace_best_disjunct) {
+  double roru_index_cost = 0.0;
+  ha_rows roru_total_records = 0;
+
+  /* Find 'best' ROR scan for each of trees in disjunction */
+  double roru_intersect_part = 1.0;
+  {
+    Opt_trace_context *const trace = &thd->opt_trace;
+    Opt_trace_array trace_analyze_ror(trace, "analyzing_roworder_scans");
+    AccessPath **cur_child = range_scans;
+    AccessPath **cur_roru_plan = &roru_read_plans[0];
+    for (auto tree_it = imerge->trees.begin(); tree_it != imerge->trees.end();
+         tree_it++, cur_child++, cur_roru_plan++) {
+      Opt_trace_object path(trace);
+      if (unlikely(trace->is_started()))
+        trace_basic_info(thd, *cur_child, param, &path);
+
+      const auto &child_param = (*cur_child)->index_range_scan();
+
+      /*
+        Assume the best ROR scan is the one that has cheapest
+        full-row-retrieval scan cost.
+        Also accumulate index_only scan costs as we'll need them to
+        calculate overall index_intersection cost.
+      */
+      double scan_cost = 0.0;
+      if (child_param.can_be_used_for_ror) {
+        /* Ok, we have index_only cost, now get full rows scan cost */
+        scan_cost = table->file
+                        ->read_cost(child_param.index, 1,
+                                    (*cur_child)->num_output_rows())
+                        .total_cost();
+        scan_cost += table->cost_model()->row_evaluate_cost(
+            (*cur_child)->num_output_rows());
+      } else
+        scan_cost = read_cost;
+
+      AccessPath *prev_plan = *cur_child;
+      if (!(*cur_roru_plan = get_best_ror_intersect(
+                thd, param, table, index_merge_intersect_allowed, *tree_it,
+                needed_fields, scan_cost,
+                /*force_index_merge_result=*/false, /*reuse_handler=*/false))) {
+        if (child_param.can_be_used_for_ror)
+          *cur_roru_plan = prev_plan;
+        else
+          return nullptr;
+      }
+      roru_index_cost += (*cur_roru_plan)->cost;
+      roru_total_records += (*cur_roru_plan)->num_output_rows();
+      roru_intersect_part *=
+          (*cur_roru_plan)->num_output_rows() / table->file->stats.records;
+    }
+  }
+
+  /*
+    rows to retrieve=
+      SUM(rows_in_scan_i) - table_rows * PROD(rows_in_scan_i / table_rows).
+    This is valid because index_merge construction guarantees that conditions
+    in disjunction do not share key parts.
+  */
+  roru_total_records -=
+      static_cast<ha_rows>(roru_intersect_part * table->file->stats.records);
+  /* ok, got a ROR read plan for each of the disjuncts
+    Calculate cost:
+    cost(index_union_scan(scan_1, ... scan_n)) =
+      SUM_i(cost_of_index_only_scan(scan_i)) +
+      queue_use_cost(rowid_len, n) +
+      cost_of_row_retrieval
+    See get_merge_buffers_cost function for queue_use_cost formula derivation.
+  */
+  double roru_total_cost;
+  {
+    JOIN *join = param->query_block->join;
+    const bool is_interrupted = join && join->tables != 1;
+    Cost_estimate sweep_cost;
+    get_sweep_read_cost(table, roru_total_records, is_interrupted, &sweep_cost);
+    roru_total_cost = sweep_cost.total_cost();
+    roru_total_cost += roru_index_cost;
+    roru_total_cost += table->cost_model()->key_compare_cost(
+        rows2double(roru_total_records) * std::log2(roru_read_plans.size()));
+  }
+
+  trace_best_disjunct->add("index_roworder_union_cost", roru_total_cost)
+      .add("members", roru_read_plans.size());
+  if (roru_total_cost < read_cost || force_index_merge) {
+    trace_best_disjunct->add("chosen", true);
+
+    auto *children = new (param->return_mem_root)
+        Mem_root_array<AccessPath *>(param->return_mem_root);
+    children->reserve(roru_read_plans.size());
+    for (AccessPath *child : roru_read_plans) {
+      // NOTE: This overwrites parameters in paths that may be used
+      // for something else, but since we've already decided that
+      // we are to choose a ROR union, it doesn't matter. If we are
+      // to keep multiple candidates around, we need to clone the
+      // AccessPaths here.
+      switch (child->type) {
+        case AccessPath::INDEX_RANGE_SCAN:
+          child->index_range_scan().need_rows_in_rowid_order = true;
+          break;
+        case AccessPath::ROWID_INTERSECTION:
+          child->rowid_intersection().need_rows_in_rowid_order = true;
+          child->rowid_intersection().retrieve_full_rows = false;
+          break;
+        default:
+          assert(false);
+      }
+      children->push_back(child);
+    }
+    AccessPath *path = new (param->return_mem_root) AccessPath;
+    path->type = AccessPath::ROWID_UNION;
+    path->cost = roru_total_cost;
+    path->set_num_output_rows(roru_total_records);
+    path->rowid_union().table = table;
+    path->rowid_union().children = children;
+    path->rowid_union().forced_by_hint = force_index_merge;
+    return path;
+  }
+  return nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/filesort.cc
+Function: filesort
+bool filesort(THD *thd, Filesort *filesort, RowIterator *source_iterator,
+              table_map tables_to_get_rowid_for, ha_rows num_rows_estimate,
+              Filesort_info *fs_info, Sort_result *sort_result,
+              ha_rows *found_rows) {
+  int error;
+  ulong memory_available = thd->variables.sortbuff_size;
+  ha_rows num_rows_found = HA_POS_ERROR;
+  IO_CACHE tempfile;    // Temporary file for storing intermediate results.
+  IO_CACHE chunk_file;  // For saving Merge_chunk structs.
+  IO_CACHE *outfile;    // Contains the final, sorted result.
+  Sort_param *param = &filesort->m_sort_param;
+  ha_rows max_rows = filesort->limit;
+  uint s_length = 0;
+
+  DBUG_TRACE;
+
+  if (!(s_length = filesort->sort_order_length()))
+    return true; /* purecov: inspected */
+
+  DEBUG_SYNC(thd, "filesort_start");
+
+  assert(sort_result->sorted_result == nullptr);
+  sort_result->sorted_result_in_fsbuf = false;
+
+  outfile = sort_result->io_cache;
+  my_b_clear(&tempfile);
+  my_b_clear(&chunk_file);
+  error = 1;
+
+  if (!param->using_addon_fields()) {
+    for (TABLE *table : filesort->tables) {
+      if (table->pos_in_table_list == nullptr ||
+          (tables_to_get_rowid_for & table->pos_in_table_list->map())) {
+        table->prepare_for_position();
+      }
+    }
+  }
+
+  // Make sure the source iterator is initialized before init_for_filesort(),
+  // since table->file (and in particular, ref_length) may not be initialized
+  // before that.
+  DBUG_EXECUTE_IF("bug14365043_1", DBUG_SET("+d,ha_rnd_init_fail"););
+  if (source_iterator->Init()) {
+    return true;
+  }
+
+  /*
+    We need a nameless wrapper, since we may be inside the "steps" of
+    "join_execution".
+  */
+  Opt_trace_context *const trace = &thd->opt_trace;
+  Opt_trace_object trace_wrapper(trace);
+  if (filesort->tables.size() == 1) {
+    trace_wrapper.add_alnum("sorting_table", filesort->tables[0]->alias);
+  }
+
+  trace_filesort_information(trace, filesort->sortorder, s_length);
+
+  param->init_for_filesort(filesort, make_array(filesort->sortorder, s_length),
+                           sortlength(thd, filesort->sortorder, s_length),
+                           filesort->tables, max_rows,
+                           filesort->m_remove_duplicates);
+
+  fs_info->addon_fields = param->addon_fields;
+
+  thd->inc_status_sort_scan();
+
+  Bounded_queue<uchar *, uchar *, Sort_param, Mem_compare_queue_key> pq(
+      param->max_record_length(),
+      (Malloc_allocator<uchar *>(key_memory_Filesort_info_record_pointers)));
+
+  // We would have liked to do this ahead-of-time so that we can show it
+  // in EXPLAIN. However, we don't know the table->file->ref_length before
+  // sorting time, which makes it hard to make the decision if we're row IDs.
+  // (If we sort rows, we would know, but it's not much use knowing it
+  // ahead-of-time _sometimes_.)
+  //
+  // However, do note this cannot change the addon fields status,
+  // so that we at least know that when checking whether we can skip
+  // in-between temporary tables (StreamingIterator).
+  if (check_if_pq_applicable(trace, param, fs_info, num_rows_estimate,
+                             memory_available)) {
+    DBUG_PRINT("info", ("filesort PQ is applicable"));
+    /*
+      For PQ queries (with limit) we know exactly how many pointers/records
+      we have in the buffer, so to simplify things, we initialize
+      all pointers here. (We cannot pack fields anyways, so there is no
+      point in doing incremental allocation).
+     */
+    if (fs_info->preallocate_records(param->max_rows_per_buffer)) {
+      my_error(ER_OUT_OF_SORTMEMORY, ME_FATALERROR);
+      LogErr(ERROR_LEVEL, ER_SERVER_OUT_OF_SORTMEMORY);
+      goto err;
+    }
+
+    if (pq.init(param->max_rows, param, fs_info->get_sort_keys())) {
+      /*
+       If we fail to init pq, we have to give up:
+       out of memory means my_malloc() will call my_error().
+      */
+      DBUG_PRINT("info", ("failed to allocate PQ"));
+      fs_info->free_sort_buffer();
+      assert(thd->is_error());
+      goto err;
+    }
+    filesort->using_pq = true;
+    param->using_pq = true;
+    param->m_addon_fields_status = Addon_fields_status::using_priority_queue;
+  } else {
+    DBUG_PRINT("info", ("filesort PQ is not applicable"));
+    filesort->using_pq = false;
+    param->using_pq = false;
+
+    /*
+      When sorting using priority queue, we cannot use packed addons.
+      Without PQ, we can try.
+    */
+    param->try_to_pack_addons();
+
+    /*
+      NOTE: param->max_rows_per_buffer is merely informative (for optimizer
+      trace) in this case, not actually used.
+    */
+    if (num_rows_estimate < MERGEBUFF2) num_rows_estimate = MERGEBUFF2;
+    ha_rows keys =
+        memory_available / (param->max_record_length() + sizeof(char *));
+    param->max_rows_per_buffer =
+        min(num_rows_estimate > 0 ? num_rows_estimate : 1, keys);
+
+    fs_info->set_max_size(memory_available, param->max_record_length());
+  }
+
+  size_t longest_key, longest_addons;
+  longest_addons = 0;
+
+  // New scope, because subquery execution must be traced within an array.
+  {
+    Opt_trace_array ota(trace, "filesort_execution");
+    num_rows_found = read_all_rows(
+        thd, param, filesort->tables, tables_to_get_rowid_for, fs_info,
+        &chunk_file, &tempfile, param->using_pq ? &pq : nullptr,
+        source_iterator, found_rows, &longest_key, &longest_addons);
+    if (num_rows_found == HA_POS_ERROR) goto err;
+  }
+
+  size_t num_chunks, num_initial_chunks;
+  if (my_b_inited(&chunk_file)) {
+    num_chunks =
+        static_cast<size_t>(my_b_tell(&chunk_file)) / sizeof(Merge_chunk);
+  } else {
+    num_chunks = 0;
+  }
+
+  num_initial_chunks = num_chunks;
+
+  if (num_chunks == 0)  // The whole set is in memory
+  {
+    ha_rows rows_in_chunk =
+        param->using_pq ? pq.num_elements() : num_rows_found;
+    if (save_index(param, rows_in_chunk, fs_info, sort_result)) goto err;
+  } else {
+    // If deduplicating, we'll need to remember the previous key somehow.
+    if (filesort->m_remove_duplicates) {
+      param->m_last_key_seen =
+          static_cast<uchar *>(thd->mem_root->Alloc(longest_key));
+    }
+
+    // We will need an extra buffer in SortFileIndirectIterator
+    if (fs_info->addon_fields != nullptr &&
+        !(fs_info->addon_fields->allocate_addon_buf(longest_addons)))
+      goto err; /* purecov: inspected */
+
+    fs_info->read_chunk_descriptors(&chunk_file, num_chunks);
+    if (fs_info->merge_chunks.is_null()) goto err; /* purecov: inspected */
+
+    close_cached_file(&chunk_file);
+
+    /* Open cached file if it isn't open */
+    if (!my_b_inited(outfile) &&
+        open_cached_file(outfile, mysql_tmpdir, TEMP_PREFIX, READ_RECORD_BUFFER,
+                         MYF(MY_WME)))
+      goto err;
+    if (reinit_io_cache(outfile, WRITE_CACHE, 0L, false, false)) goto err;
+
+    param->max_rows_per_buffer = static_cast<uint>(
+        fs_info->max_size_in_bytes() / param->max_record_length());
+
+    Bounds_checked_array<uchar> merge_buf = fs_info->get_contiguous_buffer();
+    if (merge_buf.array() == nullptr) {
+      my_error(ER_OUT_OF_SORTMEMORY, ME_FATALERROR);
+      LogErr(ERROR_LEVEL, ER_SERVER_OUT_OF_SORTMEMORY);
+      goto err;
+    }
+    if (merge_many_buff(thd, param, merge_buf, fs_info->merge_chunks,
+                        &num_chunks, &tempfile))
+      goto err;
+    if (flush_io_cache(&tempfile) ||
+        reinit_io_cache(&tempfile, READ_CACHE, 0L, false, false))
+      goto err;
+    if (merge_index(
+            thd, param, merge_buf,
+            Merge_chunk_array(fs_info->merge_chunks.begin(), num_chunks),
+            &tempfile, outfile))
+      goto err;
+
+    sort_result->found_records = num_rows_found;
+  }
+
+  if (trace->is_started()) {
+    char buffer[100];
+    String sort_mode(buffer, sizeof(buffer), &my_charset_bin);
+    sort_mode.length(0);
+    sort_mode.append("<");
+    if (param->using_varlen_keys())
+      sort_mode.append("varlen_sort_key");
+    else
+      sort_mode.append("fixed_sort_key");
+    sort_mode.append(", ");
+    sort_mode.append(param->using_packed_addons()
+                         ? "packed_additional_fields"
+                         : param->using_addon_fields() ? "additional_fields"
+                                                       : "rowid");
+    sort_mode.append(">");
+
+    const char *algo_text[] = {"none", "std::sort", "std::stable_sort"};
+
+    Opt_trace_object filesort_summary(trace, "filesort_summary");
+    filesort_summary.add("memory_available", memory_available)
+        .add("key_size", param->max_compare_length())
+        .add("row_size", param->max_record_length())
+        .add("max_rows_per_buffer", param->max_rows_per_buffer)
+        .add("num_rows_estimate", num_rows_estimate)
+        .add("num_rows_found", num_rows_found)
+        .add("num_initial_chunks_spilled_to_disk", num_initial_chunks)
+        .add("peak_memory_used", fs_info->peak_memory_used())
+        .add_alnum("sort_algorithm", algo_text[param->m_sort_algorithm]);
+    if (!param->using_packed_addons())
+      filesort_summary.add_alnum(
+          "unpacked_addon_fields",
+          addon_fields_text(param->m_addon_fields_status));
+    filesort_summary.add_alnum("sort_mode", sort_mode.c_ptr());
+  }
+
+  if (num_rows_found > param->max_rows) {
+    // If read_all_rows() produced more results than the query LIMIT.
+    num_rows_found = param->max_rows;
+  }
+  error = 0;
+
+err:
+  if (!filesort->keep_buffers) {
+    if (!sort_result->sorted_result_in_fsbuf) fs_info->free_sort_buffer();
+    my_free(fs_info->merge_chunks.array());
+    fs_info->merge_chunks = Merge_chunk_array(nullptr, 0);
+  }
+  close_cached_file(&tempfile);
+  close_cached_file(&chunk_file);
+  if (my_b_inited(outfile)) {
+    if (flush_io_cache(outfile)) error = 1;
+    {
+      my_off_t save_pos = outfile->pos_in_file;
+      /* For following reads */
+      if (reinit_io_cache(outfile, READ_CACHE, 0L, false, false)) error = 1;
+      outfile->end_of_file = save_pos;
+    }
+  }
+  if (error) {
+    assert(thd->is_error() || thd->killed);
+  } else
+    thd->inc_status_sort_rows(num_rows_found);
+
+  return error;
+} /* filesort */
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_merge.cc
+Function: IndexMergeIterator::Init
+bool IndexMergeIterator::Init() {
+  empty_record(table());
+
+  handler *file = table()->file;
+  DBUG_TRACE;
+
+  /* We're going to just read rowids. */
+  table()->set_keyread(true);
+  table()->prepare_for_position();
+
+  DBUG_EXECUTE_IF("simulate_bug13919180", {
+    my_error(ER_UNKNOWN_ERROR, MYF(0));
+    return true;
+  });
+
+  size_t sort_buffer_size = thd()->variables.sortbuff_size;
+#ifndef NDEBUG
+  if (DBUG_EVALUATE_IF("sortbuff_size_256", 1, 0)) sort_buffer_size = 256;
+#endif /* NDEBUG */
+
+  if (unique == nullptr) {
+    DBUG_EXECUTE_IF("index_merge_may_not_create_a_Unique", DBUG_ABORT(););
+    DBUG_EXECUTE_IF("only_one_Unique_may_be_created",
+                    DBUG_SET("+d,index_merge_may_not_create_a_Unique"););
+    unique.reset(new (mem_root) Unique(refpos_order_cmp, (void *)file,
+                                       file->ref_length, sort_buffer_size));
+    if (unique == nullptr) {
+      return true;
+    }
+  } else {
+    unique->reset();
+    table()->unique_result.sorted_result.reset();
+    assert(!table()->unique_result.sorted_result_in_fsbuf);
+    table()->unique_result.sorted_result_in_fsbuf = false;
+
+    if (table()->unique_result.io_cache) {
+      close_cached_file(table()->unique_result.io_cache);
+      my_free(table()->unique_result.io_cache);
+      table()->unique_result.io_cache = nullptr;
+    }
+  }
+
+  assert(file->ref_length == unique->get_size());
+  assert(sort_buffer_size == unique->get_max_in_memory_size());
+
+  {
+    const Key_map covering_keys_save = table()->covering_keys;
+    const bool no_keyread_save = table()->no_keyread;
+    auto reset_keys =
+        create_scope_guard([covering_keys_save, no_keyread_save, this] {
+          table()->covering_keys = covering_keys_save;
+          table()->no_keyread = no_keyread_save;
+        });
+    table()->no_keyread = false;
+    for (unique_ptr_destroy_only<RowIterator> &child : m_children) {
+      // Init() might reset table->key_read to false. Take care to let
+      // it know that index merge needs to read only index entries.
+      IndexRangeScanIterator *range_scan_it =
+          down_cast<IndexRangeScanIterator *>(child->real_iterator());
+      table()->covering_keys.set_bit(range_scan_it->index);
+      if (child->Init()) return true;
+      // Make sure that index only access is used.
+      assert(table()->key_read == true);
+
+      for (;;) {
+        int result = child->Read();
+        if (result == -1) {
+          break;  // EOF.
+        } else if (result != 0 || thd()->killed) {
+          return true;
+        }
+
+        /* skip row if it will be retrieved by clustered PK scan */
+        if (pk_quick_select && down_cast<IndexRangeScanIterator *>(
+                                   pk_quick_select.get()->real_iterator())
+                                   ->row_in_ranges()) {
+          continue;
+        }
+
+        handler *child_file = range_scan_it->file;
+        child_file->position(table()->record[0]);
+        if (unique->unique_add(child_file->ref)) {
+          return true;
+        }
+      }
+    }
+  }
+
+  /*
+    Ok all rowids are in the Unique now. The next call will initialize
+    table()->sort structure so it can be used to iterate through the rowids
+    sequence.
+  */
+  if (unique->get(table())) {
+    return true;
+  }
+
+  doing_pk_scan = false;
+  /* index_merge currently doesn't support "using index" at all */
+  table()->set_keyread(false);
+  read_record.reset();  // Clear out any previous iterator.
+  read_record = init_table_iterator(thd(), table(),
+                                    /*ignore_not_found_rows=*/false,
+                                    /*count_examined_rows=*/false);
+  if (read_record == nullptr) return true;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_delete.cc
+Function: DeleteRowsIterator::Init
+bool DeleteRowsIterator::Init() {
+  if (CheckSqlSafeUpdate(thd(), m_join)) {
+    return true;
+  }
+
+  if (m_source->Init()) {
+    return true;
+  }
+
+  for (Table_ref *tr = m_join->query_block->leaf_tables; tr != nullptr;
+       tr = tr->next_leaf) {
+    TABLE *const table = tr->table;
+    const uint tableno = tr->tableno();
+    if (!IsBitSet(tableno, m_tables_to_delete_from)) continue;
+
+    // We are going to delete from this table
+    if (IsBitSet(tableno, m_tables_with_after_triggers)) {
+      /*
+        The table has AFTER DELETE triggers that might access the subject
+        table and therefore might need delete to be done immediately.
+        So we turn-off the batching.
+      */
+      (void)table->file->ha_extra(HA_EXTRA_DELETE_CANNOT_BATCH);
+    }
+    if (thd()->lex->is_ignore()) {
+      table->file->ha_extra(HA_EXTRA_IGNORE_DUP_KEY);
+    }
+    if (thd()->is_error()) return true;
+
+    // Set up a Unique object for each table whose delete operation is deferred.
+    if (!IsBitSet(tableno, m_immediate_tables)) {
+      auto tempfile = make_unique_destroy_only<Unique>(
+          thd()->mem_root, refpos_order_cmp, table->file,
+          table->file->ref_length, thd()->variables.sortbuff_size);
+      if (tempfile == nullptr || m_tempfiles.push_back(std::move(tempfile)) ||
+          m_delayed_tables.push_back(table)) {
+        return true; /* purecov: inspected */
+      }
+    }
+  }
+
+  assert(!thd()->is_error());
+
+  return false;
+}
+
+

@@ -1,0 +1,358 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc
+Function: recv_sys_resize_buf
+static bool recv_sys_resize_buf() {
+  ut_ad(recv_sys->buf_len <= srv_log_buffer_size);
+
+#ifndef UNIV_HOTBACKUP
+  /* If the buffer cannot be extended further, return false. */
+  if (recv_sys->buf_len == srv_log_buffer_size) {
+    ib::error(ER_IB_MSG_723, srv_log_buffer_size);
+    return false;
+  }
+#else  /* !UNIV_HOTBACKUP */
+  if ((recv_sys->buf_len >= srv_log_buffer_size) ||
+      (recv_sys->len >= srv_log_buffer_size)) {
+    ib::fatal(UT_LOCATION_HERE, ER_IB_ERR_LOG_PARSING_BUFFER_OVERFLOW)
+        << "Log parsing buffer overflow. Log parse failed. "
+        << "Please increase --limit-memory above "
+        << srv_log_buffer_size / 1024 / 1024 << " (MB)";
+  }
+#endif /* !UNIV_HOTBACKUP */
+
+  /* Extend the buffer by double the current size with the resulting
+  size not more than srv_log_buffer_size. */
+  recv_sys->buf_len = ((recv_sys->buf_len * 2) >= srv_log_buffer_size)
+                          ? srv_log_buffer_size
+                          : recv_sys->buf_len * 2;
+
+  /* Resize the buffer to the new size. */
+  recv_sys->buf = static_cast<byte *>(ut::realloc_withkey(
+      UT_NEW_THIS_FILE_PSI_KEY, recv_sys->buf, recv_sys->buf_len));
+
+  ut_ad(recv_sys->buf != nullptr);
+
+  /* Return error and fail the recovery if not enough memory available */
+  if (recv_sys->buf == nullptr) {
+    ib::error(ER_IB_MSG_740);
+    return false;
+  }
+
+  ib::info(ER_IB_MSG_739, recv_sys->buf_len);
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc
+Function: recv_sys_add_to_parsing_buf
+static bool recv_sys_add_to_parsing_buf(const byte *log_block,
+                                        lsn_t scanned_lsn) {
+  ut_ad(scanned_lsn >= recv_sys->scanned_lsn);
+
+  if (!recv_sys->parse_start_lsn) {
+    /* Cannot start parsing yet because no start point for
+    it found */
+
+    return false;
+  }
+
+  ulint more_len;
+  ulint data_len = log_block_get_data_len(log_block);
+
+  if (recv_sys->parse_start_lsn >= scanned_lsn) {
+    return false;
+
+  } else if (recv_sys->scanned_lsn >= scanned_lsn) {
+    return false;
+
+  } else if (recv_sys->parse_start_lsn > recv_sys->scanned_lsn) {
+    more_len = (ulint)(scanned_lsn - recv_sys->parse_start_lsn);
+
+  } else {
+    more_len = (ulint)(scanned_lsn - recv_sys->scanned_lsn);
+  }
+
+  if (more_len == 0) {
+    return false;
+  }
+
+  ut_ad(data_len >= more_len);
+
+  ulint start_offset = data_len - more_len;
+
+  if (start_offset < LOG_BLOCK_HDR_SIZE) {
+    start_offset = LOG_BLOCK_HDR_SIZE;
+  }
+
+  ulint end_offset = data_len;
+
+  if (end_offset > OS_FILE_LOG_BLOCK_SIZE - LOG_BLOCK_TRL_SIZE) {
+    end_offset = OS_FILE_LOG_BLOCK_SIZE - LOG_BLOCK_TRL_SIZE;
+  }
+
+  ut_ad(start_offset <= end_offset);
+
+  if (start_offset < end_offset) {
+    memcpy(recv_sys->buf + recv_sys->len, log_block + start_offset,
+           end_offset - start_offset);
+
+    recv_sys->len += end_offset - start_offset;
+
+    ut_a(recv_sys->len <= recv_sys->buf_len);
+  }
+
+  return true;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0recv.cc
+Function: recv_sys_init
+void recv_sys_init() {
+  if (recv_sys->spaces != nullptr) {
+    return;
+  }
+
+  mutex_enter(&recv_sys->mutex);
+
+#ifndef UNIV_HOTBACKUP
+  if (!srv_read_only_mode) {
+    recv_sys->flush_start = os_event_create();
+    recv_sys->flush_end = os_event_create();
+  }
+#else  /* !UNIV_HOTBACKUP */
+  recv_is_from_backup = true;
+  recv_sys->apply_file_operations = false;
+#endif /* !UNIV_HOTBACKUP */
+
+  recv_sys->buf_len =
+      std::min<unsigned long>(RECV_PARSING_BUF_SIZE, srv_log_buffer_size);
+  recv_sys->buf = static_cast<byte *>(
+      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, recv_sys->buf_len));
+
+  recv_sys->len = 0;
+  recv_sys->recovered_offset = 0;
+
+  using Spaces = recv_sys_t::Spaces;
+
+  recv_sys->spaces = ut::new_withkey<Spaces>(
+      ut::make_psi_memory_key(mem_log_recv_space_hash_key));
+
+  recv_sys->n_addrs = 0;
+
+  recv_sys->apply_log_recs = false;
+  recv_sys->apply_batch_on = false;
+  recv_sys->is_cloned_db = false;
+
+  recv_sys->found_corrupt_log = false;
+  recv_sys->found_corrupt_fs = false;
+
+  recv_max_page_lsn = 0;
+
+  recv_sys->dblwr =
+      ut::new_withkey<dblwr::recv::DBLWR>(UT_NEW_THIS_FILE_PSI_KEY);
+
+  new (&recv_sys->deleted) recv_sys_t::Missing_Ids();
+
+  new (&recv_sys->missing_ids) recv_sys_t::Missing_Ids();
+
+  new (&recv_sys->saved_recs) recv_sys_t::Mlog_records();
+
+  recv_sys->saved_recs.resize(recv_sys_t::MAX_SAVED_MLOG_RECS);
+
+  recv_sys->metadata_recover =
+      ut::new_withkey<MetadataRecover>(UT_NEW_THIS_FILE_PSI_KEY);
+
+  mutex_exit(&recv_sys->mutex);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_allocate_buffer
+static void log_allocate_buffer(log_t &log) {
+  ut_a(srv_log_buffer_size >= INNODB_LOG_BUFFER_SIZE_MIN);
+  ut_a(srv_log_buffer_size <= INNODB_LOG_BUFFER_SIZE_MAX);
+  ut_a(srv_log_buffer_size >= 4 * UNIV_PAGE_SIZE);
+
+#ifdef UNIV_PFS_MEMORY
+  log.buf.alloc_withkey(ut::make_psi_memory_key(log_buffer_memory_key),
+                        ut::Count{srv_log_buffer_size});
+#else
+  log.buf.alloc_withkey(ut::make_psi_memory_key(PSI_NOT_INSTRUMENTED),
+                        ut::Count{srv_log_buffer_size});
+#endif
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_calc_buf_size
+static void log_calc_buf_size(log_t &log) {
+  ut_a(srv_log_buffer_size >= INNODB_LOG_BUFFER_SIZE_MIN);
+  ut_a(srv_log_buffer_size <= INNODB_LOG_BUFFER_SIZE_MAX);
+
+  log.buf_size = srv_log_buffer_size;
+
+  /* The following update has to be the last operation during resize
+  procedure of log buffer. That's because since this moment, possibly
+  new concurrent writes for higher sn will start (which were waiting
+  for free space in the log buffer). */
+
+  log.buf_size_sn = log_translate_lsn_to_sn(log.buf_size);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_buffer_resize_low
+bool log_buffer_resize_low(log_t &log, size_t new_size, lsn_t end_lsn) {
+  ut_ad(log_checkpointer_mutex_own(log));
+  ut_ad(log_writer_mutex_own(log));
+
+  const lsn_t start_lsn =
+      ut_uint64_align_down(log.write_lsn.load(), OS_FILE_LOG_BLOCK_SIZE);
+
+  end_lsn = ut_uint64_align_up(end_lsn, OS_FILE_LOG_BLOCK_SIZE);
+
+  if (end_lsn == start_lsn) {
+    end_lsn += OS_FILE_LOG_BLOCK_SIZE;
+  }
+
+  ut_ad(end_lsn - start_lsn <= log.buf_size);
+
+  if (end_lsn - start_lsn > new_size) {
+    return false;
+  }
+
+  /* Save the contents. */
+  byte *tmp_buf = ut::new_arr_withkey<byte>(UT_NEW_THIS_FILE_PSI_KEY,
+                                            ut::Count(end_lsn - start_lsn));
+  for (auto i = start_lsn; i < end_lsn; i += OS_FILE_LOG_BLOCK_SIZE) {
+    std::memcpy(&tmp_buf[i - start_lsn], &log.buf[i % log.buf_size],
+                OS_FILE_LOG_BLOCK_SIZE);
+  }
+
+  /* Re-allocate log buffer. */
+  srv_log_buffer_size = static_cast<ulong>(new_size);
+  log_deallocate_buffer(log);
+  log_allocate_buffer(log);
+
+  /* Restore the contents. */
+  for (auto i = start_lsn; i < end_lsn; i += OS_FILE_LOG_BLOCK_SIZE) {
+    std::memcpy(&log.buf[i % new_size], &tmp_buf[i - start_lsn],
+                OS_FILE_LOG_BLOCK_SIZE);
+  }
+  ut::delete_arr(tmp_buf);
+
+  log_calc_buf_size(log);
+
+  log_update_buf_limit(log);
+
+  ut_a(srv_log_buffer_size == log.buf_size);
+
+  ib::info(ER_IB_MSG_1260) << "srv_log_buffer_size was extended to "
+                           << log.buf_size << ".";
+
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: Log_files_write_impl::copy_to_write_ahead_buffer
+static inline void copy_to_write_ahead_buffer(log_t &log, const byte *buffer,
+                                              size_t &size, lsn_t start_lsn) {
+  ut_a(size <= srv_log_write_ahead_size);
+
+  ut_a(buffer >= log.buf);
+  ut_a(buffer + size <= log.buf + log.buf_size);
+
+  byte *write_buf = log.write_ahead_buf;
+
+  log_sync_point("log_writer_before_copy_to_write_ahead_buffer");
+
+  std::memcpy(write_buf, buffer, size);
+
+  size_t completed_blocks_size;
+  byte *incomplete_block;
+  size_t incomplete_size;
+
+  completed_blocks_size = ut_uint64_align_down(size, OS_FILE_LOG_BLOCK_SIZE);
+
+  incomplete_block = write_buf + completed_blocks_size;
+
+  incomplete_size = size % OS_FILE_LOG_BLOCK_SIZE;
+
+  ut_a(incomplete_block + incomplete_size <=
+       write_buf + srv_log_write_ahead_size);
+
+  if (incomplete_size != 0) {
+    /* Prepare the incomplete (last) block. */
+    ut_a(incomplete_size >= LOG_BLOCK_HDR_SIZE);
+
+    const lsn_t block_lsn = start_lsn + completed_blocks_size;
+
+    Log_data_block_header block_header;
+    block_header.set_lsn(block_lsn);
+    block_header.m_data_len = incomplete_size;
+    block_header.m_first_rec_group =
+        log_block_get_first_rec_group(incomplete_block);
+    if (block_header.m_first_rec_group > incomplete_size) {
+      block_header.m_first_rec_group = 0;
+    }
+    log_data_block_header_serialize(block_header, incomplete_block);
+
+    std::memset(incomplete_block + incomplete_size, 0x00,
+                OS_FILE_LOG_BLOCK_SIZE - incomplete_size);
+
+    log_block_store_checksum(incomplete_block);
+
+    size = completed_blocks_size + OS_FILE_LOG_BLOCK_SIZE;
+  }
+
+  /* Since now, size is about completed blocks always. */
+  ut_a(size % OS_FILE_LOG_BLOCK_SIZE == 0);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_init_params
+are determined in innodb_init_params(). */
+
+static char *innobase_data_home_dir = nullptr;
+static char *innobase_data_file_path = nullptr;
+static char *innobase_temp_data_file_path = nullptr;
+static char *innobase_enable_monitor_counter = nullptr;
+static char *innobase_disable_monitor_counter = nullptr;
+static char *innobase_reset_monitor_counter = nullptr;
+static char *innobase_reset_all_monitor_counter = nullptr;
+static char *innobase_doublewrite_dir = nullptr;
+
+static ulong innodb_flush_method;
+
+/* This variable can be set in the server configure file, specifying
+stopword table to be used */
+static char *innobase_server_stopword_table = nullptr;
+
+/* Below we have boolean-valued start-up parameters, and their default
+values */
+
+static bool innobase_rollback_on_timeout = false;
+static bool innobase_create_status_file = false;
+bool innobase_stats_on_metadata = true;
+static bool innodb_optimize_fulltext_only = false;
+
+static char *innodb_version_str = (char *)INNODB_VERSION_STR;
+
+static Innodb_data_lock_inspector innodb_data_lock_inspector;
+
+/** Note we cannot use rec_format_enum because we do not allow
+COMPRESSED row format for innodb_default_row_format option. */
+enum default_row_format_enum {
+  DEFAULT_ROW_FORMAT_REDUNDANT = 0,
+  DEFAULT_ROW_FORMAT_COMPACT = 1,
+  DEFAULT_ROW_FORMAT_DYNAMIC = 2,
+};
+
+

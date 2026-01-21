@@ -1,0 +1,140 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: Thd_mem_cnt::alloc_cnt
+void Thd_mem_cnt::alloc_cnt(size_t size) {
+  mem_counter += size;
+  max_conn_mem = std::max(max_conn_mem, mem_counter);
+
+  if (!m_enabled) {
+    return;
+  }
+
+  assert(!opt_initialize && m_thd != nullptr);
+  assert(!m_thd->kill_immunizer || !m_thd->kill_immunizer->is_active() ||
+         !is_error_mode());
+  assert(m_thd->is_killable);
+
+#ifndef NDEBUG
+  if (is_error_mode() && fail_on_alloc(m_thd)) {
+    m_thd->is_mem_cnt_error_issued = true;
+    generate_error(ER_DA_CONN_LIMIT, m_thd->variables.conn_mem_limit,
+                   mem_counter);
+  }
+#endif
+
+  if (mem_counter > m_thd->variables.conn_mem_limit) {
+#ifndef NDEBUG
+    // Used for testing the entering to idle state
+    // after successful statement execution (see mem_cnt_common_debug.test).
+    if (!DBUG_EVALUATE_IF("mem_cnt_no_error_on_exec_session", 1, 0))
+#endif
+      (void)generate_error(ER_DA_CONN_LIMIT, m_thd->variables.conn_mem_limit,
+                           mem_counter);
+  }
+
+  if ((curr_mode & MEM_CNT_UPDATE_GLOBAL_COUNTER) &&
+      m_thd->variables.conn_global_mem_tracking &&
+      max_conn_mem > glob_mem_counter) {
+    const ulonglong curr_mem =
+        (max_conn_mem / m_thd->variables.conn_mem_chunk_size + 1) *
+        m_thd->variables.conn_mem_chunk_size;
+    assert(curr_mem > glob_mem_counter && curr_mem > mem_counter);
+    ulonglong delta = curr_mem - glob_mem_counter;
+    ulonglong global_conn_mem_counter_save;
+    ulonglong global_conn_mem_limit_save;
+    {
+      MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
+      global_conn_mem_counter += delta;
+      global_conn_mem_counter_save = global_conn_mem_counter;
+      global_conn_mem_limit_save = global_conn_mem_limit;
+    }
+    glob_mem_counter = curr_mem;
+    max_conn_mem = std::max(max_conn_mem, glob_mem_counter);
+    if (global_conn_mem_counter_save > global_conn_mem_limit_save) {
+#ifndef NDEBUG
+      // Used for testing the entering to idle state
+      // after successful statement execution (see mem_cnt_common_debug.test).
+      if (DBUG_EVALUATE_IF("mem_cnt_no_error_on_exec_global", 1, 0)) return;
+#endif
+      (void)generate_error(ER_DA_GLOBAL_CONN_LIMIT, global_conn_mem_limit_save,
+                           global_conn_mem_counter_save);
+    }
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: Thd_mem_cnt::flush
+void Thd_mem_cnt::flush() {
+  max_conn_mem = mem_counter = 0;
+  if (glob_mem_counter > 0) {
+    MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
+    assert(global_conn_mem_counter >= glob_mem_counter);
+    global_conn_mem_counter -= glob_mem_counter;
+  }
+  glob_mem_counter = 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: Thd_mem_cnt::reset
+int Thd_mem_cnt::reset() {
+  restore_mode();
+  max_conn_mem = mem_counter;
+  if (m_thd->variables.conn_global_mem_tracking &&
+      (curr_mode & MEM_CNT_UPDATE_GLOBAL_COUNTER)) {
+    ulonglong delta;
+    ulonglong global_conn_mem_counter_save;
+    ulonglong global_conn_mem_limit_save;
+    if (glob_mem_counter > mem_counter) {
+      delta = glob_mem_counter - mem_counter;
+      MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
+      assert(global_conn_mem_counter >= delta);
+      global_conn_mem_counter -= delta;
+      global_conn_mem_counter_save = global_conn_mem_counter;
+      global_conn_mem_limit_save = global_conn_mem_limit;
+    } else {
+      delta = mem_counter - glob_mem_counter;
+      MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
+      global_conn_mem_counter += delta;
+      global_conn_mem_counter_save = global_conn_mem_counter;
+      global_conn_mem_limit_save = global_conn_mem_limit;
+    }
+    glob_mem_counter = mem_counter;
+    if (is_connection_stage &&
+        (global_conn_mem_counter_save > global_conn_mem_limit_save))
+      return generate_error(ER_DA_GLOBAL_CONN_LIMIT, global_conn_mem_limit_save,
+                            global_conn_mem_counter_save);
+  }
+  if (is_connection_stage && (mem_counter > m_thd->variables.conn_mem_limit))
+    return generate_error(ER_DA_CONN_LIMIT, m_thd->variables.conn_mem_limit,
+                          mem_counter);
+  is_connection_stage = false;
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: show_global_mem_counter
+static int show_global_mem_counter(THD *, SHOW_VAR *var, char *buff) {
+  var->type = SHOW_LONGLONG;
+  var->value = buff;
+  MUTEX_LOCK(lock, &LOCK_global_conn_mem_limit);
+  *((longlong *)buff) = (longlong)global_conn_mem_counter;
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: Thd_mem_cnt::Thd_mem_cnt
+  Thd_mem_cnt() {}
+  ~Thd_mem_cnt() {
+    assert(!m_enabled);
+    assert(glob_mem_counter == 0);
+  }
+
+

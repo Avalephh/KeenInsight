@@ -1,0 +1,1472 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/srv0srv.h
+Function: PCT_IO
+static inline ulong PCT_IO(ulong p) {
+  return (ulong)(srv_io_capacity * ((double)(p) / 100.0));
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/ibuf/ibuf0ibuf.cc
+Function: ibuf_merge_in_background
+ulint ibuf_merge_in_background(bool full) {
+  ulint sum_bytes = 0;
+  ulint sum_pages = 0;
+  ulint n_pag2;
+  ulint n_pages;
+
+#if defined UNIV_DEBUG || defined UNIV_IBUF_DEBUG
+  if (srv_ibuf_disable_background_merge) {
+    return (0);
+  }
+#endif /* UNIV_DEBUG || UNIV_IBUF_DEBUG */
+
+  if (full) {
+    /* Caller has requested a full batch */
+    n_pages = PCT_IO(100);
+  } else {
+    /* By default we do a batch of 5% of the io_capacity */
+    n_pages = PCT_IO(5);
+
+    mutex_enter(&ibuf_mutex);
+
+    /* If the ibuf->size is more than half the max_size
+    then we make more aggressive contraction.
+    +1 is to avoid division by zero. */
+    if (ibuf->size > ibuf->max_size / 2) {
+      ulint diff = ibuf->size - ibuf->max_size / 2;
+      /* limits to around 100% value, for shrinking max_size case */
+      diff = std::min(diff, ibuf->max_size);
+      n_pages += PCT_IO((diff * 100) / (ibuf->max_size + 1));
+    }
+
+    mutex_exit(&ibuf_mutex);
+  }
+
+  while (sum_pages < n_pages) {
+    ulint n_bytes;
+
+    n_bytes = ibuf_merge(&n_pag2, false);
+
+    if (n_bytes == 0) {
+      return (sum_bytes);
+    }
+
+    sum_bytes += n_bytes;
+    sum_pages += n_pag2;
+  }
+
+  return (sum_bytes);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_init_params
+static int innodb_init_params() {
+  DBUG_TRACE;
+
+  static char current_dir[3];
+  char *default_path;
+
+  /* First calculate the default path for innodb_data_home_dir etc.,
+  in case the user has not given any value. */
+
+  /* It's better to use current lib, to keep paths short */
+  current_dir[0] = FN_CURLIB;
+  current_dir[1] = FN_LIBCHAR;
+  current_dir[2] = 0;
+  default_path = current_dir;
+
+  std::string mysqld_datadir{default_path};
+
+  MySQL_datadir_path = Fil_path{mysqld_datadir};
+
+  /* Validate, normalize and interpret the InnoDB start-up parameters. */
+
+  /* The default dir for data files is the datadir of MySQL */
+
+  srv_data_home =
+      (innobase_data_home_dir == nullptr || *innobase_data_home_dir == '\0')
+          ? default_path
+          : innobase_data_home_dir;
+  Fil_path::normalize(srv_data_home);
+
+  /* Validate the undo directory. */
+  if (srv_undo_dir == nullptr || srv_undo_dir[0] == 0) {
+    srv_undo_dir = default_path;
+  } else {
+    Fil_path::normalize(srv_undo_dir);
+  }
+
+  MySQL_undo_path = Fil_path{srv_undo_dir};
+
+  if (MySQL_undo_path.is_ancestor(default_path)) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_INNODB_UNDO_DIRECTORY_LOCATION);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  /* Validate the temp directory */
+  if (ibt::srv_temp_dir == nullptr) {
+    ibt::srv_temp_dir = default_path;
+  } else {
+    os_file_type_t type;
+    bool exists;
+    os_file_status(ibt::srv_temp_dir, &exists, &type);
+    if (!exists || type != OS_FILE_TYPE_DIR) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_DOESNT_EXIST)
+          << "Invalid innodb_temp_tablespaces_dir: " << ibt::srv_temp_dir
+          << ". Directory doesn't exist or not valid";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    Fil_path temp_dir(ibt::srv_temp_dir);
+    if (temp_dir.path().empty()) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_EMPTY)
+          << "Invalid innodb_temp_tablespaces dir: " << ibt::srv_temp_dir
+          << ". Path cannot be empty";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    if (strchr(ibt::srv_temp_dir, ';')) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_CONTAINS_SEMICOLON)
+          << "Invalid innodb_temp_tablespaces dir: " << ibt::srv_temp_dir
+          << ". Path cannot contain ;";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    if (MySQL_datadir_path.is_ancestor(
+            Fil_path::get_real_path(temp_dir.path()))) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_SUBDIR_OF_DATADIR)
+          << "Invalid innodb_temp_tablespaces_dir=" << ibt::srv_temp_dir
+          << ". This path should not be a subdirectory of the datadir.";
+      return HA_ERR_INITIALIZATION;
+    }
+  }
+
+  Fil_path::normalize(ibt::srv_temp_dir);
+
+  /* The default dir for log files is the datadir of MySQL */
+
+  if (srv_log_group_home_dir == nullptr) {
+    srv_log_group_home_dir = default_path;
+  }
+  Fil_path::normalize(srv_log_group_home_dir);
+
+  if (strchr(srv_log_group_home_dir, ';')) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_LOG_GROUP_HOME_DIR);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  if (strchr(srv_undo_dir, ';')) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_INNODB_UNDO_DIRECTORY);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  if (!is_filename_allowed(srv_buf_dump_filename, strlen(srv_buf_dump_filename),
+                           false)) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_ILLEGAL_COLON_IN_POOL);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  /* Check that the value of system variable innodb_page_size was
+  set correctly.  Its value was put into srv_page_size. If valid,
+  return the associated srv_page_size_shift. */
+  srv_page_size_shift = page_size_validate(srv_page_size);
+  if (!srv_page_size_shift) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_PAGE_SIZE, srv_page_size);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  ut_a(srv_log_buffer_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(srv_log_buffer_size > 0);
+
+  ut_a(srv_log_write_ahead_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(srv_log_write_ahead_size > 0);
+
+  assert(innodb_change_buffering <= IBUF_USE_ALL);
+
+  /* Check that interdependent parameters have sane values. */
+  if (srv_max_buf_pool_modified_pct < srv_max_dirty_pages_pct_lwm) {
+    log_errlog(WARNING_LEVEL, ER_INNODB_DIRTY_WATER_MARK_NOT_LOW,
+               srv_max_buf_pool_modified_pct);
+    srv_max_dirty_pages_pct_lwm = srv_max_buf_pool_modified_pct;
+  }
+
+  if (srv_max_io_capacity == SRV_MAX_IO_CAPACITY_DUMMY_DEFAULT) {
+    if (srv_io_capacity >= SRV_MAX_IO_CAPACITY_LIMIT / 2) {
+      /* Avoid overflow. */
+      srv_max_io_capacity = SRV_MAX_IO_CAPACITY_LIMIT;
+    } else {
+      /* The user has not set the value. We should
+      set it based on innodb_io_capacity. */
+      srv_max_io_capacity = std::max(2 * srv_io_capacity, 2000UL);
+    }
+
+  } else if (srv_max_io_capacity < srv_io_capacity) {
+    log_errlog(WARNING_LEVEL, ER_INNODB_IO_CAPACITY_EXCEEDS_MAX,
+               srv_max_io_capacity);
+    srv_io_capacity = srv_max_io_capacity;
+  }
+
+  if (UNIV_PAGE_SIZE_DEF != srv_page_size) {
+    ib::warn(ER_IB_MSG_538)
+        << "innodb-page-size has been changed from the"
+           " default value "
+        << UNIV_PAGE_SIZE_DEF << " to " << srv_page_size << ".";
+  }
+
+  if (srv_log_write_ahead_size > srv_page_size) {
+    srv_log_write_ahead_size = srv_page_size;
+  } else {
+    ulong srv_log_write_ahead_size_tmp = OS_FILE_LOG_BLOCK_SIZE;
+
+    while (srv_log_write_ahead_size_tmp < srv_log_write_ahead_size) {
+      srv_log_write_ahead_size_tmp = srv_log_write_ahead_size_tmp * 2;
+    }
+    if (srv_log_write_ahead_size_tmp != srv_log_write_ahead_size) {
+      srv_log_write_ahead_size = srv_log_write_ahead_size_tmp / 2;
+    }
+  }
+
+  srv_buf_pool_size = srv_buf_pool_curr_size;
+
+  innodb_log_checksums_func_update(srv_log_checksums);
+
+#ifdef HAVE_LINUX_LARGE_PAGES
+  if ((os_use_large_pages = opt_large_pages)) {
+    os_large_page_size = opt_large_page_size;
+  }
+#endif /* HAVE_LINUX_LARGE_PAGES */
+
+  row_rollback_on_timeout = innobase_rollback_on_timeout;
+
+  if (innobase_open_files < 10) {
+    innobase_open_files = 300;
+    if (srv_file_per_table && table_cache_size > 300) {
+      innobase_open_files = table_cache_size;
+    }
+  }
+
+  if (innobase_open_files > (long)open_files_limit) {
+    ib::warn(ER_IB_MSG_539) << "innodb_open_files should not be greater"
+                               " than the open_files_limit.\n";
+    if (innobase_open_files > (long)table_cache_size) {
+      innobase_open_files = table_cache_size;
+    }
+  }
+
+  srv_innodb_status = innobase_create_status_file;
+
+  /* Round up ddl:fts_parser_threads to nearest power of 2 number */
+  {
+    ulong n_parser_threads = 1;
+
+    while (n_parser_threads < ddl::fts_parser_threads) {
+      n_parser_threads <<= 1;
+    }
+
+    ddl::fts_parser_threads = n_parser_threads;
+  }
+
+  /* Store the default charset-collation number of this MySQL
+  installation */
+
+  data_mysql_default_charset_coll = (ulint)default_charset_info->number;
+
+  innobase_commit_concurrency_init_default();
+
+  if (srv_force_recovery == SRV_FORCE_NO_LOG_REDO) {
+    srv_read_only_mode = true;
+  }
+
+  high_level_read_only =
+      srv_read_only_mode || srv_force_recovery > SRV_FORCE_NO_TRX_UNDO;
+
+  if (srv_read_only_mode) {
+    ib::info(ER_IB_MSG_540) << "Started in read only mode";
+
+    /* There is no write except to intrinsic table and so turn-off
+    doublewrite mechanism completely. */
+    dblwr::g_mode = dblwr::Mode::OFF;
+  }
+
+#ifdef LINUX_NATIVE_AIO
+  if (srv_use_native_aio) {
+    ib::info(ER_IB_MSG_541) << "Using Linux native AIO";
+  }
+#elif !defined _WIN32
+  /* Currently native AIO is supported only on Windows and Linux
+  and that also when the support is compiled in. In all other
+  cases, we ignore the setting of innodb_use_native_aio. */
+  srv_use_native_aio = false;
+#endif
+
+#ifndef _WIN32
+  /* Check if innodb_dedicated_server == ON and O_DIRECT is supported */
+  if (srv_dedicated_server && sysvar_source_svc != nullptr &&
+      os_is_o_direct_supported()) {
+    static const char *variable_name = "innodb_flush_method";
+    enum enum_variable_source source;
+
+    if (!sysvar_source_svc->get(variable_name, strlen(variable_name),
+                                &source)) {
+      /* If innodb_flush_method is not specified explicitly */
+      if (source == COMPILED) {
+        innodb_flush_method = static_cast<ulong>(SRV_UNIX_O_DIRECT_NO_FSYNC);
+      } else {
+        ib::warn(ER_IB_MSG_542)
+            << "Option innodb_dedicated_server"
+               " is ignored for innodb_flush_method"
+               "because innodb_flush_method="
+            << innodb_flush_method_names[innodb_flush_method]
+            << " is specified explicitly.";
+      }
+    }
+  }
+
+  srv_unix_file_flush_method =
+      static_cast<srv_unix_flush_t>(innodb_flush_method);
+  ut_ad(innodb_flush_method <= SRV_UNIX_O_DIRECT_NO_FSYNC);
+#else
+  srv_win_file_flush_method = static_cast<srv_win_flush_t>(innodb_flush_method);
+  ut_ad(innodb_flush_method <= SRV_WIN_IO_NORMAL);
+  if (srv_use_native_aio) {
+    ib::info(ER_IB_MSG_541) << "Using Windows native AIO";
+  }
+#endif /* !_WIN32 */
+
+  /* Set the maximum number of threads which can wait for a semaphore
+  inside InnoDB: this is the 'sync wait array' size, as well as the
+  maximum number of threads that can wait in the 'srv_conc array' for
+  their time to enter InnoDB. */
+
+  srv_max_n_threads = 100 * 1024;
+
+  /* This is the first time univ_page_size is used.
+  It was initialized to 16k pages before srv_page_size was set */
+  univ_page_size.copy_from(page_size_t(srv_page_size, srv_page_size, false));
+
+  srv_sys_space.set_space_id(TRX_SYS_SPACE);
+
+  /* Create the filespace flags. */
+  predefined_flags = fsp_flags_init(univ_page_size, false, false, true, false);
+  fsp_flags_set_sdi(predefined_flags);
+
+  srv_sys_space.set_flags(predefined_flags);
+
+  srv_sys_space.set_name(dict_sys_t::s_sys_space_name);
+  srv_sys_space.set_path(srv_data_home);
+
+  /* We set the temporary tablspace id later, after recovery.
+  The temp tablespace doesn't support raw devices.
+  Set the name and path. */
+  srv_tmp_space.set_name(dict_sys_t::s_temp_space_name);
+  srv_tmp_space.set_path(srv_data_home);
+
+  /* Create the filespace flags with the temp flag set. */
+  uint32_t fsp_flags =
+      fsp_flags_init(univ_page_size, false, false, false, true);
+  srv_tmp_space.set_flags(fsp_flags);
+
+  /* Set buffer pool size to default for fast startup when mysqld is
+  run with --help --verbose options. */
+  ulint srv_buf_pool_size_org = 0;
+  if (opt_help && opt_verbose && opt_validate_config &&
+      srv_buf_pool_size > srv_buf_pool_def_size) {
+    ib::warn(ER_IB_MSG_543) << "Setting innodb_buf_pool_size to "
+                            << srv_buf_pool_def_size << " for fast startup, "
+                            << "when running with --help --verbose options.";
+    srv_buf_pool_size_org = srv_buf_pool_size;
+    srv_buf_pool_size = srv_buf_pool_def_size;
+  }
+
+  innodb_buffer_pool_size_init();
+
+  innodb_undo_tablespaces_deprecate();
+
+  innodb_redo_log_capacity_init();
+
+  /* Set the original value back to show in help. */
+  if (srv_buf_pool_size_org != 0) {
+    srv_buf_pool_size_org = buf_pool_size_align(srv_buf_pool_size_org);
+    srv_buf_pool_curr_size = srv_buf_pool_size_org;
+  }
+
+  if (srv_n_page_cleaners > srv_buf_pool_instances) {
+    /* limit of page_cleaner parallelizability
+    is number of buffer pool instances. */
+    srv_n_page_cleaners = srv_buf_pool_instances;
+  }
+
+  srv_lock_table_size = 5 * (srv_buf_pool_size / UNIV_PAGE_SIZE);
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_io_capacity_max_update not found.
+static void innodb_thread_concurrency_update(THD *thd, SYS_VAR *, void *,
+                                             const void *save) {
+  srv_thread_concurrency = *static_cast<const ulong *>(save);
+
+  ib::info(ER_IB_MSG_THREAD_CONCURRENCY_CHANGED, srv_thread_concurrency);
+
+  log_files_thread_concurrency_updated(*log_sys);
+
+  if (!log_sys->concurrency_margin_is_safe.load()) {
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "Current innodb_thread_concurrency"
+                        " is too big for safety of redo log files."
+                        " Consider decreasing it or increasing"
+                        " innodb_redo_log_capacity.");
+  }
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_io_capacity_update
+static void innodb_io_capacity_update(
+    THD *thd,         /*!< in: thread handle */
+    SYS_VAR *,        /*!< in: pointer to system variable */
+    void *,           /*!< out: where the formal string goes */
+    const void *save) /*!< in: immediate result from check function */
+{
+  ulong in_val = *static_cast<const ulong *>(save);
+  if (in_val > srv_max_io_capacity) {
+    in_val = srv_max_io_capacity;
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "innodb_io_capacity cannot be set"
+                        " higher than innodb_io_capacity_max.");
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "Setting innodb_io_capacity to %lu",
+                        srv_max_io_capacity);
+  }
+
+  srv_io_capacity = in_val;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_io_capacity_max_update
+static void innodb_io_capacity_max_update(
+    THD *thd,         /*!< in: thread handle */
+    SYS_VAR *,        /*!< in: pointer to
+                                      system variable */
+    void *,           /*!< out: where the
+                      formal string goes */
+    const void *save) /*!< in: immediate result
+                      from check function */
+{
+  ulong in_val = *static_cast<const ulong *>(save);
+
+  if (in_val < srv_io_capacity) {
+    in_val = srv_io_capacity;
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "innodb_io_capacity_max cannot be"
+                        " set lower than innodb_io_capacity.");
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "Setting innodb_io_capacity_max to %lu",
+                        srv_io_capacity);
+  }
+
+  srv_max_io_capacity = in_val;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: get_pct_for_lsn
+ulint get_pct_for_lsn(lsn_t age) /*!< in: current age of LSN. */
+{
+  ut_a(log_sys != nullptr);
+  log_t &log = *log_sys;
+
+  lsn_t limit_for_free_check;
+  lsn_t limit_for_dirty_page_age;
+
+  log_files_capacity_get_limits(log, limit_for_free_check,
+                                limit_for_dirty_page_age);
+
+  double lsn_age_factor;
+  lsn_t af_lwm = (srv_adaptive_flushing_lwm * limit_for_free_check) / 100;
+
+  if (age < af_lwm) {
+    /* No adaptive flushing. */
+    return (0);
+  }
+
+  if (age < limit_for_dirty_page_age && !srv_adaptive_flushing) {
+    /* We have still not reached the max_async point and
+    the user has disabled adaptive flushing. */
+    return (0);
+  }
+
+  /* If we are here then we know that either:
+  1) User has enabled adaptive flushing
+  2) User may have disabled adaptive flushing but we have reached
+  limit_for_dirty_page_age. */
+  lsn_age_factor = (age * 100.0) / limit_for_dirty_page_age;
+
+  ut_ad(srv_max_io_capacity >= srv_io_capacity);
+
+  return (static_cast<ulint>(((srv_max_io_capacity / srv_io_capacity) *
+                              (lsn_age_factor * sqrt(lsn_age_factor))) /
+                             7.5));
+}
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: set_flush_target_by_lsn
+ulint set_flush_target_by_lsn(bool sync_flush, lsn_t sync_flush_limit_lsn) {
+  lsn_t oldest_lsn = buf_pool_get_oldest_modification_approx();
+  ut_ad(oldest_lsn <= log_get_lsn(*log_sys));
+
+  lsn_t age = cur_iter_lsn > oldest_lsn ? cur_iter_lsn - oldest_lsn : 0;
+
+  ulint pct_for_dirty = get_pct_for_dirty();
+  ulint pct_for_lsn = get_pct_for_lsn(age);
+  ulint pct_total = std::max(pct_for_dirty, pct_for_lsn);
+
+  /* Estimate pages to be flushed for the lsn progress */
+  ulint sum_pages_for_lsn = 0;
+
+  lsn_t target_lsn;
+  uint scan_factor;
+
+  if (sync_flush) {
+    target_lsn = sync_flush_limit_lsn;
+    ut_a(target_lsn < LSN_MAX);
+    scan_factor = 1;
+    buf_flush_sync_lsn = target_lsn;
+  } else {
+    target_lsn = oldest_lsn + lsn_avg_rate * buf_flush_lsn_scan_factor;
+    scan_factor = buf_flush_lsn_scan_factor;
+    buf_flush_sync_lsn = 0;
+  }
+
+  /* Cap the maximum IO capacity that we are going to use by
+  max_io_capacity. Limit the value to avoid too quick increase */
+  const ulint sum_pages_max = srv_max_io_capacity * 2;
+
+  /* Limit individual BP scan based on overall capacity. */
+  const ulint pages_for_lsn_max =
+      (sum_pages_max / srv_buf_pool_instances) * scan_factor * 2;
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    ulint pages_for_lsn = 0;
+
+    buf_flush_list_mutex_enter(buf_pool);
+    for (buf_page_t *b = UT_LIST_GET_LAST(buf_pool->flush_list); b != nullptr;
+         b = UT_LIST_GET_PREV(list, b)) {
+      if (b->get_oldest_lsn() > target_lsn) {
+        break;
+      }
+      ++pages_for_lsn;
+      if (pages_for_lsn >= pages_for_lsn_max) {
+        break;
+      }
+    }
+    buf_flush_list_mutex_exit(buf_pool);
+
+    sum_pages_for_lsn += pages_for_lsn;
+
+    mutex_enter(&page_cleaner->mutex);
+    ut_ad(page_cleaner->slots[i].state == PAGE_CLEANER_STATE_NONE);
+    page_cleaner->slots[i].n_pages_requested = pages_for_lsn / scan_factor + 1;
+    mutex_exit(&page_cleaner->mutex);
+  }
+
+  sum_pages_for_lsn /= scan_factor;
+  if (sum_pages_for_lsn < 1) {
+    sum_pages_for_lsn = 1;
+  }
+
+  /* Cap the maximum IO capacity that we are going to use by
+  max_io_capacity. Limit the value to avoid too quick increase */
+  ulint pages_for_lsn = std::min<ulint>(sum_pages_for_lsn, sum_pages_max);
+
+  /* Estimate based on LSN and dirty pages. */
+  ulint n_pages;
+  if (sync_flush) {
+    n_pages = pages_for_lsn;
+    /* For sync flush, make sure we flush at least at io capacity rate. This
+    lower bound works as a safeguard against any miscalculation leading to
+    too less flushing while we are in urgent flushing mode. Specifically, for
+    small target, if the target is evaluated to zero the flush could be stuck
+    in sync flush mode indefinitely, flushing nothing. */
+    if (n_pages < srv_io_capacity) {
+      n_pages = srv_io_capacity;
+    }
+  } else {
+    n_pages = (PCT_IO(pct_total) + page_avg_rate + pages_for_lsn) / 3;
+    if (n_pages > srv_max_io_capacity) {
+      n_pages = srv_max_io_capacity;
+    }
+  }
+
+  /* Normalize request for each instance */
+  mutex_enter(&page_cleaner->mutex);
+  ut_ad(page_cleaner->n_slots_requested == 0);
+  ut_ad(page_cleaner->n_slots_flushing == 0);
+  ut_ad(page_cleaner->n_slots_finished == 0);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    /* if REDO has enough of free space,
+    don't care about age distribution of pages */
+    page_cleaner->slots[i].n_pages_requested =
+        pct_for_lsn > 30 ? page_cleaner->slots[i].n_pages_requested * n_pages /
+                                   sum_pages_for_lsn +
+                               1
+                         : n_pages / srv_buf_pool_instances + 1;
+  }
+  mutex_exit(&page_cleaner->mutex);
+
+  MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_AGE, sum_pages_for_lsn);
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_DIRTY, pct_for_dirty);
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_LSN, pct_for_lsn);
+
+  return (n_pages);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: Adaptive_flush::set_flush_target_by_page 
+ulint set_flush_target_by_page(ulint n_pages_lsn) {
+  ulint lru_len = 0;
+  ulint free_len = 0;
+  ulint flush_list_len = 0;
+
+  buf_get_total_list_len(&lru_len, &free_len, &flush_list_len);
+
+  cur_iter_pages_dirty = flush_list_len;
+
+  cur_iter_dirty_pct = get_pct_for_dirty();
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_DIRTY, cur_iter_dirty_pct);
+
+  /* Enable page based target only when redo logging is disabled. */
+  if (mtr_t::s_logging.is_enabled()) {
+    MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_DIRTY_PAGE, 0);
+    return (n_pages_lsn);
+  }
+
+  /* No dirty pages to flush. */
+  if (cur_iter_dirty_pct == 0) {
+    MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_DIRTY_PAGE, 0);
+    return (n_pages_lsn);
+  }
+
+  ut_ad(cur_iter_time >= prev_iter_time);
+
+  auto delta_time_s = 1.0;
+  if (cur_iter_time > prev_iter_time) {
+    delta_time_s = std::chrono::duration_cast<std::chrono::duration<double>>(
+                       cur_iter_time - prev_iter_time)
+                       .count();
+  }
+
+  /* Number of pages flushed per second in last iteration. */
+  double prev_page_rate_sec = prev_iter_pages_flushed / delta_time_s;
+
+  auto delta_dirty_pages = static_cast<double>(cur_iter_pages_dirty) -
+                           static_cast<double>(prev_iter_pages_dirty);
+
+  /* Change in number of dirty pages per second. It could be negative. */
+  double dirty_page_change_sec = delta_dirty_pages / delta_time_s;
+
+  /* Next iteration we would like to adapt the flush rate based on changes in
+  dirty page rate. */
+  auto estimate = prev_page_rate_sec + dirty_page_change_sec;
+
+  ulint n_pages = 0;
+
+  if (estimate <= 0) {
+    n_pages = 0;
+  } else {
+    n_pages = static_cast<ulint>(estimate);
+  }
+
+  /* We use radical function of current dirty page percentage to boost
+  the flush rate when dirty page percentage goes higher. The boost factor
+  monotonically increases from 0.10(1%) - 1.05 (100%) with a value 1 at 90%. */
+  double boost_factor = sqrt(static_cast<double>(cur_iter_dirty_pct) / 90.0);
+
+  n_pages = static_cast<ulint>(boost_factor * n_pages);
+
+  /* We moderate the effect of spikes by including average page rate across
+  multiple iterations. */
+  n_pages = (page_avg_rate + n_pages) / 2;
+
+  if (n_pages > srv_max_io_capacity) {
+    n_pages = srv_max_io_capacity;
+  }
+
+  if (n_pages <= n_pages_lsn) {
+    MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_DIRTY_PAGE, n_pages);
+    return (n_pages_lsn);
+  }
+
+  /* Set new targets for each instance */
+  mutex_enter(&page_cleaner->mutex);
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    page_cleaner->slots[i].n_pages_requested = n_pages / srv_buf_pool_instances;
+  }
+  mutex_exit(&page_cleaner->mutex);
+
+  MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_DIRTY_PAGE, n_pages);
+  return (n_pages);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: Adaptive_flush::get_pct_for_lsn 
+ulint get_pct_for_lsn(lsn_t age) /*!< in: current age of LSN. */
+{
+  ut_a(log_sys != nullptr);
+  log_t &log = *log_sys;
+
+  lsn_t limit_for_free_check;
+  lsn_t limit_for_dirty_page_age;
+
+  log_files_capacity_get_limits(log, limit_for_free_check,
+                                limit_for_dirty_page_age);
+
+  double lsn_age_factor;
+  lsn_t af_lwm = (srv_adaptive_flushing_lwm * limit_for_free_check) / 100;
+
+  if (age < af_lwm) {
+    /* No adaptive flushing. */
+    return (0);
+  }
+
+  if (age < limit_for_dirty_page_age && !srv_adaptive_flushing) {
+    /* We have still not reached the max_async point and
+    the user has disabled adaptive flushing. */
+    return (0);
+  }
+
+  /* If we are here then we know that either:
+  1) User has enabled adaptive flushing
+  2) User may have disabled adaptive flushing but we have reached
+  limit_for_dirty_page_age. */
+  lsn_age_factor = (age * 100.0) / limit_for_dirty_page_age;
+
+  ut_ad(srv_max_io_capacity >= srv_io_capacity);
+
+  return (static_cast<ulint>(((srv_max_io_capacity / srv_io_capacity) *
+                              (lsn_age_factor * sqrt(lsn_age_factor))) /
+                             7.5));
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: set_flush_target_by_lsn 
+ulint set_flush_target_by_lsn(bool sync_flush, lsn_t sync_flush_limit_lsn) {
+  lsn_t oldest_lsn = buf_pool_get_oldest_modification_approx();
+  ut_ad(oldest_lsn <= log_get_lsn(*log_sys));
+
+  lsn_t age = cur_iter_lsn > oldest_lsn ? cur_iter_lsn - oldest_lsn : 0;
+
+  ulint pct_for_dirty = get_pct_for_dirty();
+  ulint pct_for_lsn = get_pct_for_lsn(age);
+  ulint pct_total = std::max(pct_for_dirty, pct_for_lsn);
+
+  /* Estimate pages to be flushed for the lsn progress */
+  ulint sum_pages_for_lsn = 0;
+
+  lsn_t target_lsn;
+  uint scan_factor;
+
+  if (sync_flush) {
+    target_lsn = sync_flush_limit_lsn;
+    ut_a(target_lsn < LSN_MAX);
+    scan_factor = 1;
+    buf_flush_sync_lsn = target_lsn;
+  } else {
+    target_lsn = oldest_lsn + lsn_avg_rate * buf_flush_lsn_scan_factor;
+    scan_factor = buf_flush_lsn_scan_factor;
+    buf_flush_sync_lsn = 0;
+  }
+
+  /* Cap the maximum IO capacity that we are going to use by
+  max_io_capacity. Limit the value to avoid too quick increase */
+  const ulint sum_pages_max = srv_max_io_capacity * 2;
+
+  /* Limit individual BP scan based on overall capacity. */
+  const ulint pages_for_lsn_max =
+      (sum_pages_max / srv_buf_pool_instances) * scan_factor * 2;
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    ulint pages_for_lsn = 0;
+
+    buf_flush_list_mutex_enter(buf_pool);
+    for (buf_page_t *b = UT_LIST_GET_LAST(buf_pool->flush_list); b != nullptr;
+         b = UT_LIST_GET_PREV(list, b)) {
+      if (b->get_oldest_lsn() > target_lsn) {
+        break;
+      }
+      ++pages_for_lsn;
+      if (pages_for_lsn >= pages_for_lsn_max) {
+        break;
+      }
+    }
+    buf_flush_list_mutex_exit(buf_pool);
+
+    sum_pages_for_lsn += pages_for_lsn;
+
+    mutex_enter(&page_cleaner->mutex);
+    ut_ad(page_cleaner->slots[i].state == PAGE_CLEANER_STATE_NONE);
+    page_cleaner->slots[i].n_pages_requested = pages_for_lsn / scan_factor + 1;
+    mutex_exit(&page_cleaner->mutex);
+  }
+
+  sum_pages_for_lsn /= scan_factor;
+  if (sum_pages_for_lsn < 1) {
+    sum_pages_for_lsn = 1;
+  }
+
+  /* Cap the maximum IO capacity that we are going to use by
+  max_io_capacity. Limit the value to avoid too quick increase */
+  ulint pages_for_lsn = std::min<ulint>(sum_pages_for_lsn, sum_pages_max);
+
+  /* Estimate based on LSN and dirty pages. */
+  ulint n_pages;
+  if (sync_flush) {
+    n_pages = pages_for_lsn;
+    /* For sync flush, make sure we flush at least at io capacity rate. This
+    lower bound works as a safeguard against any miscalculation leading to
+    too less flushing while we are in urgent flushing mode. Specifically, for
+    small target, if the target is evaluated to zero the flush could be stuck
+    in sync flush mode indefinitely, flushing nothing. */
+    if (n_pages < srv_io_capacity) {
+      n_pages = srv_io_capacity;
+    }
+  } else {
+    n_pages = (PCT_IO(pct_total) + page_avg_rate + pages_for_lsn) / 3;
+    if (n_pages > srv_max_io_capacity) {
+      n_pages = srv_max_io_capacity;
+    }
+  }
+
+  /* Normalize request for each instance */
+  mutex_enter(&page_cleaner->mutex);
+  ut_ad(page_cleaner->n_slots_requested == 0);
+  ut_ad(page_cleaner->n_slots_flushing == 0);
+  ut_ad(page_cleaner->n_slots_finished == 0);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    /* if REDO has enough of free space,
+    don't care about age distribution of pages */
+    page_cleaner->slots[i].n_pages_requested =
+        pct_for_lsn > 30 ? page_cleaner->slots[i].n_pages_requested * n_pages /
+                                   sum_pages_for_lsn +
+                               1
+                         : n_pages / srv_buf_pool_instances + 1;
+  }
+  mutex_exit(&page_cleaner->mutex);
+
+  MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_AGE, sum_pages_for_lsn);
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_DIRTY, pct_for_dirty);
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_LSN, pct_for_lsn);
+
+  return (n_pages);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: set_flush_target_by_lsn 
+ulint set_flush_target_by_lsn(bool sync_flush, lsn_t sync_flush_limit_lsn) {
+  lsn_t oldest_lsn = buf_pool_get_oldest_modification_approx();
+  ut_ad(oldest_lsn <= log_get_lsn(*log_sys));
+
+  lsn_t age = cur_iter_lsn > oldest_lsn ? cur_iter_lsn - oldest_lsn : 0;
+
+  ulint pct_for_dirty = get_pct_for_dirty();
+  ulint pct_for_lsn = get_pct_for_lsn(age);
+  ulint pct_total = std::max(pct_for_dirty, pct_for_lsn);
+
+  /* Estimate pages to be flushed for the lsn progress */
+  ulint sum_pages_for_lsn = 0;
+
+  lsn_t target_lsn;
+  uint scan_factor;
+
+  if (sync_flush) {
+    target_lsn = sync_flush_limit_lsn;
+    ut_a(target_lsn < LSN_MAX);
+    scan_factor = 1;
+    buf_flush_sync_lsn = target_lsn;
+  } else {
+    target_lsn = oldest_lsn + lsn_avg_rate * buf_flush_lsn_scan_factor;
+    scan_factor = buf_flush_lsn_scan_factor;
+    buf_flush_sync_lsn = 0;
+  }
+
+  /* Cap the maximum IO capacity that we are going to use by
+  max_io_capacity. Limit the value to avoid too quick increase */
+  const ulint sum_pages_max = srv_max_io_capacity * 2;
+
+  /* Limit individual BP scan based on overall capacity. */
+  const ulint pages_for_lsn_max =
+      (sum_pages_max / srv_buf_pool_instances) * scan_factor * 2;
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    ulint pages_for_lsn = 0;
+
+    buf_flush_list_mutex_enter(buf_pool);
+    for (buf_page_t *b = UT_LIST_GET_LAST(buf_pool->flush_list); b != nullptr;
+         b = UT_LIST_GET_PREV(list, b)) {
+      if (b->get_oldest_lsn() > target_lsn) {
+        break;
+      }
+      ++pages_for_lsn;
+      if (pages_for_lsn >= pages_for_lsn_max) {
+        break;
+      }
+    }
+    buf_flush_list_mutex_exit(buf_pool);
+
+    sum_pages_for_lsn += pages_for_lsn;
+
+    mutex_enter(&page_cleaner->mutex);
+    ut_ad(page_cleaner->slots[i].state == PAGE_CLEANER_STATE_NONE);
+    page_cleaner->slots[i].n_pages_requested = pages_for_lsn / scan_factor + 1;
+    mutex_exit(&page_cleaner->mutex);
+  }
+
+  sum_pages_for_lsn /= scan_factor;
+  if (sum_pages_for_lsn < 1) {
+    sum_pages_for_lsn = 1;
+  }
+
+  /* Cap the maximum IO capacity that we are going to use by
+  max_io_capacity. Limit the value to avoid too quick increase */
+  ulint pages_for_lsn = std::min<ulint>(sum_pages_for_lsn, sum_pages_max);
+
+  /* Estimate based on LSN and dirty pages. */
+  ulint n_pages;
+  if (sync_flush) {
+    n_pages = pages_for_lsn;
+    /* For sync flush, make sure we flush at least at io capacity rate. This
+    lower bound works as a safeguard against any miscalculation leading to
+    too less flushing while we are in urgent flushing mode. Specifically, for
+    small target, if the target is evaluated to zero the flush could be stuck
+    in sync flush mode indefinitely, flushing nothing. */
+    if (n_pages < srv_io_capacity) {
+      n_pages = srv_io_capacity;
+    }
+  } else {
+    n_pages = (PCT_IO(pct_total) + page_avg_rate + pages_for_lsn) / 3;
+    if (n_pages > srv_max_io_capacity) {
+      n_pages = srv_max_io_capacity;
+    }
+  }
+
+  /* Normalize request for each instance */
+  mutex_enter(&page_cleaner->mutex);
+  ut_ad(page_cleaner->n_slots_requested == 0);
+  ut_ad(page_cleaner->n_slots_flushing == 0);
+  ut_ad(page_cleaner->n_slots_finished == 0);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    /* if REDO has enough of free space,
+    don't care about age distribution of pages */
+    page_cleaner->slots[i].n_pages_requested =
+        pct_for_lsn > 30 ? page_cleaner->slots[i].n_pages_requested * n_pages /
+                                   sum_pages_for_lsn +
+                               1
+                         : n_pages / srv_buf_pool_instances + 1;
+  }
+  mutex_exit(&page_cleaner->mutex);
+
+  MONITOR_SET(MONITOR_FLUSH_N_TO_FLUSH_BY_AGE, sum_pages_for_lsn);
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_DIRTY, pct_for_dirty);
+  MONITOR_SET(MONITOR_FLUSH_PCT_FOR_LSN, pct_for_lsn);
+
+  return (n_pages);
+}
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: buf_flush_page_coordinator_thread
+static void buf_flush_page_coordinator_thread() {
+  auto loop_start_time = std::chrono::steady_clock::now();
+  ulint n_flushed = 0;
+  ulint last_activity = srv_get_activity_count();
+  ulint last_pages = 0;
+
+  THD *thd = create_internal_thd();
+
+#ifdef UNIV_LINUX
+  /* linux might be able to set different setting for each thread.
+  worth to try to set high priority for page cleaner threads */
+  if (buf_flush_page_cleaner_set_priority(buf_flush_page_cleaner_priority)) {
+    ib::info(ER_IB_MSG_126) << "page_cleaner coordinator priority: "
+                            << buf_flush_page_cleaner_priority;
+  } else {
+    ib::info(ER_IB_MSG_127) << "If the mysqld execution user is authorized,"
+                               " page cleaner thread priority can be changed."
+                               " See the man page of setpriority().";
+  }
+#endif /* UNIV_LINUX */
+
+  /* We start from 1 because the coordinator thread is part of the
+  same set */
+  for (size_t i = 1; i < srv_threads.m_page_cleaner_workers_n; ++i) {
+    srv_threads.m_page_cleaner_workers[i] = os_thread_create(
+        page_flush_thread_key, i, buf_flush_page_cleaner_thread);
+
+    srv_threads.m_page_cleaner_workers[i].start();
+  }
+
+  while (!srv_read_only_mode &&
+         srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP &&
+         recv_sys->spaces != nullptr) {
+    /* treat flushing requests during recovery. */
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+
+    os_event_wait(recv_sys->flush_start);
+
+    if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP ||
+        recv_sys->spaces == nullptr) {
+      break;
+    }
+
+    switch (recv_sys->flush_type) {
+      case BUF_FLUSH_LRU:
+        /* Flush pages from end of LRU if required */
+        pc_request(0, LSN_MAX);
+        while (pc_flush_slot() > 0) {
+        }
+        pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+        break;
+
+      case BUF_FLUSH_LIST:
+        /* Flush all pages */
+        do {
+          pc_request(ULINT_MAX, LSN_MAX);
+          while (pc_flush_slot() > 0) {
+          }
+        } while (!pc_wait_finished(&n_flushed_lru, &n_flushed_list));
+        break;
+
+      default:
+        ut_d(ut_error);
+    }
+
+    os_event_reset(recv_sys->flush_start);
+    os_event_set(recv_sys->flush_end);
+  }
+
+  os_event_wait(buf_flush_event);
+
+  ulint ret_sleep = 0;
+  ulint n_evicted = 0;
+  ulint n_flushed_last = 0;
+  ulint warn_interval = 1;
+  ulint warn_count = 0;
+  bool is_sync_flush = false;
+  bool was_server_active = true;
+  int64_t sig_count = os_event_reset(buf_flush_event);
+
+  while (srv_shutdown_state.load() < SRV_SHUTDOWN_CLEANUP) {
+    /* We consider server active if either we have just discovered a first
+    activity after a period of inactive server, or we are after the period
+    of active server in which case, it could be just the beginning of the
+    next period, so there is no reason to consider it idle yet.
+    The withdrawing blocks process when shrinking the buffer pool always
+    needs the page_cleaner activity. So, we consider server is active
+    during the withdrawing blocks process also. */
+
+    bool is_withdrawing = false;
+    for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+      buf_pool_t *buf_pool = buf_pool_from_array(i);
+      if (buf_get_withdraw_depth(buf_pool) > 0) {
+        is_withdrawing = true;
+        break;
+      }
+    }
+
+    const bool is_server_active = is_withdrawing || was_server_active ||
+                                  srv_check_activity(last_activity);
+
+    /* The page_cleaner skips sleep if the server is
+    idle and there are no pending IOs in the buffer pool
+    and there is work to do. */
+    if ((is_server_active || buf_get_n_pending_read_ios() || n_flushed == 0) &&
+        !is_sync_flush) {
+      ret_sleep = pc_sleep_if_needed(loop_start_time + std::chrono::seconds{1},
+                                     sig_count);
+
+      if (srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP) {
+        break;
+      }
+    } else if (std::chrono::steady_clock::now() >
+               loop_start_time + std::chrono::seconds{1}) {
+      ret_sleep = OS_SYNC_TIME_EXCEEDED;
+    } else {
+      ret_sleep = 0;
+    }
+
+    sig_count = os_event_reset(buf_flush_event);
+
+    if (ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+      const auto curr_time = std::chrono::steady_clock::now();
+
+      if (curr_time > loop_start_time + std::chrono::seconds{4}) {
+        if (warn_count == 0) {
+          auto diff_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+              curr_time - loop_start_time);
+
+          ib::info(ER_IB_MSG_128)
+              << "Page cleaner took " << diff_ms.count() << "ms to flush "
+              << n_flushed_last << " and evict " << n_evicted << " pages";
+
+          if (warn_interval > 300) {
+            warn_interval = 600;
+          } else {
+            warn_interval *= 2;
+          }
+
+          warn_count = warn_interval;
+        } else {
+          --warn_count;
+        }
+      } else {
+        /* reset counter */
+        warn_interval = 1;
+        warn_count = 0;
+      }
+
+      loop_start_time = curr_time;
+      n_flushed_last = n_evicted = 0;
+
+      was_server_active = srv_check_activity(last_activity);
+      last_activity = srv_get_activity_count();
+    }
+
+    lsn_t lsn_limit;
+    if (srv_flush_sync && !srv_read_only_mode) {
+      /* lsn_limit!=0 means there are requests. needs to check the lsn. */
+      lsn_limit = log_sync_flush_lsn(*log_sys);
+      if (lsn_limit != 0) {
+        /* Avoid aggressive sync flush beyond limit when redo is disabled. */
+        if (mtr_t::s_logging.is_enabled()) {
+          lsn_limit += Adaptive_flush::lsn_avg_rate * buf_flush_lsn_scan_factor;
+        }
+        is_sync_flush = true;
+      } else {
+        /* Stop the sync flush. */
+        is_sync_flush = false;
+      }
+    } else {
+      is_sync_flush = false;
+      lsn_limit = LSN_MAX;
+    }
+
+    if (!srv_read_only_mode && mtr_t::s_logging.is_enabled() &&
+        ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+      /* For smooth page flushing along with WAL,
+      flushes log as much as possible. */
+      log_sys->recent_written.advance_tail();
+      auto wait_stats = log_write_up_to(
+          *log_sys, log_buffer_ready_for_write_lsn(*log_sys), true);
+      MONITOR_INC_WAIT_STATS_EX(MONITOR_ON_LOG_, _PAGE_WRITTEN, wait_stats);
+    }
+
+    if (is_sync_flush || is_server_active) {
+      ulint n_to_flush;
+
+      /* Estimate pages from flush_list to be flushed */
+      if (is_sync_flush) {
+        ut_a(lsn_limit > 0);
+        ut_a(lsn_limit < LSN_MAX);
+        n_to_flush =
+            Adaptive_flush::page_recommendation(last_pages, true, lsn_limit);
+        last_pages = 0;
+        /* Flush n_to_flush pages or stop if you reach lsn_limit earlier.
+        This is because in sync-flush mode we want finer granularity of
+        flushes through all BP instances. */
+      } else if (ret_sleep == OS_SYNC_TIME_EXCEEDED) {
+        n_to_flush =
+            Adaptive_flush::page_recommendation(last_pages, false, LSN_MAX);
+        lsn_limit = LSN_MAX;
+        last_pages = 0;
+      } else {
+        n_to_flush = 0;
+        lsn_limit = 0;
+      }
+
+      /* Request flushing for threads */
+      pc_request(n_to_flush, lsn_limit);
+
+      const auto flush_start = std::chrono::steady_clock::now();
+
+      /* Coordinator also treats requests */
+      while (pc_flush_slot() > 0) {
+        /* No op */
+      }
+
+      /* only coordinator is using these counters,
+      so no need to protect by lock. */
+      page_cleaner->flush_time +=
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::steady_clock::now() - flush_start);
+      page_cleaner->flush_pass++;
+
+      /* Wait for all slots to be finished */
+      ulint n_flushed_lru = 0;
+      ulint n_flushed_list = 0;
+
+      pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+      if (n_flushed_list > 0 || n_flushed_lru > 0) {
+        buf_flush_stats(n_flushed_list, n_flushed_lru);
+      }
+
+      if (n_to_flush != 0) {
+        last_pages = n_flushed_list;
+      }
+
+      n_evicted += n_flushed_lru;
+      n_flushed_last += n_flushed_list;
+
+      n_flushed = n_flushed_lru + n_flushed_list;
+
+      if (is_sync_flush) {
+        MONITOR_INC_VALUE_CUMULATIVE(
+            MONITOR_FLUSH_SYNC_TOTAL_PAGE, MONITOR_FLUSH_SYNC_COUNT,
+            MONITOR_FLUSH_SYNC_PAGES, n_flushed_lru + n_flushed_list);
+      } else {
+        if (n_flushed_lru) {
+          MONITOR_INC_VALUE_CUMULATIVE(
+              MONITOR_LRU_BATCH_FLUSH_TOTAL_PAGE, MONITOR_LRU_BATCH_FLUSH_COUNT,
+              MONITOR_LRU_BATCH_FLUSH_PAGES, n_flushed_lru);
+        }
+        if (n_flushed_list) {
+          MONITOR_INC_VALUE_CUMULATIVE(
+              MONITOR_FLUSH_ADAPTIVE_TOTAL_PAGE, MONITOR_FLUSH_ADAPTIVE_COUNT,
+              MONITOR_FLUSH_ADAPTIVE_PAGES, n_flushed_list);
+        }
+      }
+
+    } else if (ret_sleep == OS_SYNC_TIME_EXCEEDED && srv_idle_flush_pct) {
+      /* no activity, slept enough */
+      buf_flush_lists(PCT_IO(srv_idle_flush_pct), LSN_MAX, &n_flushed);
+
+      n_flushed_last += n_flushed;
+
+      if (n_flushed) {
+        MONITOR_INC_VALUE_CUMULATIVE(MONITOR_FLUSH_BACKGROUND_TOTAL_PAGE,
+                                     MONITOR_FLUSH_BACKGROUND_COUNT,
+                                     MONITOR_FLUSH_BACKGROUND_PAGES, n_flushed);
+      }
+
+    } else {
+      /* no activity, but woken up by event */
+      n_flushed = 0;
+    }
+
+    ut_d(buf_flush_page_cleaner_disabled_loop());
+  }
+
+  /* This is just for test scenarios. */
+  srv_thread_delay_cleanup_if_needed(thd);
+
+  ut_ad(srv_shutdown_state.load() >= SRV_SHUTDOWN_CLEANUP);
+
+  if (srv_fast_shutdown == 2 ||
+      srv_shutdown_state.load() == SRV_SHUTDOWN_EXIT_THREADS) {
+    /* In very fast shutdown or when innodb failed to start, we
+    simulate a crash of the buffer pool. We are not required to do
+    any flushing. */
+    goto thread_exit;
+  }
+
+  /* In case of normal and slow shutdown the page_cleaner thread
+  must wait for all other activity in the server to die down.
+  Note that we can start flushing the buffer pool as soon as the
+  server enters shutdown phase but we must stay alive long enough
+  to ensure that any work done by the master or purge threads is
+  also flushed.
+  During shutdown we pass through three stages. In the first stage,
+  when SRV_SHUTDOWN_CLEANUP is set other threads like the master
+  and the purge threads may be working as well. We start flushing
+  the buffer pool but can't be sure that no new pages are being
+  dirtied until we enter SRV_SHUTDOWN_FLUSH_PHASE phase which is
+  the last phase (meanwhile we visit SRV_SHUTDOWN_MASTER_STOP).
+
+  Note, that if we are handling fatal error, we set the state
+  directly to EXIT_THREADS in which case we also might exit the loop
+  below, but still some new dirty pages could be arriving...
+  In such case we just want to stop and don't care about the new pages.
+  However we need to be careful not to crash (e.g. in assertions). */
+
+  do {
+    pc_request(ULINT_MAX, LSN_MAX);
+
+    while (pc_flush_slot() > 0) {
+    }
+
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+    pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+    n_flushed = n_flushed_lru + n_flushed_list;
+
+    /* We sleep only if there are no pages to flush */
+    if (n_flushed == 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+  } while (srv_shutdown_state.load() < SRV_SHUTDOWN_FLUSH_PHASE);
+
+  /* At this point all threads including the master and the purge
+  thread must have been closed, unless we are handling some error
+  during initialization of InnoDB (srv_init_abort). In such case
+  we could have SRV_SHUTDOWN_EXIT_THREADS set directly from the
+  srv_shutdown_exit_threads(). */
+  if (srv_shutdown_state.load() != SRV_SHUTDOWN_EXIT_THREADS) {
+    /* We could have srv_shutdown_state.load() >= FLUSH_PHASE only
+    when either: shutdown started or init is being aborted. In the
+    first case we would have FLUSH_PHASE and keep waiting until
+    this thread is alive before we switch to LAST_PHASE.
+
+    In the second case, we would jump to EXIT_THREADS from NONE,
+    so we would not enter here. */
+    ut_a(!srv_is_being_started);
+    ut_a(srv_shutdown_state.load() == SRV_SHUTDOWN_FLUSH_PHASE);
+
+    ut_a(!srv_master_thread_is_active());
+    if (!srv_read_only_mode) {
+      ut_a(!srv_purge_threads_active());
+      ut_a(!srv_thread_is_active(srv_threads.m_dict_stats));
+      ut_a(!srv_thread_is_active(srv_threads.m_ts_alter_encrypt));
+    }
+  }
+
+  /* We can now make a final sweep on flushing the buffer pool
+  and exit after we have cleaned the whole buffer pool.
+  It is important that we wait for any running batch that has
+  been triggered by us to finish. Otherwise we can end up
+  considering end of that batch as a finish of our final
+  sweep and we'll come out of the loop leaving behind dirty pages
+  in the flush_list */
+  buf_flush_wait_batch_end(nullptr, BUF_FLUSH_LIST);
+  buf_flush_wait_LRU_batch_end();
+
+  bool success;
+  bool are_any_read_ios_still_underway;
+
+  do {
+    /* If there are any read operations pending, they can result in the ibuf
+    merges and a dirtying page after the read is completed. If there are any
+    IO reads running before we run the flush loop, we risk having some dirty
+    pages after flushing reports n_flushed == 0. The ibuf change merging on
+    page results in dirtying the page and is followed by decreasing the
+    n_pend_reads counter, thus it's safe to check it before flush loop and
+    have guarantees if it was seen with value of 0. These reads could be issued
+    in the previous stage(s), the srv_master thread on shutdown tasks clear the
+    ibuf unless it's the fast shutdown. */
+    are_any_read_ios_still_underway = buf_get_n_pending_read_ios() > 0;
+    pc_request(ULINT_MAX, LSN_MAX);
+
+    while (pc_flush_slot() > 0) {
+    }
+
+    ulint n_flushed_lru = 0;
+    ulint n_flushed_list = 0;
+    success = pc_wait_finished(&n_flushed_lru, &n_flushed_list);
+
+    n_flushed = n_flushed_lru + n_flushed_list;
+
+    buf_flush_wait_batch_end(nullptr, BUF_FLUSH_LIST);
+    buf_flush_wait_LRU_batch_end();
+
+  } while (!success || n_flushed > 0 || are_any_read_ios_still_underway);
+
+  for (ulint i = 0; i < srv_buf_pool_instances; i++) {
+    buf_pool_t *buf_pool = buf_pool_from_array(i);
+    ut_a(UT_LIST_GET_LEN(buf_pool->flush_list) == 0);
+  }
+
+  /* Mark that it is safe to recover as we have already flushed all dirty
+  pages in buffer pools. */
+  if (mtr_t::s_logging.is_disabled() && !srv_read_only_mode) {
+    log_persist_crash_safe(*log_sys);
+  }
+  log_crash_safe_validate(*log_sys);
+
+  /* We have lived our life. Time to die. */
+
+thread_exit:
+  /* All worker threads are waiting for the event here,
+  and no more access to page_cleaner structure by them.
+  Wakes worker threads up just to make them exit. */
+  page_cleaner->is_running = false;
+  os_event_set(page_cleaner->is_requested);
+
+  buf_flush_page_cleaner_close();
+
+  destroy_internal_thd(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0dump.cc
+Function: buf_load_throttle_if_needed
+static inline void buf_load_throttle_if_needed(
+    std::chrono::steady_clock::time_point *last_check_time,
+    ulint *last_activity_count, ulint n_io) {
+  if (n_io % srv_io_capacity < srv_io_capacity - 1) {
+    return;
+  }
+
+  if (*last_check_time == std::chrono::steady_clock::time_point{} ||
+      *last_activity_count == 0) {
+    *last_check_time = std::chrono::steady_clock::now();
+    *last_activity_count = srv_get_activity_count();
+    return;
+  }
+
+  /* srv_io_capacity IO operations have been performed by buffer pool
+  load since the last time we were here. */
+
+  /* If no other activity, then keep going without any delay. */
+  if (srv_get_activity_count() == *last_activity_count) {
+    return;
+  }
+
+  /* There has been other activity, throttle. */
+
+  const auto elapsed_time = std::chrono::steady_clock::now() - *last_check_time;
+
+  /* Notice that elapsed_time is not the time for the last
+  srv_io_capacity IO operations performed by BP load. It is the
+  time elapsed since the last time we detected that there has been
+  other activity. This has a small and acceptable deficiency, e.g.:
+  1. BP load runs and there is no other activity.
+  2. Other activity occurs, we run N IO operations after that and
+     enter here (where 0 <= N < srv_io_capacity).
+  3. last_check_time is very old and we do not sleep at this time, but
+     only update last_check_time and last_activity_count.
+  4. We run srv_io_capacity more IO operations and call this function
+     again.
+  5. There has been more other activity and thus we enter here.
+  6. Now last_check_time is recent and we sleep if necessary to prevent
+     more than srv_io_capacity IO operations per second.
+  The deficiency is that we could have slept at 3., but for this we
+  would have to update last_check_time before the
+  "cur_activity_count == *last_activity_count" check and calling
+  ut_time_monotonic_ms() that often may turn out to be too expensive. */
+
+  if (elapsed_time < std::chrono::seconds{1}) {
+    std::this_thread::sleep_for(std::chrono::seconds{1} - elapsed_time);
+  }
+
+  *last_check_time = std::chrono::steady_clock::now();
+  *last_activity_count = srv_get_activity_count();
+}
+

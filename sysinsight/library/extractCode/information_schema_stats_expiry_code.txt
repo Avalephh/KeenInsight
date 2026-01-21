@@ -1,0 +1,90 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/table_stats.cc
+Function: dd::info_schema::Table_statistics::read_stat
+ulonglong Table_statistics::read_stat(
+    THD *thd, const String &schema_name_ptr, const String &table_name_ptr,
+    const String &index_name_ptr, const char *partition_name,
+    const String &column_name_ptr, uint index_ordinal_position,
+    uint column_ordinal_position, const String &engine_name_ptr,
+    Object_id se_private_id, const char *ts_se_private_data,
+    const char *tbl_se_private_data, const ulonglong &table_stat_data,
+    const ulonglong &cached_timestamp, enum_table_stats_type stype) {
+  DBUG_TRACE;
+  ulonglong result;
+
+  // Stop we have see and error already for this table.
+  if (check_error_for_key(schema_name_ptr, table_name_ptr)) return 0;
+
+  // Check if we can directly use the value passed from mysql.stats tables.
+  if (!is_persistent_statistics_expired(thd, cached_timestamp)) {
+    return table_stat_data;
+  }
+
+  /*
+    Get statistics from cache, if available.
+    If other statistics except cardinality is present in Statistics cache.
+    return the value from cache.
+  */
+  if (stype != enum_table_stats_type::INDEX_COLUMN_CARDINALITY &&
+      is_stat_cached_in_mem(schema_name_ptr, table_name_ptr, partition_name))
+    return get_stat(stype);
+
+  // NOTE: read_stat() may generate many "useless" warnings, which will be
+  // ignored afterwards. On the other hand, there might be "useful"
+  // warnings, which should be presented to the user. Diagnostics_area usually
+  // stores no more than THD::variables.max_error_count warnings.
+  // The problem is that "useless warnings" may occupy all the slots in the
+  // Diagnostics_area, so "useful warnings" get rejected. In order to avoid
+  // that problem we create a Diagnostics_area instance, which is capable of
+  // storing "unlimited" number of warnings.
+  Diagnostics_area *da = thd->get_stmt_da();
+  Diagnostics_area tmp_da(true);
+
+  // Don't copy existing conditions from the old DA so we don't get them twice
+  // when we call copy_non_errors_from_da below.
+  thd->push_diagnostics_area(&tmp_da, false);
+
+  /*
+    Check if engine supports fetching table statistics.
+    The engine name for partitioned table is empty string, because the
+    hton->get_table_statistics is not yet implemented to support
+    partitioned table.
+  */
+  plugin_ref tmp_plugin = ha_resolve_by_name_raw(
+      thd, lex_cstring_handle(dd::String_type(engine_name_ptr.ptr())));
+  handlerton *hton = nullptr;
+  const bool hton_implements_get_statistics =
+      (tmp_plugin && (hton = plugin_data<handlerton *>(tmp_plugin)) &&
+       hton->get_index_column_cardinality && hton->get_table_statistics);
+
+  // Try to get statistics without opening the table.
+  if (!partition_name && hton_implements_get_statistics)
+    result = read_stat_from_SE(
+        thd, schema_name_ptr, table_name_ptr, index_name_ptr, column_name_ptr,
+        index_ordinal_position, column_ordinal_position, se_private_id,
+        ts_se_private_data, tbl_se_private_data, stype, hton);
+  else
+    result = read_stat_by_open_table(
+        thd, schema_name_ptr, table_name_ptr, index_name_ptr, partition_name,
+        column_name_ptr, column_ordinal_position, stype);
+
+  thd->pop_diagnostics_area();
+
+  // Pass an error if any.
+  if (!thd->is_error() && tmp_da.is_error()) {
+    da->set_error_status(tmp_da.mysql_errno(), tmp_da.message_text(),
+                         tmp_da.returned_sqlstate());
+    da->push_warning(thd, tmp_da.mysql_errno(), tmp_da.returned_sqlstate(),
+                     Sql_condition::SL_ERROR, tmp_da.message_text());
+  }
+
+  // Pass warnings (if any).
+  //
+  // Filter out warnings with SL_ERROR level, because they
+  // correspond to the errors which were filtered out in fill_table().
+  da->copy_non_errors_from_da(thd, &tmp_da);
+
+  return result;
+}
+
+

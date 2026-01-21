@@ -1,0 +1,80 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Session_gtids_tracker::update
+bool Session_sysvars_tracker::update(THD *thd) {
+  if (!thd->variables.track_sysvars_ptr) return false;
+  m_enabled = orig_list->update(tool_list, thd);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc
+Function: Session_consistency_gtids_ctx::update_tracking_activeness_from_session_variable
+    update_tracking_activeness_from_session_variable(const THD *thd) {
+  m_curr_session_track_gtids = thd->variables.session_track_gtids;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_context.cc
+Function: Session_consistency_gtids_ctx::Session_consistency_gtids_ctx
+Session_consistency_gtids_ctx::Session_consistency_gtids_ctx()
+    : m_sid_map(nullptr),
+      m_gtid_set(nullptr),
+      m_listener(nullptr),
+      m_curr_session_track_gtids(SESSION_TRACK_GTIDS_OFF) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: set_slave_thread_options
+void set_slave_thread_options(THD *thd) {
+  DBUG_TRACE;
+  /*
+     It's nonsense to constrain the slave threads with max_join_size; if a
+     query succeeded on master, we HAVE to execute it. So set
+     OPTION_BIG_SELECTS. Setting max_join_size to HA_POS_ERROR is not enough
+     (and it's not needed if we have OPTION_BIG_SELECTS) because an INSERT
+     SELECT examining more than 4 billion rows would still fail (yes, because
+     when max_join_size is 4G, OPTION_BIG_SELECTS is automatically set, but
+     only for client threads.
+  */
+  ulonglong options = thd->variables.option_bits | OPTION_BIG_SELECTS;
+  if (opt_log_replica_updates)
+    options |= OPTION_BIN_LOG;
+  else
+    options &= ~OPTION_BIN_LOG;
+  thd->variables.option_bits = options;
+  thd->variables.completion_type = 0;
+
+  /* Do not track GTIDs for slave threads to avoid performance issues. */
+  thd->variables.session_track_gtids = SESSION_TRACK_GTIDS_OFF;
+  thd->rpl_thd_ctx.session_gtids_ctx()
+      .update_tracking_activeness_from_session_variable(thd);
+
+  /*
+    Set autocommit= 1 when info tables are used and autocommit == 0 to
+    avoid trigger asserts on mysql_execute_command(THD *thd) caused by
+    info tables updates which do not commit, like Rotate, Stop and
+    skipped events handling.
+  */
+  if ((thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
+      (opt_mi_repository_id == INFO_REPOSITORY_TABLE ||
+       opt_rli_repository_id == INFO_REPOSITORY_TABLE)) {
+    thd->variables.option_bits |= OPTION_AUTOCOMMIT;
+    thd->variables.option_bits &= ~OPTION_NOT_AUTOCOMMIT;
+    thd->server_status |= SERVER_STATUS_AUTOCOMMIT;
+  }
+
+  /*
+    Set thread InnoDB high priority.
+  */
+  DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread", {
+    if (thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+        thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER)
+      thd->thd_tx_priority = 1;
+  });
+}
+
+

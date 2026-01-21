@@ -1,0 +1,140 @@
+Global Variable: System_variables.120
+Explicit Data Flow (18):
+  Instruction: %33 = load i8, i8* %show_gipk_in_create_table_and_information_schema, align 2, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:4028:23 | Function: get_schema_tmp_table_columns_record
+  Instruction: %tobool16 = trunc i8 %33 to i1, !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:4028:23 | Function: get_schema_tmp_table_columns_record
+  Instruction: br i1 %tobool16, label %if.end23, label %if.then17, !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:4027:7 | Function: get_schema_tmp_table_columns_record
+  Instruction: %29 = load i8, i8* %show_gipk_in_create_table_and_information_schema, align 2, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:4259:23 | Function: get_schema_tmp_table_keys_record
+  Instruction: %tobool10 = trunc i8 %29 to i1, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:4259:23 | Function: get_schema_tmp_table_keys_record
+  Instruction: br i1 %tobool10, label %if.end18, label %if.then11, !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:4258:7 | Function: get_schema_tmp_table_keys_record
+  Instruction: %107 = load i8, i8* %show_gipk_in_create_table_and_information_schema, align 2, !dbg !1255506 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2035:24 | Function: store_create_info
+  Instruction: %tobool115 = trunc i8 %107 to i1, !dbg !1255506 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2035:24 | Function: store_create_info
+  Instruction: %lnot = xor i1 %tobool115, true, !dbg !1255507 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2035:8 | Function: store_create_info
+  Instruction: %108 = phi i1 [ false, %invoke.cont112 ], [ false, %if.end109 ], [ %lnot, %land.rhs ], !dbg !1255508 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:0:0 | Function: store_create_info
+  Instruction: %frombool116 = zext i1 %108 to i8, !dbg !1255498 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2032:8 | Function: store_create_info
+  Instruction: store i8 %frombool116, i8* %skip_gipk, align 1, !dbg !1255498 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2032:8 | Function: store_create_info
+  Instruction: %117 = load i8, i8* %skip_gipk, align 1, !dbg !1255514 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2045:7 | Function: store_create_info
+  Instruction: %tobool125 = trunc i8 %117 to i1, !dbg !1255514 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2045:7 | Function: store_create_info
+  Instruction: br i1 %tobool125, label %if.then126, label %if.end127, !dbg !1255516 | Location: /root/LLVM/mysql-8.0.36/sql/sql_show.cc:2045:7 | Function: store_create_info
+  Instruction: %53 = load i8, i8* %show_gipk_in_create_table_and_information_schema, align 2, !dbg !1255448 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:9182:23 | Function: Item_func_is_visible_dd_object::val_int
+  Instruction: %tobool55 = trunc i8 %53 to i1, !dbg !1255448 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:9182:23 | Function: Item_func_is_visible_dd_object::val_int
+  Instruction: br i1 %tobool55, label %if.end133, label %if.then56, !dbg !1255449 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:9181:7 | Function: Item_func_is_visible_dd_object::val_int
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: is_generated_invisible_primary_key_column_name
+  Controlled Function: String::String
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: wild_case_compare
+  Controlled Function: String::ptr
+  Controlled Function: String::~String
+  Controlled Function: String::length
+  Controlled Function: String::~String
+  Controlled Function: Field::is_flag_set
+  Controlled Function: unsigned char const* const pointer_cast
+  Controlled Function: strlen
+  Controlled Function: strlen
+  Controlled Function: Field::set_notnull
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Field::is_flag_set
+  Controlled Function: unsigned char const* const pointer_cast
+  Controlled Function: strlen
+  Controlled Function: Field::is_flag_set
+  Controlled Function: print_default_clause
+  Controlled Function: String::ptr
+  Controlled Function: print_on_update_clause
+  Controlled Function: String::length
+  Controlled Function: Field::set_notnull
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: Field::is_hidden_by_user
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::length
+  Controlled Function: String::length
+  Controlled Function: String::append
+  Controlled Function: String::append
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: my_stpcpy
+  Controlled Function: String::String
+  Controlled Function: Field::set_null
+  Controlled Function: Value_generator::print_expr
+  Controlled Function: String::ptr
+  Controlled Function: String::~String
+  Controlled Function: schema_table_store_record
+  Controlled Function: String::length
+  Controlled Function: String::~String
+  Controlled Function: is_generated_invisible_primary_key_column_name
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: strlen
+  Controlled Function: Field::is_hidden_by_system
+  Controlled Function: strlen
+  Controlled Function: Field::set_notnull
+  Controlled Function: Field::set_null
+  Controlled Function: KEY::has_records_per_key
+  Controlled Function: strlen
+  Controlled Function: __assert_fail
+  Controlled Function: KEY::records_per_key
+  Controlled Function: Field::set_notnull
+  Controlled Function: Field::is_flag_set
+  Controlled Function: Field::set_notnull
+  Controlled Function: strlen
+  Controlled Function: Bitmap
+  Controlled Function: Field::set_notnull
+  Controlled Function: Field::set_notnull
+  Controlled Function: __assert_fail
+  Controlled Function: strlen
+  Controlled Function: Field::set_notnull
+  Controlled Function: Field::set_null
+  Controlled Function: schema_table_store_record
+  Controlled Function: Field::set_notnull
+  Controlled Function: String::String
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: String::c_ptr_safe
+  Controlled Function: String::~String
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::~String
+  Controlled Function: dd::Properties::parse_properties
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: LogEvent::LogEvent
+  Controlled Function: LogEvent::prio
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: LogEvent::errcode
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: basename_prefix_find
+  Controlled Function: bool dd::Properties::get
+  Controlled Function: basename_prefix_eval
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: LogEvent::subsys
+  Controlled Function: LogEvent::source_line
+  Controlled Function: basename_index
+  Controlled Function: LogEvent::source_file
+  Controlled Function: LogEvent::function
+  Controlled Function: String::c_ptr_safe
+  Controlled Function: LogEvent::lookup
+  Controlled Function: LogEvent::~LogEvent
+  Controlled Function: __assert_fail
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,131 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mdl.cc
+Function: MDL_lock::get_incompatible_waiting_types_bitmap_idx 
+  /**
+    Get index of priority matrice in MDL_lock_strategy::m_waiting_incompatible
+    array which corresponds to current values of the m_piglet_lock_count and
+    m_hog_lock_count counters and the max_write_lock_count threshold.
+  */
+  uint get_incompatible_waiting_types_bitmap_idx() const {
+    mysql_prlock_assert_write_owner(&m_rwlock);
+    /*
+      To prevent starvation for lock types with lower priority use:
+
+      *) MDL_lock_strategy::m_waiting_incompatible[0] matrice by default.
+      *) MDL_lock_strategy::m_waiting_incompatible[1] when the number of
+         successively granted "piglet" requests exceeds max_write_lock_count.
+      *) MDL_lock_strategy::m_waiting_incompatible[2] when the number of
+         successively granted "hog" requests exceeds max_write_lock_count.
+      *) MDL_lock_strategy::m_waiting_incompatible[3] when both "piglet" and
+         "hog" counters exceed this limit.
+    */
+    uint idx = 0;
+    if (m_piglet_lock_count >= max_write_lock_count) idx += 1;
+    if (m_hog_lock_count >= max_write_lock_count) idx += 2;
+    return idx;
+  }
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/mysys/thr_lock.cc
+Function: wake_up_waiters
+static void wake_up_waiters(THR_LOCK *lock) {
+  THR_LOCK_DATA *data;
+  enum thr_lock_type lock_type;
+
+  DBUG_TRACE;
+
+  if (!lock->write.data) /* If no active write locks */
+  {
+    data = lock->write_wait.data;
+    if (!lock->read.data) /* If no more locks in use */
+    {
+      /* Release write-locks with TL_WRITE or TL_WRITE_ONLY priority first */
+      if (data &&
+          (data->type != TL_WRITE_LOW_PRIORITY || !lock->read_wait.data ||
+           lock->read_wait.data->type < TL_READ_HIGH_PRIORITY)) {
+        if (lock->write_lock_count++ > max_write_lock_count) {
+          /* Too many write locks in a row;  Release all waiting read locks */
+          lock->write_lock_count = 0;
+          if (lock->read_wait.data) {
+            DBUG_PRINT(
+                "info",
+                ("Freeing all read_locks because of max_write_lock_count"));
+            free_all_read_locks(lock, false);
+            goto end;
+          }
+        }
+        for (;;) {
+          if (((*data->prev) = data->next)) /* remove from wait-list */
+            data->next->prev = data->prev;
+          else
+            lock->write_wait.last = data->prev;
+          (*lock->write.last) = data; /* Put in execute list */
+          data->prev = lock->write.last;
+          data->next = nullptr;
+          lock->write.last = &data->next;
+          if (data->type == TL_WRITE_CONCURRENT_INSERT &&
+              (*lock->check_status)(data->status_param))
+            data->type = TL_WRITE; /* Upgrade lock */
+                                   /* purecov: begin inspected */
+          DBUG_PRINT("lock", ("giving write lock of type %d to thread: 0x%x",
+                              data->type, data->owner->thread_id));
+          /* purecov: end */
+          {
+            mysql_cond_t *cond = data->cond;
+            data->cond = nullptr;    /* Mark thread free */
+            mysql_cond_signal(cond); /* Start waiting thread */
+          }
+          if (data->type != TL_WRITE_ALLOW_WRITE || !lock->write_wait.data ||
+              lock->write_wait.data->type != TL_WRITE_ALLOW_WRITE)
+            break;
+          data = lock->write_wait.data; /* Free this too */
+        }
+        if (data->type >= TL_WRITE_LOW_PRIORITY) goto end;
+        /* Release possible read locks together with the write lock */
+      }
+      if (lock->read_wait.data)
+        free_all_read_locks(lock,
+                            data && (data->type == TL_WRITE_CONCURRENT_INSERT ||
+                                     data->type == TL_WRITE_ALLOW_WRITE));
+      else {
+        DBUG_PRINT("lock", ("No waiting read locks to free"));
+      }
+    } else if (data && (lock_type = data->type) <= TL_WRITE_CONCURRENT_INSERT &&
+               ((lock_type != TL_WRITE_CONCURRENT_INSERT &&
+                 lock_type != TL_WRITE_ALLOW_WRITE) ||
+                !lock->read_no_write_count)) {
+      /*
+        For ALLOW_READ, WRITE_ALLOW_WRITE or CONCURRENT_INSERT locks
+        start WRITE locks together with the READ locks
+      */
+      if (lock_type == TL_WRITE_CONCURRENT_INSERT &&
+          (*lock->check_status)(data->status_param)) {
+        data->type = TL_WRITE; /* Upgrade lock */
+        if (lock->read_wait.data) free_all_read_locks(lock, false);
+        goto end;
+      }
+      do {
+        mysql_cond_t *cond = data->cond;
+        if (((*data->prev) = data->next)) /* remove from wait-list */
+          data->next->prev = data->prev;
+        else
+          lock->write_wait.last = data->prev;
+        (*lock->write.last) = data; /* Put in execute list */
+        data->prev = lock->write.last;
+        lock->write.last = &data->next;
+        data->next = nullptr;    /* Only one write lock */
+        data->cond = nullptr;    /* Mark thread free */
+        mysql_cond_signal(cond); /* Start waiting thread */
+      } while (lock_type == TL_WRITE_ALLOW_WRITE &&
+               (data = lock->write_wait.data) &&
+               data->type == TL_WRITE_ALLOW_WRITE);
+      if (lock->read_wait.data)
+        free_all_read_locks(lock, (lock_type == TL_WRITE_CONCURRENT_INSERT ||
+                                   lock_type == TL_WRITE_ALLOW_WRITE));
+    } else if (!data && lock->read_wait.data)
+      free_all_read_locks(lock, false);
+  }
+end:
+  check_locks(lock, "after waking up waiters", 0);
+}
+
+

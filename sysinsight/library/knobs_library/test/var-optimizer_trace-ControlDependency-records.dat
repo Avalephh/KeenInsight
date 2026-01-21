@@ -1,0 +1,107 @@
+Global Variable: System_variables.11
+Explicit Data Flow (35):
+  Instruction: %2 = load i64, i64* %optimizer_trace, align 8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:148:40 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: store i64 %2, i64* %var, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:148:19 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %6 = load i64, i64* %var, align 8, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:155:16 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %and = and i64 %6, 1, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:155:20 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %tobool2 = icmp ne i64 %and, 0, !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:155:16 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %call4 = invoke zeroext i1 @_Z8unlikelyb(i1 zeroext %tobool2)
+          to label %invoke.cont3 unwind label %lpad, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:155:7 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: br i1 %call4, label %if.then5, label %if.end17, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:155:7 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %18 = load i64, i64* %var, align 8, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:218:23 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %and23 = and i64 %18, 2, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:218:27 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %tobool24 = icmp ne i64 %and23, 0, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:218:22 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %call30 = invoke zeroext i1 @_ZN17Opt_trace_context5startEbbbbllmy(%class.Opt_trace_context* %13, i1 zeroext %tobool19, i1 zeroext %tobool20, i1 zeroext %tobool22, i1 zeroext %tobool24, i64 %20, i64 %22, i64 %24, i64 %26)
+          to label %invoke.cont29 unwind label %lpad, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:216:16 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %1 = load i64, i64* %optimizer_trace, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:423:31 | Function: 
+  Instruction: %and = and i64 %1, 1, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:423:47 | Function: 
+  Instruction: %tobool = icmp ne i64 %and, 0, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:423:15 | Function: 
+  Instruction: %lnot = xor i1 %tobool, true, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:423:14 | Function: 
+  Instruction: %call = invoke zeroext i1 @_Z6likelyb(i1 zeroext %lnot)
+          to label %invoke.cont unwind label %lpad, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:423:7 | Function: 
+  Instruction: br i1 %call, label %if.then, label %lor.lhs.false, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:424:50 | Function: 
+  Instruction: %1 = load i64, i64* %optimizer_trace, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:276:31 | Function: opt_trace_disable_if_no_security_context_access
+  Instruction: %and = and i64 %1, 1, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:276:47 | Function: opt_trace_disable_if_no_security_context_access
+  Instruction: %tobool = icmp ne i64 %and, 0, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:276:15 | Function: opt_trace_disable_if_no_security_context_access
+  Instruction: %lnot = xor i1 %tobool, true, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:276:14 | Function: opt_trace_disable_if_no_security_context_access
+  Instruction: %call = invoke zeroext i1 @_Z6likelyb(i1 zeroext %lnot)
+          to label %invoke.cont unwind label %lpad, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:276:7 | Function: opt_trace_disable_if_no_security_context_access
+  Instruction: br i1 %call, label %if.then, label %lor.lhs.false, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:277:50 | Function: opt_trace_disable_if_no_security_context_access
+  Instruction: %1 = load i64, i64* %optimizer_trace, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:345:31 | Function: opt_trace_disable_if_no_stored_proc_func_access
+  Instruction: %and = and i64 %1, 1, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:345:47 | Function: opt_trace_disable_if_no_stored_proc_func_access
+  Instruction: %tobool = icmp ne i64 %and, 0, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:345:15 | Function: opt_trace_disable_if_no_stored_proc_func_access
+  Instruction: %lnot = xor i1 %tobool, true, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:345:14 | Function: opt_trace_disable_if_no_stored_proc_func_access
+  Instruction: %call = invoke zeroext i1 @_Z6likelyb(i1 zeroext %lnot)
+          to label %invoke.cont unwind label %lpad, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:345:7 | Function: opt_trace_disable_if_no_stored_proc_func_access
+  Instruction: br i1 %call, label %if.then, label %lor.lhs.false, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:346:50 | Function: opt_trace_disable_if_no_stored_proc_func_access
+  Instruction: %1 = load i64, i64* %optimizer_trace, align 8, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:367:31 | Function: opt_trace_disable_if_no_view_access
+  Instruction: %and = and i64 %1, 1, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:367:47 | Function: opt_trace_disable_if_no_view_access
+  Instruction: %tobool = icmp ne i64 %and, 0, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:367:15 | Function: opt_trace_disable_if_no_view_access
+  Instruction: %lnot = xor i1 %tobool, true, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:367:14 | Function: opt_trace_disable_if_no_view_access
+  Instruction: %call = invoke zeroext i1 @_Z6likelyb(i1 zeroext %lnot)
+          to label %invoke.cont unwind label %lpad, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:367:7 | Function: opt_trace_disable_if_no_view_access
+  Instruction: br i1 %call, label %if.then, label %lor.lhs.false, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:368:50 | Function: opt_trace_disable_if_no_view_access
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: 
+  Controlled Function: Opt_trace_context::start
+  Controlled Function: likely
+  Controlled Function: 
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unlikely
+  Controlled Function: 
+  Controlled Function: 
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: String::String
+  Controlled Function: Opt_trace_context::set_query
+  Controlled Function: String::set_charset
+  Controlled Function: String::~String
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: Opt_trace_context::set_query
+  Controlled Function: String::~String
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Opt_trace_context::missing_privilege
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::allocator
+  Controlled Function: Opt_trace_context::missing_privilege
+  Controlled Function: strcmp
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Opt_trace_context::missing_privilege
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Opt_trace_context::is_started
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Opt_trace_context::missing_privilege
+  Controlled Function: 
+
+Implicit Control Flow:
+
+----------------------------------------

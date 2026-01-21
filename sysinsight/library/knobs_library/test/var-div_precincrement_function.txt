@@ -1,0 +1,89 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_div::resolve_type
+   be fixed in the resolve_type() function that is called after this one or
+   by writing a specialized fix_fields() for the item.
+
+  RETURN VALUES
+  false	ok
+  true	Got error.  Stored with my_error().
+*/
+
+bool Item_func::fix_fields(THD *thd, Item **) {
+  assert(fixed == 0 || basic_const_item());
+
+  Item **arg, **arg_end;
+  uchar buff[STACK_BUFF_ALLOC];  // Max argument in function
+
+  Condition_context CCT(thd->lex->current_query_block());
+
+  used_tables_cache = get_initial_pseudo_tables();
+  not_null_tables_cache = 0;
+
+  /*
+    Use stack limit of STACK_MIN_SIZE * 2 since
+    on some platforms a recursive call to fix_fields
+    requires more than STACK_MIN_SIZE bytes (e.g. for
+    MIPS, it takes about 22kB to make one recursive
+    call to Item_func::fix_fields())
+  */
+  if (check_stack_overrun(thd, STACK_MIN_SIZE * 2, buff))
+    return true;    // Fatal error if flag is set!
+  if (arg_count) {  // Print purify happy
+    for (arg = args, arg_end = args + arg_count; arg != arg_end; arg++) {
+      if (fix_func_arg(thd, arg)) return true;
+    }
+  }
+
+  if (resolve_type(thd) || thd->is_error())  // Some impls still not error-safe
+    return true;
+  fixed = true;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_div::result_precision
+void Item_func_additive_op::result_precision() {
+  decimals = max(args[0]->decimals, args[1]->decimals);
+  int arg1_int = args[0]->decimal_precision() - args[0]->decimals;
+  int arg2_int = args[1]->decimal_precision() - args[1]->decimals;
+  int precision = max(arg1_int, arg2_int) + 1 + decimals;
+
+  /* Integer operations keep unsigned_flag if one of arguments is unsigned */
+  if (result_type() == INT_RESULT)
+    unsigned_flag = args[0]->unsigned_flag | args[1]->unsigned_flag;
+  else
+    unsigned_flag = args[0]->unsigned_flag & args[1]->unsigned_flag;
+  max_length = my_decimal_precision_to_length_no_truncation(precision, decimals,
+                                                            unsigned_flag);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum_avg::resolve_type
+bool Item_sum::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+
+  set_nullable(true);
+  null_value = true;
+
+  const Sumfunctype t = sum_func();
+
+  // None except these 4 types are allowed for geometry arguments.
+  if (!(t == COUNT_FUNC || t == COUNT_DISTINCT_FUNC || t == SUM_BIT_FUNC ||
+        t == GEOMETRY_AGGREGATE_FUNC))
+    return reject_geometry_args(arg_count, args, this);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.h
+Function: Item_sum_avg::Item_sum_avg
+  Item_sum_avg(const POS &pos, Item *item_par, bool distinct, PT_window *w)
+      : Item_sum_sum(pos, item_par, distinct, w) {}
+
+

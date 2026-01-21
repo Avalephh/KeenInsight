@@ -1,0 +1,32 @@
+Global Variable: srv_thread_sleep_delay
+Explicit Data Flow (21):
+  Instruction: %61 = load i64, i64* @srv_thread_sleep_delay, align 8, !dbg !1255412 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:149:15 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %cmp23 = icmp ugt i64 %61, 20, !dbg !1255414 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:149:38 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: br i1 %cmp23, label %land.lhs.true, label %if.end26, !dbg !1255415 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:149:43 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %63 = load i64, i64* @srv_thread_sleep_delay, align 8, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:150:13 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %dec = add i64 %63, -1, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:150:13 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: store i64 %dec, i64* @srv_thread_sleep_delay, align 8, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:150:13 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %72 = load i64, i64* @srv_thread_sleep_delay, align 8, !dbg !1255429 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:154:36 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %shr = lshr i64 %72, 1, !dbg !1255429 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:154:36 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: store i64 %shr, i64* @srv_thread_sleep_delay, align 8, !dbg !1255429 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:154:36 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %105 = load i64, i64* @srv_thread_sleep_delay, align 8, !dbg !1255458 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:177:19 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: store i64 %105, i64* %sleep_in_us, align 8, !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:177:17 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %107 = load i64, i64* %sleep_in_us, align 8, !dbg !1255464 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:182:9 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %cmp47 = icmp ugt i64 %107, %108, !dbg !1255466 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:182:21 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: br i1 %cmp47, label %if.then48, label %if.end49, !dbg !1255467 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:181:9 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: store i64 %109, i64* %sleep_in_us, align 8, !dbg !1255470 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:183:19 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %110 = load i64, i64* %sleep_in_us, align 8, !dbg !1255471 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:184:51 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: store i64 %110, i64* @srv_thread_sleep_delay, align 8, !dbg !1255472 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:184:30 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: call void @_ZNSt6chrono8durationIlSt5ratioILl1ELl1000000EEEC2ImvEERKT_(%union.anon.0* %ref.tmp, i64* dereferenceable(8) %sleep_in_us), !dbg !1255474 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:187:33 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %115 = load i64, i64* @srv_thread_sleep_delay, align 8, !dbg !1255487 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:194:7 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: %inc55 = add i64 %115, 1, !dbg !1255487 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:194:7 | Function: srv_conc_enter_innodb_with_atomics
+  Instruction: store i64 %inc55, i64* @srv_thread_sleep_delay, align 8, !dbg !1255487 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0conc.cc:194:7 | Function: srv_conc_enter_innodb_with_atomics
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

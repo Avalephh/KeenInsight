@@ -1,0 +1,41 @@
+[
+    {
+        "knob_name": "srv_force_recovery",
+        "data_matched_functions": [
+            "Clone_persist_gtid::flush_gtids",
+            "srv_purge_coordinator_thread",
+            "srv_worker_thread",
+            "row_search_mvcc",
+            "buf_page_io_complete",
+            "btr_cur_search_to_nth_level"
+        ],
+        "data_matched_count": 6,
+        "control_matched_functions": [
+            "ha_innobase::build_template",
+            "trx_purge",
+            "que_thr_move_to_run_state_for_mysql",
+            "os_event_set",
+            "fsp_is_undo_tablespace",
+            "fil_space_get",
+            "fil_space_release",
+            "buf_page_get_known_nowait",
+            "Compression::is_compressed_page",
+            "btr_pcur_t::store_position",
+            "srv_release_threads",
+            "que_thr_stop_for_mysql_no_error",
+            "thd_to_innodb_session",
+            "buf_page_t::was_stale",
+            "row_sel_store_mysql_rec",
+            "buf_LRU_free_page",
+            "fil_space_acquire_silent",
+            "mtr_t::commit",
+            "ibuf_merge_or_delete_for_page",
+            "MVCC::is_view_active",
+            "mtr_t::start",
+            "std::chrono::_V2::system_clock::now",
+            "fsp_is_system_temporary"
+        ],
+        "control_matched_count": 23,
+        "matched_count": 29
+    }
+]

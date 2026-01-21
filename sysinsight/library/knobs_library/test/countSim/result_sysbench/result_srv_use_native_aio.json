@@ -1,0 +1,22 @@
+[
+    {
+        "knob_name": "srv_use_native_aio",
+        "data_matched_functions": [
+            "os_aio_handler",
+            "AIO::reserve_slot",
+            "os_aio_func"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "std::chrono::_V2::steady_clock::now",
+            "srv_set_io_thread_op_info",
+            "os_event_set",
+            "os_event_reset",
+            "AIO::at",
+            "AIO::get_array_and_local_segment",
+            "AIO::release"
+        ],
+        "control_matched_count": 7,
+        "matched_count": 10
+    }
+]

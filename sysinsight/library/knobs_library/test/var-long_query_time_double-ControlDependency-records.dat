@@ -1,0 +1,21 @@
+Global Variable: System_variables.99
+Explicit Data Flow (10):
+  Instruction: %3 = load double, double* %long_query_time_double, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2827:9 | Function: update_cached_long_query_time
+  Instruction: %mul = fmul double %3, 1.000000e+06, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2827:9 | Function: update_cached_long_query_time
+  Instruction: %conv = fptoui double %mul to i64, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2827:9 | Function: update_cached_long_query_time
+  Instruction: store i64 %conv, i64* %long_query_time, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2826:36 | Function: update_cached_long_query_time
+  Instruction: %long_query_time = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables1, i32 0, i32 7, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:2826:20 | Function: update_cached_long_query_time
+  Instruction: %long_query_time = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 7, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3205:49 | Function: THD::update_slow_query_status
+  Instruction: %1 = load i64, i64* %long_query_time, align 8, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3205:49 | Function: THD::update_slow_query_status
+  Instruction: %add = add i64 %0, %1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3205:37 | Function: THD::update_slow_query_status
+  Instruction: %cmp = icmp ugt i64 %call, %add, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3205:23 | Function: THD::update_slow_query_status
+  Instruction: br i1 %cmp, label %if.then, label %if.end, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:3205:7 | Function: THD::update_slow_query_status
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

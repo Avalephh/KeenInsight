@@ -1,0 +1,414 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/myisam/mi_locking.cc
+Function: mi_lock_database
+int mi_lock_database(MI_INFO *info, int lock_type) {
+  int error;
+  uint count;
+  MYISAM_SHARE *share = info->s;
+  DBUG_TRACE;
+  DBUG_PRINT("enter", ("lock_type: %d  old lock %d  r_locks: %u  w_locks: %u "
+                       "global_changed:  %d  open_count: %u  name: '%s'",
+                       lock_type, info->lock_type, share->r_locks,
+                       share->w_locks, share->global_changed,
+                       share->state.open_count, share->index_file_name));
+  if (share->options & HA_OPTION_READ_ONLY_DATA || info->lock_type == lock_type)
+    return 0;
+  if (lock_type == F_EXTRA_LCK) /* Used by TMP tables */
+  {
+    ++share->w_locks;
+    ++share->tot_locks;
+    info->lock_type = lock_type;
+    info->s->in_use = list_add(info->s->in_use, &info->in_use);
+    return 0;
+  }
+
+  error = 0;
+  mysql_mutex_lock(&share->intern_lock);
+  if (share->kfile >= 0) /* May only be false on windows */
+  {
+    switch (lock_type) {
+      case F_UNLCK:
+        ftparser_call_deinitializer(info);
+        if (info->lock_type == F_RDLCK)
+          count = --share->r_locks;
+        else
+          count = --share->w_locks;
+        --share->tot_locks;
+        if (info->lock_type == F_WRLCK && !share->w_locks &&
+            !share->delay_key_write &&
+            flush_key_blocks(share->key_cache, keycache_thread_var(),
+                             share->kfile, FLUSH_KEEP)) {
+          error = my_errno();
+          mi_print_error(info->s, HA_ERR_CRASHED);
+          mi_mark_crashed(info); /* Mark that table must be checked */
+        }
+        if (info->opt_flag & (READ_CACHE_USED | WRITE_CACHE_USED)) {
+          if (end_io_cache(&info->rec_cache)) {
+            error = my_errno();
+            mi_print_error(info->s, HA_ERR_CRASHED);
+            mi_mark_crashed(info);
+          }
+        }
+        if (!count) {
+          DBUG_PRINT("info", ("changed: %u  w_locks: %u", (uint)share->changed,
+                              share->w_locks));
+          if (share->changed && !share->w_locks) {
+            if ((info->s->mmaped_length !=
+                 info->s->state.state.data_file_length) &&
+                (info->s->nonmmaped_inserts > MAX_NONMAPPED_INSERTS)) {
+              if (info->s->concurrent_insert)
+                mysql_rwlock_wrlock(&info->s->mmap_lock);
+              mi_remap_file(info, info->s->state.state.data_file_length);
+              info->s->nonmmaped_inserts = 0;
+              if (info->s->concurrent_insert)
+                mysql_rwlock_unlock(&info->s->mmap_lock);
+            }
+            share->state.process = share->last_process = share->this_process;
+            share->state.unique = info->last_unique = info->this_unique;
+            share->state.update_count = info->last_loop = ++info->this_loop;
+            if (mi_state_info_write(share->kfile, &share->state, 1))
+              error = my_errno();
+            share->changed = false;
+            if (myisam_flush) {
+              if (share->file_map)
+                my_msync(info->dfile, share->file_map, share->mmaped_length,
+                         MS_SYNC);
+
+              if (mysql_file_sync(share->kfile, MYF(0))) error = my_errno();
+              if (mysql_file_sync(info->dfile, MYF(0))) error = my_errno();
+            } else
+              share->not_flushed = true;
+            if (error) {
+              mi_print_error(info->s, HA_ERR_CRASHED);
+              mi_mark_crashed(info);
+            }
+          }
+          if (info->lock_type != F_EXTRA_LCK) {
+            if (share->r_locks) { /* Only read locks left */
+              if (my_lock(share->kfile, F_RDLCK,
+                          MYF(MY_WME | MY_SEEK_NOT_DONE)) &&
+                  !error)
+                error = my_errno();
+            } else if (!share->w_locks) { /* No more locks */
+              if (my_lock(share->kfile, F_UNLCK,
+                          MYF(MY_WME | MY_SEEK_NOT_DONE)) &&
+                  !error)
+                error = my_errno();
+            }
+          }
+        }
+        info->opt_flag &= ~(READ_CACHE_USED | WRITE_CACHE_USED);
+        info->lock_type = F_UNLCK;
+        info->s->in_use = list_delete(info->s->in_use, &info->in_use);
+        break;
+      case F_RDLCK:
+        if (info->lock_type == F_WRLCK) {
+          /*
+            Change RW to READONLY
+
+            mysqld does not turn write locks to read locks,
+            so we're never here in mysqld.
+          */
+          if (share->w_locks == 1) {
+            if (my_lock(share->kfile, lock_type, MYF(MY_SEEK_NOT_DONE))) {
+              error = my_errno();
+              break;
+            }
+          }
+          share->w_locks--;
+          share->r_locks++;
+          info->lock_type = lock_type;
+          break;
+        }
+        if (!share->r_locks && !share->w_locks) {
+          if (my_lock(share->kfile, lock_type,
+                      info->lock_wait | MY_SEEK_NOT_DONE)) {
+            error = my_errno();
+            break;
+          }
+          if (mi_state_info_read_dsk(share->kfile, &share->state, true)) {
+            error = my_errno();
+            (void)my_lock(share->kfile, F_UNLCK, MYF(MY_SEEK_NOT_DONE));
+            set_my_errno(error);
+            break;
+          }
+        }
+        (void)_mi_test_if_changed(info);
+        share->r_locks++;
+        share->tot_locks++;
+        info->lock_type = lock_type;
+        info->s->in_use = list_add(info->s->in_use, &info->in_use);
+        break;
+      case F_WRLCK:
+        if (info->lock_type == F_RDLCK) { /* Change READONLY to RW */
+          if (share->r_locks == 1) {
+            if (my_lock(share->kfile, lock_type,
+                        MYF(info->lock_wait | MY_SEEK_NOT_DONE))) {
+              error = my_errno();
+              break;
+            }
+            share->r_locks--;
+            share->w_locks++;
+            info->lock_type = lock_type;
+            break;
+          }
+        }
+        if (!(share->options & HA_OPTION_READ_ONLY_DATA)) {
+          if (!share->w_locks) {
+            if (my_lock(share->kfile, lock_type,
+                        info->lock_wait | MY_SEEK_NOT_DONE)) {
+              error = my_errno();
+              break;
+            }
+            if (!share->r_locks) {
+              if (mi_state_info_read_dsk(share->kfile, &share->state, true)) {
+                error = my_errno();
+                (void)my_lock(share->kfile, F_UNLCK,
+                              info->lock_wait | MY_SEEK_NOT_DONE);
+                set_my_errno(error);
+                break;
+              }
+            }
+          }
+        }
+        (void)_mi_test_if_changed(info);
+
+        info->lock_type = lock_type;
+        share->w_locks++;
+        share->tot_locks++;
+
+        DBUG_EXECUTE_IF("simulate_incorrect_share_wlock_value",
+                        DEBUG_SYNC_C("after_share_wlock_increment"););
+
+        info->s->in_use = list_add(info->s->in_use, &info->in_use);
+        break;
+      default:
+        break; /* Impossible */
+    }
+  }
+#ifdef _WIN32
+  else {
+    /*
+       Check for bad file descriptors if this table is part
+       of a merge union. Failing to capture this may cause
+       a crash on windows if the table is renamed and
+       later on referenced by the merge table.
+     */
+    if (info->owned_by_merge && (info->s)->kfile < 0) {
+      error = HA_ERR_NO_SUCH_TABLE;
+    }
+  }
+#endif
+  mysql_mutex_unlock(&share->intern_lock);
+  return error;
+} /* mi_lock_database */
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: get_options
+static int get_options(int *argc_ptr, char ***argv_ptr) {
+  int ho_error;
+
+  my_getopt_register_get_addr(mysql_getopt_value);
+
+  /* prepare all_options array */
+  all_options.reserve(array_elements(my_long_options));
+  for (my_option *opt = my_long_options;
+       opt < my_long_options + array_elements(my_long_options) - 1; opt++) {
+    all_options.push_back(*opt);
+  }
+  sys_var_add_options(&all_options, sys_var::PARSE_NORMAL);
+  add_terminator(&all_options);
+
+  if (is_help_or_validate_option() || opt_initialize) {
+    /*
+      Show errors during --help, but mute everything else so the info the
+      user actually wants isn't lost in the spam.  (For --help --verbose,
+      we need to set up far enough to be able to print variables provided
+      by plugins, so a good number of warnings/notes might get printed.)
+      Likewise for --initialize.
+    */
+    struct my_option *opt = &all_options[0];
+    for (; opt->name; opt++)
+      if (!strcmp("log_error_verbosity", opt->name))
+        opt->def_value = opt_initialize ? 2 : 1;
+  }
+
+  /* Skip unknown options so that they may be processed later by plugins */
+  my_getopt_skip_unknown = true;
+
+  if ((ho_error = handle_options(argc_ptr, argv_ptr, &all_options[0],
+                                 mysqld_get_one_option)))
+    return ho_error;
+
+  // update verbosity in filter engine, if needed
+  log_builtins_filter_update_verbosity(log_error_verbosity);
+
+  // update suppression list in filter engine
+  {
+    int rr;
+    // try to set the list
+    if (((rr = log_builtins_filter_parse_suppression_list(
+              opt_log_error_suppression_list, false)) != 0) ||
+        ((rr = log_builtins_filter_parse_suppression_list(
+              opt_log_error_suppression_list, true)) != 0)) {
+      rr = -(rr + 1);
+      LogErr(ERROR_LEVEL, ER_CANT_SET_ERROR_SUPPRESSION_LIST_FROM_COMMAND_LINE,
+             "log_error_suppression_list", &opt_log_error_suppression_list[rr]);
+
+      /*
+        We were given an illegal value at start-up, so the default will be
+        used instead. We have reported the problem (and the dodgy value);
+        let's now point our variable back at the default (i.e. the value
+        actually used) so SELECT @@GLOBAL.log_error_suppression_list will
+        render correct results.
+      */
+      sys_var *var = find_static_system_variable("log_error_suppression_list");
+      if (var != nullptr) {
+        opt_log_error_suppression_list = (char *)var->get_default();
+        /*
+          During unit-testing, the log subsystem is not initialized,
+          so while the default should always check out as a valid
+          argument, actually setting it will still fail in this
+          particular case as we cannot acquire the rule-set or its
+          lock.
+        */
+        if (log_builtins_filter_parse_suppression_list(
+                opt_log_error_suppression_list, false) == 0) {
+          log_builtins_filter_parse_suppression_list(
+              opt_log_error_suppression_list, true);
+        } else {
+          assert(false); /* purecov: inspected */
+        }
+      }
+    }
+  }
+
+  if (!is_help_or_validate_option())
+    vector<my_option>().swap(all_options);  // Deletes the vector contents.
+
+  /* Add back the program name handle_options removes */
+  (*argc_ptr)++;
+  (*argv_ptr)--;
+
+  /*
+    Options have been parsed. Now some of them need additional special
+    handling, like custom value checking, checking of incompatibilites
+    between options, setting of multiple variables, etc.
+    Do them here.
+  */
+
+  if (!opt_help && opt_verbose) LogErr(ERROR_LEVEL, ER_VERBOSE_REQUIRES_HELP);
+
+  if ((opt_log_slow_admin_statements || opt_log_queries_not_using_indexes ||
+       opt_log_slow_replica_statements) &&
+      !opt_slow_log)
+    LogErr(WARNING_LEVEL, ER_POINTLESS_WITHOUT_SLOWLOG);
+
+  if (global_system_variables.net_buffer_length >
+      global_system_variables.max_allowed_packet) {
+    LogErr(WARNING_LEVEL, ER_WASTEFUL_NET_BUFFER_SIZE,
+           global_system_variables.net_buffer_length,
+           global_system_variables.max_allowed_packet);
+  }
+
+  /*
+    TIMESTAMP columns get implicit DEFAULT values when
+    --explicit_defaults_for_timestamp is not set.
+    This behavior is deprecated now.
+  */
+  if (!is_help_or_validate_option() &&
+      !global_system_variables.explicit_defaults_for_timestamp)
+    LogErr(WARNING_LEVEL, ER_DEPRECATED_TIMESTAMP_IMPLICIT_DEFAULTS);
+
+  opt_init_connect.length = strlen(opt_init_connect.str);
+  opt_init_replica.length = strlen(opt_init_replica.str);
+  opt_mandatory_roles.length = strlen(opt_mandatory_roles.str);
+
+  if (global_system_variables.low_priority_updates)
+    thr_upgraded_concurrent_insert_lock = TL_WRITE_LOW_PRIORITY;
+
+  if (ft_boolean_check_syntax_string(
+          pointer_cast<const uchar *>(ft_boolean_syntax))) {
+    LogErr(ERROR_LEVEL, ER_FT_BOOL_SYNTAX_INVALID, ft_boolean_syntax);
+    return 1;
+  }
+
+  if (opt_noacl && !is_help_or_validate_option()) opt_disable_networking = true;
+
+  if (opt_disable_networking) mysqld_port = 0;
+
+  if (opt_skip_show_db) opt_specialflag |= SPECIAL_SKIP_SHOW_DB;
+
+  if (myisam_flush) flush_time = 0;
+
+  if (opt_replica_skip_errors) add_replica_skip_errors(opt_replica_skip_errors);
+
+  if (global_system_variables.max_join_size == HA_POS_ERROR)
+    global_system_variables.option_bits |= OPTION_BIG_SELECTS;
+  else
+    global_system_variables.option_bits &= ~OPTION_BIG_SELECTS;
+
+  // Synchronize @@global.autocommit value on --autocommit
+  const ulonglong turn_bit_on =
+      opt_autocommit ? OPTION_AUTOCOMMIT : OPTION_NOT_AUTOCOMMIT;
+  global_system_variables.option_bits =
+      (global_system_variables.option_bits &
+       ~(OPTION_NOT_AUTOCOMMIT | OPTION_AUTOCOMMIT)) |
+      turn_bit_on;
+
+  // Synchronize @@global.autocommit metadata on --autocommit
+  my_option *opt = &my_long_options[3];
+  assert(strcmp(opt->name, "autocommit") == 0);
+  assert(opt->arg_source != nullptr);
+  Sys_autocommit_ptr->set_source_name(opt->arg_source->m_path_name);
+  Sys_autocommit_ptr->set_source(opt->arg_source->m_source);
+
+  global_system_variables.sql_mode =
+      expand_sql_mode(global_system_variables.sql_mode, nullptr);
+
+  if (!my_enable_symlinks) have_symlink = SHOW_OPTION_DISABLED;
+
+  if (opt_debugging) {
+    /* Allow break with SIGINT, no core or stack trace */
+    test_flags |= TEST_SIGINT | TEST_NO_STACKTRACE;
+    test_flags &= ~TEST_CORE_ON_SIGNAL;
+  }
+  /* Set global MyISAM variables from delay_key_write_options */
+  fix_delay_key_write(nullptr, nullptr, OPT_GLOBAL);
+
+#ifndef _WIN32
+  if (mysqld_chroot) set_root(mysqld_chroot);
+#endif
+  if (fix_paths()) return 1;
+
+  /*
+    Set some global variables from the global_system_variables
+    In most cases the global variables will not be used
+  */
+  my_disable_locking = myisam_single_user = (opt_external_locking == 0);
+  my_default_record_cache_size = global_system_variables.read_buff_size;
+
+  global_system_variables.long_query_time =
+      (ulonglong)(global_system_variables.long_query_time_double * 1e6);
+
+  if (opt_short_log_format) opt_specialflag |= SPECIAL_SHORT_LOG_FORMAT;
+
+  if (Connection_handler_manager::init()) {
+    LogErr(ERROR_LEVEL, ER_CONNECTION_HANDLING_OOM);
+    return 1;
+  }
+  if (Global_THD_manager::create_instance()) {
+    LogErr(ERROR_LEVEL, ER_THREAD_HANDLING_OOM);
+    return 1;
+  }
+
+  /* If --super-read-only was specified, set read_only to 1 */
+  read_only = super_read_only ? super_read_only : read_only;
+  opt_readonly = read_only;
+
+  return 0;
+}
+
+

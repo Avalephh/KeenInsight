@@ -1,0 +1,128 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_aes_encrypt::val_str
+String *Item_func_aes_encrypt::val_str(String *str) {
+  assert(fixed == 1);
+  char key_buff[80]{'\0'};
+  String tmp_key_value(key_buff, sizeof(key_buff), system_charset_info);
+  THD *thd = current_thd;
+  iv_argument iv_arg;
+  DBUG_TRACE;
+
+  String *sptr = args[0]->val_str(str);  // String to encrypt
+  if (sptr == nullptr) return error_str();
+
+  String *key = args[1]->val_str(&tmp_key_value);  // key
+  if (key == nullptr) return error_str();
+
+  my_aes_opmode aes_opmode =
+      static_cast<my_aes_opmode>(thd->variables.my_aes_mode);
+  assert(aes_opmode <= MY_AES_END);
+
+  const unsigned char *iv_str = iv_arg.retrieve_iv_ptr(
+      aes_opmode, arg_count, args, func_name(), thd, &null_value);
+  if (null_value) return error_str();
+
+  vector<string> kdf_options;
+  kdf_argument kdf_arg;
+  kdf_options =
+      kdf_arg.retrieve_kdf_options(arg_count, args, func_name(), &null_value);
+  if (null_value) return error_str();
+
+  // Calculate result length
+  int aes_length = my_aes_get_size(sptr->length(), aes_opmode);
+
+  tmp_value.set_charset(&my_charset_bin);
+  const uint rkey_size = my_aes_opmode_key_sizes[aes_opmode] / 8;
+  uint key_size = key->length();
+  if ((key_size > rkey_size) && (kdf_options.size() == 0)) {
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_AES_KEY_SIZE,
+                        ER_THD(thd, WARN_AES_KEY_SIZE), rkey_size);
+  }
+  if (tmp_value.alloc(aes_length)) return error_str();
+
+  // Finally encrypt directly to allocated buffer.
+  if (my_aes_encrypt(pointer_cast<unsigned char *>(sptr->ptr()), sptr->length(),
+                     pointer_cast<unsigned char *>(tmp_value.ptr()),
+                     pointer_cast<unsigned char *>(key->ptr()), key->length(),
+                     aes_opmode, iv_str, true,
+                     (kdf_options.size() > 0) ? &kdf_options : nullptr) ==
+      aes_length) {
+    // We got the expected result length
+    tmp_value.length(static_cast<size_t>(aes_length));
+    return &tmp_value;
+  }
+  return error_str();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_aes_encrypt::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_aes_decrypt::val_str
+String *Item_func_aes_encrypt::val_str(String *str) {
+  assert(fixed == 1);
+  char key_buff[80]{'\0'};
+  String tmp_key_value(key_buff, sizeof(key_buff), system_charset_info);
+  THD *thd = current_thd;
+  iv_argument iv_arg;
+  DBUG_TRACE;
+
+  String *sptr = args[0]->val_str(str);  // String to encrypt
+  if (sptr == nullptr) return error_str();
+
+  String *key = args[1]->val_str(&tmp_key_value);  // key
+  if (key == nullptr) return error_str();
+
+  my_aes_opmode aes_opmode =
+      static_cast<my_aes_opmode>(thd->variables.my_aes_mode);
+  assert(aes_opmode <= MY_AES_END);
+
+  const unsigned char *iv_str = iv_arg.retrieve_iv_ptr(
+      aes_opmode, arg_count, args, func_name(), thd, &null_value);
+  if (null_value) return error_str();
+
+  vector<string> kdf_options;
+  kdf_argument kdf_arg;
+  kdf_options =
+      kdf_arg.retrieve_kdf_options(arg_count, args, func_name(), &null_value);
+  if (null_value) return error_str();
+
+  // Calculate result length
+  int aes_length = my_aes_get_size(sptr->length(), aes_opmode);
+
+  tmp_value.set_charset(&my_charset_bin);
+  const uint rkey_size = my_aes_opmode_key_sizes[aes_opmode] / 8;
+  uint key_size = key->length();
+  if ((key_size > rkey_size) && (kdf_options.size() == 0)) {
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_AES_KEY_SIZE,
+                        ER_THD(thd, WARN_AES_KEY_SIZE), rkey_size);
+  }
+  if (tmp_value.alloc(aes_length)) return error_str();
+
+  // Finally encrypt directly to allocated buffer.
+  if (my_aes_encrypt(pointer_cast<unsigned char *>(sptr->ptr()), sptr->length(),
+                     pointer_cast<unsigned char *>(tmp_value.ptr()),
+                     pointer_cast<unsigned char *>(key->ptr()), key->length(),
+                     aes_opmode, iv_str, true,
+                     (kdf_options.size() > 0) ? &kdf_options : nullptr) ==
+      aes_length) {
+    // We got the expected result length
+    tmp_value.length(static_cast<size_t>(aes_length));
+    return &tmp_value;
+  }
+  return error_str();
+}
+
+

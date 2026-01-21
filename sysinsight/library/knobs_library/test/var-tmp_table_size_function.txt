@@ -1,0 +1,178 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc
+Function: thd_get_tmp_table_size
+size_t thd_get_tmp_table_size(const THD *thd) {
+  // We are intentionally narrowing the unsigned long long int (type of
+  // thd->variables.tmp_table_size) to size_t here. Issue with the former is
+  // that it represents more memory than one can address, in particular this is
+  // the case with 32-bit builds because unsigned long long int is guaranteed
+  // to be _at least_ 64 bits wide. That is much larger than the available
+  // address space.
+  //
+  // Given that tmp_table_size sysvar is about limiting the consumed (virtual)
+  // memory, size_t is the type which actually only makes sense to use here as
+  // it represents exactly the theoretical maximum sized object
+  if (thd->variables.tmp_table_size < std::numeric_limits<size_t>::max()) {
+    return thd->variables.tmp_table_size;
+  } else {
+    return std::numeric_limits<size_t>::max();
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc
+Function: temptable::Handler::create
+int Handler::create(const char *table_name, TABLE *mysql_table,
+                    HA_CREATE_INFO *, dd::Table *) {
+  DBUG_TRACE;
+
+  assert(mysql_table != nullptr);
+  assert(mysql_table->s != nullptr);
+  assert(mysql_table->field != nullptr);
+  assert(table_name != nullptr);
+
+  bool all_columns_are_fixed_size = true;
+  for (uint i = 0; i < mysql_table->s->fields; ++i) {
+    Field *mysql_field = mysql_table->field[i];
+    assert(mysql_field != nullptr);
+    if (!is_field_type_fixed_size(*mysql_field)) {
+      all_columns_are_fixed_size = false;
+      break;
+    }
+  }
+
+  Result ret;
+
+  try {
+    DBUG_EXECUTE_IF("temptable_create_return_full",
+                    throw Result::RECORD_FILE_FULL;);
+    DBUG_EXECUTE_IF("temptable_create_return_non_result_type_exception",
+                    throw 42;);
+
+    // Calculate m_number_of_elements_per_page, see Table::Table():
+    if (all_columns_are_fixed_size) {
+      Storage rows_of_the_table = Storage(nullptr);
+      rows_of_the_table.element_size(mysql_table->s->rec_buff_length);
+      if (rows_of_the_table.number_of_elements_per_page() == 0)
+        DBUG_RET(Result::TOO_BIG_ROW);
+    }
+
+    size_t per_table_limit = thd_get_tmp_table_size(ha_thd());
+    auto &kv_store = kv_store_shard[thd_thread_id(ha_thd())];
+    const auto insert_result = kv_store.emplace(
+        std::piecewise_construct, std::forward_as_tuple(table_name),
+        std::forward_as_tuple(mysql_table, m_shared_block,
+                              all_columns_are_fixed_size, per_table_limit));
+
+    ret = insert_result.second ? Result::OK : Result::TABLE_EXIST;
+
+  } catch (Result ex) {
+    ret = ex;
+  } catch (...) {
+    ret = Result::OUT_OF_MEM;
+  }
+
+  DBUG_RET(ret);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc
+Function: alloc_record_buffers
+static bool alloc_record_buffers(THD *thd, TABLE *table) {
+  TABLE_SHARE *share = table->s;
+  /*
+    Same as MI_UNIQUE_HASH_LENGTH,
+    allows to exclude "myisam.h" from include files.
+  */
+  const int TMP_TABLE_UNIQUE_HASH_LENGTH = 4;
+  uint alloc_length =
+      ALIGN_SIZE(share->reclength + TMP_TABLE_UNIQUE_HASH_LENGTH + 1);
+  share->rec_buff_length = alloc_length;
+  /*
+    Note that code in open_table_from_share() relies on the fact that
+    for optimizer-created temporary tables TABLE_SHARE::default_values
+    is allocated in a single chuck with TABLE::record[0] for the first
+    TABLE instance.
+  */
+  if (!(table->record[0] = (uchar *)share->mem_root.Alloc(
+            (alloc_length * 3 + share->null_bytes))))
+    return true;
+  table->record[1] = table->record[0] + alloc_length;
+  share->default_values = table->record[1] + alloc_length;
+  table->null_flags_saved = share->default_values + alloc_length;
+  if (share->null_bytes) {
+    table->null_flags = table->record[0];
+    memset(table->record[0], 255, share->null_bytes);  // Set null fields
+  }
+
+  if (thd->variables.tmp_table_size == ~(ulonglong)0)  // No limit
+    share->max_rows = ~(ha_rows)0;
+  else
+    share->max_rows = (ha_rows)(((share->db_type() == heap_hton)
+                                     ? min(thd->variables.tmp_table_size,
+                                           thd->variables.max_heap_table_size)
+                                     : thd->variables.tmp_table_size) /
+                                share->reclength);
+  share->max_rows =
+      std::max(share->max_rows, ha_rows(1));  // For dummy start options
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc
+Function: trace_tmp_table
+static void trace_tmp_table(Opt_trace_context *trace, const TABLE *table) {
+  TABLE_SHARE *s = table->s;
+  Opt_trace_object trace_tmp(trace, "tmp_table_info");
+  if (strlen(table->alias) != 0)
+    if (table->pos_in_table_list != nullptr &&
+        strlen(table->pos_in_table_list->table_name) > 0) {
+      trace_tmp.add_utf8_table(table->pos_in_table_list);
+    } else {
+      trace_tmp.add_alnum("table", table->alias);
+    }
+  else
+    trace_tmp.add_alnum("table", "intermediate_tmp_table");
+  QEP_TAB *tab = table->reginfo.qep_tab;
+  if (tab != nullptr && tab->join() != nullptr)
+    trace_tmp.add("in_plan_at_position", tab->idx());
+  trace_tmp.add("columns", s->fields)
+      .add("row_length", s->reclength)
+      .add("key_length", table->s->keys > 0 ? table->key_info->key_length : 0)
+      .add("unique_constraint", table->hash_field ? true : false)
+      .add("makes_grouped_rows", table->group != nullptr)
+      .add("cannot_insert_duplicates", s->is_distinct);
+
+  if (s->db_type() == innodb_hton) {
+    trace_tmp.add_alnum("location", "disk (InnoDB)");
+    if (s->db_create_options & HA_OPTION_PACK_RECORD)
+      trace_tmp.add_alnum("record_format", "packed");
+    else
+      trace_tmp.add_alnum("record_format", "fixed");
+  } else if (table->s->db_type() == temptable_hton) {
+    trace_tmp.add_alnum("location", "TempTable");
+  } else {
+    assert(s->db_type() == heap_hton);
+    trace_tmp.add_alnum("location", "memory (heap)")
+        .add("row_limit_estimate", s->max_rows);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum::ram_limitation
+ulonglong Item_sum::ram_limitation(THD *thd) {
+  ulonglong limitation =
+      min(thd->variables.tmp_table_size, thd->variables.max_heap_table_size);
+
+  DBUG_EXECUTE_IF("simulate_low_itemsum_ram_limitation", limitation = 32;);
+
+  return limitation;
+}
+
+

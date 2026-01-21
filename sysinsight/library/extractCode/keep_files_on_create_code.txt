@@ -1,0 +1,129 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_table.cc
+Function: create_table_impl
+  Simple wrapper around create_table_impl() to be used
+  in various version of CREATE TABLE statement.
+*/
+bool mysql_create_table_no_lock(THD *thd, const char *db,
+                                const char *table_name,
+                                HA_CREATE_INFO *create_info,
+                                Alter_info *alter_info, uint select_field_count,
+                                bool find_parent_keys, bool *is_trans,
+                                handlerton **post_ddl_ht) {
+  KEY *not_used_1;
+  uint not_used_2;
+  FOREIGN_KEY *not_used_3 = nullptr;
+  uint not_used_4 = 0;
+  std::unique_ptr<dd::Table> not_used_5;
+  char path[FN_REFLEN + 1];
+
+  if (create_info->options & HA_LEX_CREATE_TMP_TABLE)
+    build_tmptable_filename(thd, path, sizeof(path));
+  else {
+    bool was_truncated;
+    const char *alias = table_case_name(create_info, table_name);
+    build_table_filename(path, sizeof(path) - 1 - reg_ext_length, db, alias, "",
+                         0, &was_truncated);
+    // Check truncation, will lead to overflow when adding extension
+    if (was_truncated) {
+      my_error(ER_IDENT_CAUSES_TOO_LONG_PATH, MYF(0), sizeof(path) - 1, path);
+      return true;
+    }
+  }
+
+  /*
+    Don't create the DD tables in the DDSE unless installing the DD.
+  */
+
+  bool no_ha_table = false;
+  if (!opt_initialize && dd::get_dictionary()->is_dd_table_name(db, table_name))
+    no_ha_table = true;
+
+  // Check if the schema exists. We must make sure the schema is released
+  // and unlocked in the right order.
+  dd::Schema_MDL_locker mdl_locker(thd);
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  const dd::Schema *schema = nullptr;
+  if (mdl_locker.ensure_locked(db) || thd->dd_client()->acquire(db, &schema)) {
+    // Error is reported by the dictionary subsystem.
+    return true;
+  }
+
+  if (schema == nullptr) {
+    my_error(ER_BAD_DB_ERROR, MYF(0), db);
+    return true;
+  }
+
+  // Do not accept ENCRYPTION and AUTOEXTEND_SIZE clauses for
+  // temporary table.
+  if (create_info->options & HA_LEX_CREATE_TMP_TABLE) {
+    if (create_info->encrypt_type.length) {
+      my_error(ER_CANNOT_USE_ENCRYPTION_CLAUSE, MYF(0), "temporary");
+      return true;
+    }
+
+    if (create_info->m_implicit_tablespace_autoextend_size > 0) {
+      my_error(ER_CANNOT_USE_AUTOEXTEND_SIZE_CLAUSE, MYF(0), "temporary");
+      return true;
+    }
+  }
+
+  // Determine table encryption type, and check if user is allowed to create.
+  if (!(create_info->options & HA_LEX_CREATE_TMP_TABLE)) {
+    /*
+      Assume table as encrypted, if user did not explicitly state it and
+      we have a schema with default encryption enabled.
+     */
+    if (!create_info->encrypt_type.length && schema->default_encryption()) {
+      create_info->encrypt_type = {strmake_root(thd->mem_root, "Y", 1), 1};
+    }
+
+    // Stop if it is invalid encryption clause, when using general tablespace.
+    if (validate_table_encryption(thd, create_info)) return true;
+
+    // Check table encryption privilege
+    if (create_info->encrypt_type.str || create_info->tablespace) {
+      /*
+        Check privilege only if request encryption type differ from schema
+        default encryption type.
+       */
+      bool request_type = dd::is_encrypted(create_info->encrypt_type);
+      if (schema->default_encryption() != request_type) {
+        if (opt_table_encryption_privilege_check) {
+          if (check_table_encryption_admin_access(thd)) {
+            my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
+            return true;
+          }
+        } else if (schema->default_encryption() && !request_type) {
+          push_warning(thd, Sql_condition::SL_WARNING,
+                       WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB,
+                       ER_THD(thd, WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB));
+        }
+      }
+    }
+  }
+
+  for (const Create_field &sql_field : alter_info->create_list) {
+    warn_on_deprecated_float_auto_increment(thd, sql_field);
+  }
+
+  // Only needed for CREATE TABLE LIKE / SELECT, as warnings for
+  // pure CREATE TABLE is reported in the parser.
+  if (!thd->lex->query_block->field_list_is_empty()) {
+    for (const Create_field &sql_field : alter_info->create_list) {
+      warn_on_deprecated_float_precision(thd, sql_field);
+      warn_on_deprecated_float_unsigned(thd, sql_field);
+      warn_on_deprecated_zerofill(thd, sql_field);
+    }
+  }
+
+  if (thd->is_plugin_fake_ddl()) no_ha_table = true;
+
+  return create_table_impl(
+      thd, *schema, db, table_name, table_name, path, create_info, alter_info,
+      false, select_field_count, find_parent_keys, no_ha_table, false, is_trans,
+      &not_used_1, &not_used_2, Alter_info::ENABLE, &not_used_3, &not_used_4,
+      nullptr, 0, nullptr, 0, &not_used_5, post_ddl_ht);
+}
+
+

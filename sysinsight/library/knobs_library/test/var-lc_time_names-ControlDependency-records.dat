@@ -1,0 +1,49 @@
+Global Variable: System_variables.94
+Explicit Data Flow (38):
+  Instruction: %6 = load %class.MY_LOCALE*, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1279:27 | Function: Item_func_monthname::resolve_type
+  Instruction: store %class.MY_LOCALE* %6, %class.MY_LOCALE** %locale, align 8, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1279:10 | Function: Item_func_monthname::resolve_type
+  Instruction: %locale = getelementptr inbounds %class.Item_func_monthname.73151, %class.Item_func_monthname.73151* %this1, i32 0, i32 1, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1279:3 | Function: Item_func_monthname::resolve_type
+  Instruction: %locale4 = getelementptr inbounds %class.Item_func_monthname.73151, %class.Item_func_monthname.73151* %this1, i32 0, i32 1, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1281:24 | Function: Item_func_monthname::resolve_type
+  Instruction: %11 = load %class.MY_LOCALE*, %class.MY_LOCALE** %locale4, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1281:24 | Function: Item_func_monthname::resolve_type
+  Instruction: %max_month_name_length = getelementptr inbounds %class.MY_LOCALE, %class.MY_LOCALE* %11, i32 0, i32 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1281:32 | Function: Item_func_monthname::resolve_type
+  Instruction: %12 = load i32, i32* %max_month_name_length, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1281:32 | Function: Item_func_monthname::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEj(%class.Item* %10, i32 %12), !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1281:3 | Function: Item_func_monthname::resolve_type
+  Instruction: %6 = load %class.MY_LOCALE*, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1480:27 | Function: Item_func_dayname::resolve_type
+  Instruction: store %class.MY_LOCALE* %6, %class.MY_LOCALE** %locale, align 8, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1480:10 | Function: Item_func_dayname::resolve_type
+  Instruction: %locale = getelementptr inbounds %class.Item_func_dayname.73159, %class.Item_func_dayname.73159* %this1, i32 0, i32 1, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1480:3 | Function: Item_func_dayname::resolve_type
+  Instruction: %locale4 = getelementptr inbounds %class.Item_func_dayname.73159, %class.Item_func_dayname.73159* %this1, i32 0, i32 1, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1482:24 | Function: Item_func_dayname::resolve_type
+  Instruction: %11 = load %class.MY_LOCALE*, %class.MY_LOCALE** %locale4, align 8, !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1482:24 | Function: Item_func_dayname::resolve_type
+  Instruction: %max_day_name_length = getelementptr inbounds %class.MY_LOCALE, %class.MY_LOCALE* %11, i32 0, i32 9, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1482:32 | Function: Item_func_dayname::resolve_type
+  Instruction: %12 = load i32, i32* %max_day_name_length, align 4, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1482:32 | Function: Item_func_dayname::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEj(%class.Item* %10, i32 %12), !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1482:3 | Function: Item_func_dayname::resolve_type
+  Instruction: %14 = load %class.MY_LOCALE*, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2194:23 | Function: Item_func_date_format::resolve_type
+  Instruction: %is_ascii = getelementptr inbounds %class.MY_LOCALE, %class.MY_LOCALE* %14, i32 0, i32 3, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2194:38 | Function: Item_func_date_format::resolve_type
+  Instruction: %15 = load i8, i8* %is_ascii, align 8, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2194:38 | Function: Item_func_date_format::resolve_type
+  Instruction: %tobool = trunc i8 %15 to i1, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2194:38 | Function: Item_func_date_format::resolve_type
+  Instruction: br i1 %tobool, label %if.end9, label %if.then8, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2194:7 | Function: Item_func_date_format::resolve_type
+  Instruction: %3 = load %class.MY_LOCALE*, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:523:38 | Function: make_date_time
+  Instruction: store %class.MY_LOCALE* %3, %class.MY_LOCALE** %locale, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:523:14 | Function: make_date_time
+  Instruction: store %class.MY_LOCALE* %call438, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255676 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4678:44 | Function: Query_log_event::do_apply_event
+  Instruction: %lc_time_names = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables440, i32 0, i32 94, !dbg !1255675 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4678:30 | Function: Query_log_event::do_apply_event
+  Instruction: %lc_time_names = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables10, i32 0, i32 94, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7344:30 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: %17 = load %class.MY_LOCALE*, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7344:30 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: %number = getelementptr inbounds %class.MY_LOCALE, %class.MY_LOCALE* %17, i32 0, i32 0, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7344:45 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: %18 = load i32, i32* %number, align 8, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7344:45 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: call void @_ZN10binary_log11Query_eventC2EPKcS2_S2_jmymmjyi(%"class.binary_log::Query_event"* %2, i8* %3, i8* %5, i8* %7, i32 %conv, i64 %conv7, i64 %11, i64 %13, i64 %15, i32 %18, i64 %20, i32 %21), !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:7339:7 | Function: Execute_load_query_log_event::Execute_load_query_log_event
+  Instruction: store %class.MY_LOCALE* @my_locale_en_US, %class.MY_LOCALE** %lc_time_names452, align 8, !dbg !1255685 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4682:40 | Function: Query_log_event::do_apply_event
+  Instruction: %lc_time_names452 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables451, i32 0, i32 94, !dbg !1255684 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4682:26 | Function: Query_log_event::do_apply_event
+  Instruction: store %class.MY_LOCALE* @my_locale_en_US, %class.MY_LOCALE** %lc_time_names457, align 8, !dbg !1255691 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4686:38 | Function: Query_log_event::do_apply_event
+  Instruction: %lc_time_names457 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables456, i32 0, i32 94, !dbg !1255690 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4686:24 | Function: Query_log_event::do_apply_event
+  Instruction: %17 = load %class.MY_LOCALE*, %class.MY_LOCALE** %lc_time_names, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3805:30 | Function: Query_log_event::Query_log_event
+  Instruction: %number = getelementptr inbounds %class.MY_LOCALE, %class.MY_LOCALE* %17, i32 0, i32 0, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3805:45 | Function: Query_log_event::Query_log_event
+  Instruction: %18 = load i32, i32* %number, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3805:45 | Function: Query_log_event::Query_log_event
+  Instruction: call void @_ZN10binary_log11Query_eventC2EPKcS2_S2_jmymmjyi(%"class.binary_log::Query_event"* %2, i8* %3, i8* %5, i8* %7, i32 %conv, i64 %conv8, i64 %11, i64 %13, i64 %15, i32 %18, i64 %20, i32 %21), !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3800:7 | Function: Query_log_event::Query_log_event
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

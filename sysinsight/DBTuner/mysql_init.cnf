@@ -1,0 +1,18 @@
+[mysqld]
+user		= mysql
+pid-file		= /var/run/mysqld/mysqld.pid
+socket		= /var/run/mysqld/mysqld.sock
+port		= 3306
+datadir		= /var/lib/mysql
+bind-address		= 127.0.0.1
+mysqlx-bind-address		= 127.0.0.1
+key_buffer_size		= 16M
+myisam-recover-options		= BACKUP
+innodb_buffer_pool_size		= 1024M
+join_buffer_size		= 128M
+read_rnd_buffer_size		= 2M
+max_connections		= 1000
+log_error		= /var/log/mysql/error.log
+innodb_spin_wait_delay		= 508
+innodb_thread_concurrency		= 367
+max_prepared_stmt_count		= 104857

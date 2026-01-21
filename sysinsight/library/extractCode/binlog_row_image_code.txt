@@ -1,0 +1,221 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_value_options not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_value_options not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_value_options not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: TABLE::mark_columns_per_binlog_row_image
+void TABLE::mark_columns_per_binlog_row_image(THD *thd) {
+  DBUG_TRACE;
+  assert(read_set->bitmap);
+  assert(write_set->bitmap);
+
+  /*
+    If in RBR we may need to mark some extra columns,
+    depending on the binlog-row-image command line argument.
+   */
+  if ((mysql_bin_log.is_open() && thd->is_current_stmt_binlog_format_row() &&
+       !ha_check_storage_engine_flag(s->db_type(), HTON_NO_BINLOG_ROW_OPT))) {
+    /* if there is no PK, then mark all columns for the BI. */
+    if (s->primary_key >= MAX_KEY) bitmap_set_all(read_set);
+
+    switch (thd->variables.binlog_row_image) {
+      case BINLOG_ROW_IMAGE_FULL:
+        if (s->primary_key < MAX_KEY) bitmap_set_all(read_set);
+        bitmap_set_all(write_set);
+        break;
+      case BINLOG_ROW_IMAGE_NOBLOB:
+        /* for every field that is not set, mark it unless it is a blob */
+        for (Field **ptr = field; *ptr; ptr++) {
+          Field *my_field = *ptr;
+          /*
+            bypass blob fields. These can be set or not set, we don't care.
+            Later, at binlogging time, if we don't need them in the before
+            image, we will discard them.
+
+            If set in the AI, then the blob is really needed, there is
+            nothing we can do about it.
+           */
+          if ((s->primary_key < MAX_KEY) &&
+              (my_field->is_flag_set(PRI_KEY_FLAG) ||
+               (my_field->type() != MYSQL_TYPE_BLOB)))
+            bitmap_set_bit(read_set, my_field->field_index());
+
+          if (my_field->type() != MYSQL_TYPE_BLOB)
+            bitmap_set_bit(write_set, my_field->field_index());
+        }
+        break;
+      case BINLOG_ROW_IMAGE_MINIMAL:
+        /* mark the primary key if available in the read_set */
+        if (s->primary_key < MAX_KEY)
+          mark_columns_used_by_index_no_reset(s->primary_key, read_set);
+        break;
+
+      default:
+        assert(false);
+    }
+    file->column_bitmaps_signal();
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: binlog_log_row
+int binlog_log_row(TABLE *table, const uchar *before_record,
+                   const uchar *after_record, Log_func *log_func) {
+  bool error = false;
+  THD *const thd = table->in_use;
+
+  if (check_table_binlog_row_based(thd, table)) {
+    if (thd->variables.transaction_write_set_extraction != HASH_ALGORITHM_OFF) {
+      try {
+        MY_BITMAP save_read_set;
+        MY_BITMAP save_write_set;
+        if (bitmap_init(&save_read_set, nullptr, table->s->fields) ||
+            bitmap_init(&save_write_set, nullptr, table->s->fields)) {
+          my_error(ER_OUT_OF_RESOURCES, MYF(0));
+          return HA_ERR_RBR_LOGGING_FAILED;
+        }
+
+        Binlog_log_row_cleanup cleanup_sentry(*table, save_read_set,
+                                              save_write_set);
+
+        if (thd->variables.binlog_row_image == 0) {
+          for (uint key_number = 0; key_number < table->s->keys; ++key_number) {
+            if (((table->key_info[key_number].flags & (HA_NOSAME)) ==
+                 HA_NOSAME)) {
+              table->mark_columns_used_by_index_no_reset(key_number,
+                                                         table->read_set);
+              table->mark_columns_used_by_index_no_reset(key_number,
+                                                         table->write_set);
+            }
+          }
+        }
+        std::array<const uchar *, 2> records{after_record, before_record};
+        for (auto rec : records) {
+          if (rec != nullptr) {
+            assert(rec == table->record[0] || rec == table->record[1]);
+            bool res = add_pke(table, thd, rec);
+            if (res) return HA_ERR_RBR_LOGGING_FAILED;
+          }
+        }
+      } catch (const std::bad_alloc &) {
+        my_error(ER_OUT_OF_RESOURCES, MYF(0));
+        return HA_ERR_RBR_LOGGING_FAILED;
+      }
+    }
+    if (table->in_use->is_error()) return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+
+    DBUG_DUMP("read_set 10", (uchar *)table->read_set->bitmap,
+              (table->s->fields + 7) / 8);
+
+    /*
+      If there are no table maps written to the binary log, this is
+      the first row handled in this statement. In that case, we need
+      to write table maps for all locked tables to the binary log.
+    */
+    if (likely(!(error = write_locked_table_maps(thd)))) {
+      /*
+        We need to have a transactional behavior for SQLCOM_CREATE_TABLE
+        (i.e. CREATE TABLE... SELECT * FROM TABLE) in order to keep a
+        compatible behavior with the STMT based replication even when
+        the table is not transactional. In other words, if the operation
+        fails while executing the insert phase nothing is written to the
+        binlog.
+      */
+      bool const has_trans = thd->lex->sql_command == SQLCOM_CREATE_TABLE ||
+                             table->file->has_transactions();
+      error = (*log_func)(thd, table, has_trans, before_record, after_record);
+    }
+  }
+
+  return error ? HA_ERR_RBR_LOGGING_FAILED : 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: binlog_prepare_row_images
+void binlog_prepare_row_images(const THD *thd, TABLE *table) {
+  DBUG_TRACE;
+  /**
+    Remove from read_set spurious columns. The write_set has been
+    handled before in table->mark_columns_needed_for_update.
+   */
+
+  DBUG_PRINT_BITSET("debug", "table->read_set (before preparing): %s",
+                    table->read_set);
+
+  /**
+    if there is a primary key in the table (ie, user declared PK or a
+    non-null unique index) and we dont want to ship the entire image,
+    and the handler involved supports this.
+   */
+  if (table->s->primary_key < MAX_KEY &&
+      (thd->variables.binlog_row_image < BINLOG_ROW_IMAGE_FULL) &&
+      !ha_check_storage_engine_flag(table->s->db_type(),
+                                    HTON_NO_BINLOG_ROW_OPT)) {
+    /**
+      Just to be sure that tmp_set is currently not in use as
+      the read_set already.
+    */
+    assert(table->read_set != &table->tmp_set);
+    // Verify it's not used
+    assert(bitmap_is_clear_all(&table->tmp_set));
+
+    switch (thd->variables.binlog_row_image) {
+      case BINLOG_ROW_IMAGE_MINIMAL:
+        /* MINIMAL: Mark only PK */
+        table->mark_columns_used_by_index_no_reset(table->s->primary_key,
+                                                   &table->tmp_set);
+        break;
+      case BINLOG_ROW_IMAGE_NOBLOB:
+        /**
+          NOBLOB: Remove unnecessary BLOB fields from read_set
+                  (the ones that are not part of PK).
+         */
+        bitmap_union(&table->tmp_set, table->read_set);
+        for (Field **ptr = table->field; *ptr; ptr++) {
+          Field *field = (*ptr);
+          if ((field->type() == MYSQL_TYPE_BLOB) &&
+              !field->is_flag_set(PRI_KEY_FLAG))
+            bitmap_clear_bit(&table->tmp_set, field->field_index());
+        }
+        break;
+      default:
+        assert(0);  // impossible.
+    }
+
+    /* set the temporary read_set */
+    table->column_bitmaps_set_no_signal(&table->tmp_set, table->write_set);
+  }
+
+  DBUG_PRINT_BITSET("debug", "table->read_set (after preparing): %s",
+                    table->read_set);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc
+Function: Applier_security_context_guard::has_access
+bool Applier_security_context_guard::has_access(
+    std::initializer_list<ulong> extra_privileges) const {
+  if (this->m_privilege_checks_none) return true;
+  if (this->m_current == nullptr) return false;
+
+  for (auto privilege : extra_privileges)
+    if (!this->m_current->check_access(privilege, "", true)) return false;
+
+  return true;
+}
+
+

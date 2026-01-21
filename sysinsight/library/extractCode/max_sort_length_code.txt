@@ -1,0 +1,77 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/filesort.cc
+Function: sortlength
+                           sortlength(thd, filesort->sortorder, s_length),
+                           filesort->tables, max_rows,
+                           filesort->m_remove_duplicates);
+
+  fs_info->addon_fields = param->addon_fields;
+
+  thd->inc_status_sort_scan();
+
+  Bounded_queue<uchar *, uchar *, Sort_param, Mem_compare_queue_key> pq(
+      param->max_record_length(),
+      (Malloc_allocator<uchar *>(key_memory_Filesort_info_record_pointers)));
+
+  // We would have liked to do this ahead-of-time so that we can show it
+  // in EXPLAIN. However, we don't know the table->file->ref_length before
+  // sorting time, which makes it hard to make the decision if we're row IDs.
+  // (If we sort rows, we would know, but it's not much use knowing it
+  // ahead-of-time _sometimes_.)
+  //
+  // However, do note this cannot change the addon fields status,
+  // so that we at least know that when checking whether we can skip
+  // in-between temporary tables (StreamingIterator).
+  if (check_if_pq_applicable(trace, param, fs_info, num_rows_estimate,
+                             memory_available)) {
+    DBUG_PRINT("info", ("filesort PQ is applicable"));
+    /*
+      For PQ queries (with limit) we know exactly how many pointers/records
+      we have in the buffer, so to simplify things, we initialize
+      all pointers here. (We cannot pack fields anyways, so there is no
+      point in doing incremental allocation).
+     */
+    if (fs_info->preallocate_records(param->max_rows_per_buffer)) {
+      my_error(ER_OUT_OF_SORTMEMORY, ME_FATALERROR);
+      LogErr(ERROR_LEVEL, ER_SERVER_OUT_OF_SORTMEMORY);
+      goto err;
+    }
+
+    if (pq.init(param->max_rows, param, fs_info->get_sort_keys())) {
+      /*
+       If we fail to init pq, we have to give up:
+       out of memory means my_malloc() will call my_error().
+      */
+      DBUG_PRINT("info", ("failed to allocate PQ"));
+      fs_info->free_sort_buffer();
+      assert(thd->is_error());
+      goto err;
+    }
+    filesort->using_pq = true;
+    param->using_pq = true;
+    param->m_addon_fields_status = Addon_fields_status::using_priority_queue;
+  } else {
+    DBUG_PRINT("info", ("filesort PQ is not applicable"));
+    filesort->using_pq = false;
+    param->using_pq = false;
+
+    /*
+      When sorting using priority queue, we cannot use packed addons.
+      Without PQ, we can try.
+    */
+    param->try_to_pack_addons();
+
+    /*
+      NOTE: param->max_rows_per_buffer is merely informative (for optimizer
+      trace) in this case, not actually used.
+    */
+    if (num_rows_estimate < MERGEBUFF2) num_rows_estimate = MERGEBUFF2;
+    ha_rows keys =
+        memory_available / (param->max_record_length() + sizeof(char *));
+    param->max_rows_per_buffer =
+        min(num_rows_estimate > 0 ? num_rows_estimate : 1, keys);
+
+    fs_info->set_max_size(memory_available, param->max_record_length());
+  }
+
+

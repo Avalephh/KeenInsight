@@ -1,0 +1,424 @@
+Global Variable: System_variables.96
+Explicit Data Flow (49):
+  Instruction: %374 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1256295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8293:23 | Function: mysql_prepare_create_table
+  Instruction: %tobool437 = trunc i8 %374 to i1, !dbg !1256295 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8293:23 | Function: mysql_prepare_create_table
+  Instruction: br i1 %tobool437, label %if.end465, label %if.then438, !dbg !1256296 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8292:7 | Function: mysql_prepare_create_table
+  Instruction: %102 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255731 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:10116:23 | Function: mysql_create_table
+  Instruction: %tobool110 = trunc i8 %102 to i1, !dbg !1255731 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:10116:23 | Function: mysql_create_table
+  Instruction: br i1 %tobool110, label %if.end113, label %if.then111, !dbg !1255732 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:10116:7 | Function: mysql_create_table
+  Instruction: %575 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1256964 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:17063:23 | Function: mysql_alter_table
+  Instruction: %tobool1034 = trunc i8 %575 to i1, !dbg !1256964 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:17063:23 | Function: mysql_alter_table
+  Instruction: br i1 %tobool1034, label %if.end1038, label %if.then1035, !dbg !1256965 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:17063:7 | Function: mysql_alter_table
+  Instruction: %1 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1257:22 | Function: check_explicit_defaults_for_timestamp
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1257:22 | Function: check_explicit_defaults_for_timestamp
+  Instruction: br i1 %tobool, label %if.then, label %if.end3, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc:1257:7 | Function: check_explicit_defaults_for_timestamp
+  Instruction: %5 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_column_attrs.h:774:29 | Function: PT_timestamp_type::contextualize
+  Instruction: %tobool = trunc i8 %5 to i1, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_column_attrs.h:774:29 | Function: PT_timestamp_type::contextualize
+  Instruction: br i1 %tobool, label %if.end3, label %if.then2, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_column_attrs.h:774:9 | Function: PT_timestamp_type::contextualize
+  Instruction: store i8 %frombool, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:398:50 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %explicit_defaults_for_timestamp = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables50, i32 0, i32 96, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:398:18 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %explicit_defaults_for_timestamp = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables1, i32 0, i32 96, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:929:18 | Function: dd::bootstrap::restart
+  Instruction: store i8 1, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc:929:50 | Function: dd::bootstrap::restart
+  Instruction: %explicit_defaults_for_timestamp = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables144, i32 0, i32 96, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4507:20 | Function: Query_log_event::do_apply_event
+  Instruction: store i8 %frombool145, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255418 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4507:52 | Function: Query_log_event::do_apply_event
+  Instruction: %74 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255537 | Location: /root/LLVM/mysql-8.0.36/sql/create_field.cc:309:24 | Function: Create_field::init
+  Instruction: %tobool129 = trunc i8 %74 to i1, !dbg !1255537 | Location: /root/LLVM/mysql-8.0.36/sql/create_field.cc:309:24 | Function: Create_field::init
+  Instruction: br i1 %tobool129, label %if.then133, label %lor.lhs.false130, !dbg !1255538 | Location: /root/LLVM/mysql-8.0.36/sql/create_field.cc:309:56 | Function: Create_field::init
+  Instruction: %1 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:5135:23 | Function: Field_timestamp::validate_stored_val
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:5135:23 | Function: Field_timestamp::validate_stored_val
+  Instruction: br i1 %tobool, label %if.end, label %if.then, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:5135:7 | Function: Field_timestamp::validate_stored_val
+  Instruction: %1 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:5243:23 | Function: Field_timestampf::validate_stored_val
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:5243:23 | Function: Field_timestampf::validate_stored_val
+  Instruction: br i1 %tobool, label %if.end, label %if.then, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/field.cc:5243:7 | Function: Field_timestampf::validate_stored_val
+  Instruction: %12 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/field_conv.cc:178:23 | Function: set_field_to_null_with_conversions
+  Instruction: %tobool7 = trunc i8 %12 to i1, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/field_conv.cc:178:23 | Function: set_field_to_null_with_conversions
+  Instruction: br i1 %tobool7, label %if.end11, label %if.then8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/field_conv.cc:177:7 | Function: set_field_to_null_with_conversions
+  Instruction: %72 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255442 | Location: /root/LLVM/mysql-8.0.36/sql/field_conv.cc:756:24 | Function: fields_are_memcpyable
+  Instruction: %tobool97 = trunc i8 %72 to i1, !dbg !1255442 | Location: /root/LLVM/mysql-8.0.36/sql/field_conv.cc:756:24 | Function: fields_are_memcpyable
+  Instruction: br i1 %tobool97, label %land.lhs.true98, label %if.end101, !dbg !1255443 | Location: /root/LLVM/mysql-8.0.36/sql/field_conv.cc:756:56 | Function: fields_are_memcpyable
+  Instruction: %8 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_insert.cc:2657:23 | Function: create_table_from_items
+  Instruction: %tobool = trunc i8 %8 to i1, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_insert.cc:2657:23 | Function: create_table_from_items
+  Instruction: br i1 %tobool, label %if.end3, label %if.then1, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/sql_insert.cc:2657:7 | Function: create_table_from_items
+  Instruction: %278 = load i8, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255646 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3580:31 | Function: Query_log_event::write
+  Instruction: %tobool305 = trunc i8 %278 to i1, !dbg !1255646 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3580:31 | Function: Query_log_event::write
+  Instruction: %conv306 = zext i1 %tobool305 to i8, !dbg !1255644 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3580:16 | Function: Query_log_event::write
+  Instruction: store i8 %conv306, i8* %279, align 1, !dbg !1255648 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3580:14 | Function: Query_log_event::write
+  Instruction: store i8 0, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2471:50 | Function: wl6292_upgrade_func
+  Instruction: %explicit_defaults_for_timestamp = getelementptr inbounds %struct.System_variables.163345, %struct.System_variables.163345* %variables, i32 0, i32 96, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2471:18 | Function: wl6292_upgrade_func
+  Instruction: %explicit_defaults_for_timestamp = getelementptr inbounds %struct.System_variables.163345, %struct.System_variables.163345* %variables, i32 0, i32 96, !dbg !1255285 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2480:20 | Function: wl6292_downgrade_func
+  Instruction: store i8 0, i8* %explicit_defaults_for_timestamp, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2480:52 | Function: wl6292_downgrade_func
+  Instruction: %explicit_defaults_for_timestamp2 = getelementptr inbounds %struct.System_variables.163345, %struct.System_variables.163345* %variables1, i32 0, i32 96, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2473:20 | Function: wl6292_upgrade_func
+  Instruction: store i8 1, i8* %explicit_defaults_for_timestamp2, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:2473:52 | Function: wl6292_upgrade_func
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: List_iterator
+  Controlled Function: List_iterator
+  Controlled Function: Mem_root_array
+  Controlled Function: Mem_root_array
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: handler::max_record_length
+  Controlled Function: is_timestamp_type
+  Controlled Function: handler::max_record_length
+  Controlled Function: my_error
+  Controlled Function: Mem_root_array
+  Controlled Function: Mem_root_array
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: is_generate_invisible_primary_key_mode_active
+  Controlled Function: promote_first_timestamp_column
+  Controlled Function: is_candidate_table_for_invisible_primary_key_generation
+  Controlled Function: mysql_create_table_no_lock
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: validate_and_generate_invisible_primary_key
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: Transaction_ctx::mark_created_temp_table
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: dd::get_dictionary
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: write_bin_log
+  Controlled Function: Foreign_key_parents_invalidator::invalidate
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::String
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: String::length
+  Controlled Function: String::~String
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: String::ptr
+  Controlled Function: String::length
+  Controlled Function: write_bin_log
+  Controlled Function: __assert_fail
+  Controlled Function: adjust_fk_children_after_parent_def_change
+  Controlled Function: String::~String
+  Controlled Function: __assert_fail
+  Controlled Function: adjust_fk_parents
+  Controlled Function: promote_first_timestamp_column
+  Controlled Function: MDL_request::MDL_request
+  Controlled Function: MDL_request::init_with_source
+  Controlled Function: std::unique_ptr
+  Controlled Function: validate_table_encryption
+  Controlled Function: MDL_context::acquire_lock
+  Controlled Function: std::set
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: std::unique_ptr
+  Controlled Function: create_table_impl
+  Controlled Function: std::set
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: std::unique_ptr
+  Controlled Function: Alter_table_prelocking_strategy::~Alter_table_prelocking_strategy
+  Controlled Function: Alter_table_prelocking_strategy::~Alter_table_prelocking_strategy
+  Controlled Function: Table_ddl_hton_notification_guard::~Table_ddl_hton_notification_guard
+  Controlled Function: std::unique_ptr
+  Controlled Function: remove_secondary_engine
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Table_ddl_hton_notification_guard::~Table_ddl_hton_notification_guard
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: dd::is_checked_for_upgrade
+  Controlled Function: set_check_constraints_alter_mode
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: Alter_inplace_info::Alter_inplace_info
+  Controlled Function: fk_check_copy_alter_table
+  Controlled Function: check_fk_children_after_parent_def_change
+  Controlled Function: __assert_fail
+  Controlled Function: std::unique_ptr
+  Controlled Function: quick_rm_table
+  Controlled Function: _db_pargs_
+  Controlled Function: fill_alter_inplace_info
+  Controlled Function: std::vector
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: _db_enabled_
+  Controlled Function: Alter_inplace_info::~Alter_inplace_info
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: I_P_List
+  Controlled Function: check_fk_children_after_parent_def_change
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Alter_inplace_info::~Alter_inplace_info
+  Controlled Function: _db_keyword_
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Foreign_key_parents_invalidator::invalidate
+  Controlled Function: check_fk_children_after_parent_def_change
+  Controlled Function: Diagnostics_area::current_row_for_condition
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: _db_keyword_
+  Controlled Function: my_error
+  Controlled Function: MDL_context::upgrade_shared_lock
+  Controlled Function: push_zero_date_warning
+  Controlled Function: dd::is_encrypted
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: _db_doprnt_
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: unlikely
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_sleep
+  Controlled Function: _db_keyword_
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: std::unique_ptr
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: unlikely
+  Controlled Function: MDL_context::release_all_locks_for_name
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: my_error
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: dd::is_encrypted
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: State_tracker::is_enabled
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: __assert_fail
+  Controlled Function: collect_fk_names
+  Controlled Function: get_fk_max_generated_name_number
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: Diagnostics_area::current_statement_cond_count
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: collect_fk_names_for_new_fks
+  Controlled Function: snprintf
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: __assert_fail
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: my_error
+  Controlled Function: update_altered_table
+  Controlled Function: _db_keyword_
+  Controlled Function: MYSQL_BIN_LOG::is_open
+  Controlled Function: TABLE::column_bitmaps_set_no_signal
+  Controlled Function: collect_fk_names_for_rename_table
+  Controlled Function: collect_fk_parents_for_new_fks
+  Controlled Function: set_column_static_defaults
+  Controlled Function: my_error
+  Controlled Function: unlikely
+  Controlled Function: I_P_List
+  Controlled Function: __assert_fail
+  Controlled Function: copy_data_between_tables
+  Controlled Function: dd::get_dictionary
+  Controlled Function: MDL_context::acquire_locks
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: unlikely
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: write_bin_log
+  Controlled Function: alter_table_manage_keys
+  Controlled Function: mysql_inplace_alter_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: unlikely
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: Foreign_key_parents_invalidator::invalidate
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: check_fk_names_before_rename
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: _db_keyword_
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: write_bin_log
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: collect_and_lock_fk_tables_for_complex_alter_table
+  Controlled Function: snprintf
+  Controlled Function: std::unique_ptr
+  Controlled Function: __assert_fail
+  Controlled Function: MDL_request::MDL_request
+  Controlled Function: MDL_request::init_with_source
+  Controlled Function: std::unique_ptr
+  Controlled Function: MDL_context::acquire_lock
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: quick_rm_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: quick_rm_table
+  Controlled Function: mysql_rename_table
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: quick_rm_table
+  Controlled Function: __assert_fail
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: adjust_foreign_key_names_for_old_table_version
+  Controlled Function: mysql_rename_table
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: adjust_fks_for_complex_alter_table
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: __assert_fail
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: quick_rm_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: mysql_rename_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: alter_table_drop_histograms
+  Controlled Function: dd::Collection
+  Controlled Function: set_check_constraints_alter_mode
+  Controlled Function: adjust_check_constraint_names_for_old_table_version
+  Controlled Function: reset_check_constraints_alter_mode
+  Controlled Function: dd::is_checked_for_upgrade
+  Controlled Function: dd::is_checked_for_upgrade
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: rename_histograms
+  Controlled Function: quick_rm_table
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: is_timestamp_type
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __errno_location
+  Controlled Function: my_strtoull
+  Controlled Function: __errno_location
+  Controlled Function: __assert_fail
+  Controlled Function: my_decimal_trim
+  Controlled Function: List
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: String::String
+  Controlled Function: my_error
+  Controlled Function: List
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: my_decimal_precision_to_length
+  Controlled Function: String::length
+  Controlled Function: String::~String
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: unsigned long const& std::min
+  Controlled Function: List_STL_Iterator
+  Controlled Function: my_error
+  Controlled Function: __assert_fail
+  Controlled Function: my_error
+  Controlled Function: THD::is_strict_mode
+  Controlled Function: List_STL_Iterator
+  Controlled Function: List
+  Controlled Function: my_error
+  Controlled Function: String::~String
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: List_STL_Iterator
+  Controlled Function: Field_temporal_with_date::validate_stored_val
+  Controlled Function: Field_temporal_with_date::validate_stored_val
+  Controlled Function: Field::is_gcol
+  Controlled Function: Field::is_tmp_nullable
+  Controlled Function: my_error
+  Controlled Function: Item_func_now_local::store_in
+  Controlled Function: Field::set_null
+  Controlled Function: my_error
+  Controlled Function: __assert_fail
+  Controlled Function: Field::set_warning
+  Controlled Function: my_error
+  Controlled Function: promote_first_timestamp_column
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: VisibleFields
+  Controlled Function: VisibleFieldsContainer
+  Controlled Function: VisibleFieldsContainer
+  Controlled Function: VisibleFieldsAdapter
+  Controlled Function: VisibleFieldsAdapter
+  Controlled Function: _db_keyword_
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: I_P_List
+  Controlled Function: unlikely
+  Controlled Function: my_error
+  Controlled Function: __assert_fail
+  Controlled Function: CountVisibleFields
+  Controlled Function: I_P_List
+  Controlled Function: VisibleFieldsAdapter
+  Controlled Function: MDL_context::acquire_locks
+  Controlled Function: unlikely
+  Controlled Function: __assert_fail
+
+Implicit Control Flow:
+
+----------------------------------------

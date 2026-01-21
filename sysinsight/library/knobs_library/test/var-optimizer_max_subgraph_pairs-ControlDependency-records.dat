@@ -1,0 +1,19 @@
+Global Variable: System_variables.43
+Explicit Data Flow (6):
+  Instruction: %127 = load i64, i64* %optimizer_max_subgraph_pairs, align 8, !dbg !1255584 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:6530:22 | Function: FindBestQueryPlan
+  Instruction: %conv157 = trunc i64 %127 to i32, !dbg !1255582 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:6530:7 | Function: FindBestQueryPlan
+  Instruction: invoke void @_ZN12_GLOBAL__N_115CostingReceiverC2EP3THDP11Query_blockR14JoinHypergraphPK16LogicalOrderingsPK14Mem_root_arrayI17SortAheadOrderingEPKSA_I15ActiveIndexInfoEPKSA_I17FullTextIndexInfoEmmmmbmiPFbS2_RKS5_P10AccessPathEPNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE(%"class.(anonymous namespace)::CostingReceiver"* %receiver, %class.THD.78824* %118, %class.Query_block.78570* %119, %struct.JoinHypergraph* dereferenceable(520) %graph, %class.LogicalOrderings* %orderings, %class.Mem_root_array.636* %sort_ahead_orderings, %class.Mem_root_array.638* %active_indexes, %class.Mem_root_array.640* %fulltext_searches, i64 %120, i64 %121, i64 %122, i64 %123, i1 zeroext %tobool154, i64 %call156, i32 %conv157, i1 (%class.THD.78824*, %struct.JoinHypergraph*, %struct.AccessPath.78827*)* %128, %"class.std::__cxx11::basic_string"* %129)
+          to label %invoke.cont158 unwind label %lpad128, !dbg !1255572 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:6525:19 | Function: FindBestQueryPlan
+  Instruction: %142 = load i64, i64* %optimizer_max_subgraph_pairs186, align 8, !dbg !1255619 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:6541:44 | Function: FindBestQueryPlan
+  Instruction: %conv187 = trunc i64 %142 to i32, !dbg !1255617 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:6541:29 | Function: FindBestQueryPlan
+  Instruction: invoke void @_Z18SimplifyQueryGraphP3THDiP14JoinHypergraphPNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE(%class.THD.78824* %140, i32 %conv187, %struct.JoinHypergraph* %graph, %"class.std::__cxx11::basic_string"* %143)
+          to label %invoke.cont188 unwind label %lpad159, !dbg !1255621 | Location: /root/LLVM/mysql-8.0.36/sql/join_optimizer/join_optimizer.cc:6541:5 | Function: FindBestQueryPlan
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

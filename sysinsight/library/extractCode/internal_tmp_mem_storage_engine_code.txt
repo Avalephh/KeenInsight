@@ -1,0 +1,104 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc
+Function: setup_tmp_table_handler
+  first assign and lock a storage engine using setup_tmp_table_handler(). The
+  locked engine is assigned to TABLE_SHARE::db_plugin and the file handler is
+  assigned to TABLE::file. After this, calling TABLE::has_storage_handler()
+  reports true.
+
+  After this, the table contents is created by calling TABLE::file->create()
+  and the table is opened by calling open_tmp_table(), which itself calls
+  TABLE::file->ha_open(), and sets the TABLE::created flag.
+
+  Thus, opening a temporary table is a two-stage operation:
+   1. assign and lock a storage engine, and
+   2. create the table contents.
+
+  Since a temporary table may be in any of the two stages, we use two
+  counter members in the TABLE_SHARE to count the number of TABLEs in each
+  of the stages: tmp_handler_count and tmp_open_count.
+  tmp_handler_count is incremented in setup_tmp_table_handler().
+  tmp_open_count is incremented in open_tmp_table().
+
+  To open an already instantiated table, assign a storage handler by calling
+  setup_tmp_table_handler(), then call open_tmp_table() which will
+  again increment TABLE_SHARE::tmp_open_count and set TABLE::created.
+
+  Insert, update, delete and read rows using the active TABLE handlers.
+
+  After use, close all active TABLE handlers by calling close_tmp_table().
+  For simplicity, we may also call close_tmp_table() on a non-active TABLE,
+  as it will check whether a storage handler has been assigned.
+
+  If the table is created, TABLE_SHARE::tmp_open_count is decremented.
+  If there are no remaining active TABLE objects, delete the table contents
+  by calling TABLE::file->ha_drop_table(), otherwise close it by calling
+  TABLE::file->ha_close().
+  Set status of the TABLE to deleted and delete the storage handler.
+  If there are no remaining active tables and the storage engine is still
+  locked, unlock the plugin and disassociate it from the TABLE_SHARE object,
+  and decrement TABLE_SHARE::tmp_handler_count.
+
+  After the final instantiation of an internal temporary table, call
+  free_tmp_table() for all associated TABLE objects.
+
+  free_tmp_table() can only be called on a non-instantiated temporary table
+  (but handlers may be assigned for other TABLE objects to the same table)..
+  It will decrement TABLE_SHARE::ref_count and the final call will also
+  remove the temporary table's mem_root object.
+*/
+
+/****************************************************************************
+  Create internal temporary table
+****************************************************************************/
+
+/**
+  Create field for temporary table from given field.
+
+  @param thd	      Thread handler
+  @param org_field    Field from which new field will be created
+  @param name         New field name
+  @param table	      Temporary table
+  @param item	      If item != NULL then fill_record() will update
+                      the record in the original table.
+                      If item == NULL then fill_record() will update
+                      the temporary table
+
+  @retval
+    NULL		on error
+  @retval
+    new_created field
+*/
+
+Field *create_tmp_field_from_field(THD *thd, const Field *org_field,
+                                   const char *name, TABLE *table,
+                                   Item_field *item) {
+  Field *new_field = org_field->new_field(thd->mem_root, table);
+  if (new_field == nullptr) return nullptr;
+
+  new_field->init(table);
+  new_field->field_name = name;
+  if (org_field->is_flag_set(NO_DEFAULT_VALUE_FLAG))
+    new_field->set_flag(NO_DEFAULT_VALUE_FLAG);
+  if (org_field->is_nullable() || org_field->table->is_nullable() ||
+      (item && item->is_nullable()))
+    new_field->clear_flag(NOT_NULL_FLAG);  // Because of outer join
+  if (org_field->type() == FIELD_TYPE_DOUBLE)
+    down_cast<Field_double *>(new_field)->not_fixed = true;
+  /*
+    This field will belong to an internal temporary table, it cannot be
+    generated.
+  */
+  new_field->gcol_info = nullptr;
+  new_field->stored_in_db = true;
+  /*
+    Invisible column is explicitly referred in the column list. Mark it as
+    VISIBLE column in the internal temporary table.
+  */
+  if (new_field->is_hidden_by_user())
+    new_field->set_hidden(dd::Column::enum_hidden_type::HT_VISIBLE);
+
+  return new_field;
+}
+
+

@@ -1,0 +1,13 @@
+Global Variable: System_variables.67
+Explicit Data Flow (2):
+  Instruction: store i32 %3, i32* %binlog_trx_compression_level_zstd, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6731:52 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %binlog_trx_compression_level_zstd = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables3, i32 0, i32 67, !dbg !1255295 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6731:18 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

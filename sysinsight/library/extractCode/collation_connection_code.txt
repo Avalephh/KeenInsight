@@ -1,0 +1,2741 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/set_var.cc
+Function: set_var_collation_client::update
+bool sys_var::update(THD *thd, set_var *var) {
+  /*
+    Invoke preparatory step for updating a system variable. Doing this action
+    before we have acquired any locks allows to invoke code which acquires other
+    locks without introducing deadlocks.
+  */
+  if (pre_update && pre_update(this, thd, var)) return true;
+
+  enum_var_type type = var->type;
+  if (type == OPT_GLOBAL || type == OPT_PERSIST || scope() == GLOBAL) {
+    /*
+      Yes, both locks need to be taken before an update, just as
+      both are taken to get a value. If we'll take only 'guard' here,
+      then value_ptr() for strings won't be safe in SHOW VARIABLES anymore,
+      to make it safe we'll need value_ptr_unlock().
+    */
+    AutoWLock lock1(&PLock_global_system_variables);
+    AutoWLock lock2(guard);
+    return global_update(thd, var) ||
+           (on_update && on_update(this, thd, OPT_GLOBAL));
+  } else {
+    /* Block reads from other threads. */
+    mysql_mutex_lock(&thd->LOCK_thd_sysvar);
+
+    bool ret = session_update(thd, var) ||
+               (on_update && on_update(this, thd, OPT_SESSION));
+
+    mysql_mutex_unlock(&thd->LOCK_thd_sysvar);
+
+    /*
+      Make sure we don't session-track variables that are not actually
+      part of the session. tx_isolation and and tx_read_only for example
+      exist as GLOBAL, SESSION, and one-shot ("for next transaction only").
+    */
+    if ((var->type == OPT_SESSION) || !is_trilevel()) {
+      if ((!ret) && thd->session_tracker.get_tracker(SESSION_SYSVARS_TRACKER)
+                        ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_SYSVARS_TRACKER)
+            ->mark_as_changed(thd, name);
+
+      if ((!ret) &&
+          thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, name);
+    }
+
+    return ret;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc
+Function: ndb_create_thd
+THD *ndb_create_thd(char *stackptr) {
+  DBUG_TRACE;
+  THD *thd = new THD; /* note that constructor of THD uses DBUG_ */
+  if (thd == nullptr) {
+    return nullptr;
+  }
+  THD_CHECK_SENTRY(thd);
+
+  thd->thread_stack = stackptr; /* remember where our stack is */
+  thd->store_globals();
+
+  thd->init_query_mem_roots();
+  thd->set_command(COM_DAEMON);
+  thd->system_thread = SYSTEM_THREAD_NDBCLUSTER_BINLOG;
+  thd->get_protocol_classic()->set_client_capabilities(0);
+  thd->lex->start_transaction_opt = 0;
+  thd->security_context()->skip_grants();
+
+  CHARSET_INFO *charset_connection =
+      get_charset_by_csname("utf8mb3", MY_CS_PRIMARY, MYF(MY_WME));
+  thd->variables.character_set_client = charset_connection;
+  thd->variables.character_set_results = charset_connection;
+  thd->variables.collation_connection = charset_connection;
+  thd->update_charset();
+  return thd;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::Trigger_loader::load_triggers
+  Module private variables to be used in Trigger_loader::load_triggers().
+*/
+
+static LEX_STRING default_client_cs_name = NULL_STR;
+static LEX_STRING default_connection_cl_name = NULL_STR;
+static LEX_STRING default_db_cl_name = NULL_STR;
+
+class Handle_old_incorrect_sql_modes_hook : public Unknown_key_hook {
+ private:
+  char *m_path;
+
+ public:
+  Handle_old_incorrect_sql_modes_hook(char *file_path) : m_path(file_path) {}
+  bool process_unknown_string(const char *&unknown_key, uchar *base,
+                              MEM_ROOT *mem_root, const char *end) override;
+};
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fix_view_cols_and_deps not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::update_charset
+void THD::update_charset() {
+  size_t not_used;
+  charset_is_system_charset = !String::needs_conversion(
+      0, variables.character_set_client, system_charset_info, &not_used);
+  charset_is_collation_connection =
+      !String::needs_conversion(0, variables.character_set_client,
+                                variables.collation_connection, &not_used);
+  charset_is_character_set_filesystem =
+      !String::needs_conversion(0, variables.character_set_client,
+                                variables.character_set_filesystem, &not_used);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc
+Function: thd_init_client_charset
+bool thd_init_client_charset(THD *thd, uint cs_number) {
+  CHARSET_INFO *cs;
+  /*
+   Use server character set and collation if
+   - opt_character_set_client_handshake is not set
+   - client has not specified a character set
+   - client character set is the same as the servers
+   - client character set doesn't exists in server
+  */
+  if (!opt_character_set_client_handshake ||
+      !(cs = get_charset(cs_number, MYF(0))) ||
+      !my_strcasecmp(&my_charset_latin1,
+                     global_system_variables.character_set_client->m_coll_name,
+                     cs->m_coll_name)) {
+    if (!is_supported_parser_charset(
+            global_system_variables.character_set_client)) {
+      /* Disallow non-supported parser character sets: UCS2, UTF16, UTF32 */
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "character_set_client",
+               global_system_variables.character_set_client->csname);
+      return true;
+    }
+    thd->variables.character_set_client =
+        global_system_variables.character_set_client;
+    thd->variables.collation_connection =
+        global_system_variables.collation_connection;
+    thd->variables.character_set_results =
+        global_system_variables.character_set_results;
+  } else {
+    if (!is_supported_parser_charset(cs)) {
+      /* Disallow non-supported parser character sets: UCS2, UTF16, UTF32 */
+      my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), "character_set_client",
+               cs->csname);
+      return true;
+    }
+    thd->variables.character_set_results = thd->variables.collation_connection =
+        thd->variables.character_set_client = cs;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: Prepared_statement::insert_parameters
+bool Prepared_statement::insert_parameters(THD *thd, String *query,
+                                           bool has_new_types,
+                                           PS_PARAM *parameters) {
+  DBUG_TRACE;
+
+  Item_param **end = m_param_array + m_param_count;
+  size_t length = 0;
+
+  // Reserve an extra space of 32 bytes for each placeholder parameter.
+  if (m_with_log && query->reserve(m_query_string.length + 32 * m_param_count))
+    return true;
+
+  uint i = 0;
+  for (Item_param **it = m_param_array; it < end; ++it, i++) {
+    Item_param *const param = *it;
+
+    if (has_new_types) {
+      set_parameter_type(param, parameters[i].type, parameters[i].unsigned_type,
+                         thd->variables.character_set_client);
+      // Client may have provided invalid metadata:
+      if (param->data_type_source() == MYSQL_TYPE_INVALID) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+    }
+
+    if (param->param_state() == Item_param::LONG_DATA_VALUE) {
+      /*
+        A long data stream was supplied for this parameter marker.
+        This was done after prepare, prior to providing a placeholder
+        type (the types are supplied at execute). Check that the
+        supplied type of placeholder can accept a data stream.
+      */
+      if (!is_param_long_data_type(param)) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+      param->set_data_type_actual(MYSQL_TYPE_VARCHAR);
+      // see Item_param::set_str() for explanation
+      param->set_collation_actual(
+          param->collation_source() == &my_charset_bin
+              ? &my_charset_bin
+              : param->collation.collation != &my_charset_bin
+                    ? param->collation.collation
+                    : current_thd->variables.collation_connection);
+
+    } else if (parameters[i].null_bit) {
+      param->set_null();
+    } else {
+      if (set_parameter_value(param, &parameters[i].value,
+                              parameters[i].length)) {
+        return true;
+      }
+      // NO_VALUE probably means broken client, no metadata provided.
+      if (param->param_state() == Item_param::NO_VALUE) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+
+      // Pinning of data types only implemented for integers
+      assert(!param->is_type_pinned() || param->result_type() == INT_RESULT);
+
+      if (param->is_type_pinned()) {
+        // Accept string values from client
+        // @todo Validate string values, do not accept garbage in string
+        if (param->data_type_actual() == MYSQL_TYPE_VARCHAR) {
+          longlong val = param->val_int();
+          if (param->unsigned_flag)
+            param->set_int((ulonglong)val);
+          else
+            param->set_int(val);
+        } else if (param->data_type_actual() != MYSQL_TYPE_LONGLONG) {
+          my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+          return true;
+        }
+        if ((param->unsigned_flag && !param->is_unsigned_actual() &&
+             param->value.integer < 0) ||
+            (!param->unsigned_flag && param->is_unsigned_actual() &&
+             param->value.integer < 0)) {
+          my_error(ER_DATA_OUT_OF_RANGE, MYF(0), "signed integer",
+                   "mysqld_stmt_execute");
+          return true;
+        }
+      }
+    }
+    if (m_with_log) {
+      String str;
+      const String *val = param->query_val_str(thd, &str);
+      if (val == nullptr) return true;
+      if (param->convert_value()) return true; /* out of memory */
+
+      size_t num_bytes = param->pos_in_query - length;
+      if (query->length() + num_bytes + val->length() >
+          std::numeric_limits<uint32>::max()) {
+        my_error(ER_WRONG_ARGUMENTS, MYF(0), "mysqld_stmt_execute");
+        return true;
+      }
+      if (query->append(m_query_string.str + length, num_bytes) ||
+          query->append(*val))
+        return true;
+
+      length = param->pos_in_query + 1;
+    } else {
+      if (param->convert_value()) return true; /* out of memory */
+    }
+    param->sync_clones();
+  }
+
+  // Copy part of query string after last parameter marker
+  if (m_with_log && query->append(m_query_string.str + length,
+                                  m_query_string.length - length))
+    return true;
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: mysql_sql_stmt_prepare
+void mysql_sql_stmt_prepare(THD *thd) {
+  LEX *lex = thd->lex;
+  const LEX_CSTRING &name = lex->prepared_stmt_name;
+  DBUG_TRACE;
+
+  Prepared_statement *stmt = thd->stmt_map.find_by_name(name);
+  if (stmt != nullptr) {
+    /*
+      If there is a statement with the same name, remove it. It is ok to
+      remove old and fail to insert a new one at the same time.
+    */
+    if (stmt->is_in_use()) {
+      my_error(ER_PS_NO_RECURSION, MYF(0));
+      return;
+    }
+
+    MYSQL_DESTROY_PS(stmt->m_prepared_stmt);
+    stmt->deallocate(thd);
+  }
+
+  size_t query_len = 0;
+  const char *query = get_dynamic_sql_string(lex, &query_len);
+  if (query == nullptr) return; /* out of memory */
+
+  stmt = new Prepared_statement(thd);
+  if (stmt == nullptr) return; /* out of memory */
+
+  stmt->set_sql_prepare();
+
+  /* Set the name first, insert should know that this statement has a name */
+  if (stmt->set_name(name)) {
+    delete stmt;
+    return;
+  }
+
+  if (thd->stmt_map.insert(stmt)) {
+    /* The statement is deleted and an error is set if insert fails */
+    return;
+  }
+
+  /* Create PS table entry, set query text after rewrite. */
+  stmt->m_prepared_stmt =
+      MYSQL_CREATE_PS(stmt, stmt->id(), thd->m_statement_psi, stmt->name().str,
+                      stmt->name().length, nullptr, 0);
+
+  if (stmt->prepare(thd, query, query_len, nullptr)) {
+    /* Delete this stmt stats from PS table. */
+    MYSQL_DESTROY_PS(stmt->m_prepared_stmt);
+    /* Statement map deletes the statement on erase */
+    thd->stmt_map.erase(stmt);
+  } else {
+    /* send the boolean tracker in the OK packet when
+       @@session_track_state_change is set to ON */
+    if (thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->is_enabled())
+      thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+          ->mark_as_changed(thd, {});
+    my_ok(thd, 0L, 0L, "Statement prepared");
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc
+Function: get_dynamic_sql_string not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: Default_object_creation_ctx::change_env
+void Default_object_creation_ctx::change_env(THD *thd) const {
+  thd->variables.character_set_client = m_client_cs;
+  thd->variables.collation_connection = m_connection_cl;
+
+  thd->update_charset();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: Default_object_creation_ctx::Default_object_creation_ctx
+Default_object_creation_ctx::Default_object_creation_ctx(THD *thd)
+    : m_client_cs(thd->variables.character_set_client),
+      m_connection_cl(thd->variables.collation_connection) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: fix_value_generator_fields not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::clone not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::clone not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::clone not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::load_from_db not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: Stored_routine_creation_ctx::load_from_db not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger.cc
+Function: Trigger::create_from_parser not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc
+Function: Trigger_creation_ctx::create not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::run_bootstrap_thread
+bool run_bootstrap_thread(const char *file_name, MYSQL_FILE *file,
+                          bootstrap_functor boot_handler,
+                          enum_thread_type thread_type) {
+  DBUG_TRACE;
+
+  THD *thd = new THD;
+  thd->system_thread = thread_type;
+  thd->get_protocol_classic()->init_net(nullptr);
+  // Skip grants and set the system_user flag in THD.
+  thd->security_context()->skip_grants();
+
+  thd->set_new_thread_id();
+
+  handle_bootstrap_args args;
+
+  args.m_thd = thd;
+  args.m_bootstrap_handler = boot_handler;
+  args.m_file_name = file_name;
+  args.m_file = file;
+
+  // Set server default sql_mode irrespective of mysqld server command line
+  // argument.
+  thd->variables.sql_mode =
+      find_static_system_variable("sql_mode")->get_default();
+
+  // Set session server and connection collation irrespective of
+  // mysqld server command line argument.
+  thd->variables.collation_server =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+  thd->variables.collation_connection =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+
+  // Set session transaction completion type to server default to
+  // avoid problems due to transactions being active when they are
+  // not supposed to.
+  thd->variables.completion_type =
+      find_static_system_variable("completion_type")->get_default();
+
+  /*
+    Set default value for explicit_defaults_for_timestamp variable. Bootstrap
+    thread creates dictionary tables. The creation of dictionary tables should
+    be independent of the value of explicit_defaults_for_timestamp specified by
+    the user.
+  */
+  thd->variables.explicit_defaults_for_timestamp =
+      find_static_system_variable("explicit_defaults_for_timestamp")
+          ->get_default();
+
+  /*
+    The global table encryption default setting applies to user threads.
+    Setting it false for system threads.
+  */
+  thd->variables.default_table_encryption = false;
+
+  my_thread_attr_t thr_attr;
+  my_thread_attr_init(&thr_attr);
+#ifndef _WIN32
+  pthread_attr_setscope(&thr_attr, PTHREAD_SCOPE_SYSTEM);
+#endif
+  my_thread_attr_setdetachstate(&thr_attr, MY_THREAD_CREATE_JOINABLE);
+
+  // Default stack size may be too small.
+  size_t stacksize = 0;
+  my_thread_attr_getstacksize(&thr_attr, &stacksize);
+  if (stacksize < my_thread_stack_size) {
+    if (0 != my_thread_attr_setstacksize(&thr_attr, my_thread_stack_size)) {
+      assert(false);
+    }
+  }
+
+  my_thread_handle thread_handle;
+  // What about setting THD::real_id?
+  int error = mysql_thread_create(key_thread_bootstrap, &thread_handle,
+                                  &thr_attr, handle_bootstrap, &args);
+  if (error) {
+    /* purecov: begin inspected */
+    LogErr(WARNING_LEVEL, ER_BOOTSTRAP_CANT_THREAD, errno).os_errno(errno);
+    thd->release_resources();
+    delete thd;
+    return true;
+    /* purecov: end */
+  }
+  /* Wait for thread to die */
+  my_thread_join(&thread_handle, nullptr);
+  // Free Items that were created during this execution.
+  thd->free_items();
+  delete thd;
+  return args.m_bootstrap_error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item_param::set_str
+bool Item_param::set_str(const char *str, size_t length) {
+  DBUG_TRACE;
+  /*
+    Assign string with no conversion: data is converted only after it's
+    been written to the binary log.
+  */
+  uint dummy_errors;
+  if (str_value.copy(str, length, &my_charset_bin, &my_charset_bin,
+                     &dummy_errors))
+    return true;
+  m_data_type_actual = MYSQL_TYPE_VARCHAR;
+  /*
+    Generally, the character set of the string stored in the parameter object
+    is the resolved character set of the parameter, except:
+    - when the resolved character set is a binary string, ensure the string
+      is in the connection character set.
+    - when the source string is a binary string, keep it as-is and perform
+      no conversion.
+  */
+  set_collation_actual(collation_source() == &my_charset_bin
+                           ? &my_charset_bin
+                           : collation.collation != &my_charset_bin
+                                 ? collation.collation
+                                 : current_thd->variables.collation_connection);
+
+  m_param_state = STRING_VALUE;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item::default_charset
+const CHARSET_INFO *Item::default_charset() {
+  return current_thd->variables.collation_connection;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item_param::fix_fields
+bool Item_sp_variable::fix_fields(THD *, Item **) {
+  Item *it = this_item();
+
+  assert(it->fixed);
+
+  max_length = it->max_length;
+  decimals = it->decimals;
+  unsigned_flag = it->unsigned_flag;
+  collation.set(it->collation);
+  set_data_type(it->data_type());
+
+  fixed = true;
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item_cache_int::val_str
+String *Item_sp_variable::val_str(String *sp) {
+  assert(fixed);
+  Item *it = this_item();
+  String *res = it->val_str(sp);
+
+  null_value = it->null_value;
+
+  if (!res) return nullptr;
+
+  /*
+    This way we mark returned value of val_str as const,
+    so that various functions (e.g. CONCAT) won't try to
+    modify the value of the Item. Analogous mechanism is
+    implemented for Item_param.
+    Without this trick Item_splocal could be changed as a
+    side-effect of expression computation. Here is an example
+    of what happens without it: suppose x is varchar local
+    variable in a SP with initial value 'ab' Then
+      select concat(x,'c');
+    would change x's value to 'abc', as Item_func_concat::val_str()
+    would use x's internal buffer to compute the result.
+    This is intended behaviour of Item_func_concat. Comments to
+    Item_param class contain some more details on the topic.
+  */
+
+  if (res != &str_value)
+    str_value.set(res->ptr(), res->length(), res->charset());
+  else
+    res->mark_as_const();
+
+  return &str_value;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: Item_cache_real::val_str
+String *Item_sp_variable::val_str(String *sp) {
+  assert(fixed);
+  Item *it = this_item();
+  String *res = it->val_str(sp);
+
+  null_value = it->null_value;
+
+  if (!res) return nullptr;
+
+  /*
+    This way we mark returned value of val_str as const,
+    so that various functions (e.g. CONCAT) won't try to
+    modify the value of the Item. Analogous mechanism is
+    implemented for Item_param.
+    Without this trick Item_splocal could be changed as a
+    side-effect of expression computation. Here is an example
+    of what happens without it: suppose x is varchar local
+    variable in a SP with initial value 'ab' Then
+      select concat(x,'c');
+    would change x's value to 'abc', as Item_func_concat::val_str()
+    would use x's internal buffer to compute the result.
+    This is intended behaviour of Item_func_concat. Comments to
+    Item_param class contain some more details on the topic.
+  */
+
+  if (res != &str_value)
+    str_value.set(res->ptr(), res->length(), res->charset());
+  else
+    res->mark_as_const();
+
+  return &str_value;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: agg_item_collations not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.cc
+Function: agg_item_collations not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item.h
+Function: Item::propagate_type
+    Wrapper for easier calling of propagate_type(const Type_properties &).
+    @param thd     thread handler
+    @param def     type to make Type_properties object
+    @param pin     if true: also mark the type as pinned
+    @param inherit if true: also mark the type as inherited
+
+    @returns false if success, true if error
+  */
+  bool propagate_type(THD *thd, enum_field_types def = MYSQL_TYPE_VARCHAR,
+                      bool pin = false, bool inherit = false) {
+    /*
+      Propagate supplied type if types have not yet been assigned to expression,
+      or type is pinned, in which case the supplied type overrides the
+      actual type of parameters. Note we do not support "pinning" of
+      expressions containing parameters, only standalone parameters,
+      but this is a very minor problem.
+     */
+    if (data_type() != MYSQL_TYPE_INVALID && !(pin && type() == PARAM_ITEM))
+      return false;
+    if (propagate_type(thd,
+                       (def == MYSQL_TYPE_VARCHAR)
+                           ? Type_properties(def, Item::default_charset())
+                           : (def == MYSQL_TYPE_JSON)
+                                 ? Type_properties(def, &my_charset_utf8mb4_bin)
+                                 : Type_properties(def)))
+      return true;
+    if (pin) pin_data_type();
+    if (inherit) set_data_type_inherited();
+
+    return false;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Item_func_case::val_real
+double Item_func_if::val_real() {
+  assert(fixed == 1);
+  Item *arg = args[0]->val_bool() ? args[1] : args[2];
+  if (current_thd->is_error()) return error_real();
+  double value = arg->val_real();
+  null_value = arg->null_value;
+  return value;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Item_func_case::val_int
+longlong Item_func_not::val_int() {
+  assert(fixed == 1);
+  bool value = args[0]->val_bool();
+  null_value = args[0]->null_value;
+  /*
+    If NULL, return 0 because some higher layers like
+    evaluate_join_record() just test for !=0 to implement IS TRUE.
+    If not NULL, return inverted value.
+  */
+  return ((!null_value && value == 0) ? 1 : 0);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Item_func_case::val_decimal
+my_decimal *Item_func_if::val_decimal(my_decimal *decimal_value) {
+  assert(fixed == 1);
+  Item *arg = args[0]->val_bool() ? args[1] : args[2];
+  if (current_thd->is_error()) return error_decimal(decimal_value);
+  my_decimal *value = arg->val_decimal(decimal_value);
+  null_value = arg->null_value;
+  return value;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Item_func_case::val_json
+bool Item_func_ifnull::val_json(Json_wrapper *result) {
+  null_value = false;
+  bool has_value;
+  if (json_value(args[0], result, &has_value)) return error_json();
+  assert(!current_thd->is_error() && has_value);
+
+  if (!args[0]->null_value) return false;
+
+  if (json_value(args[1], result, &has_value)) return error_json();
+  assert(!current_thd->is_error() && has_value);
+
+  null_value = args[1]->null_value;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Item_func_case::get_date
+bool Item_func_if::get_date(MYSQL_TIME *ltime, my_time_flags_t fuzzydate) {
+  assert(fixed == 1);
+  Item *arg = args[0]->val_bool() ? args[1] : args[2];
+  if (arg->get_date(ltime, fuzzydate)) return error_date();
+  null_value = arg->null_value;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc
+Function: Item_func_case::get_time
+bool Item_func_if::get_time(MYSQL_TIME *ltime) {
+  assert(fixed == 1);
+  Item *arg = args[0]->val_bool() ? args[1] : args[2];
+  if (arg->get_time(ltime)) return error_time();
+  null_value = arg->null_value;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_set_user_var::resolve_type
+   be fixed in the resolve_type() function that is called after this one or
+   by writing a specialized fix_fields() for the item.
+
+  RETURN VALUES
+  false	ok
+  true	Got error.  Stored with my_error().
+*/
+
+bool Item_func::fix_fields(THD *thd, Item **) {
+  assert(fixed == 0 || basic_const_item());
+
+  Item **arg, **arg_end;
+  uchar buff[STACK_BUFF_ALLOC];  // Max argument in function
+
+  Condition_context CCT(thd->lex->current_query_block());
+
+  used_tables_cache = get_initial_pseudo_tables();
+  not_null_tables_cache = 0;
+
+  /*
+    Use stack limit of STACK_MIN_SIZE * 2 since
+    on some platforms a recursive call to fix_fields
+    requires more than STACK_MIN_SIZE bytes (e.g. for
+    MIPS, it takes about 22kB to make one recursive
+    call to Item_func::fix_fields())
+  */
+  if (check_stack_overrun(thd, STACK_MIN_SIZE * 2, buff))
+    return true;    // Fatal error if flag is set!
+  if (arg_count) {  // Print purify happy
+    for (arg = args, arg_end = args + arg_count; arg != arg_end; arg++) {
+      if (fix_func_arg(thd, arg)) return true;
+    }
+  }
+
+  if (resolve_type(thd) || thd->is_error())  // Some impls still not error-safe
+    return true;
+  fixed = true;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_set_user_var::update
+    and set it again later in Item_func_set_user_var::update().
+  */
+  entry = nullptr;
+}
+
+bool Item_func_set_user_var::set_entry(THD *thd, bool create_if_not_exists) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_set_user_var::set_entry
+bool Item_func_set_user_var::set_entry(THD *thd, bool create_if_not_exists) {
+  if (entry == nullptr) {
+    const CHARSET_INFO *cs =
+        create_if_not_exists
+            ? (args[0]->collation.derivation == DERIVATION_NUMERIC
+                   ? default_charset()
+                   : args[0]->collation.collation)
+            : nullptr;
+
+    /* Protects thd->user_vars. */
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+    entry = get_variable(thd, name, cs);
+    mysql_mutex_unlock(&thd->LOCK_thd_data);
+
+    if (entry == nullptr) return true;
+  }
+
+  // Ensure this user variable is owned by the current session
+  assert(entry->owner_session() == thd);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: get_var_with_binlog
+      get_var_with_binlog(thd, thd->lex->sql_command, name, &var_entry))
+    return error_str();
+  if (var_entry == nullptr) return error_str();  // No such variable
+  String *res = var_entry->val_str(&null_value, str, decimals);
+  if (res && !my_charset_same(res->charset(), collation.collation)) {
+    String tmpstr;
+    uint error;
+    if (tmpstr.copy(res->ptr(), res->length(), res->charset(),
+                    collation.collation, &error) ||
+        error > 0) {
+      char tmp[32];
+      convert_to_printable(tmp, sizeof(tmp), res->ptr(), res->length(),
+                           res->charset(), 6);
+      my_error(ER_INVALID_CHARACTER_STRING, MYF(0), collation.collation->csname,
+               tmp);
+      return error_str();
+    }
+    if (str->copy(tmpstr)) return error_str();
+    return str;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: Item_func_bit::resolve_type
+   be fixed in the resolve_type() function that is called after this one or
+   by writing a specialized fix_fields() for the item.
+
+  RETURN VALUES
+  false	ok
+  true	Got error.  Stored with my_error().
+*/
+
+bool Item_func::fix_fields(THD *thd, Item **) {
+  assert(fixed == 0 || basic_const_item());
+
+  Item **arg, **arg_end;
+  uchar buff[STACK_BUFF_ALLOC];  // Max argument in function
+
+  Condition_context CCT(thd->lex->current_query_block());
+
+  used_tables_cache = get_initial_pseudo_tables();
+  not_null_tables_cache = 0;
+
+  /*
+    Use stack limit of STACK_MIN_SIZE * 2 since
+    on some platforms a recursive call to fix_fields
+    requires more than STACK_MIN_SIZE bytes (e.g. for
+    MIPS, it takes about 22kB to make one recursive
+    call to Item_func::fix_fields())
+  */
+  if (check_stack_overrun(thd, STACK_MIN_SIZE * 2, buff))
+    return true;    // Fatal error if flag is set!
+  if (arg_count) {  // Print purify happy
+    for (arg = args, arg_end = args + arg_count; arg != arg_end; arg++) {
+      if (fix_func_arg(thd, arg)) return true;
+    }
+  }
+
+  if (resolve_type(thd) || thd->is_error())  // Some impls still not error-safe
+    return true;
+  fixed = true;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_cond.cc
+Function: ndb_serialize_cond
+static void ndb_serialize_cond(const Item *item, void *arg) {
+  Ndb_cond_traverse_context *context = (Ndb_cond_traverse_context *)arg;
+  DBUG_TRACE;
+
+  // Check if we are skipping arguments to a function to be evaluated
+  if (context->skip) {
+    DBUG_PRINT("info", ("Skipping argument %d", context->skip));
+    context->skip--;
+    if (item != nullptr) {
+      context->skip += operand_count(item);
+    }
+    return;
+  }
+
+  if (context->supported) {
+    Ndb_rewrite_context *rewrite_context = context->rewrite_stack;
+    // Check if we are rewriting some unsupported function call
+    if (rewrite_context) {
+      rewrite_context->count++;
+      if (rewrite_context->count == 1) {
+        // This is the <left_hand_item>, save it in the rewrite context
+        rewrite_context->left_hand_item = item;
+      } else {
+        // Has already seen the 'left_hand_item', this 'item' is one of
+        // the right hand items in the in/between predicate to be rewritten.
+        Item *cmp_func = nullptr;
+        const Item_func *rewrite_func_item = rewrite_context->func_item;
+        switch (rewrite_func_item->functype()) {
+          case Item_func::BETWEEN: {
+            /*
+              Rewrite <left_hand_item> BETWEEN <item1> AND <item2>
+              to <left_hand_item> >= <item1> AND
+                 <left_hand_item> <= <item2>
+            */
+            if (rewrite_context->count == 2)  // Lower 'between-limit'
+            {
+              // Lower limit of BETWEEN
+              DBUG_PRINT("info", ("GE_FUNC"));
+              cmp_func = new (*THR_MALLOC) Item_func_ge(
+                  const_cast<Item *>(rewrite_context->left_hand_item),
+                  const_cast<Item *>(item));
+            } else if (rewrite_context->count == 3)  // Upper 'between-limit'
+            {
+              // Upper limit of BETWEEN
+              DBUG_PRINT("info", ("LE_FUNC"));
+              cmp_func = new (*THR_MALLOC) Item_func_le(
+                  const_cast<Item *>(rewrite_context->left_hand_item),
+                  const_cast<Item *>(item));
+            } else {
+              // Illegal BETWEEN expression
+              DBUG_PRINT("info", ("Illegal BETWEEN expression"));
+              context->supported = false;
+              return;
+            }
+            break;
+          }
+          case Item_func::IN_FUNC: {
+            /*
+              Rewrite <left_hand_item> IN(<item1>, <item2>,..)
+              to <left_hand_item> = <item1> OR
+                 <left_hand_item> = <item2> ...
+            */
+            DBUG_PRINT("info", ("EQ_FUNC"));
+            cmp_func = new (*THR_MALLOC) Item_func_eq(
+                const_cast<Item *>(rewrite_context->left_hand_item),
+                const_cast<Item *>(item));
+            break;
+          }
+          default:
+            // Only BETWEEN/IN can be rewritten.
+            // If we add support for rewrite of others, handling must be added
+            // above
+            assert(false);
+            context->supported = false;
+            return;
+        }
+        cmp_func->fix_fields(current_thd, &cmp_func);
+        cmp_func->update_used_tables();
+
+        // Traverse and serialize the rewritten predicate
+        context->rewrite_stack = nullptr;  // Disable rewrite mode
+        context->expect_only(Item::FUNC_ITEM);
+        context->expect(Item::COND_ITEM);
+        cmp_func->traverse_cond(&ndb_serialize_cond, context, Item::PREFIX);
+        context->rewrite_stack = rewrite_context;  // Re-enable rewrite mode
+
+        // Possibly terminate the rewrite_context
+        if (context->supported &&
+            rewrite_context->count ==
+                rewrite_context->func_item->argument_count()) {
+          // Rewrite is done, wrap an END() at the end
+          DBUG_PRINT("info", ("End of rewrite condition group"));
+          context->items.push_back(new (*THR_MALLOC) Ndb_end_cond());
+          // Pop rewrite stack
+          context->rewrite_stack = rewrite_context->next;
+          rewrite_context->next = nullptr;
+          destroy(rewrite_context);
+        }
+      }
+      DBUG_PRINT("info",
+                 ("Skip 'item' (to be) handled in rewritten predicate"));
+      context->skip = operand_count(item);
+      return;
+    } else  // not in a 'rewrite_context'
+    {
+      const Ndb_item *ndb_item = nullptr;
+      // Check for end of AND/OR expression
+      if (unlikely(item == nullptr)) {
+        // End marker for condition group
+        DBUG_PRINT("info", ("End of condition group"));
+        context->expect_no_length();
+        ndb_item = new (*THR_MALLOC) Ndb_end_cond();
+      } else {
+        bool pop = true;
+        /*
+          Based on which tables being used from an item expression,
+          we might be able to evaluate its value immediately.
+          Generally any tables prior to 'this' table has values known by
+          now, same is true for expressions being entirely 'const'.
+        */
+        const table_map this_table(context->table->pos_in_table_list->map());
+        const table_map used_tables(item->used_tables() & ~PSEUDO_TABLE_BITS);
+        if ((used_tables & ~context->m_const_expr_tables) == 0) {
+          /*
+            Item value can be evaluated right away, and its value used in the
+            condition, instead of the Item-expression. Note that this will
+            also catch the INT_, STRING_, REAL_, DECIMAL_ and VARBIN_ITEM,
+            as well as any CACHE_ITEM and FIELD_ITEM referring 'other' tables.
+          */
+#ifndef NDEBUG
+          String str;
+          item->print(current_thd, &str, QT_ORDINARY);
+#endif
+          if (item->type() == Item::VARBIN_ITEM) {
+            // VARBIN_ITEM is special as no similar VARBIN_RESULT type is
+            // defined, so it needs to be explicitly handled here.
+            DBUG_PRINT("info", ("VARBIN_ITEM 'VALUE' expression: '%s'",
+                                str.c_ptr_safe()));
+            if (context->expecting(Item::VARBIN_ITEM)) {
+              ndb_item = new (*THR_MALLOC) Ndb_value(item);
+              if (context->expecting_no_field_result()) {
+                // We have not seen the field argument referring this table yet
+                context->expect_only_field_from_table(this_table);
+                context->expect_field_result(STRING_RESULT);
+              } else {
+                // Expect another logical expression
+                context->expect_only(Item::FUNC_ITEM);
+                context->expect(Item::COND_ITEM);
+              }
+            } else
+              context->supported = false;
+          } else {
+            // For the INT, REAL, DECIMAL and STRING Item type, we use
+            // the similar result_type() as a 'catch it all' synonym to
+            // handle both an Item and any expression of the specific type.
+            //
+            // Assert that any such Items are of the expected RESULT_ type:
+            assert(item->type() != Item::INT_ITEM ||
+                   item->result_type() == INT_RESULT);
+            assert(item->type() != Item::REAL_ITEM ||
+                   item->result_type() == REAL_RESULT);
+            assert(item->type() != Item::DECIMAL_ITEM ||
+                   item->result_type() == DECIMAL_RESULT);
+            assert(item->type() != Item::STRING_ITEM ||
+                   item->result_type() == STRING_RESULT);
+
+            switch (item->result_type()) {
+              case INT_RESULT:
+                DBUG_PRINT("info", ("INTEGER 'VALUE' expression: '%s'",
+                                    str.c_ptr_safe()));
+                // MySQL do not define a 'BOOL_RESULT', INT_RESULT is used
+                // instead. Thus there are two different cases to be handled
+                // where an INT_RESULT is const-folded :
+                // 1) It is a 'BOOL_RESULT'  where the entire condition is
+                //    const-folded to true or false. In these cases we are
+                //    expecting a 'COND_ITEM'.
+                // 2) It is really an 'INT_RESULT'.
+                //    (Used as an argument in a condition.)
+                if (context->expecting(Item::COND_ITEM)) {  // 1)
+                  // Entire condition is a true/false-const
+                  assert(!context->expecting(Item::INT_ITEM));
+                  ndb_item = new (*THR_MALLOC) Ndb_value(item);
+                  // Expect another logical expression
+                  context->expect_only(Item::FUNC_ITEM);
+                  context->expect(Item::COND_ITEM);
+                } else if (context->expecting(Item::INT_ITEM)) {  // 2)
+                  ndb_item = new (*THR_MALLOC) Ndb_value(item);
+                  if (context->expecting_no_field_result()) {
+                    // We have not seen the field argument yet
+                    context->expect_only_field_from_table(this_table);
+                    context->expect_field_result(INT_RESULT);
+                    context->expect_field_result(REAL_RESULT);
+                    context->expect_field_result(DECIMAL_RESULT);
+                  } else {
+                    // Expect another logical expression
+                    context->expect_only(Item::FUNC_ITEM);
+                    context->expect(Item::COND_ITEM);
+                  }
+                } else
+                  context->supported = false;
+                break;
+
+              case REAL_RESULT:
+                DBUG_PRINT("info",
+                           ("REAL 'VALUE' expression: '%s'", str.c_ptr_safe()));
+                if (context->expecting(Item::REAL_ITEM)) {
+                  ndb_item = new (*THR_MALLOC) Ndb_value(item);
+                  if (context->expecting_no_field_result()) {
+                    // We have not seen the field argument yet
+                    context->expect_only_field_from_table(this_table);
+                    context->expect_field_result(REAL_RESULT);
+                  } else {
+                    // Expect another logical expression
+                    context->expect_only(Item::FUNC_ITEM);
+                    context->expect(Item::COND_ITEM);
+                  }
+                } else
+                  context->supported = false;
+                break;
+
+              case DECIMAL_RESULT:
+                DBUG_PRINT("info", ("DECIMAL 'VALUE' expression: '%s'",
+                                    str.c_ptr_safe()));
+                if (context->expecting(Item::DECIMAL_ITEM)) {
+                  ndb_item = new (*THR_MALLOC) Ndb_value(item);
+                  if (context->expecting_no_field_result()) {
+                    // We have not seen the field argument yet
+                    context->expect_only_field_from_table(this_table);
+                    context->expect_field_result(REAL_RESULT);
+                    context->expect_field_result(DECIMAL_RESULT);
+                  } else {
+                    // Expect another logical expression
+                    context->expect_only(Item::FUNC_ITEM);
+                    context->expect(Item::COND_ITEM);
+                  }
+                } else
+                  context->supported = false;
+                break;
+
+              case STRING_RESULT:
+                DBUG_PRINT("info", ("STRING 'VALUE' expression: '%s'",
+                                    str.c_ptr_safe()));
+                // Check that we do support pushing the item value length
+                if (context->expecting(Item::STRING_ITEM) &&
+                    context->expecting_length(item->max_length)) {
+                  ndb_item = new (*THR_MALLOC) Ndb_value(item);
+                  if (context->expecting_no_field_result()) {
+                    // We have not seen the field argument yet
+                    context->expect_only_field_from_table(this_table);
+                    context->expect_field_result(STRING_RESULT);
+                    context->expect_collation(item->collation.collation);
+                    context->expect_length(item->max_length);
+                  } else {
+                    // Expect another logical expression
+                    context->expect_only(Item::FUNC_ITEM);
+                    context->expect(Item::COND_ITEM);
+                    context->expect_no_length();
+                    // Check that we are comparing with a field with same
+                    // collation
+                    if (!context->expecting_collation(
+                            item->collation.collation)) {
+                      DBUG_PRINT("info",
+                                 ("Found non-matching collation %s",
+                                  item->collation.collation->m_coll_name));
+                      context->supported = false;
+                    }
+                  }
+                } else
+                  context->supported = false;
+                break;
+
+              default:
+                assert(false);
+                context->supported = false;
+                break;
+            }
+          }
+          if (context->supported) {
+            assert(ndb_item != nullptr);
+            context->items.push_back(ndb_item);
+          }
+
+          // Skip any arguments since we will evaluate this expression instead
+          context->skip = operand_count(item);
+          DBUG_PRINT("info", ("Skip until end of arguments marker, operands:%d",
+                              context->skip));
+          return;
+        }
+
+        switch (item->type()) {
+          case Item::REF_ITEM: {
+            // Not interested in the REF_ITEM itself, just what it REF's.
+            // -> Ignore it and let traverse_cond() continue.
+            return;
+          }
+          case Item::FIELD_ITEM: {
+            const Item_field *field_item = down_cast<const Item_field *>(item);
+            Field *field = field_item->field;
+            const enum_field_types type = field->real_type();
+
+            /* Check whether field is computed at MySQL layer */
+            if (field->is_virtual_gcol()) {
+              context->supported = false;
+              break;
+            }
+
+            DBUG_PRINT("info", ("FIELD_ITEM"));
+            DBUG_PRINT("info", ("table %s", field->table->alias));
+            DBUG_PRINT("info", ("column %s", field->field_name));
+            DBUG_PRINT("info", ("column length %u", field->field_length));
+            DBUG_PRINT("info", ("type %d", type));
+            DBUG_PRINT("info", ("result type %d", field->result_type()));
+
+            // Check that we are expecting a field from the 'used_tables',
+            // with the correct type, and possibly being 'comparable' with
+            // a previous Field.
+            if (context->expecting_field_from_table(item->used_tables()) &&
+                context->expecting_comparable_field(field) &&
+                // Bit fields not yet supported in scan filter
+                type != MYSQL_TYPE_BIT &&
+                /* Char(0) field is treated as Bit fields inside NDB
+                   Hence not supported in scan filter */
+                (!(type == MYSQL_TYPE_STRING && field->pack_length() == 0)) &&
+                // No BLOB support in scan filter
+                type != MYSQL_TYPE_TINY_BLOB &&
+                type != MYSQL_TYPE_MEDIUM_BLOB &&
+                type != MYSQL_TYPE_LONG_BLOB && type != MYSQL_TYPE_BLOB &&
+                type != MYSQL_TYPE_JSON && type != MYSQL_TYPE_GEOMETRY) {
+              // Found a Field_item of a supported type
+
+              assert(item->used_tables() != 0);
+              if (item->used_tables() == this_table) {
+                // Field refer 'this' table.
+                assert(field->table == context->table);
+                const NdbDictionary::Column *col =
+                    context->ndb_table->getColumn(field->field_name);
+                ndb_item =
+                    new (*THR_MALLOC) Ndb_field(field, col->getColumnNo());
+              } else if ((item->used_tables() &
+                          ~context->m_param_expr_tables) == 0) {
+                // Field is supplied as a parameter
+                assert(field->table != context->table);
+                ndb_item = new (*THR_MALLOC) Ndb_param(field_item);
+              } else {
+                // Field was neither from 'this' table, or supplied as a param
+                context->supported = false;
+                break;
+              }
+
+              /*
+                Check, or set, further expectations for the operand(s).
+                For an operation taking multiple operands, the first operand
+                sets the requirement for the next to be compatible.
+                'expecting_*_field_result' is used to check if this is the
+                first operand or not: If there are no 'field_result'
+                expectations set yet, this is the first operand, and it is used
+                to set expectations for the next one(s).
+              */
+              if (!context->expecting_no_field_result()) {
+                // Have some result type expectations to check.
+                // Note that STRING and INT(Year) are always allowed
+                // to be used together with temporal data types.
+                if (!(context->expecting_field_result(field->result_type()) ||
+                      // Date and year can be written as string or int
+                      (is_supported_temporal_type(type) &&
+                       (context->expecting_field_result(STRING_RESULT) ||
+                        context->expecting_field_result(INT_RESULT))))) {
+                  DBUG_PRINT("info",
+                             ("Was not expecting field of result_type %u(%u)",
+                              field->result_type(), type));
+                  context->supported = false;
+                  break;
+                }
+
+                // STRING results has to be checked for correct 'length' and
+                // collation, except if it is a result from a temporal data
+                // type.
+                if (field->result_type() == STRING_RESULT &&
+                    !is_supported_temporal_type(type)) {
+                  if (!context->expecting_max_length(field->field_length)) {
+                    DBUG_PRINT("info", ("Found non-matching string length %s",
+                                        field->field_name));
+                    context->supported = false;
+                    break;
+                  }
+                  // Check that field and string constant collations are the
+                  // same
+                  if (!context->expecting_collation(
+                          item->collation.collation)) {
+                    DBUG_PRINT("info",
+                               ("Found non-matching collation %s",
+                                item->collation.collation->m_coll_name));
+                    context->supported = false;
+                    break;
+                  }
+                }
+
+                // Seen expected arguments, expect another logical expression
+                context->expect_only(Item::FUNC_ITEM);
+                context->expect(Item::COND_ITEM);
+              } else  // is not 'expecting_field_result'
+              {
+                // This is the first operand, it decides expectations for
+                // the next operand, required to be compatible with this one.
+                if (is_supported_temporal_type(type)) {
+                  context->expect_only(Item::STRING_ITEM);
+                  context->expect(Item::INT_ITEM);
+                } else {
+                  switch (field->result_type()) {
+                    case STRING_RESULT:
+                      // Expect char string or binary string
+                      context->expect_only(Item::STRING_ITEM);
+                      context->expect(Item::VARBIN_ITEM);
+                      context->expect_collation(
+                          field_item->collation.collation);
+                      context->expect_max_length(field->field_length);
+                      break;
+                    case REAL_RESULT:
+                      context->expect_only(Item::REAL_ITEM);
+                      context->expect(Item::DECIMAL_ITEM);
+                      context->expect(Item::INT_ITEM);
+                      break;
+                    case INT_RESULT:
+                      context->expect_only(Item::INT_ITEM);
+                      context->expect(Item::VARBIN_ITEM);
+                      break;
+                    case DECIMAL_RESULT:
+                      context->expect_only(Item::DECIMAL_ITEM);
+                      context->expect(Item::REAL_ITEM);
+                      context->expect(Item::INT_ITEM);
+                      break;
+                    default:
+                      assert(false);
+                      break;
+                  }
+                }
+                const Ndb *ndb = get_thd_ndb(current_thd)->ndb;
+                if (item->used_tables() == this_table &&
+                    ndbd_support_column_cmp(ndb->getMinDbNodeVersion())) {
+                  // Since WL#13120: Two columns may be compared in
+                  // NdbScanFilter:
+                  // -> Second argument can also be a FIELD_ITEM, referring
+                  // another Field from this_table. Need to ensure that these
+                  // Fields are of identical type, length, precision etc.
+                  context->expect(Item::FIELD_ITEM);
+                  context->expect_comparable_field(field);
+                }
+                if (item->used_tables() != this_table) {
+                  // Is a param, next need to be a 'real' Field from this_table
+                  // Can't be another parameter or constant
+                  context->expect_only_field_from_table(this_table);
+                  context->expect_comparable_field(field);
+                }
+                context->expect_field_result(field->result_type());
+              }
+            } else {
+              DBUG_PRINT("info", ("Was not expecting field of type %u(%u)",
+                                  field->result_type(), type));
+              context->supported = false;
+            }
+            break;
+          }
+          case Item::FUNC_ITEM: {
+            // Check that we expect a function here
+            if (!context->expecting(Item::FUNC_ITEM)) {
+              context->supported = false;
+              break;
+            }
+
+            context->expect_nothing();
+            context->expect_no_length();
+
+            const table_map this_or_param_table(this_table |
+                                                context->m_param_expr_tables);
+            const Item_func *func_item = static_cast<const Item_func *>(item);
+            switch (func_item->functype()) {
+              case Item_func::EQ_FUNC: {
+                DBUG_PRINT("info", ("EQ_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::STRING_ITEM);
+                context->expect(Item::INT_ITEM);
+                context->expect(Item::REAL_ITEM);
+                context->expect(Item::DECIMAL_ITEM);
+                context->expect(Item::VARBIN_ITEM);
+                context->expect_field_from_table(this_or_param_table);
+                context->expect_no_field_result();
+                break;
+              }
+              case Item_func::NE_FUNC: {
+                DBUG_PRINT("info", ("NE_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::STRING_ITEM);
+                context->expect(Item::INT_ITEM);
+                context->expect(Item::REAL_ITEM);
+                context->expect(Item::DECIMAL_ITEM);
+                context->expect(Item::VARBIN_ITEM);
+                context->expect_field_from_table(this_or_param_table);
+                context->expect_no_field_result();
+                break;
+              }
+              case Item_func::LT_FUNC: {
+                DBUG_PRINT("info", ("LT_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::STRING_ITEM);
+                context->expect(Item::INT_ITEM);
+                context->expect(Item::REAL_ITEM);
+                context->expect(Item::DECIMAL_ITEM);
+                context->expect(Item::VARBIN_ITEM);
+                context->expect_field_from_table(this_or_param_table);
+                context->expect_no_field_result();
+                // Enum can only be compared by equality.
+                context->dont_expect_field_type(MYSQL_TYPE_ENUM);
+                break;
+              }
+              case Item_func::LE_FUNC: {
+                DBUG_PRINT("info", ("LE_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::STRING_ITEM);
+                context->expect(Item::INT_ITEM);
+                context->expect(Item::REAL_ITEM);
+                context->expect(Item::DECIMAL_ITEM);
+                context->expect(Item::VARBIN_ITEM);
+                context->expect_field_from_table(this_or_param_table);
+                context->expect_no_field_result();
+                // Enum can only be compared by equality.
+                context->dont_expect_field_type(MYSQL_TYPE_ENUM);
+                break;
+              }
+              case Item_func::GE_FUNC: {
+                DBUG_PRINT("info", ("GE_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::STRING_ITEM);
+                context->expect(Item::INT_ITEM);
+                context->expect(Item::REAL_ITEM);
+                context->expect(Item::DECIMAL_ITEM);
+                context->expect(Item::VARBIN_ITEM);
+                context->expect_field_from_table(this_or_param_table);
+                context->expect_no_field_result();
+                // Enum can only be compared by equality.
+                context->dont_expect_field_type(MYSQL_TYPE_ENUM);
+                break;
+              }
+              case Item_func::GT_FUNC: {
+                DBUG_PRINT("info", ("GT_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::STRING_ITEM);
+                context->expect(Item::REAL_ITEM);
+                context->expect(Item::DECIMAL_ITEM);
+                context->expect(Item::INT_ITEM);
+                context->expect(Item::VARBIN_ITEM);
+                context->expect_field_from_table(this_or_param_table);
+                context->expect_no_field_result();
+                // Enum can only be compared by equality.
+                context->dont_expect_field_type(MYSQL_TYPE_ENUM);
+                break;
+              }
+              case Item_func::LIKE_FUNC: {
+                Ndb_expect_stack *expect_next =
+                    new (*THR_MALLOC) Ndb_expect_stack();
+                DBUG_PRINT("info", ("LIKE_FUNC"));
+
+                const Item_func_like *like_func =
+                    static_cast<const Item_func_like *>(func_item);
+                if (like_func->escape_was_used_in_parsing()) {
+                  DBUG_PRINT("info",
+                             ("LIKE expressions with ESCAPE not supported"));
+                  context->supported = false;
+                }
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+
+                /*
+                  Ndb currently only supports pushing
+                  <field> LIKE <string> | <func>
+                  we thus push <string> | <func>
+                  on the expect stack to catch that we
+                  don't support <string> LIKE <field>.
+                 */
+                context->expect_field_from_table(this_table);
+                context->expect_only_field_type(MYSQL_TYPE_STRING);
+                context->expect_field_type(MYSQL_TYPE_VAR_STRING);
+                context->expect_field_type(MYSQL_TYPE_VARCHAR);
+                context->expect_field_result(STRING_RESULT);
+                expect_next->expect(Item::STRING_ITEM);
+                expect_next->expect(Item::FUNC_ITEM);
+                context->expect_stack.push(expect_next);
+                pop = false;
+                break;
+              }
+              case Item_func::ISNULL_FUNC: {
+                DBUG_PRINT("info", ("ISNULL_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect_field_from_table(this_table);
+                context->expect_field_result(STRING_RESULT);
+                context->expect_field_result(REAL_RESULT);
+                context->expect_field_result(INT_RESULT);
+                context->expect_field_result(DECIMAL_RESULT);
+                break;
+              }
+              case Item_func::ISNOTNULL_FUNC: {
+                DBUG_PRINT("info", ("ISNOTNULL_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect_field_from_table(this_table);
+                context->expect_field_result(STRING_RESULT);
+                context->expect_field_result(REAL_RESULT);
+                context->expect_field_result(INT_RESULT);
+                context->expect_field_result(DECIMAL_RESULT);
+                break;
+              }
+              case Item_func::NOT_FUNC: {
+                DBUG_PRINT("info", ("NOT_FUNC"));
+                ndb_item = new (*THR_MALLOC)
+                    Ndb_func(func_item->functype(), func_item);
+                context->expect(Item::FUNC_ITEM);
+                context->expect(Item::COND_ITEM);
+                break;
+              }
+              case Item_func::BETWEEN: {
+                DBUG_PRINT("info", ("BETWEEN, rewriting using AND"));
+                const Item_func_between *between_func =
+                    static_cast<const Item_func_between *>(func_item);
+                Ndb_rewrite_context *rewrite_context =
+                    new (*THR_MALLOC) Ndb_rewrite_context(func_item);
+                rewrite_context->next = context->rewrite_stack;
+                context->rewrite_stack = rewrite_context;
+                if (between_func->negated) {
+                  DBUG_PRINT("info", ("NOT_FUNC"));
+                  context->items.push_back(
+                      new (*THR_MALLOC) Ndb_func(Item_func::NOT_FUNC, 1));
+                }
+                DBUG_PRINT("info", ("COND_AND_FUNC"));
+                ndb_item = new (*THR_MALLOC) Ndb_func(
+                    Item_func::COND_AND_FUNC, func_item->argument_count() - 1);
+                // We do not 'expect' anything yet, added later as part of
+                // rewrite,
+                break;
+              }
+              case Item_func::IN_FUNC: {
+                DBUG_PRINT("info", ("IN_FUNC, rewriting using OR"));
+                const Item_func_in *in_func =
+                    static_cast<const Item_func_in *>(func_item);
+                Ndb_rewrite_context *rewrite_context =
+                    new (*THR_MALLOC) Ndb_rewrite_context(func_item);
+                rewrite_context->next = context->rewrite_stack;
+                context->rewrite_stack = rewrite_context;
+                if (in_func->negated) {
+                  DBUG_PRINT("info", ("NOT_FUNC"));
+                  context->items.push_back(
+                      new (*THR_MALLOC) Ndb_func(Item_func::NOT_FUNC, 1));
+                }
+                DBUG_PRINT("info", ("COND_OR_FUNC"));
+                ndb_item = new (*THR_MALLOC) Ndb_func(
+                    Item_func::COND_OR_FUNC, func_item->argument_count() - 1);
+                // We do not 'expect' anything yet, added later as part of
+                // rewrite,
+                break;
+              }
+              default: {
+                DBUG_PRINT("info", ("Found func_item of type %d",
+                                    func_item->functype()));
+                context->supported = false;
+              }
+            }
+            break;
+          }
+
+          case Item::COND_ITEM: {
+            const Item_cond *cond_item = static_cast<const Item_cond *>(item);
+            if (context->expecting(Item::COND_ITEM)) {
+              switch (cond_item->functype()) {
+                case Item_func::COND_AND_FUNC:
+                  DBUG_PRINT("info", ("COND_AND_FUNC"));
+                  ndb_item = new (*THR_MALLOC)
+                      Ndb_func(cond_item->functype(), cond_item);
+                  break;
+                case Item_func::COND_OR_FUNC:
+                  DBUG_PRINT("info", ("COND_OR_FUNC"));
+                  ndb_item = new (*THR_MALLOC)
+                      Ndb_func(cond_item->functype(), cond_item);
+                  break;
+                default:
+                  DBUG_PRINT("info", ("COND_ITEM %d", cond_item->functype()));
+                  context->supported = false;
+                  break;
+              }
+            } else {
+              /* Did not expect condition */
+              context->supported = false;
+            }
+            break;
+          }
+          case Item::STRING_ITEM:
+          case Item::INT_ITEM:
+          case Item::REAL_ITEM:
+          case Item::VARBIN_ITEM:
+          case Item::DECIMAL_ITEM:
+          case Item::CACHE_ITEM:
+            assert(false);  // Expression folded under 'used_tables'
+            [[fallthrough]];
+          default:
+            DBUG_PRINT("info",
+                       ("Found unsupported item of type %d", item->type()));
+            context->supported = false;
+        }
+        if (pop) context->expect_stack.pop();
+      }
+
+      if (context->supported) {
+        assert(ndb_item != nullptr);
+        context->items.push_back(ndb_item);
+      }
+    }
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_gtid_func.cc
+Function: Item_func_gtid_subtract::resolve_type
+bool Item_func_gtid_subtract::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+
+  collation.set(default_charset(), DERIVATION_COERCIBLE, MY_REPERTOIRE_ASCII);
+  /*
+    In the worst case, the string grows after subtraction. This
+    happens when a GTID in args[0] is split by a GTID in args[1],
+    e.g., UUID:1-6 minus UUID:3-4 becomes UUID:1-2,5-6.  The worst
+    case is UUID:1-100 minus UUID:9, where the two characters ":9" in
+    args[1] yield the five characters "-8,10" in the result.
+  */
+  set_data_type_string(
+      args[0]->max_length +
+      max<ulonglong>(args[1]->max_length - binary_log::Uuid::TEXT_LENGTH, 0) *
+          5 / 2);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_md5::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_sha::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_sha2::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_to_base64::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_statement_digest::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_format::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_space::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_bin_to_uuid::val_str_ascii
+  For the Items which have only val_str_ascii() method
+  and don't have their own "native" val_str(),
+  we provide a "wrapper" method to convert from ASCII
+  to Item character set when it's necessary.
+  Conversion happens only in case of "tricky" Item character set (e.g. UCS2).
+  Normally conversion does not happen, and val_str_ascii() is immediately
+  returned instead.
+*/
+String *Item_str_func::val_str_from_val_str_ascii(String *str, String *str2) {
+  assert(fixed == 1);
+
+  if (my_charset_is_ascii_based(collation.collation)) {
+    String *res = val_str_ascii(str);
+    if (res) res->set_charset(collation.collation);
+    return res;
+  }
+
+  assert(str != str2);
+
+  uint errors;
+  String *res = val_str_ascii(str);
+  if (!res) return nullptr;
+
+  if ((null_value = str2->copy(res->ptr(), res->length(), &my_charset_latin1,
+                               collation.collation, &errors)))
+    return nullptr;
+
+  return str2;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_bin_to_uuid::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_conv::val_str
+String *Item_func_aes_encrypt::val_str(String *str) {
+  assert(fixed == 1);
+  char key_buff[80]{'\0'};
+  String tmp_key_value(key_buff, sizeof(key_buff), system_charset_info);
+  THD *thd = current_thd;
+  iv_argument iv_arg;
+  DBUG_TRACE;
+
+  String *sptr = args[0]->val_str(str);  // String to encrypt
+  if (sptr == nullptr) return error_str();
+
+  String *key = args[1]->val_str(&tmp_key_value);  // key
+  if (key == nullptr) return error_str();
+
+  my_aes_opmode aes_opmode =
+      static_cast<my_aes_opmode>(thd->variables.my_aes_mode);
+  assert(aes_opmode <= MY_AES_END);
+
+  const unsigned char *iv_str = iv_arg.retrieve_iv_ptr(
+      aes_opmode, arg_count, args, func_name(), thd, &null_value);
+  if (null_value) return error_str();
+
+  vector<string> kdf_options;
+  kdf_argument kdf_arg;
+  kdf_options =
+      kdf_arg.retrieve_kdf_options(arg_count, args, func_name(), &null_value);
+  if (null_value) return error_str();
+
+  // Calculate result length
+  int aes_length = my_aes_get_size(sptr->length(), aes_opmode);
+
+  tmp_value.set_charset(&my_charset_bin);
+  const uint rkey_size = my_aes_opmode_key_sizes[aes_opmode] / 8;
+  uint key_size = key->length();
+  if ((key_size > rkey_size) && (kdf_options.size() == 0)) {
+    push_warning_printf(thd, Sql_condition::SL_WARNING, WARN_AES_KEY_SIZE,
+                        ER_THD(thd, WARN_AES_KEY_SIZE), rkey_size);
+  }
+  if (tmp_value.alloc(aes_length)) return error_str();
+
+  // Finally encrypt directly to allocated buffer.
+  if (my_aes_encrypt(pointer_cast<unsigned char *>(sptr->ptr()), sptr->length(),
+                     pointer_cast<unsigned char *>(tmp_value.ptr()),
+                     pointer_cast<unsigned char *>(key->ptr()), key->length(),
+                     aes_opmode, iv_str, true,
+                     (kdf_options.size() > 0) ? &kdf_options : nullptr) ==
+      aes_length) {
+    // We got the expected result length
+    tmp_value.length(static_cast<size_t>(aes_length));
+    return &tmp_value;
+  }
+  return error_str();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_conv::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_hex::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc
+Function: Item_func_quote::resolve_type
+bool Item_func_md5::resolve_type(THD *thd) {
+  if (param_type_is_default(thd, 0, -1)) return true;
+  CHARSET_INFO *cs = get_checksum_charset(args[0]->collation.collation->csname);
+  args[0]->collation.set(cs, DERIVATION_COERCIBLE);
+  set_data_type_string(32, default_charset());
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum_bit::update_field
+void Item_sum_variance::update_field() {
+  ulonglong field_count;
+  uchar *res = result_field->field_ptr();
+
+  double nr = args[0]->val_real(); /* sets null_value as side-effect */
+
+  if (args[0]->null_value) return;
+
+  /* Serialize format is (double)m, (double)s, (longlong)count */
+  double field_recurrence_m = float8get(res);
+  double field_recurrence_s = float8get(res + sizeof(double));
+  field_count = sint8korr(res + sizeof(double) * 2);
+
+  if (variance_fp_recurrence_next(this, &field_recurrence_m,
+                                  &field_recurrence_s, nullptr, &field_count,
+                                  nr, false, false))
+    return;
+
+  float8store(res, field_recurrence_m);
+  float8store(res + sizeof(double), field_recurrence_s);
+  res += sizeof(double) * 2;
+  int8store(res, field_count);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_date_add_interval::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_add_time::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_monthname::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_dayname::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_date_format::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.h
+Function: Item_func_get_format::resolve_type
+  bool resolve_type(THD *thd) override {
+    if (param_type_is_default(thd, 0, 1, MYSQL_TYPE_DATETIME)) return true;
+    collation.set_numeric();
+    const uint8 dec = arg_count == 0 ? 0 : args[0]->datetime_precision();
+    if (dec > 0) {
+      set_data_type_decimal(11 + dec, dec);
+    } else {
+      set_data_type_longlong();
+    }
+    return false;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_inetfunc.h
+Function: Item_func_inet_ntoa::resolve_type
+  bool resolve_type(THD *thd) override {
+    if (param_type_is_default(thd, 0, 1)) return true;
+    set_nullable(true);
+    unsigned_flag = true;
+    return false;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_inetfunc.h
+Function: Item_func_inet6_ntoa::resolve_type
+  bool resolve_type(THD *thd) override {
+    if (param_type_is_default(thd, 0, 1)) return true;
+    set_nullable(true);
+    unsigned_flag = true;
+    return false;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc
+Function: Item_func_as_wkt::resolve_type
+bool Item_geometry_func::resolve_type(THD *) {
+  set_data_type(MYSQL_TYPE_GEOMETRY);
+  collation.set(&my_charset_bin);
+  max_length = 0xFFFFFFFFU;
+  set_nullable(true);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc
+Function: Item_func_geohash::resolve_type
+bool Item_geometry_func::resolve_type(THD *) {
+  set_data_type(MYSQL_TYPE_GEOMETRY);
+  collation.set(&my_charset_bin);
+  max_length = 0xFFFFFFFFU;
+  set_nullable(true);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_geofunc.h
+Function: Item_func_geometry_type::resolve_type
+  bool resolve_type(THD *thd) override {
+    if (param_type_is_default(thd, 0, 1)) return true;
+    if (param_type_is_default(thd, 1, 2, MYSQL_TYPE_LONGLONG)) return true;
+    if (param_type_is_default(thd, 2, 3)) return true;
+    return Item_geometry_func::resolve_type(thd);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_create.cc
+Function: create_func_cast not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_create.cc
+Function: create_func_cast not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc
+Function: PTI_text_literal_text_string::itemize
+bool PTI_comp_op::itemize(Parse_context *pc, Item **res) {
+  if (super::itemize(pc, res) || left->itemize(pc, &left) ||
+      right->itemize(pc, &right))
+    return true;
+
+  *res = (*boolfunc2creator)(false)->create(left, right);
+  return *res == nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc
+Function: PTI_text_literal_concat::itemize
+bool PTI_comp_op::itemize(Parse_context *pc, Item **res) {
+  if (super::itemize(pc, res) || left->itemize(pc, &left) ||
+      right->itemize(pc, &right))
+    return true;
+
+  *res = (*boolfunc2creator)(false)->create(left, right);
+  return *res == nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc
+Function: PT_json_table_column_with_path::contextualize
+  Convenience function that calls Parse_tree_node::contextualize() on each of
+  the nodes that are non-NULL, stopping when a call returns true.
+*/
+template <typename Context, typename Node, typename... Nodes>
+bool contextualize_safe(Context *pc, Node node, Nodes... nodes) {
+  return contextualize_safe(pc, node) || contextualize_safe(pc, nodes...);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: set_slave_thread_default_charset
+void set_slave_thread_default_charset(THD *thd, Relay_log_info const *rli) {
+  DBUG_TRACE;
+
+  thd->variables.character_set_client =
+      global_system_variables.character_set_client;
+  thd->variables.collation_connection =
+      global_system_variables.collation_connection;
+  thd->variables.collation_server = global_system_variables.collation_server;
+  thd->update_charset();
+
+  /*
+    We use a const cast here since the conceptual (and externally
+    visible) behavior of the function is to set the default charset of
+    the thread.  That the cache has to be invalidated is a secondary
+    effect.
+   */
+  const_cast<Relay_log_info *>(rli)->cached_charset_invalidate();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc
+Function: dd::set_event_attributes
+  set_event_attributes(thd, schema, event.get(), event_name, event_body,
+                       event_body_utf8, definer, event_data, false);
+
+  return thd->dd_client()->store(event.get());
+}
+
+bool update_event(THD *thd, Event *event, const dd::Schema &schema,
+                  const dd::Schema *new_schema,
+                  const String_type &new_event_name,
+                  const String_type &new_event_body,
+                  const String_type &new_event_body_utf8,
+                  const LEX_USER *definer, Event_parse_data *event_data) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc
+Function: dd::fill_dd_routine_info
+  Method is called from the fill_dd_routine_info().
+
+  @param[in]  thd        Thread handle.
+  @param[in]  sp         Stored routine object.
+  @param[out] routine    dd::Routine object prepared from sp_head.
+
+  @retval false  ON SUCCESS
+  @retval true   ON FAILURE
+*/
+
+static bool fill_routine_parameters_info(THD *thd, sp_head *sp,
+                                         Routine *routine) {
+  DBUG_TRACE;
+
+  /*
+    The return type of the stored function is listed as first parameter from
+    the Information_schema.parameters. Storing return type as first parameter
+    for the stored functions.
+  */
+  if (sp->m_type == enum_sp_type::FUNCTION) {
+    // Add parameter.
+    dd::Parameter *param = routine->add_parameter();
+
+    // Fill return type information.
+    fill_parameter_info_from_field(thd, &sp->m_return_field_def, param);
+  }
+
+  // Fill parameter information of the stored routine.
+  sp_pcontext *sp_root_parsing_ctx = sp->get_root_parsing_context();
+  assert(sp_root_parsing_ctx != nullptr);
+  for (uint i = 0; i < sp_root_parsing_ctx->context_var_count(); i++) {
+    sp_variable *sp_var = sp_root_parsing_ctx->find_variable(i);
+    Create_field *field_def = &sp_var->field_def;
+
+    // Add parameter.
+    dd::Parameter *param = routine->add_parameter();
+
+    // Set parameter name.
+    param->set_name(sp_var->name.str);
+
+    // Set parameter mode.
+    Parameter::enum_parameter_mode mode;
+    switch (sp_var->mode) {
+      case sp_variable::MODE_IN:
+        mode = Parameter::PM_IN;
+        break;
+      case sp_variable::MODE_OUT:
+        mode = Parameter::PM_OUT;
+        break;
+      case sp_variable::MODE_INOUT:
+        mode = Parameter::PM_INOUT;
+        break;
+      default:
+        assert(false); /* purecov: deadcode */
+        return true;   /* purecov: deadcode */
+    }
+    param->set_mode(mode);
+
+    // Fill return type information.
+    fill_parameter_info_from_field(thd, field_def, param);
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_trigger.cc
+Function: dd::load_triggers
+bool load_triggers(THD *thd, MEM_ROOT *mem_root, const char *schema_name,
+                   const char *table_name, const dd::Table &table,
+                   List<::Trigger> *triggers) {
+  DBUG_TRACE;
+
+  for (const auto &trigger : table.triggers()) {
+    LEX_CSTRING db_name_str = {schema_name, strlen(schema_name)};
+    LEX_CSTRING subject_table_name = {table_name, strlen(table_name)};
+    LEX_CSTRING definition, definition_utf8;
+
+    if (lex_string_strmake(mem_root, &definition,
+                           trigger->action_statement().c_str(),
+                           trigger->action_statement().length()))
+      return true;
+
+    if (lex_string_strmake(mem_root, &definition_utf8,
+                           trigger->action_statement_utf8().c_str(),
+                           trigger->action_statement_utf8().length()))
+      return true;
+
+    LEX_CSTRING definer_user;
+    if (lex_string_strmake(mem_root, &definer_user,
+                           trigger->definer_user().c_str(),
+                           trigger->definer_user().length()))
+      return true;
+
+    LEX_CSTRING definer_host;
+    if (lex_string_strmake(mem_root, &definer_host,
+                           trigger->definer_host().c_str(),
+                           trigger->definer_host().length()))
+      return true;
+
+    const CHARSET_INFO *client_cs =
+        dd_get_mysql_charset(trigger->client_collation_id());
+    if (client_cs == nullptr) client_cs = thd->variables.character_set_client;
+
+    const CHARSET_INFO *connection_cs =
+        dd_get_mysql_charset(trigger->connection_collation_id());
+    if (connection_cs == nullptr)
+      connection_cs = thd->variables.collation_connection;
+
+    const CHARSET_INFO *schema_cs =
+        dd_get_mysql_charset(trigger->schema_collation_id());
+    if (schema_cs == nullptr) schema_cs = thd->variables.collation_database;
+
+    LEX_CSTRING client_cs_name, connection_cl_name, db_cl_name, trigger_name;
+    const char *csname = client_cs->csname;
+    if (lex_string_strmake(mem_root, &client_cs_name, csname, strlen(csname)) ||
+        lex_string_strmake(mem_root, &connection_cl_name,
+                           connection_cs->m_coll_name,
+                           strlen(connection_cs->m_coll_name)) ||
+        lex_string_strmake(mem_root, &db_cl_name, schema_cs->m_coll_name,
+                           strlen(schema_cs->m_coll_name)) ||
+        lex_string_strmake(mem_root, &trigger_name, trigger->name().c_str(),
+                           trigger->name().length()))
+      return true;
+
+    ::Trigger *trigger_to_add = ::Trigger::create_from_dd(
+        mem_root, trigger_name, db_name_str, subject_table_name, definition,
+        definition_utf8, trigger->sql_mode(), definer_user, definer_host,
+        client_cs_name, connection_cl_name, db_cl_name,
+        convert_event_type_from_dd(trigger->event_type()),
+        convert_action_time_from_dd(trigger->action_timing()),
+        trigger->action_order(), trigger->created());
+
+    if (trigger_to_add == nullptr) return true;
+
+    if (triggers->push_back(trigger_to_add, mem_root)) {
+      destroy(trigger_to_add);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::Routine_event_context_guard::Routine_event_context_guard
+Routine_event_context_guard::Routine_event_context_guard(THD *thd)
+    : m_thd(thd) {
+  m_thd = thd;
+  m_sql_mode = m_thd->variables.sql_mode;
+  m_client_cs = m_thd->variables.character_set_client;
+  m_connection_cl = m_thd->variables.collation_connection;
+  m_saved_time_zone = m_thd->variables.time_zone;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::Routine_event_context_guard::
+  if (should_log_error(error))
+    LogEvent()
+        .type(LOG_TYPE_ERROR)
+        .subsys(LOG_SUBSYSTEM_TAG)
+        .prio(ERROR_LEVEL)
+        .errcode(ER_ERROR_INFO_FROM_DA)
+        .verbatim(str);
+}
+
+void Bootstrap_error_handler::set_abort_on_error(uint error) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::invalid_routine
+bool invalid_routine(THD *thd, const dd::Schema &schema,
+                     const dd::Routine &routine) {
+  Routine_event_context_guard guard(thd);
+  sp_head *sp = nullptr;
+  st_sp_chistics chistics;
+  prepare_sp_chistics_from_dd_routine(&routine, &chistics);
+
+  dd::String_type return_type_str;
+  prepare_return_type_string_from_dd_routine(thd, &routine, &return_type_str);
+
+  // Create SP creation context to be used in db_load_routine()
+  Stored_program_creation_ctx *creation_ctx =
+      Stored_routine_creation_ctx::create_routine_creation_ctx(&routine);
+
+  thd->variables.character_set_client = creation_ctx->get_client_cs();
+  thd->variables.collation_connection = creation_ctx->get_connection_cl();
+  thd->update_charset();
+
+  enum_sp_return_code error = db_load_routine(
+      thd,
+      routine.type() == dd::Routine::RT_FUNCTION ? enum_sp_type::FUNCTION
+                                                 : enum_sp_type::PROCEDURE,
+      schema.name().c_str(), schema.name().size(), routine.name().c_str(),
+      routine.name().size(), &sp, routine.sql_mode(),
+      routine.parameter_str().c_str(), return_type_str.c_str(),
+      routine.definition().c_str(), &chistics, routine.definer_user().c_str(),
+      routine.definer_host().c_str(), routine.created(true),
+      routine.last_altered(true), creation_ctx);
+
+  if (sp != nullptr)  // To be safe
+    sp_head::destroy(sp);
+
+  if (error) return (thd->get_stmt_da()->mysql_errno() == ER_PARSE_ERROR);
+  thd->clear_error();
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/routine.cc
+Function: dd::upgrade_57::migrate_routine_to_dd
+static bool migrate_routine_to_dd(THD *thd, TABLE *proc_table) {
+  const char *params, *returns, *body, *definer;
+  char *sp_db, *sp_name1;
+  sp_head *sp = nullptr;
+  enum_sp_type routine_type;
+  LEX_USER user_info;
+  bool dummy_is_sp_created = false;
+
+  // Fetch SP/SF name, database name, definer and type.
+  if ((sp_db = get_field(thd->mem_root,
+                         proc_table->field[MYSQL_PROC_FIELD_DB])) == nullptr)
+    return true;
+
+  if ((sp_name1 = get_field(
+           thd->mem_root, proc_table->field[MYSQL_PROC_FIELD_NAME])) == nullptr)
+    return true;
+
+  if ((definer = get_field(thd->mem_root,
+                           proc_table->field[MYSQL_PROC_FIELD_DEFINER])) ==
+      nullptr)
+    return true;
+
+  routine_type =
+      (enum_sp_type)proc_table->field[MYSQL_PROC_MYSQL_TYPE]->val_int();
+
+  // Fetch SP/SF parameters string
+  if ((params = get_field(thd->mem_root,
+                          proc_table->field[MYSQL_PROC_FIELD_PARAM_LIST])) ==
+      nullptr)
+    params = "";
+
+  // Create return type string for SF
+  if (routine_type == enum_sp_type::PROCEDURE)
+    returns = "";
+  else if ((returns = get_field(thd->mem_root,
+                                proc_table->field[MYSQL_PROC_FIELD_RETURNS])) ==
+           nullptr)
+    return true;
+
+  st_sp_chistics chistics;
+  if (set_st_sp_chistics(thd, proc_table, &chistics)) return true;
+
+  // Fetch SP/SF created and modified timestamp
+  longlong created = proc_table->field[MYSQL_PROC_FIELD_CREATED]->val_int();
+  longlong modified = proc_table->field[MYSQL_PROC_FIELD_MODIFIED]->val_int();
+
+  // Fetch SP/SF body
+  if ((body = get_field(thd->mem_root,
+                        proc_table->field[MYSQL_PROC_FIELD_BODY])) == nullptr)
+    return true;
+
+  dd::upgrade::Routine_event_context_guard routine_ctx_guard(thd);
+
+  thd->variables.sql_mode =
+      (sql_mode_t)(proc_table->field[MYSQL_PROC_FIELD_SQL_MODE]->val_int() &
+                   MODE_ALLOWED_MASK);
+
+  LEX_CSTRING sp_db_str;
+  LEX_STRING sp_name_str;
+
+  sp_db_str.str = sp_db;
+  sp_db_str.length = strlen(sp_db);
+  sp_name_str.str = sp_name1;
+  sp_name_str.length = strlen(sp_name1);
+
+  sp_name sp_name_obj = sp_name(sp_db_str, sp_name_str, true);
+  sp_name_obj.init_qname(thd);
+
+  // Create SP creation context to be used in db_load_routine()
+  Stored_program_creation_ctx *creation_ctx =
+      Stored_routine_creation_ctx::load_from_db(thd, &sp_name_obj, proc_table);
+
+  /*
+    Update character set info in thread variable.
+    Restore will be taken care by Routine_event_context_guard
+  */
+  thd->variables.character_set_client = creation_ctx->get_client_cs();
+  thd->variables.collation_connection = creation_ctx->get_connection_cl();
+  thd->update_charset();
+
+  // Holders for user name and host name used in parse user.
+  char definer_user_name_holder[USERNAME_LENGTH + 1];
+  char definer_host_name_holder[HOSTNAME_LENGTH + 1];
+  user_info.user = {definer_user_name_holder, USERNAME_LENGTH};
+  user_info.host = {definer_host_name_holder, HOSTNAME_LENGTH};
+
+  // Parse user string to separate user name and host
+  parse_user(definer, strlen(definer), definer_user_name_holder,
+             &user_info.user.length, definer_host_name_holder,
+             &user_info.host.length);
+
+  // Disable autocommit option in thd variable
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  // This function fixes sp_head to use in sp_create_routine()
+  enum_sp_return_code sp_ret_code = db_load_routine(
+      thd, routine_type, sp_db_str.str, sp_db_str.length, sp_name_str.str,
+      sp_name_str.length, &sp, thd->variables.sql_mode, params, returns, body,
+      &chistics, definer_user_name_holder, definer_host_name_holder, created,
+      modified, creation_ctx);
+
+  if (sp_ret_code != SP_OK) {
+    if (sp_ret_code == SP_NO_DB_ERROR) {
+      // Schema does not exist. Fail with an error indicating the presence of an
+      // orphan routine.
+      LogErr(ERROR_LEVEL, ER_UPGRADE_NONEXISTENT_SCHEMA, sp_db_str.str,
+             "routine", sp_name_str.str, "routines");
+      goto err;
+    }
+
+    /*
+      Parsing of routine body failed. Use empty routine body and report a
+      warning if the routine does not belong to sys schema. Sys schema routines
+      will get fixed when mysql_upgrade is executed.
+    */
+    if (strcmp(sp_db_str.str, "sys") != 0) {
+      if (dd::upgrade::Syntax_error_handler::is_parse_error) {
+        LogErr(ERROR_LEVEL, ER_UPGRADE_PARSE_ERROR, "Routine", sp_db_str.str,
+               sp_name_str.str,
+               dd::upgrade::Syntax_error_handler::error_message());
+        return false;
+      }
+      LogErr(WARNING_LEVEL, ER_CANT_PARSE_STORED_ROUTINE_BODY, sp_db_str.str,
+             sp_name_str.str, " Creating routine without parsing routine body");
+    }
+
+    LEX_CSTRING sr_body;
+    if (routine_type == enum_sp_type::FUNCTION)
+      sr_body = {STRING_WITH_LEN("RETURN NULL")};
+    else
+      sr_body = {STRING_WITH_LEN("BEGIN END")};
+
+    if (db_load_routine(
+            thd, routine_type, sp_db_str.str, sp_db_str.length, sp_name_str.str,
+            sp_name_str.length, &sp, thd->variables.sql_mode, params, returns,
+            sr_body.str, &chistics, definer_user_name_holder,
+            definer_host_name_holder, created, modified, creation_ctx))
+      goto err;
+
+    // Set actual routine body.
+    sp->m_body.str = body;
+    sp->m_body.length = strlen(body);
+  }
+
+  // Create entry for SP/SF in DD table.
+  if (sp_create_routine(thd, sp, &user_info, false, dummy_is_sp_created))
+    goto err;
+
+  if (sp != nullptr)  // To be safe
+    sp_head::destroy(sp);
+
+  return false;
+
+err:
+  LogErr(ERROR_LEVEL, ER_DD_CANT_CREATE_SP, sp_db_str.str, sp_name_str.str);
+  if (sp != nullptr)  // To be safe
+    sp_head::destroy(sp);
+  return true;
+}
+
+

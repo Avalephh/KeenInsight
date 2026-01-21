@@ -1,0 +1,140 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum_sum::check_wf_semantics1
+bool Item_sum::check_wf_semantics1(THD *, Query_block *,
+                                   Window_evaluation_requirements *r) {
+  const PT_frame *frame = m_window->frame();
+
+  /*
+    If we have ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, we can just
+    accumulate as we see rows, never need to invert old rows or to look at
+    future rows, so don't need a frame buffer.
+  */
+  r->needs_buffer = !(frame->m_query_expression == WFU_ROWS &&
+                      frame->m_from->m_border_type == WBT_UNBOUNDED_PRECEDING &&
+                      frame->m_to->m_border_type == WBT_CURRENT_ROW);
+
+  if (with_distinct) {
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "<window function>(DISTINCT ..)");
+    return true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum_variance::check_wf_semantics1
+bool Item_sum::check_wf_semantics1(THD *, Query_block *,
+                                   Window_evaluation_requirements *r) {
+  const PT_frame *frame = m_window->frame();
+
+  /*
+    If we have ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, we can just
+    accumulate as we see rows, never need to invert old rows or to look at
+    future rows, so don't need a frame buffer.
+  */
+  r->needs_buffer = !(frame->m_query_expression == WFU_ROWS &&
+                      frame->m_from->m_border_type == WBT_UNBOUNDED_PRECEDING &&
+                      frame->m_to->m_border_type == WBT_CURRENT_ROW);
+
+  if (with_distinct) {
+    my_error(ER_NOT_SUPPORTED_YET, MYF(0), "<window function>(DISTINCT ..)");
+    return true;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum_variance::Item_sum_variance
+Item_sum_variance::Item_sum_variance(THD *thd, Item_sum_variance *item)
+    : Item_sum_num(thd, item),
+      hybrid_type(item->hybrid_type),
+      count(item->count),
+      sample(item->sample),
+      prec_increment(item->prec_increment),
+      optimize(item->optimize) {
+  recurrence_m = item->recurrence_m;
+  recurrence_s = item->recurrence_s;
+  recurrence_s2 = item->recurrence_s2;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/window.h
+Function: Window_evaluation_requirements::Window_evaluation_requirements
+  Window_evaluation_requirements()
+      : needs_buffer(false),
+        needs_peerset(false),
+        needs_last_peer_in_frame(false),
+        opt_first_row(false),
+        opt_last_row(false),
+        row_optimizable(true),
+        range_optimizable(true) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/window.cc
+Function: Window::check_window_functions1
+bool Window::check_window_functions1(THD *thd, Query_block *select) {
+  m_static_aggregates =
+      (m_frame->m_from->m_border_type == WBT_UNBOUNDED_PRECEDING &&
+       m_frame->m_to->m_border_type == WBT_UNBOUNDED_FOLLOWING);
+
+  // If static aggregates, inversion isn't necessary
+  m_row_optimizable =
+      (m_frame->m_query_expression == WFU_ROWS) && !m_static_aggregates;
+  m_range_optimizable =
+      (m_frame->m_query_expression == WFU_RANGE) && !m_static_aggregates;
+
+  for (Item_sum &wf : m_functions) {
+    Window_evaluation_requirements reqs;
+
+    if (wf.check_wf_semantics1(thd, select, &reqs)) return true;
+
+    // [Not] buffering depends only on facts known at resolution time
+    m_needs_frame_buffering |= reqs.needs_buffer;
+    if (reqs.needs_peerset) {
+      /*
+        A framing function looks at the frame only (which may or not include
+        the peers, but it's irrelevant: what matters is the frame's set, not
+        the peer set in itself).
+      */
+      assert(!wf.framing());
+      m_needs_peerset = true;
+    }
+    if (reqs.needs_last_peer_in_frame) {
+      assert(wf.framing());
+      m_needs_last_peer_in_frame = true;
+    }
+    if (wf.needs_partition_cardinality()) {
+      assert(!wf.framing());
+      m_needs_partition_cardinality = true;
+    }
+    m_opt_first_row |= reqs.opt_first_row;
+    m_opt_last_row |= reqs.opt_last_row;
+    m_row_optimizable &= reqs.row_optimizable;
+    m_range_optimizable &= reqs.range_optimizable;
+
+    if (thd->lex->is_explain() && !m_frame->m_originally_absent &&
+        !wf.framing()) {
+      /*
+        SQL2014 <window clause> SR6b: functions which do not respect frames
+        shouldn't have any frame specification in their window; we are more
+        relaxed, as some users may find it handy to have one single
+        window definition for framing and non-framing functions; but in case
+        it's a user's mistake, we send a Note in EXPLAIN.
+      */
+      push_warning_printf(thd, Sql_condition::SL_NOTE,
+                          ER_WINDOW_FUNCTION_IGNORES_FRAME,
+                          ER_THD(thd, ER_WINDOW_FUNCTION_IGNORES_FRAME),
+                          wf.func_name(), printable_name());
+    }
+  }
+
+  return false;
+}
+
+

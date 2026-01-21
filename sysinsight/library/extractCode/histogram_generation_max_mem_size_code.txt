@@ -1,0 +1,253 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/histograms/histogram.cc
+Function: histograms::update_histogram
+bool update_histogram(THD *thd, Table_ref *table, const columns_set &columns,
+                      int num_buckets, LEX_STRING data, results_map &results) {
+  dd::cache::Dictionary_client::Auto_releaser auto_releaser(thd->dd_client());
+
+  // Read only should have been stopped at an earlier stage.
+  assert(!check_readonly(thd, false));
+  assert(!thd->tx_read_only);
+
+  assert(results.empty());
+  assert(!columns.empty());
+
+  // Only one table should be specified in ANALYZE TABLE .. UPDATE HISTOGRAM
+  assert(table->next_local == nullptr);
+
+  if (table->table != nullptr && table->table->s->tmp_table != NO_TMP_TABLE) {
+    /*
+      Normally, the table we are going to read data from is not initialized at
+      this point. But if table->table is not a null-pointer, it has already been
+      initialized at an earlier stage. This will happen if the table is a
+      temporary table.
+    */
+    results.emplace("", Message::TEMPORARY_TABLE);
+    return true;
+  }
+
+  /*
+    Create two scope guards; one for disabling autocommit and one that will do a
+    rollback and ensure that any open tables are closed before returning.
+  */
+  Disable_autocommit_guard autocommit_guard(thd);
+  auto tables_guard = create_scope_guard([thd]() {
+    if (trans_rollback_stmt(thd) || trans_rollback(thd))
+      assert(false); /* purecov: deadcode */
+    close_thread_tables(thd);
+  });
+
+  if (open_and_lock_tables(thd, table, 0)) {
+    return true;
+  }
+
+  DBUG_EXECUTE_IF("histogram_fail_after_open_table", { return true; });
+
+  if (table->is_view()) {
+    results.emplace("", Message::VIEW);
+    return true;
+  }
+
+  assert(table->table != nullptr);
+  TABLE *tbl = table->table;
+
+  if (tbl->s->encrypt_type.length > 0 &&
+      my_strcasecmp(system_charset_info, "n", tbl->s->encrypt_type.str) != 0) {
+    results.emplace("", Message::ENCRYPTED_TABLE);
+    return true;
+  }
+
+  /*
+    Check if the provided column names exist, and that they have a supported
+    data type. If they do, mark them in the read set.
+  */
+  bitmap_clear_all(tbl->write_set);
+  bitmap_clear_all(tbl->read_set);
+  std::vector<Field *, Histogram_key_allocator<Field *>> resolved_fields;
+
+  for (const std::string &column_name : columns) {
+    Field *field = find_field_in_table_sef(tbl, column_name.c_str());
+
+    if (field == nullptr) {
+      // Field not found in table
+      results.emplace(column_name, Message::FIELD_NOT_FOUND);
+      continue;
+    } else if (histograms::field_type_to_value_map_type(field) ==
+               histograms::Value_map_type::INVALID) {
+      // Unsupported data type
+      results.emplace(column_name, Message::UNSUPPORTED_DATA_TYPE);
+      continue;
+    }
+
+    /*
+      Check if this field is covered by a single-part unique index. If it is, we
+      don't want to create histogram statistics for it.
+    */
+    if (covered_by_single_part_index(thd, field)) {
+      results.emplace(column_name,
+                      Message::COVERED_BY_SINGLE_PART_UNIQUE_INDEX);
+      continue;
+    }
+    resolved_fields.push_back(field);
+
+    bitmap_set_bit(tbl->read_set, field->field_index());
+    if (field->is_gcol()) {
+      bitmap_set_bit(tbl->write_set, field->field_index());
+      /*
+        The base columns needs to be in the write set in case of nested
+        generated columns:
+
+        CREATE TABLE t1 (
+          col1 INT,
+          col2 INT AS (col1 + 1) VIRTUAL,
+          col3 INT AS (col2 + 1) VIRTUAL);
+
+        If we are reading data from "col3", we also need to update the data in
+        "col2" in order for the generated value to be correct.
+      */
+      bitmap_union(tbl->write_set, &field->gcol_info->base_columns_map);
+      bitmap_union(tbl->read_set, &field->gcol_info->base_columns_map);
+    }
+  }
+
+  /*
+    If we don't have any fields, we just quit here. Return "true" so we don't
+    write empty transactions/statements to the binlog.
+  */
+  if (resolved_fields.empty()) {
+    return true;
+  }
+  if (data.str != nullptr) {
+    assert(!resolved_fields.empty());
+    if (resolved_fields.size() > 1) {
+      results.emplace("", Message::MULTIPLE_COLUMNS_SPECIFIED);
+      return true;
+    }
+
+    Field *field = resolved_fields.front();
+
+    /*
+      The column needs to be in the write set because Field::store()
+      is used on a copy of the histogram Field to test value domain.
+    */
+    bitmap_set_bit(tbl->write_set, field->field_index());
+
+    // Parse the literal for a standard JSON object.
+    String parse_input{data.str, static_cast<uint32>(data.length),
+                       &my_charset_utf8mb4_bin};
+    Json_dom_ptr dom;
+    {
+      Histogram_error_handler error_handler(thd);
+      JsonParseDefaultErrorHandler parse_handler("UPDATE HISTOGRAM", 0);
+      if (parse_json(parse_input, &dom, true, parse_handler,
+                     JsonDocumentDefaultDepthHandler) ||
+          error_handler.has_error()) {
+        results.emplace("", Message::JSON_FORMAT_ERROR);
+        return true;
+      }
+      if (dom->json_type() != enum_json_type::J_OBJECT) {
+        results.emplace("", Message::JSON_NOT_AN_OBJECT);
+        return true;
+      }
+    }
+
+    MEM_ROOT local_mem_root;
+
+    // Create a histogram for the json object.
+    Error_context context(thd, field, &results);
+    std::string col_name(field->field_name);
+    // Convert JSON to histogram
+    histograms::Histogram *histogram = Histogram::json_to_histogram(
+        &local_mem_root, std::string(table->db, table->db_length),
+        std::string(table->table_name, table->table_name_length), col_name,
+        *down_cast<Json_object *>(dom.get()), &context);
+
+    // Store it to persistent storage.
+    if (histogram == nullptr || histogram->store_histogram(thd)) {
+      my_error(ER_UNABLE_TO_BUILD_HISTOGRAM, MYF(0), field->field_name,
+               table->db, table->table_name);
+      return true;
+    }
+
+    results.emplace(col_name, Message::HISTOGRAM_CREATED);
+
+    bool ret = trans_commit_stmt(thd) || trans_commit(thd);
+    close_thread_tables(thd);
+    tables_guard.commit();
+
+    return ret;
+  }
+
+  /*
+    Prepare one Value_map for each field we are creating histogram statistics
+    for. Also, estimate how many bytes one row will consume so that we can
+    estimate how many rows we can fit into memory permitted by
+    histogram_generation_max_mem_size.
+  */
+  size_t row_size_bytes = 0;
+  value_map_collection value_maps;
+  if (prepare_value_maps(resolved_fields, value_maps, &row_size_bytes))
+    return true; /* purecov: deadcode */
+
+  /*
+    Caclulate how many rows we can fit into memory permitted by
+    histogram_generation_max_mem_size.
+  */
+  double rows_in_memory = thd->variables.histogram_generation_max_mem_size /
+                          static_cast<double>(row_size_bytes);
+
+  /*
+    Ensure that we estimate at least one row in the table, so we avoid
+    division by zero error.
+
+    NOTE: We ignore errors from "fetch_number_of_rows()" on purpose, since we
+    don't consider it fatal not having the correct row estimate.
+  */
+  table->fetch_number_of_rows();
+  ha_rows rows_in_table = std::max(1ULL, tbl->file->stats.records);
+
+  double sample_percentage = rows_in_memory / rows_in_table * 100.0;
+  sample_percentage = std::min(sample_percentage, 100.0);
+
+  // Read data from the table into the Value_maps we have prepared.
+  if (fill_value_maps(resolved_fields, sample_percentage, tbl, value_maps))
+    return true; /* purecov: deadcode */
+
+  // Create a histogram for each Value_map, and store it to persistent storage.
+  for (const Field *field : resolved_fields) {
+    /*
+      The MEM_ROOT is transferred to the dictionary object when
+      histogram->store_histogram is called.
+    */
+    MEM_ROOT local_mem_root(key_memory_histograms, 256);
+
+    std::string col_name(field->field_name);
+    histograms::Histogram *histogram =
+        value_maps.at(field->field_index())
+            ->build_histogram(
+                &local_mem_root, num_buckets,
+                std::string(table->db, table->db_length),
+                std::string(table->table_name, table->table_name_length),
+                col_name);
+
+    if (histogram == nullptr) {
+      /* purecov: begin inspected */
+      my_error(ER_UNABLE_TO_BUILD_HISTOGRAM, MYF(0), field->field_name,
+               table->db, table->table_name);
+      return true;
+      /* purecov: end */
+    } else if (histogram->store_histogram(thd)) {
+      // errors have already been reported
+      return true; /* purecov: deadcode */
+    }
+
+    results.emplace(col_name, Message::HISTOGRAM_CREATED);
+  }
+
+  bool ret = trans_commit_stmt(thd) || trans_commit(thd);
+  close_thread_tables(thd);
+  tables_guard.commit();
+  return ret;
+}
+
+

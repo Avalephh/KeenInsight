@@ -1,0 +1,1953 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: unlock_variables
+static void unlock_variables(struct System_variables *vars) {
+  intern_plugin_unlock(nullptr, vars->table_plugin);
+  intern_plugin_unlock(nullptr, vars->temp_table_plugin);
+  vars->table_plugin = nullptr;
+  vars->temp_table_plugin = nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: plugin_register_builtin_and_init_core_se
+bool plugin_register_builtin_and_init_core_se(int *argc, char **argv) {
+  bool mandatory = true;
+  DBUG_TRACE;
+
+  /* Don't allow initializing twice */
+  assert(!initialized);
+
+  /* Allocate the temporary mem root, will be freed before returning */
+  MEM_ROOT tmp_root(key_memory_plugin_init_tmp, 4096);
+
+  mysql_rwlock_wrlock(&LOCK_system_variables_hash);
+  mysql_mutex_lock(&LOCK_plugin);
+  initialized = true;
+
+  /* First we register the builtin mandatory and optional plugins */
+  for (struct st_mysql_plugin **builtins = mysql_mandatory_plugins;
+       *builtins || mandatory; builtins++) {
+    /* Switch to optional plugins when done with the mandatory ones */
+    if (!*builtins) {
+      builtins = mysql_optional_plugins;
+      mandatory = false;
+      if (!*builtins) break;
+    }
+    /* Process all plugins declared in same plugin declaration. */
+    bool disable_extra_plugins = false;
+    for (struct st_mysql_plugin *plugin = *builtins; plugin->info; plugin++) {
+      struct st_plugin_int tmp;
+      tmp.plugin = plugin;
+      tmp.name.str = plugin->name;
+      tmp.name.length = strlen(plugin->name);
+      tmp.state = 0;
+      /* tmp.load_option is set by test_plugin_option call further down */
+
+      std::optional<enum_plugin_load_option> force_load_option;
+      if (mandatory) force_load_option = PLUGIN_FORCE;
+
+      /*
+        If the performance schema is compiled in,
+        treat the storage engine plugin as 'mandatory',
+        to suppress any plugin-level options such as '--performance-schema'.
+        This is specific to the performance schema, and is done on purpose:
+        the server-level option '--performance-schema' controls the overall
+        performance schema initialization, which consists of much more that
+        the underlying storage engine initialization.
+        See mysqld.cc, set_vars.cc.
+        Suppressing ways to interfere directly with the storage engine alone
+        prevents awkward situations where:
+        - the user wants the performance schema functionality, by using
+          '--enable-performance-schema' (the server option),
+        - yet disable explicitly a component needed for the functionality
+          to work, by using '--skip-performance-schema' (the plugin)
+      */
+      if (!my_strcasecmp(&my_charset_latin1, plugin->name,
+                         "PERFORMANCE_SCHEMA")) {
+        force_load_option = PLUGIN_FORCE;
+      }
+
+      if (disable_extra_plugins) force_load_option = PLUGIN_OFF;
+
+      tmp_root.ClearForReuse();
+      if (test_plugin_options(&tmp_root, &tmp, argc, argv, force_load_option))
+        tmp.state = PLUGIN_IS_DISABLED;
+      else
+        tmp.state = PLUGIN_IS_UNINITIALIZED;
+
+      struct st_plugin_int *plugin_ptr;  // Pointer to registered plugin
+      if (register_builtin(plugin, &tmp, &plugin_ptr)) goto err_unlock;
+
+      if ((plugin->flags & PLUGIN_OPT_DEPENDENT_EXTRA_PLUGINS) &&
+          plugin_ptr->state == PLUGIN_IS_DISABLED)
+        disable_extra_plugins = true;
+
+      /*
+        Only initialize daemon_keyring_proxy, MyISAM, InnoDB and CSV at this
+        stage. Note that when the --help option is supplied,
+        daemon_keyring_proxy and InnoDB are not initialized because the plugin
+        table will not be read anyway, as indicated by the flag set when the
+        plugin_init() function is called.
+      */
+      bool is_daemon_keyring_proxy = !my_strcasecmp(
+          &my_charset_latin1, plugin->name, "daemon_keyring_proxy_plugin");
+      bool is_myisam =
+          !my_strcasecmp(&my_charset_latin1, plugin->name, "MyISAM");
+      bool is_innodb =
+          !my_strcasecmp(&my_charset_latin1, plugin->name, "InnoDB");
+      if ((!is_daemon_keyring_proxy || is_help_or_validate_option()) &&
+          !is_myisam && (!is_innodb || is_help_or_validate_option()) &&
+          my_strcasecmp(&my_charset_latin1, plugin->name, "CSV"))
+        continue;
+
+      if (plugin_ptr->state != PLUGIN_IS_UNINITIALIZED ||
+          plugin_initialize(plugin_ptr))
+        goto err_unlock;
+
+      /*
+        Once server is started and plugin initialized and if there are persisted
+        read-write plugin variables which need to be handled, we do it here.
+      */
+      if (update_persisted_plugin_sysvars(plugin->name)) goto err_unlock;
+
+      /*
+        Initialize the global default storage engine so that it may
+        not be null in any child thread.
+      */
+      if (is_myisam) {
+        assert(!global_system_variables.table_plugin);
+        assert(!global_system_variables.temp_table_plugin);
+        global_system_variables.table_plugin =
+            my_intern_plugin_lock(nullptr, plugin_int_to_ref(plugin_ptr));
+        global_system_variables.temp_table_plugin =
+            my_intern_plugin_lock(nullptr, plugin_int_to_ref(plugin_ptr));
+        assert(plugin_ptr->ref_count == 2);
+      }
+    }
+  }
+
+  /* Should now be set to MyISAM storage engine */
+  assert(global_system_variables.table_plugin);
+  assert(global_system_variables.temp_table_plugin);
+
+  mysql_mutex_unlock(&LOCK_plugin);
+  mysql_rwlock_unlock(&LOCK_system_variables_hash);
+
+  tmp_root.Clear();
+  return false;
+
+err_unlock:
+  mysql_mutex_unlock(&LOCK_plugin);
+  mysql_rwlock_unlock(&LOCK_system_variables_hash);
+  tmp_root.Clear();
+  return true;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: plugin_thdvar_init
+void plugin_thdvar_init(THD *thd, bool enable_plugins) {
+  plugin_ref old_table_plugin = thd->variables.table_plugin;
+  plugin_ref old_temp_table_plugin = thd->variables.temp_table_plugin;
+  DBUG_TRACE;
+
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+  cleanup_variables(thd, &thd->variables);
+
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  thd->variables = global_system_variables;
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+
+  thd->variables.dynamic_variables_version = 0;
+  thd->variables.dynamic_variables_size = 0;
+  thd->variables.dynamic_variables_ptr = nullptr;
+
+  if (enable_plugins) {
+    mysql_mutex_lock(&LOCK_plugin);
+    thd->variables.table_plugin =
+        my_intern_plugin_lock(nullptr, global_system_variables.table_plugin);
+    intern_plugin_unlock(nullptr, old_table_plugin);
+    thd->variables.temp_table_plugin = my_intern_plugin_lock(
+        nullptr, global_system_variables.temp_table_plugin);
+    intern_plugin_unlock(nullptr, old_temp_table_plugin);
+    mysql_mutex_unlock(&LOCK_plugin);
+  }
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  /* Initialize all Sys_var_charptr variables here. */
+
+  // @@session.session_track_system_variables
+  thd->session_sysvar_res_mgr.init(&thd->variables.track_sysvars_ptr);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: cleanup_variables
+static void cleanup_variables(THD *thd, struct System_variables *vars) {
+  if (thd) {
+    /* Block the Performance Schema from accessing THD::variables. */
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    plugin_var_memalloc_free(&thd->variables);
+    /* Remove references to session_sysvar_res_mgr memory before freeing it. */
+    thd->variables.track_sysvars_ptr = nullptr;
+    thd->session_sysvar_res_mgr.deinit();
+  }
+  assert(vars->table_plugin == nullptr);
+  assert(vars->temp_table_plugin == nullptr);
+
+  my_free(vars->dynamic_variables_ptr);
+  vars->dynamic_variables_ptr = nullptr;
+  vars->dynamic_variables_size = 0;
+  vars->dynamic_variables_version = 0;
+
+  if (thd) mysql_mutex_unlock(&thd->LOCK_thd_data);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_default_plugin
+static plugin_ref ha_default_plugin(THD *thd) {
+  if (thd->variables.table_plugin) return thd->variables.table_plugin;
+  return my_plugin_lock(thd, &global_system_variables.table_plugin);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_default_handlerton
+    ha_default_handlerton(thd)
+    thd         current thread
+
+  RETURN
+    pointer to handlerton
+*/
+handlerton *ha_default_handlerton(THD *thd) {
+  plugin_ref plugin = ha_default_plugin(thd);
+  assert(plugin);
+  handlerton *hton = plugin_data<handlerton *>(plugin);
+  assert(hton);
+  return hton;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: get_new_handler
+  return get_new_handler(share, partitioned, alloc,
+                         ha_default_handlerton(current_thd));
+}
+
+static const char **handler_errmsgs;
+
+static const char *get_handler_errmsg(int nr) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_resolve_by_legacy_type
+handlerton *ha_resolve_by_legacy_type(THD *thd, enum legacy_db_type db_type) {
+  plugin_ref plugin;
+  switch (db_type) {
+    case DB_TYPE_DEFAULT:
+      return ha_default_handlerton(thd);
+    default:
+      if (db_type > DB_TYPE_UNKNOWN && db_type < DB_TYPE_DEFAULT &&
+          (plugin = ha_lock_engine(thd, installed_htons[db_type])))
+        return plugin_data<handlerton *>(plugin);
+      [[fallthrough]];
+    case DB_TYPE_UNKNOWN:
+      return nullptr;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_checktype not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_resolve_by_name
+plugin_ref ha_resolve_by_name(THD *thd, const LEX_CSTRING *name,
+                              bool is_temp_table) {
+  if (thd && 0 == strnncmp_nopads(hton_charset(), *name,
+                                  {STRING_WITH_LEN("DEFAULT")})) {
+    return is_temp_table ? ha_default_plugin(thd) : ha_default_temp_plugin(thd);
+  }
+
+  // Note that thd CAN be nullptr here - it is not actually needed by
+  // ha_resolve_by_name_raw().
+  plugin_ref plugin = ha_resolve_by_name_raw(thd, *name);
+  if (plugin == nullptr) {
+    // If we fail to resolve the name passed in, we try to see if it is a
+    // historical alias.
+    auto match = std::find_if(
+        std::begin(se_names), se_names_end,
+        [&](const Storage_engine_identifier &sei) {
+          return (0 == strnncmp_nopads(hton_charset(), *name, sei.legacy));
+        });
+    if (match != se_names_end) {
+      // if it is, we resolve using the new name
+      plugin = ha_resolve_by_name_raw(thd, match->canonical);
+    }
+  }
+  if (plugin != nullptr) {
+    handlerton *hton = plugin_data<handlerton *>(plugin);
+    if (hton && !(hton->flags & HTON_NOT_USER_SELECTABLE)) return plugin;
+
+    /*
+      unlocking plugin immediately after locking is relatively low cost.
+    */
+    plugin_unlock(thd, plugin);
+  }
+  return nullptr;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: ha_default_temp_plugin
+static plugin_ref ha_default_temp_plugin(THD *thd) {
+  if (thd->variables.temp_table_plugin) return thd->variables.temp_table_plugin;
+  return my_plugin_lock(thd, &global_system_variables.temp_table_plugin);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_show.cc
+Function: iter_schema_engines
+static bool iter_schema_engines(THD *thd, plugin_ref plugin, void *ptable) {
+  TABLE *table = (TABLE *)ptable;
+  handlerton *hton = plugin_data<handlerton *>(plugin);
+  const char *wild = thd->lex->wild ? thd->lex->wild->ptr() : NullS;
+  CHARSET_INFO *scs = system_charset_info;
+  handlerton *default_type = ha_default_handlerton(thd);
+  DBUG_TRACE;
+
+  /* Disabled plugins */
+  if (plugin_state(plugin) != PLUGIN_IS_READY) {
+    struct st_mysql_plugin *plug = plugin_decl(plugin);
+
+    if (!(wild && wild[0] && wild_case_compare(scs, plug->name, wild))) {
+      restore_record(table, s->default_values);
+      table->field[0]->store(plug->name, strlen(plug->name), scs);
+      table->field[1]->store(STRING_WITH_LEN("NO"), scs);
+      table->field[2]->store(plug->descr, strlen(plug->descr), scs);
+      if (schema_table_store_record(thd, table)) return true;
+    }
+    return false;
+  }
+
+  if (!(hton->flags & HTON_HIDDEN)) {
+    LEX_CSTRING *name = plugin_name(plugin);
+    if (!(wild && wild[0] && wild_case_compare(scs, name->str, wild))) {
+      const char *option_name = show_comp_option_name[(int)hton->state];
+      restore_record(table, s->default_values);
+
+      table->field[0]->store(name->str, name->length, scs);
+      if (hton->state == SHOW_OPTION_YES && default_type == hton)
+        option_name = "DEFAULT";
+      table->field[1]->store(option_name, strlen(option_name), scs);
+      table->field[2]->store(plugin_decl(plugin)->descr,
+                             strlen(plugin_decl(plugin)->descr), scs);
+
+      LEX_CSTRING yes{STRING_WITH_LEN("YES")};
+      LEX_CSTRING no{STRING_WITH_LEN("NO")};
+      LEX_CSTRING *tmp;
+
+      tmp = (hton->commit != nullptr) ? &yes : &no;
+      table->field[3]->store(tmp->str, tmp->length, scs);
+      table->field[3]->set_notnull();
+      tmp = (hton->prepare != nullptr) ? &yes : &no;
+      table->field[4]->store(tmp->str, tmp->length, scs);
+      table->field[4]->set_notnull();
+      tmp = (hton->savepoint_set != nullptr) ? &yes : &no;
+      table->field[5]->store(tmp->str, tmp->length, scs);
+      table->field[5]->set_notnull();
+
+      if (schema_table_store_record(thd, table)) return true;
+    }
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: open_binary_frm
+  open_binary_frm(), newly added ones are initialized here by copying
+  KEY_PART_INFO structure from primary key part and calling
+  setup_key_part_field().
+
+  Function updates sk->actual/unused_key_parts and sk->actual_flags.
+
+  @param[in]     sk            Secondary key
+  @param[in]     sk_n          Secondary key number
+  @param[in]     pk            Primary key
+  @param[in]     pk_n          Primary key number
+  @param[in]     share         Pointer to TABLE_SHARE
+  @param[in]     handler_file  Pointer to handler
+  @param[in,out] usable_parts  Pointer to usable_parts variable
+  @param[in]     use_extended_sk  TRUE if use_index_extensions is ON
+
+  @retval                      Number of added key parts
+*/
+
+uint add_pk_parts_to_sk(KEY *sk, uint sk_n, KEY *pk, uint pk_n,
+                        TABLE_SHARE *share, handler *handler_file,
+                        uint *usable_parts, bool use_extended_sk) {
+  uint max_key_length = sk->key_length;
+  /*
+    Secondary key becomes unique if the key does not exceed
+    key length limitation(MAX_KEY_LENGTH) and key parts
+    limitation(MAX_REF_PARTS) and PK parts are added to SK.
+  */
+  bool is_unique_key = use_extended_sk;
+  uint pk_part = 0;
+  KEY_PART_INFO *current_key_part = &sk->key_part[sk->user_defined_key_parts];
+
+  /*
+     For each keypart in the primary key: check if the keypart is
+     already part of the secondary key and add it if not.
+  */
+  for (; pk_part < pk->user_defined_key_parts; pk_part++) {
+    KEY_PART_INFO *pk_key_part = &pk->key_part[pk_part];
+    /* No more than MAX_REF_PARTS key parts are supported. */
+    if (sk->actual_key_parts >= MAX_REF_PARTS) {
+      is_unique_key = false;
+      break;
+    }
+
+    bool pk_field_is_in_sk = false;
+    for (uint j = 0; j < sk->user_defined_key_parts; j++) {
+      if (sk->key_part[j].fieldnr == pk_key_part->fieldnr &&
+          share->field[pk_key_part->fieldnr - 1]->key_length() ==
+              sk->key_part[j].length) {
+        pk_field_is_in_sk = true;
+        break;
+      }
+    }
+
+    /* Do not add key part if it's already present in SK. */
+    if (!pk_field_is_in_sk) {
+      /* MySQL does not support keys longer than MAX_KEY_LENGTH. */
+      if (max_key_length + pk_key_part->length > MAX_KEY_LENGTH) {
+        is_unique_key = false;
+        break;
+      }
+      max_key_length += pk_key_part->length;
+      /*
+        Do not add key part if SK is a unique key or
+        if use_index_extensions is OFF.
+      */
+      if ((sk->flags & HA_NOSAME) || !use_extended_sk) continue;
+      *current_key_part = *pk_key_part;
+      setup_key_part_field(share, handler_file, pk_n, sk, sk_n,
+                           sk->actual_key_parts, usable_parts, false);
+      sk->actual_key_parts++;
+      sk->unused_key_parts--;
+      sk->rec_per_key[sk->actual_key_parts - 1] = 0;
+      sk->set_records_per_key(sk->actual_key_parts - 1, REC_PER_KEY_UNKNOWN);
+      current_key_part++;
+    }
+  }
+  if (is_unique_key) sk->actual_flags |= HA_NOSAME;
+
+  /*
+    Clean key maps for those PK parts which exceed
+    MAX_KEY_LENGTH or MAX_REF_PARTS limits.
+  */
+  for (; pk_part < pk->user_defined_key_parts; pk_part++) {
+    Field *fld = pk->key_part[pk_part].field;
+    fld->part_of_key.clear_bit(sk_n);
+    fld->part_of_sortkey.clear_bit(sk_n);
+  }
+  return (sk->actual_key_parts - sk->user_defined_key_parts);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc
+Function: dd::ndb_upgrade::fill_partition_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc
+Function: dd::ndb_upgrade::fill_partition_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc
+Function: dd::ndb_upgrade::fill_partition_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc
+Function: dd::ndb_upgrade::fill_create_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ndb_dd_upgrade_table.cc
+Function: dd::ndb_upgrade::fill_create_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd_table_share.cc
+Function: fill_share_from_dd not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd_table_share.cc
+Function: fill_share_from_dd not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd_table_share.cc
+Function: fill_share_from_dd not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_utility.cc
+Function: dd::check_if_server_ddse_readonly
+bool check_if_server_ddse_readonly(THD *thd, const char *schema_name_abbrev) {
+  /*
+    We must check if the DDSE is started in a way that makes the DD
+    read only. For now, we only support InnoDB as SE for the DD. The call
+    to retrieve the handlerton for the DDSE should be replaced by a more
+    generic mechanism.
+  */
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+  if (ddse->is_dict_readonly && ddse->is_dict_readonly()) {
+    LogErr(WARNING_LEVEL, ER_SKIP_UPDATING_METADATA_IN_SE_RO_MODE,
+           schema_name_abbrev);
+    return true;
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/dictionary_impl.cc
+Function: dd::reset_tables_and_tablespaces
+bool reset_tables_and_tablespaces() {
+  Auto_THD thd;
+  handlerton *ddse = ha_resolve_by_legacy_type(thd.thd, DB_TYPE_INNODB);
+
+  // Acquire transactional metadata locks and evict all cached objects.
+  if (dd::cache::Shared_dictionary_cache::reset_tables_and_tablespaces(thd.thd))
+    return true;
+
+  // Evict all cached objects in the DD cache in the DDSE.
+  if (ddse->dict_cache_reset_tables_and_tablespaces != nullptr)
+    ddse->dict_cache_reset_tables_and_tablespaces();
+
+  bool ret = close_cached_tables(nullptr, nullptr, false, LONG_TIMEOUT);
+
+  // Release transactional metadata locks.
+  thd.thd->mdl_context.release_transactional_locks();
+
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc
+Function: dd::bootstrap::DDSE_dict_init
+bool DDSE_dict_init(THD *thd, dict_init_mode_t dict_init_mode, uint version) {
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+
+  /*
+    The lists with element wrappers are mem root allocated. The wrapped
+    instances are allocated dynamically in the DDSE. These instances will be
+    owned by the System_tables registry by the end of this function.
+  */
+  List<const Object_table> ddse_tables;
+  List<const Plugin_tablespace> ddse_tablespaces;
+  if (ddse->ddse_dict_init == nullptr ||
+      ddse->ddse_dict_init(dict_init_mode, version, &ddse_tables,
+                           &ddse_tablespaces))
+    return true;
+
+  /*
+    Iterate over the table definitions and add them to the System_tables
+    registry. The Object_table instances will later be used to execute
+    CREATE TABLE statements to actually create the tables.
+
+    If Object_table::is_hidden(), then we add the tables as type DDSE_PRIVATE
+    (not available neither for DDL nor DML), otherwise, we add them as type
+    DDSE_PROTECTED (available for DML, not for DDL).
+  */
+  List_iterator<const Object_table> table_it(ddse_tables);
+  const Object_table *ddse_table = nullptr;
+  while ((ddse_table = table_it++)) {
+    System_tables::Types table_type = System_tables::Types::DDSE_PROTECTED;
+    if (ddse_table->is_hidden()) {
+      table_type = System_tables::Types::DDSE_PRIVATE;
+    }
+    System_tables::instance()->add(MYSQL_SCHEMA_NAME.str, ddse_table->name(),
+                                   table_type, ddse_table);
+  }
+
+  /*
+    Get the server version number from the DD tablespace header and verify
+    that we are allowed to upgrade from that version. The error handling is done
+    after adding the ddse tables into the system registry to avoid memory leaks.
+  */
+  if (!opt_initialize) {
+    uint server_version = 0;
+    if (ddse->dict_get_server_version == nullptr ||
+        ddse->dict_get_server_version(&server_version)) {
+      LogErr(ERROR_LEVEL, ER_CANNOT_GET_SERVER_VERSION_FROM_TABLESPACE_HEADER);
+      return true;
+    }
+
+    if (server_version != MYSQL_VERSION_ID) {
+      if (opt_upgrade_mode == UPGRADE_NONE) {
+        LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_OFF);
+        return true;
+      }
+      if (!DD_bootstrap_ctx::instance().supported_server_version(
+              server_version)) {
+        if (server_version > MYSQL_VERSION_ID &&
+            !DD_bootstrap_ctx::instance().is_server_patch_downgrade(
+                server_version))
+          LogErr(ERROR_LEVEL, ER_INVALID_SERVER_DOWNGRADE_NOT_PATCH,
+                 server_version, MYSQL_VERSION_ID);
+        else
+          LogErr(ERROR_LEVEL, ER_SERVER_UPGRADE_VERSION_NOT_SUPPORTED,
+                 server_version);
+        return true;
+      }
+    }
+  }
+
+  /*
+    At this point, the Systen_tables registry contains the INERT DD tables,
+    and the DDSE tables. Before we continue, we must add the remaining
+    DD tables.
+  */
+  System_tables::instance()->add_remaining_dd_tables();
+
+  /*
+    Iterate over the tablespace definitions, add the names and the
+    tablespace meta data to the System_tablespaces registry. The
+    meta data will be used later to create dd::Tablespace objects.
+    The Plugin_tablespace instances are owned by the DDSE.
+  */
+  List_iterator<const Plugin_tablespace> tablespace_it(ddse_tablespaces);
+  const Plugin_tablespace *tablespace = nullptr;
+  while ((tablespace = tablespace_it++)) {
+    // Add the name and the object instance to the registry with the
+    // appropriate property.
+    if (my_strcasecmp(system_charset_info, MYSQL_TABLESPACE_NAME.str,
+                      tablespace->get_name()) == 0)
+      System_tablespaces::instance()->add(
+          tablespace->get_name(), System_tablespaces::Types::DD, tablespace);
+    else
+      System_tablespaces::instance()->add(
+          tablespace->get_name(), System_tablespaces::Types::PREDEFINED_DDSE,
+          tablespace);
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc
+Function: dd::update_versions
+      update_versions(thd, false)) {
+    return true;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/bootstrap/bootstrapper.cc
+Function: dd::sync_meta_data
+bool sync_meta_data(THD *thd) {
+  // Acquire exclusive meta data locks for the relevant DD objects.
+  if (acquire_exclusive_mdl(thd)) return true;
+
+  {
+    /*
+      Use a scoped auto releaser to make sure the cached objects are released
+      before the shared cache is reset.
+    */
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    /*
+      First, we acquire the DD schema and tablespace and keep them in
+      local variables. The DD table objects are acquired and put into
+      a vector. We also get hold of the corresponding persisted objects.
+
+      In this way, we make sure the shared cache is populated. The auto
+      releaser will make sure the objects are not evicted. This must be
+      ensured since we need to make sure the ids stay consistent across
+      all objects in the shared cache.
+    */
+
+    const Schema *dd_schema = nullptr;
+    const Tablespace *dd_tspace = nullptr;
+    if (thd->dd_client()->acquire(dd::String_type(MYSQL_SCHEMA_NAME.str),
+                                  &dd_schema) ||
+        thd->dd_client()->acquire(dd::String_type(MYSQL_TABLESPACE_NAME.str),
+                                  &dd_tspace))
+      return dd::end_transaction(thd, true);
+
+    std::vector<Table *> dd_tables;  // Owned by the shared cache.
+    for (System_tables::Const_iterator it = System_tables::instance()->begin();
+         it != System_tables::instance()->end(); ++it) {
+      // Skip extraneous tables during minor downgrade.
+      if ((*it)->entity() == nullptr) continue;
+
+      const dd::Table *dd_table = nullptr;
+      if (thd->dd_client()->acquire(MYSQL_SCHEMA_NAME.str,
+                                    (*it)->entity()->name(), &dd_table))
+        return dd::end_transaction(thd, true);
+      dd_tables.push_back(const_cast<Table *>(dd_table));
+    }
+
+    // Get the persisted DD schema and tablespace.
+    Schema::Name_key schema_key;
+    dd_schema->update_name_key(&schema_key);
+    const Schema *tmp_schema = nullptr;
+
+    Tablespace::Name_key tspace_key;
+    dd_tspace->update_name_key(&tspace_key);
+    const Tablespace *tmp_tspace = nullptr;
+
+    if (dd::cache::Storage_adapter::instance()->get(
+            thd, schema_key, ISO_READ_COMMITTED, true, &tmp_schema) ||
+        dd::cache::Storage_adapter::instance()->get(
+            thd, tspace_key, ISO_READ_COMMITTED, true, &tmp_tspace))
+      return dd::end_transaction(thd, true);
+
+    assert(tmp_schema != nullptr && tmp_tspace != nullptr);
+    std::unique_ptr<Schema> persisted_dd_schema(
+        const_cast<Schema *>(tmp_schema));
+    std::unique_ptr<Tablespace> persisted_dd_tspace(
+        const_cast<Tablespace *>(tmp_tspace));
+
+    // If the persisted meta data indicates that the DD tablespace is
+    // encrypted, then we record this fact to make sure the DDL statements
+    // that are generated during e.g. upgrade will have the correct
+    // encryption option.
+    String_type encryption("");
+    Object_table_definition_impl::set_dd_tablespace_encrypted(
+        persisted_dd_tspace->options().exists("encryption") &&
+        !persisted_dd_tspace->options().get("encryption", &encryption) &&
+        encryption == "Y");
+
+    // Get the persisted DD table objects into a vector.
+    std::vector<std::unique_ptr<Table_impl>> persisted_dd_tables;
+    for (System_tables::Const_iterator it = System_tables::instance()->begin();
+         it != System_tables::instance()->end(); ++it) {
+      // Skip extraneous tables during minor downgrade.
+      if ((*it)->entity() == nullptr) continue;
+
+      const dd::Abstract_table *dd_table = nullptr;
+      dd::Abstract_table::Name_key table_key;
+      Abstract_table::update_name_key(&table_key, persisted_dd_schema->id(),
+                                      (*it)->entity()->name());
+
+      if (dd::cache::Storage_adapter::instance()->get(
+              thd, table_key, ISO_READ_COMMITTED, true, &dd_table))
+        return dd::end_transaction(thd, true);
+
+      std::unique_ptr<Table_impl> persisted_dd_table(
+          dynamic_cast<Table_impl *>(const_cast<Abstract_table *>(dd_table)));
+      persisted_dd_tables.push_back(std::move(persisted_dd_table));
+    }
+
+    // Drop the tablespaces with type PREDEFINED_DDSE from the storage adapter.
+    for (System_tablespaces::Const_iterator it =
+             System_tablespaces::instance()->begin(
+                 System_tablespaces::Types::PREDEFINED_DDSE);
+         it != System_tablespaces::instance()->end();
+         it = System_tablespaces::instance()->next(
+             it, System_tablespaces::Types::PREDEFINED_DDSE)) {
+      const Tablespace *tspace = nullptr;
+      if (thd->dd_client()->acquire((*it)->entity()->get_name(), &tspace))
+        return dd::end_transaction(thd, true);
+
+      /*
+        There is a possibility of the InnoDB system tablespace being extended by
+        adding additional datafiles during server restart. Hence, we would need
+        to check the DD tables to verify which tablespace datafiles have been
+        persisted already and then add the extra datafiles to system tablespace
+        and persist the updated metadata.
+
+        The documentation mentions that datafiles can only be added to the sytem
+        tablespace and can not be removed.
+      */
+      Tablespace::Name_key predef_tspace_key;
+      tspace->update_name_key(&predef_tspace_key);
+      const Tablespace *predef_tspace = nullptr;
+
+      if (dd::cache::Storage_adapter::instance()->get(
+              thd, predef_tspace_key, ISO_READ_COMMITTED, true, &predef_tspace))
+        return dd::end_transaction(thd, true);
+
+      std::unique_ptr<Tablespace> predef_tspace_persist(
+          const_cast<Tablespace *>(predef_tspace));
+
+      size_t existing_datafiles, added_datafiles;
+      existing_datafiles = predef_tspace->files().size();
+      added_datafiles = tspace->files().size() - existing_datafiles;
+      if (added_datafiles) {
+        std::unordered_set<std::string> predef_tspace_files;
+        for (auto tspace_file_it = predef_tspace->files().begin();
+             tspace_file_it != predef_tspace->files().end(); ++tspace_file_it) {
+          predef_tspace_files.insert((*tspace_file_it)->filename().c_str());
+        }
+
+        List<const Plugin_tablespace::Plugin_tablespace_file> files =
+            (*it)->entity()->get_files();
+        List_iterator<const Plugin_tablespace::Plugin_tablespace_file> file_it(
+            files);
+        const Plugin_tablespace::Plugin_tablespace_file *file = nullptr;
+        while ((file = file_it++)) {
+          if (predef_tspace_files.find(file->get_name()) ==
+              predef_tspace_files.end()) {
+            Tablespace_file *space_file = predef_tspace_persist->add_file();
+            space_file->set_filename(file->get_name());
+            space_file->set_se_private_data(file->get_se_private_data());
+          }
+        }
+        dd::cache::Storage_adapter::instance()->store(
+            thd, predef_tspace_persist.get());
+        DBUG_PRINT("info", ("Persisted metadata for additional datafile(s) "
+                            "added to the predefined tablespace %s",
+                            predef_tspace_persist->name().c_str()));
+      }
+      dd::cache::Storage_adapter::instance()->core_drop(thd, tspace);
+    }
+    /*
+      We have now populated the shared cache with the core objects. The
+      scoped auto releaser makes sure we will not evict the objects from
+      the shared cache until the auto releaser exits scope. Thus, within
+      the scope of the auto releaser, we can modify the contents of the
+      core registry in the storage adapter without risking that this will
+      interfere with the contents of the shared cache, because the DD
+      transactions will acquire the core objects from the shared cache.
+    */
+
+    /*
+      We have also read the DD schema and tablespace as well as the DD
+      tables from persistent storage. The last thing we do before resetting
+      the shared cache is to update the contents of the core registry to
+      match the persisted objects. First, we update the core registry with
+      the persisted DD schema and tablespace.
+    */
+    dd::cache::Storage_adapter::instance()->core_drop(thd, dd_schema);
+    dd::cache::Storage_adapter::instance()->core_store(
+        thd, persisted_dd_schema.get());
+
+    dd::cache::Storage_adapter::instance()->core_drop(thd, dd_tspace);
+    dd::cache::Storage_adapter::instance()->core_store(
+        thd, persisted_dd_tspace.get());
+
+    // Make sure the IDs after storing are as expected.
+    assert(persisted_dd_schema->id() == 1);
+    assert(persisted_dd_tspace->id() == 1);
+
+    /*
+      Finally, we update the core registry of the DD tables. This must be
+      done in two loops to avoid issues related to overlapping ID sequences.
+    */
+    std::vector<Table *>::const_iterator table_it = dd_tables.begin();
+    for (System_tables::Const_iterator it = System_tables::instance()->begin();
+         it != System_tables::instance()->end() && table_it != dd_tables.end();
+         ++it, ++table_it) {
+      /*
+        If we are in the process of upgrading, there may not be an entry
+        in the dd_tables for new tables that have been added after the
+        version we are upgrading from.
+      */
+      if ((*table_it) != nullptr) {
+        assert((*it)->entity()->name() == (*table_it)->name());
+        dd::cache::Storage_adapter::instance()->core_drop(thd, *table_it);
+      }
+    }
+
+    std::vector<std::unique_ptr<Table_impl>>::const_iterator persisted_it =
+        persisted_dd_tables.begin();
+    for (System_tables::Const_iterator it = System_tables::instance()->begin();
+         it != System_tables::instance()->end() &&
+         persisted_it != persisted_dd_tables.end();
+         ++it, ++persisted_it) {
+      /*
+        If we are in the process of upgrading, there may not be an entry
+        in the persisted_dd_tables for new tables that have been added after
+        the version we are upgrading from.
+      */
+      if ((*persisted_it) == nullptr) continue;
+
+      if ((*it)->property() == System_tables::Types::CORE) {
+        dd::cache::Storage_adapter::instance()->core_store(
+            thd, static_cast<Table *>((*persisted_it).get()));
+      }
+    }
+  }
+
+  /*
+    Now, the auto releaser has released the objects, and we can go ahead and
+    reset the shared cache.
+  */
+  dd::cache::Shared_dictionary_cache::instance()->reset(true);
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::SYNCED);
+
+  // Commit and flush tables to force re-opening using the refreshed meta data.
+  if (dd::end_transaction(thd, false) || dd::execute_query(thd, "FLUSH TABLES"))
+    return true;
+
+  // Get hold of the temporary actual and target schema names.
+  String_type target_schema_name;
+  bool target_schema_exists = false;
+  if (dd::tables::DD_properties::instance().get(thd, "UPGRADE_TARGET_SCHEMA",
+                                                &target_schema_name,
+                                                &target_schema_exists))
+    return true;
+
+  String_type actual_schema_name;
+  bool actual_schema_exists = false;
+  if (dd::tables::DD_properties::instance().get(thd, "UPGRADE_ACTUAL_SCHEMA",
+                                                &actual_schema_name,
+                                                &actual_schema_exists))
+    return true;
+
+  // Reset the DDSE local dictionary cache.
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+  if (ddse->dict_cache_reset == nullptr) return true;
+
+  for (System_tables::Const_iterator it = System_tables::instance()->begin();
+       it != System_tables::instance()->end(); ++it) {
+    // Skip extraneous tables during minor downgrade.
+    if ((*it)->entity() == nullptr) continue;
+
+    if ((*it)->property() == System_tables::Types::CORE ||
+        (*it)->property() == System_tables::Types::SECOND) {
+      ddse->dict_cache_reset(MYSQL_SCHEMA_NAME.str,
+                             (*it)->entity()->name().c_str());
+      if (target_schema_exists && !target_schema_name.empty())
+        ddse->dict_cache_reset(target_schema_name.c_str(),
+                               (*it)->entity()->name().c_str());
+      if (actual_schema_exists && !actual_schema_name.empty())
+        ddse->dict_cache_reset(actual_schema_name.c_str(),
+                               (*it)->entity()->name().c_str());
+    }
+  }
+
+  /*
+    At this point, we're to a large extent open for business.
+    If there are leftover schema names from upgrade, delete them
+    and remove the names from the DD properties.
+  */
+  if (target_schema_exists && !target_schema_name.empty()) {
+    std::stringstream ss;
+    ss << "DROP SCHEMA IF EXISTS " << target_schema_name;
+    if (dd::execute_query(thd, ss.str().c_str())) return true;
+  }
+
+  if (actual_schema_exists && !actual_schema_name.empty()) {
+    std::stringstream ss;
+    ss << "DROP SCHEMA IF EXISTS " << actual_schema_name;
+    if (dd::execute_query(thd, ss.str().c_str())) return true;
+  }
+
+  /*
+   The statements above are auto committed, so there is nothing uncommitted
+   at this stage. Go ahead and remove the schema keys.
+  */
+  if (actual_schema_exists)
+    (void)dd::tables::DD_properties::instance().remove(thd,
+                                                       "UPGRADE_ACTUAL_SCHEMA");
+
+  if (target_schema_exists)
+    (void)dd::tables::DD_properties::instance().remove(thd,
+                                                       "UPGRADE_TARGET_SCHEMA");
+
+  if (actual_schema_exists || target_schema_exists)
+    return dd::end_transaction(thd, false);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/dd.cc
+Function: dd::upgrade::upgrade_tables
+bool upgrade_tables(THD *thd) {
+  if (!bootstrap::DD_bootstrap_ctx::instance().is_dd_upgrade()) return false;
+
+  /*
+    Create the temporary schemas used for target and actual tables,
+    and get hold of their ids.
+  */
+  Object_id mysql_schema_id = INVALID_OBJECT_ID;
+  Object_id target_table_schema_id = INVALID_OBJECT_ID;
+  Object_id actual_table_schema_id = INVALID_OBJECT_ID;
+  String_type target_table_schema_name;
+  if (create_temporary_schemas(thd, &mysql_schema_id, &target_table_schema_id,
+                               &target_table_schema_name,
+                               &actual_table_schema_id))
+    return true;
+
+  /*
+    Establish the sets of table names to be removed and/or created.
+  */
+  std::set<String_type> remove_set = {};
+  std::set<String_type> create_set = {};
+  establish_table_name_sets(&create_set, &remove_set);
+
+  /*
+    Loop over all DD tables, and create the target tables. We may do version
+    specific handling, but the default is to create the target table if it is
+    different from the actual table (or if there is no corresponding actual
+    table). The table creation is done by executing DDL statements that are
+    auto committed.
+  */
+  if (create_tables(thd, &create_set)) return true;
+
+  /*
+    Loop over all DD tables and migrate the meta data. We may do version
+    specific handling, but the default is to just copy all meta data from
+    the actual to the target table, assuming the number and type of columns
+    are the same (e.g. if an index is added). The data migration is committed.
+
+    We achieve data migration in two steps:
+
+    1) update_meta_data() is used to adjust metadata in source DD tables in
+    mysql schema. This is done by mostly executing UPDATE queries on
+    them, but we do not migrate data to destination DD tables.
+
+    2) migrate_meta_data() is used to adjust metadata in destination DD
+    tables using UPDATE command and also migrate data to destination DD
+    tables using INSERT command.
+
+    Note that the changes done during migration of meta data are committed
+    in next step at the end of 'atomic switch' described below.
+  */
+  if (update_meta_data(thd) || migrate_meta_data(thd, create_set, remove_set))
+    return true;
+
+  /*
+    We are now ready to do the atomic switch of the actual and target DD
+    tables. Thus, the next three steps must be done without intermediate
+    commits. Note that in case of failure, rollback is done immediately.
+    In case of success, no commit is done until at the very end of
+    update_versions(). The switch is done as follows:
+
+    - First, update the DD properties. Note that we must acquire the
+      modified DD tables from the temporary target schema. This is done
+      before the object ids are modified, because that step also may mess
+      up object acquisition (if we change the schema id of a newly created
+      table to that of the 'mysql' schema, and then try acquire(), we will
+      get the table from the core registry in the storage adapter, and that
+      is not what we want).
+
+    - Then, update the object ids and schema names to simulate altering the
+      schema of the modified tables. The changes are done on the 'tables',
+      'foreign_keys' and 'foreign_key_column_usage' tables. If these tables
+      are modified, the changes must be done on the corresponding new table
+      in the target schema. If not, the change must be done on the actual
+      table in the 'mysql' schema.
+
+    - Finally, update the version numbers and commit. In update_versions(),
+      the atomic switch will either be committed.
+  */
+  if (update_properties(thd, &create_set, &remove_set,
+                        target_table_schema_name) ||
+      update_object_ids(thd, create_set, remove_set, mysql_schema_id,
+                        target_table_schema_id, target_table_schema_name,
+                        actual_table_schema_id) ||
+      update_versions(thd, false))
+    return true;
+
+  LogErr(SYSTEM_LEVEL, ER_DD_UPGRADE_COMPLETED,
+         bootstrap::DD_bootstrap_ctx::instance().get_actual_dd_version(),
+         dd::DD_VERSION);
+  sysd::notify("STATUS=Data Dictionary upgrade complete\n");
+
+  /*
+    At this point, the DD upgrade is committed. Below, we will reset the
+    DD cache and re-initialize based on 'mysql.dd_properties', hence,
+    we will lose track of the fact that we have done a DD upgrade as part
+    of this restart. Thus, we record this fact in the bootstrap context
+    so we can check it e.g. when initializing the information schema,
+    where we need to regenerate the meta data if the underlying tables
+    have changed.
+  */
+  bootstrap::DD_bootstrap_ctx::instance().set_dd_upgrade_done();
+
+  /*
+    Flush tables, reset the shared dictionary cache and the storage adapter.
+    Start over DD bootstrap from the beginning.
+  */
+  if (dd::execute_query(thd, "FLUSH TABLES")) return true;
+
+  dd::cache::Shared_dictionary_cache::instance()->reset(false);
+
+  /*
+    Reset the encryption attribute in object table def since we will now
+    start over by creating the scaffolding, which expects an unencrypted
+    DD tablespace.
+  */
+  Object_table_definition_impl::set_dd_tablespace_encrypted(false);
+
+  // Reset the DDSE local dictionary cache.
+  handlerton *ddse = ha_resolve_by_legacy_type(thd, DB_TYPE_INNODB);
+  if (ddse->dict_cache_reset == nullptr) return true;
+
+  for (System_tables::Const_iterator it =
+           System_tables::instance()->begin(System_tables::Types::CORE);
+       it != System_tables::instance()->end();
+       it = System_tables::instance()->next(it, System_tables::Types::CORE)) {
+    ddse->dict_cache_reset(MYSQL_SCHEMA_NAME.str,
+                           (*it)->entity()->name().c_str());
+    ddse->dict_cache_reset(target_table_schema_name.c_str(),
+                           (*it)->entity()->name().c_str());
+  }
+
+  /*
+    We need to start over DD initialization. This is done by executing the
+    first stages of the procedure followed at restart. Note that this
+    will see and use the newly upgraded DD that was created above. Cleanup
+    of the temporary schemas is done at the end of 'sync_meta_data()'.
+  */
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(bootstrap::Stage::STARTED);
+
+  store_predefined_tablespace_metadata(thd);
+  if (create_dd_schema(thd) || initialize_dd_properties(thd) ||
+      create_tables(thd, nullptr) || sync_meta_data(thd)) {
+    return true;
+  }
+
+  bootstrap::DD_bootstrap_ctx::instance().set_stage(
+      bootstrap::Stage::UPGRADED_TABLES);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/ndbinfo_schema/init.cc
+Function: initialize_ndbinfo
+static bool initialize_ndbinfo(THD *thd) {
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  Disable_autocommit_guard autocommit_guard(thd);
+
+  // Fetch the ndbinfo handler.
+  plugin_ref plugin = ha_resolve_by_name_raw(thd, LEX_CSTRING{"ndbinfo", 7});
+
+  // If the plugin was not found, the server is running without ndbinfo
+  if (plugin == nullptr) {
+    return false;
+  }
+
+  // If ndbinfo is present, it should have been initialized
+  handlerton *hton = plugin_data<handlerton *>(plugin);
+  if (!(hton && hton->dict_init)) {
+    assert(false);
+    return true;
+  }
+
+  // Also check that ndbcluster itself is enabled
+  if (!ha_storage_engine_is_enabled(
+          ha_resolve_by_legacy_type(thd, DB_TYPE_NDBCLUSTER))) {
+    return false;
+  }
+
+  // If no upgrade is needed, just write the "not upgrading" log message
+  if (!forced_upgrade) {
+    if (check_ndbinfo_schema_has_correct_version(thd)) {
+      LogErr(INFORMATION_LEVEL, ER_NDBINFO_NOT_UPGRADING_SCHEMA);
+      return false;
+    }
+  }
+
+  // Abort if the data dictionary is in read-only mode
+  if (dd::check_if_server_ddse_readonly(thd, "ndbinfo")) return true;
+
+  // Upgrade of ndbinfo schema begins here. Write the "upgrading" log message.
+  LogErr(INFORMATION_LEVEL, ER_NDBINFO_UPGRADING_SCHEMA, MYSQL_SERVER_VERSION);
+
+  // Call into hton->dict_init() to fetch all ndbinfo tables and views
+  List<const Plugin_table> ndbinfo_tables;
+  if (hton->dict_init(DICT_INIT_CREATE_FILES,
+                      dd::Dictionary_impl::instance()->get_target_dd_version(),
+                      &ndbinfo_tables, nullptr))
+    return true;
+
+  // Create the ndbinfo schema
+  if (create_schema(thd, "ndbinfo")) return true;
+
+  // Drop all known tables & views (current version and previous versions)
+  bool failed = false;
+  for (const Plugin_table &table : ndbinfo_tables) {
+    if (!failed) {
+      failed = drop_object(thd, table);
+    }
+  }
+
+  // Create the current set of tables and views
+  for (const Plugin_table &table : ndbinfo_tables) {
+    if (!failed) {
+      failed = create_object(thd, table);
+    }
+  }
+
+  // Update the stored version number
+  if (!failed) {
+    dd::Dictionary_impl *d = dd::Dictionary_impl::instance();
+    failed = d->set_ndbinfo_schema_version(thd, MYSQL_VERSION_ID);
+  }
+
+  ndbinfo_tables.delete_elements();
+
+  // Commit the DD transaction
+  return dd::end_transaction(thd, failed);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/resourcegroups/resource_group_mgr.cc
+Function: resourcegroups::persist_resource_group not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc
+Function: Sql_cmd_create_table::execute
+bool Sql_cmd_create_table::execute(THD *thd) {
+  LEX *const lex = thd->lex;
+  Query_block *const query_block = lex->query_block;
+  Query_expression *const query_expression = lex->unit;
+  Table_ref *const create_table = lex->query_tables;
+  partition_info *part_info = lex->part_info;
+
+  /*
+    Code below (especially in mysql_create_table() and Query_result_create
+    methods) may modify HA_CREATE_INFO structure in LEX, so we have to
+    use a copy of this structure to make execution prepared statement-
+    safe. A shallow copy is enough as this code won't modify any memory
+    referenced from this structure.
+  */
+  HA_CREATE_INFO create_info(*lex->create_info);
+  /*
+    We need to copy alter_info for the same reasons of re-execution
+    safety, only in case of Alter_info we have to do (almost) a deep
+    copy.
+  */
+  Alter_info alter_info(*m_alter_info, thd->mem_root);
+
+  if (thd->is_error()) {
+    /* If out of memory when creating a copy of alter_info. */
+    return true;
+  }
+
+  if (((lex->create_info->used_fields & HA_CREATE_USED_DATADIR) != 0 ||
+       (lex->create_info->used_fields & HA_CREATE_USED_INDEXDIR) != 0) &&
+      check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "FILE");
+    return true;
+  }
+
+  if (!thd->is_plugin_fake_ddl()) {
+    if (create_table_precheck(thd, query_expression_tables, create_table))
+      return true;
+  }
+
+  /* Might have been updated in create_table_precheck */
+  create_info.alias = create_table->alias;
+
+  /*
+    If no engine type was given, work out the default now
+    rather than at parse-time.
+  */
+  if (!(create_info.used_fields & HA_CREATE_USED_ENGINE))
+    create_info.db_type = create_info.options & HA_LEX_CREATE_TMP_TABLE
+                              ? ha_default_temp_handlerton(thd)
+                              : ha_default_handlerton(thd);
+
+  assert(create_info.db_type != nullptr);
+  if ((m_alter_info->flags & Alter_info::ANY_ENGINE_ATTRIBUTE) != 0 &&
+      ((create_info.db_type->flags & HTON_SUPPORTS_ENGINE_ATTRIBUTE) == 0 &&
+       DBUG_EVALUATE_IF("simulate_engine_attribute_support", false, true))) {
+    my_error(ER_ENGINE_ATTRIBUTE_NOT_SUPPORTED, MYF(0),
+             ha_resolve_storage_engine_name(create_info.db_type));
+    return true;
+  }
+
+  /*
+    Assign target tablespace name to enable locking in lock_table_names().
+    Reject invalid names.
+  */
+  if (create_info.tablespace) {
+    if (validate_tablespace_name_length(create_info.tablespace) ||
+        validate_tablespace_name(TS_CMD_NOT_DEFINED, create_info.tablespace,
+                                 create_info.db_type))
+      return true;
+
+    if (lex_string_strmake(thd->mem_root, &create_table->target_tablespace_name,
+                           create_info.tablespace,
+                           strlen(create_info.tablespace)))
+      return true;
+  }
+
+  // Reject invalid tablespace names specified for partitions.
+  if (validate_partition_tablespace_name_lengths(part_info) ||
+      validate_partition_tablespace_names(part_info, create_info.db_type))
+    return true;
+
+  /* Fix names if symlinked or relocated tables */
+  if (prepare_index_and_data_dir_path(thd, &create_info.data_file_name,
+                                      &create_info.index_file_name,
+                                      create_table->table_name))
+    return true;
+
+  {
+    partition_info *part = thd->lex->part_info;
+    if (part != nullptr && has_external_data_or_index_dir(*part) &&
+        check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+      return true;
+    }
+    if (part && !(part = thd->lex->part_info->get_clone(thd, true)))
+      return true;
+    thd->work_part_info = part;
+  }
+
+  if (part_info != nullptr && part_info->part_expr &&
+      part_info->part_expr->fixed) {  // @todo Code may be redundant
+    part_info->fixed = true;
+  }
+  bool res = false;
+
+  if (!query_block->field_list_is_empty())  // With select
+  {
+    /*
+      CREATE TABLE...IGNORE/REPLACE SELECT... can be unsafe, unless
+      ORDER BY PRIMARY KEY clause is used in SELECT statement. We therefore
+      use row based logging if mixed or row based logging is available.
+      TODO: Check if the order of the output of the select statement is
+      deterministic. Waiting for BUG#42415
+    */
+    if (lex->is_ignore())
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_IGNORE_SELECT);
+
+    if (lex->duplicates == DUP_REPLACE)
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_REPLACE_SELECT);
+
+    /**
+      Disallow creation of foreign keys if,
+
+      - SE supports atomic DDL's.
+      - The binlogging is enabled.
+      - The binlog format is ROW.
+
+      This is done to avoid complications involved in locking,
+      updating and invalidation (in case of rollback) of DD cache
+      for parent table.
+    */
+    if ((alter_info.flags & Alter_info::ADD_FOREIGN_KEY) &&
+        (create_info.db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+        mysql_bin_log.is_open() &&
+        (thd->variables.option_bits & OPTION_BIN_LOG) &&
+        thd->variables.binlog_format == BINLOG_FORMAT_ROW) {
+      my_error(ER_FOREIGN_KEY_WITH_ATOMIC_CREATE_SELECT, MYF(0));
+      return true;
+    }
+
+    // Reject request to CREATE TABLE AS SELECT with START TRANSACTION.
+    if (create_info.m_transactional_ddl) {
+      my_error(ER_NOT_ALLOWED_WITH_START_TRANSACTION, MYF(0),
+               "with CREATE TABLE ... AS SELECT statement.");
+      return true;
+    }
+
+    /*
+      If:
+      a) we inside an SP and there was NAME_CONST substitution,
+      b) binlogging is on (STMT mode),
+      c) we log the SP as separate statements
+      raise a warning, as it may cause problems
+      (see 'NAME_CONST issues' in 'Binary Logging of Stored Programs')
+     */
+    if (thd->query_name_consts && mysql_bin_log.is_open() &&
+        thd->variables.binlog_format == BINLOG_FORMAT_STMT &&
+        !mysql_bin_log.is_query_in_union(thd, thd->query_id)) {
+      uint splocal_refs = 0;
+      /* Count SP local vars in the top-level SELECT list */
+      for (Item *item : query_block->visible_fields()) {
+        if (item->is_splocal()) splocal_refs++;
+      }
+      /*
+        If it differs from number of NAME_CONST substitution applied,
+        we may have a SOME_FUNC(NAME_CONST()) in the SELECT list,
+        that may cause a problem with binary log (see BUG#35383),
+        raise a warning.
+      */
+      if (splocal_refs != thd->query_name_consts)
+        push_warning(
+            thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+            "Invoked routine ran a statement that may cause problems with "
+            "binary log, see 'NAME_CONST issues' in 'Binary Logging of Stored "
+            "Programs' "
+            "section of the manual.");
+    }
+
+    /*
+      Disable non-empty MERGE tables with CREATE...SELECT. Too
+      complicated. See Bug #26379. Empty MERGE tables are read-only
+      and don't allow CREATE...SELECT anyway.
+    */
+    if (create_info.used_fields & HA_CREATE_USED_UNION) {
+      my_error(ER_WRONG_OBJECT, MYF(0), create_table->db,
+               create_table->table_name, "BASE TABLE");
+      return true;
+    }
+
+    if (query_expression->is_prepared()) {
+      cleanup(thd);
+    }
+    auto cleanup_se_guard = create_scope_guard(
+        [lex] { lex->set_secondary_engine_execution_context(nullptr); });
+    if (open_tables_for_query(thd, lex->query_tables, false)) return true;
+
+    /* The table already exists */
+    if (create_table->table || create_table->is_view()) {
+      if (create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+        push_warning_printf(thd, Sql_condition::SL_NOTE, ER_TABLE_EXISTS_ERROR,
+                            ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                            create_info.alias);
+        my_ok(thd);
+        return false;
+      } else {
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_info.alias);
+        return false;
+      }
+    }
+
+    /*
+      Remove target table from main select and name resolution
+      context. This can't be done earlier as it will break view merging in
+      statements like "CREATE TABLE IF NOT EXISTS existing_view SELECT".
+    */
+    bool link_to_local;
+    lex->unlink_first_table(&link_to_local);
+
+    /* Updating any other table is prohibited in CTS statement */
+    for (Table_ref *table = lex->query_tables; table;
+         table = table->next_global) {
+      if (table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+        lex->link_first_table_back(create_table, link_to_local);
+
+        my_error(ER_CANT_UPDATE_TABLE_IN_CREATE_TABLE_SELECT, MYF(0),
+                 table->table_name, create_info.alias);
+        return true;
+      }
+    }
+
+    Query_result_create *result;
+    if (!query_expression->is_prepared()) {
+      const Prepare_error_tracker tracker(thd);
+      Prepared_stmt_arena_holder ps_arena_holder(thd);
+      result = new (thd->mem_root)
+          Query_result_create(create_table, &query_block->fields,
+                              lex->duplicates, query_expression_tables);
+      if (result == nullptr) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+
+      // Use the hypergraph optimizer for the SELECT statement, if enabled.
+      lex->set_using_hypergraph_optimizer(
+          thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
+
+      if (query_expression->prepare(thd, result, nullptr, SELECT_NO_UNLOCK,
+                                    0)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+      if (!thd->stmt_arena->is_regular() && lex->save_cmd_properties(thd)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+    } else {
+      result = down_cast<Query_result_create *>(
+          query_expression->query_result() != nullptr
+              ? query_expression->query_result()
+              : query_block->query_result());
+      // Restore prepared statement properties, bind table and field information
+      lex->restore_cmd_properties();
+      bind_fields(thd->stmt_arena->item_list());
+    }
+    if (validate_use_secondary_engine(lex)) return true;
+
+    result->set_two_fields(&create_info, &alter_info);
+
+    // For objects acquired during table creation.
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    Ignore_error_handler ignore_handler;
+    Strict_error_handler strict_handler;
+    if (lex->is_ignore())
+      thd->push_internal_handler(&ignore_handler);
+    else if (thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+
+    res = populate_table(thd, lex);
+
+    // Count the number of statements offloaded to a secondary storage engine.
+    if (using_secondary_storage_engine() && lex->unit->is_executed())
+      ++thd->status_var.secondary_engine_execution_count;
+
+    if (lex->is_ignore() || thd->is_strict_mode()) thd->pop_internal_handler();
+    lex->cleanup(false);
+    thd->clear_current_query_costs();
+    lex->clear_values_map();
+
+    // Abort the result set if execution ended in error
+    if (res) result->abort_result_set(thd);
+
+    result->cleanup();
+
+    lex->link_first_table_back(create_table, link_to_local);
+    THD_STAGE_INFO(thd, stage_end);
+  } else {
+    Strict_error_handler strict_handler;
+    /* Push Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+    /* regular create */
+    if (create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
+      /* CREATE TABLE ... LIKE ... */
+      res = mysql_create_like_table(thd, create_table, query_expression_tables,
+                                    &create_info);
+    } else {
+      /* Regular CREATE TABLE */
+      res = mysql_create_table(thd, create_table, &create_info, &alter_info);
+    }
+    /* Pop Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode()) thd->pop_internal_handler();
+    if (!res) {
+      /* in case of create temp tables if @@session_track_state_change is
+         ON then send session state notification in OK packet */
+      if (create_info.options & HA_LEX_CREATE_TMP_TABLE &&
+          thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, {});
+      my_ok(thd);
+    }
+  }
+  // The following code is required to make CREATE TABLE re-execution safe.
+  // @todo Consider refactoring this code.
+  if (part_info != nullptr) {
+    if (part_info->part_expr != nullptr &&
+        part_info->part_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->part_expr)->reset_field();
+
+    if (part_info->subpart_expr != nullptr &&
+        part_info->subpart_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->subpart_expr)->reset_field();
+  }
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fill_create_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc
+Function: dd::upgrade_57::fill_create_info_for_upgrade not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/opt_costconstants.cc
+Function: Cost_model_constants::find_handler_slot_from_name
+uint Cost_model_constants::find_handler_slot_from_name(
+    THD *thd, const LEX_CSTRING &name) const {
+  // Look up the storage engine
+  const plugin_ref plugin = ha_resolve_by_name(thd, &name, false);
+  if (!plugin) return HA_SLOT_UNDEF;
+
+  // Find the handlerton for this storage engine
+  handlerton *ht = plugin_data<handlerton *>(plugin);
+  assert(ht != nullptr);
+  if (!ht) {
+    assert(false); /* purecov: inspected */
+    return HA_SLOT_UNDEF;
+  }
+
+  return ht->slot;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_storage_engine
+static bool check_storage_engine(sys_var *self, THD *thd, set_var *var) {
+  if (check_not_null(self, thd, var)) return true;
+
+  if (!opt_initialize && !opt_noacl) {
+    char buff[STRING_BUFFER_USUAL_SIZE];
+    String str(buff, sizeof(buff), system_charset_info), *res;
+    LEX_CSTRING se_name;
+
+    if (var->value) {
+      res = var->value->val_str(&str);
+      lex_cstring_set(&se_name, res->ptr());
+    } else {
+      // Use the default value defined by sys_var.
+      lex_cstring_set(
+          &se_name,
+          pointer_cast<const char *>(
+              down_cast<Sys_var_plugin *>(self)->global_value_ptr(thd, {})));
+    }
+
+    plugin_ref plugin;
+    if ((plugin = ha_resolve_by_name(nullptr, &se_name, false))) {
+      handlerton *hton = plugin_data<handlerton *>(plugin);
+      if (ha_is_storage_engine_disabled(hton))
+        LogErr(WARNING_LEVEL, ER_DISABLED_STORAGE_ENGINE_AS_DEFAULT,
+               self->name.str, se_name.str);
+      plugin_unlock(nullptr, plugin);
+    }
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.h
+Function: Sys_var_plugin::do_check
+  bool do_check(THD *thd, set_var *var) override {
+    bool fixed = false;
+    longlong v;
+    ulonglong uv;
+
+    v = var->value->val_int();
+    if (SIGNED) { /* target variable has signed type */
+      if (var->value->unsigned_flag) {
+        /*
+          Input value is such a large positive number that MySQL used
+          an unsigned item to hold it. When cast to a signed longlong,
+          if the result is negative there is "cycling" and this is
+          incorrect (large positive input value should not end up as a
+          large negative value in the session signed variable to be
+          set); instead, we need to pick the allowed number closest to
+          the positive input value, i.e. pick the biggest allowed
+          positive integer.
+        */
+        if (v < 0)
+          uv = max_of_int_range(ARGT);
+        else /* no cycling, longlong can hold true value */
+          uv = (ulonglong)v;
+      } else
+        uv = v;
+      /* This will further restrict with VALID_RANGE, BLOCK_SIZE */
+      var->save_result.ulonglong_value =
+        getopt_ll_limit_value(uv, &option, &fixed);
+    } else {
+      if (var->value->unsigned_flag) {
+        /* Guaranteed positive input value, ulonglong can hold it */
+        uv = (ulonglong)v;
+      } else {
+        /*
+          Maybe negative input value; in this case, cast to ulonglong
+          makes it positive, which is wrong. Pick the closest allowed
+          value i.e. 0.
+        */
+        uv = (ulonglong)(v < 0 ? 0 : v);
+      }
+      var->save_result.ulonglong_value =
+        getopt_ull_limit_value(uv, &option, &fixed);
+    }
+
+    if (max_var_ptr()) {
+      /* check constraint set with --maximum-...=X */
+      if (SIGNED) {
+        longlong max_val = *max_var_ptr();
+        if (((longlong)(var->save_result.ulonglong_value)) > max_val)
+          var->save_result.ulonglong_value = max_val;
+        /*
+          Signed variable probably has some kind of symmetry. Then
+          it's good to limit negative values just as we limit positive
+          values.
+        */
+        max_val = -max_val;
+        if (((longlong)(var->save_result.ulonglong_value)) < max_val)
+          var->save_result.ulonglong_value = max_val;
+      } else {
+        ulonglong max_val = *max_var_ptr();
+        if (var->save_result.ulonglong_value > max_val)
+          var->save_result.ulonglong_value = max_val;
+      }
+    }
+
+    return throw_bounds_warning(
+        thd, name.str, var->save_result.ulonglong_value != (ulonglong)v,
+        var->value->unsigned_flag, v);
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.h
+Function: Sys_var_plugin::global_save_default
+  void global_save_default(THD *, set_var *var) override {
+    var->save_result.ulonglong_value = option.def_value;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: open_secondary_engine_tables
+static bool open_secondary_engine_tables(THD *thd, uint flags) {
+  LEX *const lex = thd->lex;
+  Sql_cmd *const sql_cmd = lex->m_sql_cmd;
+
+  // The previous execution context should have been destroyed.
+  assert(lex->secondary_engine_execution_context() == nullptr);
+
+  // If use of secondary engines has been disabled for the statement,
+  // there is nothing to do.
+  if (sql_cmd == nullptr || sql_cmd->secondary_storage_engine_disabled())
+    return false;
+
+  // If the user has requested the use of a secondary storage engine
+  // for this statement, skip past the initial optimization for the
+  // primary storage engine and go straight to the secondary engine.
+  if (thd->secondary_engine_optimization() ==
+          Secondary_engine_optimization::PRIMARY_TENTATIVELY &&
+      thd->variables.use_secondary_engine == SECONDARY_ENGINE_FORCED) {
+    thd->set_secondary_engine_optimization(
+        Secondary_engine_optimization::SECONDARY);
+    mysql_thread_set_secondary_engine(true);
+    mysql_statement_set_secondary_engine(thd->m_statement_psi, true);
+  }
+
+  // Only open secondary engine tables if use of a secondary engine
+  // has been requested.
+  if (thd->secondary_engine_optimization() !=
+      Secondary_engine_optimization::SECONDARY)
+    return false;
+
+  // If the statement cannot be executed in a secondary engine because
+  // of a property of the statement, do not attempt to open the
+  // secondary tables. Also disable use of secondary engines for
+  // future executions of the statement, since these properties will
+  // not change between executions.
+  const LEX_CSTRING *secondary_engine =
+      sql_cmd->eligible_secondary_storage_engine();
+  const plugin_ref secondary_engine_plugin =
+      secondary_engine == nullptr
+          ? nullptr
+          : ha_resolve_by_name(thd, secondary_engine, false);
+
+  if ((secondary_engine_plugin == nullptr) ||
+      !plugin_is_ready(*secondary_engine, MYSQL_STORAGE_ENGINE_PLUGIN)) {
+    // Didn't find a secondary storage engine to use for the query.
+    sql_cmd->disable_secondary_storage_engine();
+    return false;
+  }
+
+  // If the statement cannot be executed in a secondary engine because
+  // of a property of the environment, do not attempt to open the
+  // secondary tables. However, do not disable use of secondary
+  // storage engines for future executions of the statement, since the
+  // environment may change before the next execution.
+  if (!thd->is_secondary_storage_engine_eligible()) return false;
+
+  auto hton = plugin_data<const handlerton *>(secondary_engine_plugin);
+  sql_cmd->use_secondary_storage_engine(hton);
+
+  // Replace the TABLE objects in the Table_ref with secondary tables.
+  Open_table_context ot_ctx(thd, flags | MYSQL_OPEN_SECONDARY_ENGINE);
+  Table_ref *tl = lex->query_tables;
+  // For INSERT INTO SELECT and CTAS statements, the table to insert into does
+  // not have to have a secondary engine. This table is always first in the list
+  if ((lex->sql_command == SQLCOM_INSERT_SELECT ||
+       lex->sql_command == SQLCOM_CREATE_TABLE) &&
+      tl != nullptr)
+    tl = tl->next_global;
+  for (; tl != nullptr; tl = tl->next_global) {
+    if (tl->is_placeholder()) continue;
+    TABLE *primary_table = tl->table;
+    tl->table = nullptr;
+    if (open_table(thd, tl, &ot_ctx)) {
+      if (!thd->is_error()) {
+        /*
+          open_table() has not registered any error, implying that we can
+          retry the failed open; but it is complicated to do so reliably, so we
+          prefer to simply fail and re-prepare the statement in the primary
+          engine, as an exceptional case. So we register an error.
+        */
+        my_error(ER_SECONDARY_ENGINE_PLUGIN, MYF(0),
+                 "Transient error when opening tables in RAPID");
+      }
+      return true;
+    }
+    assert(tl->table->s->is_secondary_engine());
+    tl->table->file->ha_set_primary_handler(primary_table->file);
+  }
+
+  // Prepare the secondary engine for executing the statement.
+  return hton->prepare_secondary_engine != nullptr &&
+         hton->prepare_secondary_engine(thd, lex);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: init_server_components
+    like init_server_components() the word is used in bit different context
+    and may mean general idea of modularity.
+  */
+  assert(strlen(mysql_real_data_home) > 0);
+  g_deployed_components =
+      new (std::nothrow) Deployed_components(my_progname, mysql_real_data_home);
+  if (g_deployed_components == nullptr ||
+      g_deployed_components->valid() == false) {
+    /*Error would have been raised by Deployed_components constructor */
+    g_deployed_components = nullptr;
+    return true;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: initialize_storage_engine not found.
+

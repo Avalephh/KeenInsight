@@ -1,0 +1,44 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Rows_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Rows_log_event::handle_idempotent_and_ignored_errors
+int Rows_log_event::handle_idempotent_and_ignored_errors(
+    Relay_log_info const *rli, int *err) {
+  int error = *err;
+  if (error) {
+    int actual_error = convert_handler_error(error, thd, m_table);
+    bool idempotent_error = (idempotent_error_code(error) &&
+                             (rbr_exec_mode == RBR_EXEC_MODE_IDEMPOTENT));
+    bool ignored_error =
+        (idempotent_error == 0 ? ignored_error_code(actual_error) : 0);
+
+    if (idempotent_error || ignored_error) {
+      loglevel ll;
+      if (idempotent_error)
+        ll = WARNING_LEVEL;
+      else
+        ll = INFORMATION_LEVEL;
+      slave_rows_error_report(
+          ll, error, rli, thd, m_table, get_type_str(),
+          const_cast<Relay_log_info *>(rli)->get_rpl_log_name(),
+          (ulong)common_header->log_pos);
+      thd->get_stmt_da()->reset_condition_info(thd);
+      clear_all_errors(thd, const_cast<Relay_log_info *>(rli));
+      *err = 0;
+      if (idempotent_error == 0) return ignored_error;
+    }
+  }
+
+  return *err;
+}
+
+

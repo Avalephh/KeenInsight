@@ -1,0 +1,18 @@
+Global Variable: System_variables.49
+Explicit Data Flow (6):
+  Instruction: %69 = load i64, i64* %read_rnd_buff_size, align 8, !dbg !1255454 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:624:29 | Function: check_quick_select
+  Instruction: %conv51 = trunc i64 %69 to i32, !dbg !1255452 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:624:14 | Function: check_quick_select
+  Instruction: store i32 %conv51, i32* %70, align 4, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:624:12 | Function: check_quick_select
+  Instruction: %call38 = invoke i64 @_Z18check_quick_selectP3THDP15RANGE_OPT_PARAMjbP8SEL_ROOTb10enum_orderbPjS6_P13Cost_estimatePbS9_(%class.THD* %47, %class.RANGE_OPT_PARAM* %48, i32 %49, i1 zeroext %tobool34, %class.SEL_ROOT* %51, i1 zeroext %tobool35, i32 %53, i1 zeroext %tobool36, i32* %mrr_flags, i32* %buf_size, %class.Cost_estimate* %cost, i8* %is_ror_scan, i8* %is_imerge_scan)
+          to label %invoke.cont37 unwind label %lpad31, !dbg !1255446 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:867:23 | Function: get_key_scans_params
+  Instruction: %115 = load i32, i32* %buf_size, align 4, !dbg !1255586 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:936:25 | Function: get_key_scans_params
+  Instruction: store i32 %115, i32* %best_buf_size, align 4, !dbg !1255587 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:936:23 | Function: get_key_scans_params
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

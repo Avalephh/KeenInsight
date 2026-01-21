@@ -1,0 +1,255 @@
+Global Variable: System_variables.106
+Explicit Data Flow (41):
+  Instruction: %1 = load i8, i8* %session_track_schema, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:31 | Function: Current_schema_tracker::update
+  Instruction: %tobool = trunc i8 %1 to i1, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:31 | Function: Current_schema_tracker::update
+  Instruction: %2 = zext i1 %tobool to i64, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:15 | Function: Current_schema_tracker::update
+  Instruction: %cond = select i1 %tobool, i1 true, i1 false, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:15 | Function: Current_schema_tracker::update
+  Instruction: %frombool = zext i1 %cond to i8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:13 | Function: Current_schema_tracker::update
+  Instruction: store i8 %frombool, i8* %m_enabled, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:13 | Function: Current_schema_tracker::update
+  Instruction: %m_enabled = getelementptr inbounds %class.State_tracker, %class.State_tracker* %3, i32 0, i32 1, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:839:3 | Function: Current_schema_tracker::update
+  Instruction: %m_enabled = getelementptr inbounds %class.State_tracker, %class.State_tracker* %this1, i32 0, i32 1, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.h:98:36 | Function: State_tracker::is_enabled
+  Instruction: %0 = load i8, i8* %m_enabled, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.h:98:36 | Function: State_tracker::is_enabled
+  Instruction: %tobool = trunc i8 %0 to i1, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.h:98:36 | Function: State_tracker::is_enabled
+  Instruction: ret i1 %tobool, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.h:98:29 | Function: State_tracker::is_enabled
+  Instruction: %call = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %2), !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1573:24 | Function: Session_tracker::enabled_any
+  Instruction: br i1 %call, label %if.then, label %if.end, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc:1573:9 | Function: Session_tracker::enabled_any
+  Instruction: %call38 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call37), !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:372:27 | Function: sys_var::update
+  Instruction: br i1 %call38, label %if.then39, label %if.end44, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:371:11 | Function: sys_var::update
+  Instruction: %call49 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call48), !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:378:17 | Function: sys_var::update
+  Instruction: br i1 %call49, label %if.then50, label %if.end57, !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:376:11 | Function: sys_var::update
+  Instruction: %call3 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call2), !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:1899:13 | Function: set_var_user::update
+  Instruction: br i1 %call3, label %if.then4, label %if.end7, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:1898:7 | Function: set_var_user::update
+  Instruction: %call7 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call), !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2018:66 | Function: set_var_collation_client::update
+  Instruction: br i1 %call7, label %if.then, label %if.end, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2018:7 | Function: set_var_collation_client::update
+  Instruction: %call22 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call21), !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2030:13 | Function: set_var_collation_client::update
+  Instruction: br i1 %call22, label %if.then23, label %if.end29, !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2029:7 | Function: set_var_collation_client::update
+  Instruction: %call262 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call260)
+          to label %invoke.cont261 unwind label %lpad59, !dbg !1256478 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:934:15 | Function: mysql_rm_db
+  Instruction: br i1 %call262, label %if.then263, label %if.end271, !dbg !1256479 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:933:9 | Function: mysql_rm_db
+  Instruction: %call238 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call236)
+          to label %invoke.cont237 unwind label %lpad6, !dbg !1255562 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:1506:65 | Function: mysql_change_db
+  Instruction: br i1 %call238, label %if.then239, label %if.end247, !dbg !1255563 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:1506:7 | Function: mysql_change_db
+  Instruction: %call252 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call250)
+          to label %invoke.cont251 unwind label %lpad6, !dbg !1255576 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:1511:13 | Function: mysql_change_db
+  Instruction: br i1 %call252, label %if.then253, label %if.end263, !dbg !1255577 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:1510:7 | Function: mysql_change_db
+  Instruction: %call1 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %1), !dbg !1255287 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:5221:23 | Function: statement_id_to_session
+  Instruction: br i1 %call1, label %if.then, label %if.end, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:5221:7 | Function: statement_id_to_session
+  Instruction: %call881 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call879)
+          to label %invoke.cont880 unwind label %lpad369, !dbg !1256436 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:3705:19 | Function: mysql_execute_command
+  Instruction: br i1 %call881, label %if.then882, label %if.end892, !dbg !1256437 | Location: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc:3704:13 | Function: mysql_execute_command
+  Instruction: %call50 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call48)
+          to label %invoke.cont49 unwind label %lpad, !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1839:15 | Function: mysql_sql_stmt_prepare
+  Instruction: br i1 %call50, label %if.then51, label %if.end58, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1838:9 | Function: mysql_sql_stmt_prepare
+  Instruction: %call11 = call zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call10), !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:2088:13 | Function: mysql_sql_stmt_close
+  Instruction: br i1 %call11, label %if.then12, label %if.end17, !dbg !1255325 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:2087:7 | Function: mysql_sql_stmt_close
+  Instruction: %call1816 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call1814)
+          to label %invoke.cont1815 unwind label %lpad1080, !dbg !1257894 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:17666:17 | Function: mysql_alter_table
+  Instruction: br i1 %call1816, label %if.then1817, label %if.end1824, !dbg !1257895 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:17665:11 | Function: mysql_alter_table
+  Instruction: %call417 = invoke zeroext i1 @_ZNK13State_tracker10is_enabledEv(%class.State_tracker* %call415)
+          to label %invoke.cont416 unwind label %lpad377, !dbg !1255926 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:444:17 | Function: Sql_cmd_create_table::execute
+  Instruction: br i1 %call417, label %if.then418, label %if.end426, !dbg !1255927 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:442:11 | Function: Sql_cmd_create_table::execute
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: State_tracker::is_enabled
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: my_ok
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: std::set
+  Controlled Function: Drop_table_error_handler::~Drop_table_error_handler
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: std::set
+  Controlled Function: Drop_table_error_handler::~Drop_table_error_handler
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: State_tracker::is_enabled
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: std::atomic
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Reprepare_observer::is_invalidated
+  Controlled Function: is_explainable_query
+  Controlled Function: Reprepare_observer::can_retry
+  Controlled Function: __assert_fail
+  Controlled Function: unlikely
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: stmt_causes_implicit_commit
+  Controlled Function: std::atomic
+  Controlled Function: unlikely
+  Controlled Function: std::atomic
+  Controlled Function: THD::reset_query_for_display
+  Controlled Function: std::atomic
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: __assert_fail
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_statement_locks
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: Diagnostics_area::set_overwrite_status
+  Controlled Function: MDL_context::release_transactional_locks
+  Controlled Function: binlog_gtid_end_transaction
+  Controlled Function: unlikely
+  Controlled Function: unlikely
+  Controlled Function: Opt_trace_array::~Opt_trace_array
+  Controlled Function: Opt_trace_object::~Opt_trace_object
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: std::unique_ptr
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::set
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: Alter_table_ctx::get_tmp_path
+  Controlled Function: Alter_table_prelocking_strategy::~Alter_table_prelocking_strategy
+  Controlled Function: __assert_fail
+  Controlled Function: std::unique_ptr
+  Controlled Function: quick_rm_table
+  Controlled Function: Table_ddl_hton_notification_guard::~Table_ddl_hton_notification_guard
+  Controlled Function: _db_keyword_
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: unlikely
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: copy_data_between_tables
+  Controlled Function: Diagnostics_area::current_row_for_condition
+  Controlled Function: std::set
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: push_zero_date_warning
+  Controlled Function: Foreign_key_parents_invalidator::~Foreign_key_parents_invalidator
+  Controlled Function: unlikely
+  Controlled Function: __assert_fail
+  Controlled Function: alter_table_manage_keys
+  Controlled Function: Alter_table_prelocking_strategy::~Alter_table_prelocking_strategy
+  Controlled Function: Table_ddl_hton_notification_guard::~Table_ddl_hton_notification_guard
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: __assert_fail
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: unlikely
+  Controlled Function: _db_keyword_
+  Controlled Function: write_bin_log
+  Controlled Function: my_error
+  Controlled Function: Diagnostics_area::current_statement_cond_count
+  Controlled Function: snprintf
+  Controlled Function: collect_and_lock_fk_tables_for_complex_alter_table
+  Controlled Function: snprintf
+  Controlled Function: std::unique_ptr
+  Controlled Function: __assert_fail
+  Controlled Function: MDL_request::MDL_request
+  Controlled Function: MDL_request::init_with_source
+  Controlled Function: std::unique_ptr
+  Controlled Function: MDL_context::acquire_lock
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: my_error
+  Controlled Function: quick_rm_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: quick_rm_table
+  Controlled Function: mysql_rename_table
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: quick_rm_table
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: __assert_fail
+  Controlled Function: Foreign_key_parents_invalidator::invalidate
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: adjust_foreign_key_names_for_old_table_version
+  Controlled Function: mysql_rename_table
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: std::unique_ptr
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: std::unique_ptr
+  Controlled Function: adjust_fks_for_complex_alter_table
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: __assert_fail
+  Controlled Function: trans_intermediate_ddl_commit
+  Controlled Function: quick_rm_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: mysql_rename_table
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: alter_table_drop_histograms
+  Controlled Function: dd::Collection
+  Controlled Function: set_check_constraints_alter_mode
+  Controlled Function: adjust_check_constraint_names_for_old_table_version
+  Controlled Function: reset_check_constraints_alter_mode
+  Controlled Function: dd::is_checked_for_upgrade
+  Controlled Function: dd::is_checked_for_upgrade
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: rename_histograms
+  Controlled Function: quick_rm_table
+  Controlled Function: _db_keyword_
+  Controlled Function: my_sleep
+  Controlled Function: unlikely
+  Controlled Function: MYSQL_BIN_LOG::is_open
+  Controlled Function: __assert_fail
+  Controlled Function: write_bin_log
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: __assert_fail
+  Controlled Function: Foreign_key_parents_invalidator::invalidate
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: Alter_table_ctx::is_table_renamed
+  Controlled Function: MDL_context::release_all_locks_for_name
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: MDL_ticket::downgrade_lock
+  Controlled Function: Alter_table_ctx::is_database_changed
+  Controlled Function: MDL_context::set_lock_duration
+  Controlled Function: Session_tracker::get_tracker
+  Controlled Function: my_ok
+  Controlled Function: Strict_error_handler::~Strict_error_handler
+  Controlled Function: Strict_error_handler::~Strict_error_handler
+  Controlled Function: Item_field* down_cast
+  Controlled Function: Item_field* down_cast
+
+Implicit Control Flow:
+
+----------------------------------------

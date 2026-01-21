@@ -1,0 +1,14 @@
+Global Variable: System_variables.102
+Explicit Data Flow (3):
+  Instruction: %gtid_set = getelementptr inbounds %struct.Gtid_set_or_null, %struct.Gtid_set_or_null* %gtid_next_list, i32 0, i32 0, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1448:32 | Function: THD::~THD
+  Instruction: %is_non_null = getelementptr inbounds %struct.Gtid_set_or_null, %struct.Gtid_set_or_null* %gtid_next_list, i32 0, i32 1, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:3433:37 | Function: THD::get_gtid_next_list
+  Instruction: %gtid_set = getelementptr inbounds %struct.Gtid_set_or_null, %struct.Gtid_set_or_null* %gtid_next_list3, i32 0, i32 0, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.h:3434:43 | Function: THD::get_gtid_next_list
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

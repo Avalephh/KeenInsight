@@ -1,0 +1,449 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc
+Function: thd_get_autoinc
+void thd_get_autoinc(const THD *thd, ulong *off, ulong *inc) {
+  *off = thd->variables.auto_increment_offset;
+  *inc = thd->variables.auto_increment_increment;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: compute_next_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: handler::update_auto_increment
+int handler::update_auto_increment() {
+  ulonglong nr, nb_reserved_values = 0;
+  bool append = false;
+  THD *thd = table->in_use;
+  struct System_variables *variables = &thd->variables;
+  assert(table_share->tmp_table != NO_TMP_TABLE || m_lock_type != F_UNLCK);
+  DBUG_TRACE;
+
+  /*
+    next_insert_id is a "cursor" into the reserved interval, it may go greater
+    than the interval, but not smaller.
+  */
+  assert(next_insert_id >= auto_inc_interval_for_cur_row.minimum());
+
+  if ((nr = table->next_number_field->val_int()) != 0 ||
+      (table->autoinc_field_has_explicit_non_null_value &&
+       thd->variables.sql_mode & MODE_NO_AUTO_VALUE_ON_ZERO)) {
+    /*
+      First test if the query was aborted due to strict mode constraints.
+    */
+    if (thd->is_error() &&
+        thd->get_stmt_da()->mysql_errno() == ER_TRUNCATED_WRONG_VALUE)
+      return HA_ERR_AUTOINC_ERANGE;
+
+    /*
+      Update next_insert_id if we had already generated a value in this
+      statement (case of INSERT VALUES(null),(3763),(null):
+      the last NULL needs to insert 3764, not the value of the first NULL plus
+      1).
+      Also we should take into account the the sign of the value.
+      Since auto_increment value can't have negative value we should update
+      next_insert_id only in case when we INSERTing explicit positive value.
+      It means that for a table that has SIGNED INTEGER column when we execute
+      the following statement
+      INSERT INTO t1 VALUES( NULL), (-1), (NULL)
+      we shouldn't call adjust_next_insert_id_after_explicit_value()
+      and the result row will be (1, -1, 2) (for new opened connection
+      to the server). On the other hand, for the statement
+      INSERT INTO t1 VALUES( NULL), (333), (NULL)
+      we should call adjust_next_insert_id_after_explicit_value()
+      and result row will be (1, 333, 334).
+    */
+    if (table->next_number_field->is_unsigned() || ((longlong)nr) > 0)
+      adjust_next_insert_id_after_explicit_value(nr);
+
+    insert_id_for_cur_row = 0;  // didn't generate anything
+    return 0;
+  }
+
+  if (next_insert_id > table->next_number_field->get_max_int_value())
+    return HA_ERR_AUTOINC_READ_FAILED;
+
+  if ((nr = next_insert_id) >= auto_inc_interval_for_cur_row.maximum()) {
+    /* next_insert_id is beyond what is reserved, so we reserve more. */
+    const Discrete_interval *forced = thd->auto_inc_intervals_forced.get_next();
+    if (forced != nullptr) {
+      nr = forced->minimum();
+      /*
+        In a multi insert statement when the number of affected rows is known
+        then reserve those many number of auto increment values. So that
+        interval will be starting value to starting value + number of affected
+        rows * increment of auto increment.
+       */
+      nb_reserved_values = (estimation_rows_to_insert > 0)
+                               ? estimation_rows_to_insert
+                               : forced->values();
+    } else {
+      /*
+        handler::estimation_rows_to_insert was set by
+        handler::ha_start_bulk_insert(); if 0 it means "unknown".
+      */
+      ulonglong nb_desired_values;
+      /*
+        If an estimation was given to the engine:
+        - use it.
+        - if we already reserved numbers, it means the estimation was
+        not accurate, then we'll reserve 2*AUTO_INC_DEFAULT_NB_ROWS the 2nd
+        time, twice that the 3rd time etc.
+        If no estimation was given, use those increasing defaults from the
+        start, starting from AUTO_INC_DEFAULT_NB_ROWS.
+        Don't go beyond a max to not reserve "way too much" (because
+        reservation means potentially losing unused values).
+        Note that in prelocked mode no estimation is given.
+      */
+
+      if ((auto_inc_intervals_count == 0) && (estimation_rows_to_insert > 0))
+        nb_desired_values = estimation_rows_to_insert;
+      else if ((auto_inc_intervals_count == 0) &&
+               (thd->lex->bulk_insert_row_cnt > 0)) {
+        /*
+          For multi-row inserts, if the bulk inserts cannot be started, the
+          handler::estimation_rows_to_insert will not be set. But we still
+          want to reserve the autoinc values.
+        */
+        nb_desired_values = thd->lex->bulk_insert_row_cnt;
+      } else /* go with the increasing defaults */
+      {
+        /* avoid overflow in formula, with this if() */
+        if (auto_inc_intervals_count <= AUTO_INC_DEFAULT_NB_MAX_BITS) {
+          nb_desired_values =
+              AUTO_INC_DEFAULT_NB_ROWS * (1 << auto_inc_intervals_count);
+          nb_desired_values =
+              std::min(nb_desired_values, ulonglong(AUTO_INC_DEFAULT_NB_MAX));
+        } else
+          nb_desired_values = AUTO_INC_DEFAULT_NB_MAX;
+      }
+      /* This call ignores all its parameters but nr, currently */
+      get_auto_increment(variables->auto_increment_offset,
+                         variables->auto_increment_increment, nb_desired_values,
+                         &nr, &nb_reserved_values);
+      if (nr == ULLONG_MAX) return HA_ERR_AUTOINC_READ_FAILED;  // Mark failure
+
+      /*
+        That rounding below should not be needed when all engines actually
+        respect offset and increment in get_auto_increment(). But they don't
+        so we still do it. Wonder if for the not-first-in-index we should do
+        it. Hope that this rounding didn't push us out of the interval; even
+        if it did we cannot do anything about it (calling the engine again
+        will not help as we inserted no row).
+      */
+      nr = compute_next_insert_id(nr - 1, variables);
+    }
+
+    if (table->s->next_number_keypart == 0) {
+      /* We must defer the appending until "nr" has been possibly truncated */
+      append = true;
+    } else {
+      /*
+        For such auto_increment there is no notion of interval, just a
+        singleton. The interval is not even stored in
+        thd->auto_inc_interval_for_cur_row, so we are sure to call the engine
+        for next row.
+      */
+      DBUG_PRINT("info", ("auto_increment: special not-first-in-index"));
+    }
+  }
+
+  if (unlikely(nr == ULLONG_MAX)) return HA_ERR_AUTOINC_ERANGE;
+
+  DBUG_PRINT("info", ("auto_increment: %lu", (ulong)nr));
+
+  if (unlikely(table->next_number_field->store((longlong)nr, true))) {
+    /*
+      first test if the query was aborted due to strict mode constraints
+    */
+    if (thd->is_error() &&
+        thd->get_stmt_da()->mysql_errno() == ER_WARN_DATA_OUT_OF_RANGE)
+      return HA_ERR_AUTOINC_ERANGE;
+
+    /*
+      field refused this value (overflow) and truncated it, use the result of
+      the truncation (which is going to be inserted); however we try to
+      decrease it to honour auto_increment_* variables.
+      That will shift the left bound of the reserved interval, we don't
+      bother shifting the right bound (anyway any other value from this
+      interval will cause a duplicate key).
+    */
+    nr = prev_insert_id(table->next_number_field->val_int(), variables);
+    if (unlikely(table->next_number_field->store((longlong)nr, true)))
+      nr = table->next_number_field->val_int();
+  }
+  if (append) {
+    auto_inc_interval_for_cur_row.replace(nr, nb_reserved_values,
+                                          variables->auto_increment_increment);
+    auto_inc_intervals_count++;
+    /* Row-based replication does not need to store intervals in binlog */
+    if (mysql_bin_log.is_open() && !thd->is_current_stmt_binlog_format_row())
+      thd->auto_inc_intervals_in_cur_stmt_for_binlog.append(
+          auto_inc_interval_for_cur_row.minimum(),
+          auto_inc_interval_for_cur_row.values(),
+          variables->auto_increment_increment);
+  }
+
+  /*
+    Record this autogenerated value. If the caller then
+    succeeds to insert this value, it will call
+    record_first_successful_insert_id_in_cur_stmt()
+    which will set first_successful_insert_id_in_cur_stmt if it's not
+    already set.
+  */
+  insert_id_for_cur_row = nr;
+  /*
+    Set next insert id to point to next auto-increment value to be able to
+    handle multi-row statements.
+  */
+  set_next_insert_id(compute_next_insert_id(nr, variables));
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: prev_insert_id not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/persistent_dynamic_loader.cc
+Function: mysql_persistent_dynamic_loader_imp::load not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/persistent_dynamic_loader.cc
+Function: mysql_persistent_dynamic_loader_imp::load not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Rotate_log_event::do_update_pos
+int Log_event::do_update_pos(Relay_log_info *rli) {
+  int error = 0;
+  assert(!rli->belongs_to_client());
+
+  if (rli) error = rli->stmt_done(common_header->log_pos);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/transaction_impl.cc
+Function: dd::Update_dictionary_tables_ctx::
+  if (!m_tables[name])
+    m_tables[name] = new (std::nothrow) Raw_table(m_lock_type, name);
+}
+
+bool Open_dictionary_tables_ctx::open_tables() {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/transaction_impl.cc
+Function: dd::Update_dictionary_tables_ctx::Update_dictionary_tables_ctx
+Update_dictionary_tables_ctx::Update_dictionary_tables_ctx(THD *thd)
+    : otx(thd, TL_WRITE),
+      m_thd(thd),
+      m_kill_immunizer(thd),
+      m_query_tables_list_backup(new Query_tables_list()),
+      m_saved_in_sub_stmt(thd->in_sub_stmt),
+      m_saved_time_zone_used(thd->time_zone_used),
+      m_saved_auto_increment_increment(
+          thd->variables.auto_increment_increment) {
+  m_saved_check_for_truncated_fields = m_thd->check_for_truncated_fields;
+
+  m_saved_mode = m_thd->variables.sql_mode;
+  m_thd->variables.sql_mode = 0;  // Reset during DD operations
+
+  /*
+    Backup and reset part of LEX which will be accessed while opening
+    and closing data-dictionary tables.
+  */
+  m_thd->lex->reset_n_backup_query_tables_list(m_query_tables_list_backup);
+
+  m_thd->reset_n_backup_open_tables_state(&m_open_tables_state_backup,
+                                          Open_tables_state::SYSTEM_TABLES);
+
+  if ((m_saved_binlog_row_based = m_thd->is_current_stmt_binlog_format_row()))
+    m_thd->clear_current_stmt_binlog_format_row();
+
+  // Disable bin logging
+  m_saved_options = m_thd->variables.option_bits;
+  m_thd->variables.option_bits &= ~OPTION_BIN_LOG;
+
+  // Set bit to indicate that the thread is updating the data dictionary tables.
+  m_thd->variables.option_bits |= OPTION_DD_UPDATE_CONTEXT;
+
+  /*
+    In @@autocommit=1 mode InnoDB automatically commits its transaction when
+    all InnoDB tables in the statement are closed. Particularly, this can
+    happen when ~Update_dictionary_tables_ctx() closes data-dictionary tables
+    and there are no other InnoDB tables open by the statement.
+    Since normally we decide whether we want to commit or rollback changes to
+    data-dictionary sometime after this point we need to avoid this happening.
+    So we disallow usage of Update_dictionary_tables_ctx in @@autocommit=1
+    mode. This means that all DDL statements using Update_dictionary_tables_ctx
+    to update data-dictionary need to turn off @@autocommit for its duration.
+  */
+  assert((m_thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
+         !(m_thd->variables.option_bits & OPTION_AUTOCOMMIT));
+
+  // Store current intervals.
+  m_thd->auto_inc_intervals_in_cur_stmt_for_binlog.swap(
+      &m_auto_inc_intervals_in_cur_stmt_for_binlog_saved);
+
+  // Store current interval.
+  m_thd->auto_inc_intervals_forced.swap(&m_auto_inc_intervals_forced_saved);
+
+  m_thd->variables.auto_increment_increment = 1;
+
+  m_thd->in_sub_stmt = 0;
+
+  m_thd->time_zone_used = false;
+}
+
+

@@ -1,0 +1,490 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::calculate_scan_cost
+double Optimize_table_order::calculate_scan_cost(
+    const JOIN_TAB *tab, const uint idx, const Key_use *best_ref,
+    const double prefix_rowcount, const bool found_condition,
+    const bool disable_jbuf, double *rows_after_filtering,
+    Opt_trace_object *trace_access_scan) {
+  double scan_and_filter_cost;
+  TABLE *const table = tab->table();
+  const Cost_model_server *const cost_model = join->cost_model();
+  *rows_after_filtering = static_cast<double>(tab->found_records);
+
+  trace_access_scan->add("rows_to_scan", tab->found_records);
+
+  /*
+    This block should only affect the cost of scans using join
+    buffering. Consider moving it to the if () block that handles join
+    buffering.
+  */
+  if (thd->optimizer_switch_flag(OPTIMIZER_SWITCH_COND_FANOUT_FILTER)) {
+    const float const_cond_filter = calculate_condition_filter(
+        tab, nullptr, 0, static_cast<double>(tab->found_records), !disable_jbuf,
+        true, *trace_access_scan);
+
+    /*
+      For high found_records values, multiplication by float may
+      result in a higher value than the original for
+      const_cond_filter=1.0. Cast to double to increase precision.
+    */
+    *rows_after_filtering = rows2double(tab->found_records) * const_cond_filter;
+  } else if (table->quick_condition_rows != tab->found_records)
+    *rows_after_filtering = static_cast<double>(table->quick_condition_rows);
+  else if (found_condition) {
+    /*
+      If there is a filtering condition on the table (i.e. ref
+      analyzer found at least one "table.keyXpartY= exprZ", where
+      exprZ refers only to tables preceding this table in the join
+      order we're now considering), and optimizer condition filtering
+      is turned off, then assume that 25% of the rows will be filtered
+      out by this condition.
+
+      This heuristic is supposed to force tables used in exprZ to be
+      before this table in join order.
+    */
+
+    *rows_after_filtering = tab->found_records * 0.75;
+  }
+
+  /*
+    Range optimizer never proposes a RANGE if it isn't better
+    than FULL: so if RANGE is present, it's always preferred to FULL.
+    Here we estimate its cost.
+  */
+  if (tab->range_scan()) {
+    trace_access_scan->add_alnum("access_type", "range");
+    trace_quick_description(tab->range_scan(), &thd->opt_trace);
+    /*
+      For each record we:
+      - read record range through 'quick'
+      - skip rows which does not satisfy WHERE constraints
+      TODO:
+      We take into account possible use of join cache for ALL/index
+      access (see first else-branch below), but we don't take it into
+      account here for range/index_merge access. Find out why this is so.
+    */
+    scan_and_filter_cost =
+        prefix_rowcount * (tab->range_scan()->cost +
+                           cost_model->row_evaluate_cost(
+                               tab->found_records - *rows_after_filtering));
+  } else {
+    trace_access_scan->add_alnum("access_type", "scan");
+
+    // Cost of scanning the table once
+    Cost_estimate scan_cost;
+    if (table->force_index && !best_ref)  // index scan
+      scan_cost = table->file->read_cost(tab->ref().key, 1,
+                                         static_cast<double>(tab->records()));
+    else
+      scan_cost = table->file->table_scan_cost();  // table scan
+    const double single_scan_read_cost = scan_cost.total_cost();
+
+    /* Estimate total cost of reading table. */
+    if (disable_jbuf) {
+      /*
+        For each record from the prefix we have to:
+        - read the whole table
+        - skip rows which does not satisfy join condition
+
+        Note that there is also the cost of evaluating rows that DO
+        satisfy the WHERE condition, but this is added
+        a) temporarily in best_access_path(), before comparing this
+           scan cost to the best 'ref' access method, and
+        b) permanently by the caller of best_access_path() (@see e.g.
+           best_extension_by_limited_search())
+      */
+      scan_and_filter_cost =
+          prefix_rowcount *
+          (single_scan_read_cost + cost_model->row_evaluate_cost(
+                                       tab->records() - *rows_after_filtering));
+    } else {
+      /*
+        IO cost: We read the table as many times as join buffer
+        becomes full. (It would be more exact to round the result of
+        the division with floor(), but that takes 5% of time in a
+        20-table query plan search.)
+
+        CPU cost: For every full join buffer, attached conditions are
+        evaluated for each row in the scanned table. We assume that
+        the conditions evaluate to 'true' for 'rows_after_filtering'
+        number of rows. The rows that pass are then joined with the
+        prefix rows.
+
+        The CPU cost for the rows that do NOT satisfy the attached
+        conditions is considered to be part of the read cost and is
+        added below. The cost of joining the rows that DO satisfy the
+        attached conditions with all prefix rows is added in
+        greedy_search().
+      */
+      const double buffer_count =
+          1.0 + ((double)cache_record_length(join, idx) * prefix_rowcount /
+                 (double)thd->variables.join_buff_size);
+
+      scan_and_filter_cost =
+          buffer_count *
+          (single_scan_read_cost + cost_model->row_evaluate_cost(
+                                       tab->records() - *rows_after_filtering));
+
+      trace_access_scan->add("using_join_cache", true);
+      trace_access_scan->add(
+          "buffers_needed",
+          static_cast<ulonglong>(std::min(buffer_count, ULLONG_MAX_DOUBLE)));
+    }
+  }
+
+  return scan_and_filter_cost;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::best_access_path
+  to provide a number which best_access_path() can add to best_read_cost.
+*/
+double Optimize_table_order::lateral_derived_cost(
+    const JOIN_TAB *tab, const uint idx, const double prefix_rowcount,
+    const Cost_model_server *cost_model) {
+  assert(tab->table_ref->is_derived() &&
+         tab->table_ref->derived_query_expression()->m_lateral_deps);
+  if (prefix_rowcount == 0)  // no input rows: no materialization needed
+    return 0;
+  table_map deps = tab->table_ref->derived_query_expression()->m_lateral_deps;
+  POSITION *positions = got_final_plan ? join->best_positions : join->positions;
+  double derived_mat_cost = 0;
+  for (int j = idx; j >= (int)join->const_tables; j--) {
+    if (deps & join->best_ref[j]->table_ref->map()) {
+      // We found the last table in plan, on which 'tab' depends.
+      auto res = tab->table_ref->derived_query_expression()->query_result();
+      double inner_query_cost = res->estimated_cost;
+      double inner_query_rowcount = res->estimated_rowcount;
+      // copied and simplified from calculate_materialization_costs()
+      Cost_model_server::enum_tmptable_type tmp_table_type;
+      if (tab->table()->s->reclength * inner_query_rowcount <
+          thd->variables.max_heap_table_size)
+        tmp_table_type = Cost_model_server::MEMORY_TMPTABLE;
+      else
+        tmp_table_type = Cost_model_server::DISK_TMPTABLE;
+      double write_cost = cost_model->tmptable_readwrite_cost(
+          tmp_table_type, inner_query_rowcount, 0.0);
+      double mat_times = positions[j].prefix_rowcount;
+      double total_mat_cost = mat_times * (inner_query_cost + write_cost);
+      // average per read request:
+      derived_mat_cost = total_mat_cost / prefix_rowcount;
+      Opt_trace_context *const trace = &thd->opt_trace;
+      Opt_trace_object trace_lateral(trace);
+      Opt_trace_object trace_details(trace, "lateral_materialization");
+      trace_details.add("cost_for_one_run_of_inner_query", inner_query_cost)
+          .add("cost_for_writing_to_tmp_table", write_cost)
+          .add("count_of_runs", mat_times)
+          .add("total_cost", total_mat_cost)
+          .add("cost_per_read", derived_mat_cost);
+      break;
+    }
+  }
+  return derived_mat_cost;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: get_partial_join_cost
+void get_partial_join_cost(JOIN *join, uint n_tables, double *cost_arg,
+                           double *rowcount_arg) {
+  double rowcount = 1.0;
+  double cost = 0.0;
+  const Cost_model_server *const cost_model = join->cost_model();
+
+  for (uint i = join->const_tables; i < n_tables + join->const_tables; i++) {
+    POSITION *const pos = join->best_positions + i;
+
+    if (pos->rows_fetched > 0.0) {
+      rowcount *= pos->rows_fetched;
+      cost += pos->read_cost + cost_model->row_evaluate_cost(rowcount);
+      rowcount *= pos->filter_effect;
+    }
+  }
+  *cost_arg = cost;
+  *rowcount_arg = rowcount;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/join_optimizer/access_path.cc
+Function: CreateIteratorFromAccessPath not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/join_optimizer/access_path.cc
+Function: CreateIteratorFromAccessPath not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/iterators/hash_join_iterator.cc
+Function: HashJoinIterator::ReadNextHashJoinChunk
+bool HashJoinIterator::ReadNextHashJoinChunk() {
+  // See if we should proceed to the next pair of chunk files. In general,
+  // it works like this; if we are at the end of the build chunk, move to the
+  // next. If not, keep reading from the same chunk pair. We also move to the
+  // next pair of chunk files if the probe chunk file is empty.
+  bool move_to_next_chunk = false;
+  if (m_current_chunk == -1) {
+    // We are before the first chunk, so move to the next.
+    move_to_next_chunk = true;
+  } else if (m_build_chunk_current_row >=
+             m_chunk_files_on_disk[m_current_chunk].build_chunk.num_rows()) {
+    // We are done reading all the rows from the build chunk.
+    move_to_next_chunk = true;
+  } else if (m_chunk_files_on_disk[m_current_chunk].probe_chunk.num_rows() ==
+             0) {
+    // The probe chunk file is empty.
+    move_to_next_chunk = true;
+  }
+
+  if (move_to_next_chunk) {
+    m_current_chunk++;
+    m_build_chunk_current_row = 0;
+
+    // Since we are moving to a new set of chunk files, ensure that we read from
+    // the chunk file and not from the probe row saving file.
+    m_read_from_probe_row_saving = false;
+  }
+
+  if (m_current_chunk == static_cast<int>(m_chunk_files_on_disk.size())) {
+    // We have moved past the last chunk, so we are done.
+    m_state = State::END_OF_ROWS;
+    return false;
+  }
+
+  if (InitRowBuffer()) {
+    return true;
+  }
+
+  HashJoinChunk &build_chunk =
+      m_chunk_files_on_disk[m_current_chunk].build_chunk;
+
+  const bool reject_duplicate_keys = RejectDuplicateKeys();
+  for (; m_build_chunk_current_row < build_chunk.num_rows();
+       ++m_build_chunk_current_row) {
+    // Read the next row from the chunk file, and put it in the in-memory row
+    // buffer. If the buffer goes full, do the probe phase against the rows we
+    // managed to put in the buffer and continue reading where we left in the
+    // next iteration.
+    if (build_chunk.LoadRowFromChunk(&m_temporary_row_and_join_key_buffer,
+                                     /*matched=*/nullptr)) {
+      assert(thd()->is_error());  // my_error should have been called.
+      return true;
+    }
+
+    hash_join_buffer::StoreRowResult store_row_result =
+        m_row_buffer.StoreRow(thd(), reject_duplicate_keys);
+
+    if (store_row_result == hash_join_buffer::StoreRowResult::BUFFER_FULL) {
+      // The row buffer checks for OOM _after_ the row was inserted, so we
+      // should always manage to insert at least one row.
+      assert(!m_row_buffer.empty());
+
+      // Since the last row read was actually stored in the buffer, increment
+      // the row counter manually before breaking out of the loop.
+      ++m_build_chunk_current_row;
+      break;
+    } else if (store_row_result ==
+               hash_join_buffer::StoreRowResult::FATAL_ERROR) {
+      // An unrecoverable error. Most likely, malloc failed, so report OOM.
+      // Note that we cannot say for sure how much memory we tried to allocate
+      // when failing, so just report 'join_buffer_size' as the amount of
+      // memory we tried to allocate.
+      my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR),
+               thd()->variables.join_buff_size);
+      return true;
+    }
+
+    assert(store_row_result == hash_join_buffer::StoreRowResult::ROW_STORED);
+  }
+
+  // Prepare to do a lookup in the hash table for all rows from the probe
+  // chunk.
+  if (m_chunk_files_on_disk[m_current_chunk].probe_chunk.Rewind()) {
+    assert(thd()->is_error());  // my_error should have been called.
+    return true;
+  }
+  m_probe_chunk_current_row = 0;
+  SetReadingProbeRowState();
+
+  if (m_build_chunk_current_row < build_chunk.num_rows() &&
+      m_join_type != JoinType::INNER) {
+    // The build chunk did not fit into memory, causing us to refill the hash
+    // table once the probe input is consumed. If we don't take any special
+    // action, we can end up outputting the same probe row twice if the probe
+    // phase finds a match in both iterations through the hash table.
+    // By enabling probe row saving, unmatched probe rows are written to a probe
+    // row saving file. After the next hash table refill, we load the probe rows
+    // from the probe row saving file instead of from the build chunk, and thus
+    // ensuring that we only see unmatched probe rows. Note that we have not
+    // started reading probe rows yet, but we are about to do so.
+    InitWritingToProbeRowSavingFile();
+  } else {
+    m_write_to_probe_row_saving = false;
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/iterators/hash_join_iterator.cc
+Function: HashJoinIterator::BuildHashTable
+bool HashJoinIterator::BuildHashTable() {
+  if (!m_build_iterator_has_more_rows) {
+    m_state = State::END_OF_ROWS;
+    return false;
+  }
+
+  // Restore the last row that was inserted into the row buffer. This is
+  // necessary if the build input is a nested loop with a filter on the inner
+  // side, like this:
+  //
+  //        +---Hash join---+
+  //        |               |
+  //  Nested loop          t1
+  //  |         |
+  //  t3    Filter: (t3.i < t2.i)
+  //               |
+  //              t2
+  //
+  // If the hash join is not allowed to spill to disk, we may need to re-fill
+  // the hash table multiple times. If the nested loop happens to be in the
+  // state "reading inner rows" when a re-fill is triggered, the filter will
+  // look at the data in t3's record buffer in order to evaluate the filter. The
+  // row in t3's record buffer may be any of the rows that was stored in the
+  // hash table, and not the last row returned from t3. To ensure that the
+  // filter is looking at the correct data, restore the last row that was
+  // inserted into the hash table.
+  if (m_row_buffer.Initialized() && m_row_buffer.LastRowStored() != nullptr) {
+    LoadImmutableStringIntoTableBuffers(m_build_input_tables,
+                                        m_row_buffer.LastRowStored());
+  }
+
+  if (InitRowBuffer()) {
+    return true;
+  }
+
+  const bool reject_duplicate_keys = RejectDuplicateKeys();
+
+  // If Init() is called multiple times (e.g., if hash join is inside an
+  // dependent subquery), we must clear the NULL row flag, as it may have been
+  // set by the previous executing of this hash join.
+  m_build_input->SetNullRowFlag(/*is_null_row=*/false);
+
+  PFSBatchMode batch_mode(m_build_input.get());
+  for (;;) {  // Termination condition within loop.
+    int res = m_build_input->Read();
+    if (res == 1) {
+      assert(thd()->is_error() ||
+             thd()->killed);  // my_error should have been called.
+      return true;
+    }
+
+    if (res == -1) {
+      m_build_iterator_has_more_rows = false;
+      // If the build input was empty, the result of inner joins and semijoins
+      // will also be empty. However, if the build input was empty, the output
+      // of antijoins will be all the rows from the probe input.
+      if (m_row_buffer.empty() && m_join_type != JoinType::ANTI &&
+          m_join_type != JoinType::OUTER) {
+        m_state = State::END_OF_ROWS;
+        return false;
+      }
+
+      // As we managed to read to the end of the build iterator, this is the
+      // last time we will read from the probe iterator. Thus, we can disable
+      // probe row saving again (it was enabled if the hash table ran out of
+      // memory _and_ we were not allowed to spill to disk).
+      m_write_to_probe_row_saving = false;
+      SetReadingProbeRowState();
+      return false;
+    }
+    assert(res == 0);
+    RequestRowId(m_build_input_tables.tables(), m_tables_to_get_rowid_for);
+
+    const hash_join_buffer::StoreRowResult store_row_result =
+        m_row_buffer.StoreRow(thd(), reject_duplicate_keys);
+    switch (store_row_result) {
+      case hash_join_buffer::StoreRowResult::ROW_STORED:
+        break;
+      case hash_join_buffer::StoreRowResult::BUFFER_FULL: {
+        // The row buffer is full, so start spilling to disk (if allowed). Note
+        // that the row buffer checks for OOM _after_ the row was inserted, so
+        // we should always manage to insert at least one row.
+        assert(!m_row_buffer.empty());
+
+        // If we are not allowed to spill to disk, just go on to reading from
+        // the probe iterator.
+        if (!m_allow_spill_to_disk) {
+          if (m_join_type != JoinType::INNER) {
+            // Enable probe row saving, so that unmatched probe rows are written
+            // to the probe row saving file. After the next refill of the hash
+            // table, we will read rows from the probe row saving file, ensuring
+            // that we only read unmatched probe rows.
+            InitWritingToProbeRowSavingFile();
+          }
+          SetReadingProbeRowState();
+          return false;
+        }
+
+        if (InitializeChunkFiles(
+                m_estimated_build_rows, m_row_buffer.size(), kMaxChunks,
+                m_probe_input_tables, m_build_input_tables,
+                /*include_match_flag_for_probe=*/m_join_type == JoinType::OUTER,
+                &m_chunk_files_on_disk)) {
+          assert(thd()->is_error());  // my_error should have been called.
+          return true;
+        }
+
+        // Write out the remaining rows from the build input out to chunk files.
+        // The probe input will be written out to chunk files later; we will do
+        // it _after_ we have checked the probe input for matches against the
+        // rows that are already written to the hash table. An alternative
+        // approach would be to write out the remaining rows from the build
+        // _and_ the rows that already are in the hash table. In that case, we
+        // could also write out the entire probe input to disk here as well. But
+        // we don't want to waste the rows that we already have stored in
+        // memory.
+        //
+        // We never write out rows with NULL in condition for the build/right
+        // input, as these rows will never match in a join condition.
+        if (WriteRowsToChunks(thd(), m_build_input.get(), m_build_input_tables,
+                              m_join_conditions, kChunkPartitioningHashSeed,
+                              &m_chunk_files_on_disk,
+                              true /* write_to_build_chunks */,
+                              false /* write_rows_with_null_in_join_key */,
+                              m_tables_to_get_rowid_for,
+                              &m_temporary_row_and_join_key_buffer)) {
+          assert(thd()->is_error() ||
+                 thd()->killed);  // my_error should have been called.
+          return true;
+        }
+
+        // Flush and position all chunk files from the build input at the
+        // beginning.
+        for (ChunkPair &chunk_pair : m_chunk_files_on_disk) {
+          if (chunk_pair.build_chunk.Rewind()) {
+            assert(thd()->is_error() ||
+                   thd()->killed);  // my_error should have been called.
+            return true;
+          }
+        }
+        SetReadingProbeRowState();
+        return false;
+      }
+      case hash_join_buffer::StoreRowResult::FATAL_ERROR:
+        // An unrecoverable error. Most likely, malloc failed, so report OOM.
+        // Note that we cannot say for sure how much memory we tried to allocate
+        // when failing, so just report 'join_buffer_size' as the amount of
+        // memory we tried to allocate.
+        my_error(ER_OUTOFMEMORY, MYF(ME_FATALERROR),
+                 thd()->variables.join_buff_size);
+        return true;
+    }
+  }
+}
+
+

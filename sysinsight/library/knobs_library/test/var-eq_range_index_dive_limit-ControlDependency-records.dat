@@ -1,0 +1,14 @@
+Global Variable: System_variables.23
+Explicit Data Flow (2):
+  Instruction: %25 = load i32, i32* %eq_range_index_dive_limit, align 8, !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:604:42 | Function: check_quick_select
+  Instruction: %call = invoke zeroext i1 @_ZL23eq_ranges_exceeds_limitPK8SEL_ROOTPjj(%class.SEL_ROOT* %23, i32* %range_count14, i32 %25)
+          to label %invoke.cont unwind label %lpad, !dbg !1255388 | Location: /root/LLVM/mysql-8.0.36/sql/range_optimizer/index_range_scan_plan.cc:603:33 | Function: check_quick_select
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,307 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_monthname::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_dayname::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_date_format::resolve_type
+bool Item_func_at_time_zone::resolve_type(THD *thd) {
+  if (check_type()) return true;
+
+  if (strcmp(specifier_string(), "+00:00") != 0 &&
+      (m_is_interval || strcmp(specifier_string(), "UTC") != 0)) {
+    my_error(ER_UNKNOWN_TIME_ZONE, MYF(0), specifier_string());
+    return true;
+  }
+
+  return set_time_zone(thd);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: make_date_time
+bool make_date_time(Date_time_format *format, MYSQL_TIME *l_time,
+                    enum_mysql_timestamp_type type, String *str) {
+  char intbuff[15];
+  uint hours_i;
+  uint weekday;
+  ulong length;
+  const char *ptr, *end;
+  THD *thd = current_thd;
+  MY_LOCALE *locale = thd->variables.lc_time_names;
+
+  str->length(0);
+
+  if (l_time->neg) str->append('-');
+
+  end = (ptr = format->format.str) + format->format.length;
+  for (; ptr != end; ptr++) {
+    if (*ptr != '%' || ptr + 1 == end)
+      str->append(*ptr);
+    else {
+      switch (*++ptr) {
+        case 'M':
+          if (!l_time->month) return true;
+          str->append(
+              locale->month_names->type_names[l_time->month - 1],
+              strlen(locale->month_names->type_names[l_time->month - 1]),
+              system_charset_info);
+          break;
+        case 'b':
+          if (!l_time->month) return true;
+          str->append(
+              locale->ab_month_names->type_names[l_time->month - 1],
+              strlen(locale->ab_month_names->type_names[l_time->month - 1]),
+              system_charset_info);
+          break;
+        case 'W':
+          if (type == MYSQL_TIMESTAMP_TIME || !(l_time->month || l_time->year))
+            return true;
+          weekday = calc_weekday(
+              calc_daynr(l_time->year, l_time->month, l_time->day), false);
+          str->append(locale->day_names->type_names[weekday],
+                      strlen(locale->day_names->type_names[weekday]),
+                      system_charset_info);
+          break;
+        case 'a':
+          if (type == MYSQL_TIMESTAMP_TIME || !(l_time->month || l_time->year))
+            return true;
+          weekday = calc_weekday(
+              calc_daynr(l_time->year, l_time->month, l_time->day), false);
+          str->append(locale->ab_day_names->type_names[weekday],
+                      strlen(locale->ab_day_names->type_names[weekday]),
+                      system_charset_info);
+          break;
+        case 'D':
+          if (type == MYSQL_TIMESTAMP_TIME) return true;
+          length = longlong10_to_str(l_time->day, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 1, '0');
+          if (l_time->day >= 10 && l_time->day <= 19)
+            str->append(STRING_WITH_LEN("th"));
+          else {
+            switch (l_time->day % 10) {
+              case 1:
+                str->append(STRING_WITH_LEN("st"));
+                break;
+              case 2:
+                str->append(STRING_WITH_LEN("nd"));
+                break;
+              case 3:
+                str->append(STRING_WITH_LEN("rd"));
+                break;
+              default:
+                str->append(STRING_WITH_LEN("th"));
+                break;
+            }
+          }
+          break;
+        case 'Y':
+          length = longlong10_to_str(l_time->year, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 4, '0');
+          break;
+        case 'y':
+          length = longlong10_to_str(l_time->year % 100, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'm':
+          length = longlong10_to_str(l_time->month, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'c':
+          length = longlong10_to_str(l_time->month, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 1, '0');
+          break;
+        case 'd':
+          length = longlong10_to_str(l_time->day, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'e':
+          length = longlong10_to_str(l_time->day, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 1, '0');
+          break;
+        case 'f':
+          length =
+              longlong10_to_str(l_time->second_part, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 6, '0');
+          break;
+        case 'H':
+          length = longlong10_to_str(l_time->hour, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'h':
+        case 'I':
+          hours_i = (l_time->hour % 24 + 11) % 12 + 1;
+          length = longlong10_to_str(hours_i, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'i': /* minutes */
+          length = longlong10_to_str(l_time->minute, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'j': {
+          if (type == MYSQL_TIMESTAMP_TIME) return true;
+
+          int radix = 10;
+          int diff = calc_daynr(l_time->year, l_time->month, l_time->day) -
+                     calc_daynr(l_time->year, 1, 1) + 1;
+          if (diff < 0) radix = -10;
+
+          length = longlong10_to_str(diff, intbuff, radix) - intbuff;
+          str->append_with_prefill(intbuff, length, 3, '0');
+        } break;
+        case 'k':
+          length = longlong10_to_str(l_time->hour, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 1, '0');
+          break;
+        case 'l':
+          hours_i = (l_time->hour % 24 + 11) % 12 + 1;
+          length = longlong10_to_str(hours_i, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 1, '0');
+          break;
+        case 'p':
+          hours_i = l_time->hour % 24;
+          str->append(hours_i < 12 ? "AM" : "PM", 2);
+          break;
+        case 'r':
+          length = sprintf(intbuff,
+                           ((l_time->hour % 24) < 12) ? "%02d:%02d:%02d AM"
+                                                      : "%02d:%02d:%02d PM",
+                           (l_time->hour + 11) % 12 + 1, l_time->minute,
+                           l_time->second);
+          str->append(intbuff, length);
+          break;
+        case 'S':
+        case 's':
+          length = longlong10_to_str(l_time->second, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+          break;
+        case 'T':
+          length = sprintf(intbuff, "%02d:%02d:%02d", l_time->hour,
+                           l_time->minute, l_time->second);
+          str->append(intbuff, length);
+          break;
+        case 'U':
+        case 'u': {
+          uint year;
+          if (type == MYSQL_TIMESTAMP_TIME) return true;
+          length =
+              longlong10_to_str(calc_week(*l_time,
+                                          (*ptr) == 'U' ? WEEK_FIRST_WEEKDAY
+                                                        : WEEK_MONDAY_FIRST,
+                                          &year),
+                                intbuff, 10) -
+              intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+        } break;
+        case 'v':
+        case 'V': {
+          uint year;
+          if (type == MYSQL_TIMESTAMP_TIME) return true;
+          length =
+              longlong10_to_str(
+                  calc_week(*l_time,
+                            ((*ptr) == 'V' ? (WEEK_YEAR | WEEK_FIRST_WEEKDAY)
+                                           : (WEEK_YEAR | WEEK_MONDAY_FIRST)),
+                            &year),
+                  intbuff, 10) -
+              intbuff;
+          str->append_with_prefill(intbuff, length, 2, '0');
+        } break;
+        case 'x':
+        case 'X': {
+          uint year;
+          if (type == MYSQL_TIMESTAMP_TIME) return true;
+          (void)calc_week(*l_time,
+                          ((*ptr) == 'X' ? WEEK_YEAR | WEEK_FIRST_WEEKDAY
+                                         : WEEK_YEAR | WEEK_MONDAY_FIRST),
+                          &year);
+          length = longlong10_to_str(year, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 4, '0');
+        } break;
+        case 'w':
+          if (type == MYSQL_TIMESTAMP_TIME || !(l_time->month || l_time->year))
+            return true;
+          weekday = calc_weekday(
+              calc_daynr(l_time->year, l_time->month, l_time->day), true);
+          length = longlong10_to_str(weekday, intbuff, 10) - intbuff;
+          str->append_with_prefill(intbuff, length, 1, '0');
+          break;
+
+        default:
+          str->append(*ptr);
+          break;
+      }
+    }
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Execute_load_query_log_event::Execute_load_query_log_event not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+

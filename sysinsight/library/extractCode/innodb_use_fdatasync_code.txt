@@ -1,0 +1,67 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/os/os0file.cc
+Function: os_file_fsync_posix
+static int os_file_fsync_posix(os_file_t file) {
+  ulint failures = 0;
+#ifdef UNIV_HOTBACKUP
+  static meb::Mutex meb_mutex;
+#endif /* UNIV_HOTBACKUP */
+
+  for (;;) {
+#ifdef UNIV_HOTBACKUP
+    meb_mutex.lock();
+#endif /* UNIV_HOTBACKUP */
+    ++os_n_fsyncs;
+#ifdef UNIV_HOTBACKUP
+    meb_mutex.unlock();
+#endif /* UNIV_HOTBACKUP */
+
+#if defined(HAVE_FDATASYNC) && defined(HAVE_DECL_FDATASYNC)
+    const auto ret = srv_use_fdatasync ? fdatasync(file) : fsync(file);
+#else
+    const auto ret = fsync(file);
+#endif
+
+    if (ret == 0) {
+      return (ret);
+    }
+
+    switch (errno) {
+      case ENOLCK:
+
+        ++failures;
+        ut_a(failures < 1000);
+
+        if (!(failures % 100)) {
+          ib::warn(ER_IB_MSG_773) << "fsync(): "
+                                  << "No locks available; retrying";
+        }
+
+        /* 0.2 sec */
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        break;
+
+      case EIO:
+
+        ib::fatal(UT_LOCATION_HERE, ER_IB_MSG_1358)
+            << "fsync() returned EIO, aborting.";
+        break;
+
+      case EINTR:
+
+        ++failures;
+        ut_a(failures < 2000);
+        break;
+
+      default:
+        ut_error;
+        break;
+    }
+  }
+
+  ut_error;
+
+  return (-1);
+}
+
+

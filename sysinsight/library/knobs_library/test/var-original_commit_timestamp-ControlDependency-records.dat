@@ -1,0 +1,75 @@
+Global Variable: System_variables.112
+Explicit Data Flow (20):
+  Instruction: %2 = load i64, i64* %original_commit_timestamp, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2598:54 | Function: THD::set_original_commit_timestamp_for_slave_thread
+  Instruction: store i64 %2, i64* %original_commit_timestamp4, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2598:42 | Function: THD::set_original_commit_timestamp_for_slave_thread
+  Instruction: %original_commit_timestamp4 = getelementptr inbounds %class.Relay_log_info, %class.Relay_log_info* %3, i32 0, i32 78, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2598:16 | Function: THD::set_original_commit_timestamp_for_slave_thread
+  Instruction: %9 = load i64, i64* %original_commit_timestamp9, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1659:22 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: store i64 %9, i64* %original_commit_timestamp, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1658:13 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %10 = load i64, i64* %original_commit_timestamp, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1666:7 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %cmp10 = icmp eq i64 %10, 36028797018963968, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1666:33 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: br i1 %cmp10, label %if.then, label %if.else19, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1666:7 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: store i64 0, i64* %original_commit_timestamp, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1673:33 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %34 = load i64, i64* %original_commit_timestamp, align 8, !dbg !1255411 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1729:41 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: invoke void @_ZN14Gtid_log_eventC1EP3THDbllbyyjj(%class.Gtid_log_event* %gtid_event, %class.THD* %29, i1 zeroext %call58, i64 %31, i64 %32, i1 zeroext %call60, i64 %34, i64 %35, i32 %36, i32 %37)
+          to label %invoke.cont61 unwind label %lpad, !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1727:18 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: store i64 36028797018963968, i64* %original_commit_timestamp21, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1684:46 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %original_commit_timestamp21 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables20, i32 0, i32 112, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:1684:20 | Function: MYSQL_BIN_LOG::write_transaction
+  Instruction: %original_commit_timestamp = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables17, i32 0, i32 112, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:570:53 | Function: Trans_delegate::before_commit
+  Instruction: store i64* %original_commit_timestamp, i64** %original_commit_timestamp18, align 8, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:570:35 | Function: Trans_delegate::before_commit
+  Instruction: %original_commit_timestamp18 = getelementptr inbounds %struct.Trans_param, %struct.Trans_param* %param, i32 0, i32 14, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:570:9 | Function: Trans_delegate::before_commit
+  Instruction: store i64 %51, i64* %original_commit_timestamp69, align 8, !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13363:44 | Function: Gtid_log_event::do_apply_event
+  Instruction: %original_commit_timestamp69 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables68, i32 0, i32 112, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:13363:18 | Function: Gtid_log_event::do_apply_event
+  Instruction: store i64 36028797018963968, i64* %original_commit_timestamp, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1299:46 | Function: Relay_log_info::cleanup_context
+  Instruction: %original_commit_timestamp = getelementptr inbounds %struct.System_variables.163345, %struct.System_variables.163345* %variables, i32 0, i32 112, !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_rli.cc:1299:20 | Function: Relay_log_info::cleanup_context
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: THD::is_binlog_applier
+  Controlled Function: do_server_version_int
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: _db_keyword_
+  Controlled Function: _db_keyword_
+  Controlled Function: _db_keyword_
+  Controlled Function: THD::is_binlog_applier
+  Controlled Function: binlog_cache_data::is_trx_cache
+  Controlled Function: binlog_cache_data::may_have_sbr_stmts
+  Controlled Function: binlog_cache_data::get_byte_position
+  Controlled Function: Binlog_event_writer::is_checksum_enabled
+  Controlled Function: Gtid_log_event::~Gtid_log_event
+  Controlled Function: binlog_cache_data::get_event_counter
+  Controlled Function: Gtid_log_event::set_trx_length_by_cache_size
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::get_byte_position
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: binlog_cache_data::get_event_counter
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Binlog_event_writer::is_checksum_enabled
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: Gtid_log_event::get_event_length
+  Controlled Function: _db_doprnt_
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: Log_event::write
+  Controlled Function: MYSQL_BIN_LOG::write_cache
+  Controlled Function: Gtid_log_event::~Gtid_log_event
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: binlog::Context::monitoring_context
+  Controlled Function: binlog::monitoring::Context::transaction_compression
+  Controlled Function: binlog_cache_data::get_compression_type
+  Controlled Function: binlog_cache_data::get_compressed_size
+  Controlled Function: binlog_cache_data::get_decompressed_size
+  Controlled Function: binlog::monitoring::Transaction_compression::update
+
+Implicit Control Flow:
+
+----------------------------------------

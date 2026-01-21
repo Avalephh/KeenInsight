@@ -1,0 +1,19 @@
+Global Variable: System_variables.34
+Explicit Data Flow (8):
+  Instruction: %23 = load i64, i64* %min_examined_row_limit, align 8, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1614:56 | Function: log_slow_applicable
+  Instruction: %cmp31 = icmp uge i64 %call30, %23, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1614:38 | Function: log_slow_applicable
+  Instruction: %24 = phi i1 [ false, %lor.lhs.false ], [ %cmp31, %invoke.cont29 ], !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:0:0 | Function: log_slow_applicable
+  Instruction: %frombool33 = zext i1 %24 to i8, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1612:8 | Function: log_slow_applicable
+  Instruction: store i8 %frombool33, i8* %log_this_query, align 1, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1612:8 | Function: log_slow_applicable
+  Instruction: %25 = load i8, i8* %log_this_query, align 1, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1617:7 | Function: log_slow_applicable
+  Instruction: %tobool34 = trunc i8 %25 to i1, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1617:7 | Function: log_slow_applicable
+  Instruction: br i1 %tobool34, label %if.then35, label %if.end36, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/log.cc:1617:7 | Function: log_slow_applicable
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

@@ -1,0 +1,405 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_init_params
+static int innodb_init_params() {
+  DBUG_TRACE;
+
+  static char current_dir[3];
+  char *default_path;
+
+  /* First calculate the default path for innodb_data_home_dir etc.,
+  in case the user has not given any value. */
+
+  /* It's better to use current lib, to keep paths short */
+  current_dir[0] = FN_CURLIB;
+  current_dir[1] = FN_LIBCHAR;
+  current_dir[2] = 0;
+  default_path = current_dir;
+
+  std::string mysqld_datadir{default_path};
+
+  MySQL_datadir_path = Fil_path{mysqld_datadir};
+
+  /* Validate, normalize and interpret the InnoDB start-up parameters. */
+
+  /* The default dir for data files is the datadir of MySQL */
+
+  srv_data_home =
+      (innobase_data_home_dir == nullptr || *innobase_data_home_dir == '\0')
+          ? default_path
+          : innobase_data_home_dir;
+  Fil_path::normalize(srv_data_home);
+
+  /* Validate the undo directory. */
+  if (srv_undo_dir == nullptr || srv_undo_dir[0] == 0) {
+    srv_undo_dir = default_path;
+  } else {
+    Fil_path::normalize(srv_undo_dir);
+  }
+
+  MySQL_undo_path = Fil_path{srv_undo_dir};
+
+  if (MySQL_undo_path.is_ancestor(default_path)) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_INNODB_UNDO_DIRECTORY_LOCATION);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  /* Validate the temp directory */
+  if (ibt::srv_temp_dir == nullptr) {
+    ibt::srv_temp_dir = default_path;
+  } else {
+    os_file_type_t type;
+    bool exists;
+    os_file_status(ibt::srv_temp_dir, &exists, &type);
+    if (!exists || type != OS_FILE_TYPE_DIR) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_DOESNT_EXIST)
+          << "Invalid innodb_temp_tablespaces_dir: " << ibt::srv_temp_dir
+          << ". Directory doesn't exist or not valid";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    Fil_path temp_dir(ibt::srv_temp_dir);
+    if (temp_dir.path().empty()) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_EMPTY)
+          << "Invalid innodb_temp_tablespaces dir: " << ibt::srv_temp_dir
+          << ". Path cannot be empty";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    if (strchr(ibt::srv_temp_dir, ';')) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_CONTAINS_SEMICOLON)
+          << "Invalid innodb_temp_tablespaces dir: " << ibt::srv_temp_dir
+          << ". Path cannot contain ;";
+      return HA_ERR_INITIALIZATION;
+    }
+
+    if (MySQL_datadir_path.is_ancestor(
+            Fil_path::get_real_path(temp_dir.path()))) {
+      ib::error(ER_IB_ERR_TEMP_TABLESPACE_DIR_SUBDIR_OF_DATADIR)
+          << "Invalid innodb_temp_tablespaces_dir=" << ibt::srv_temp_dir
+          << ". This path should not be a subdirectory of the datadir.";
+      return HA_ERR_INITIALIZATION;
+    }
+  }
+
+  Fil_path::normalize(ibt::srv_temp_dir);
+
+  /* The default dir for log files is the datadir of MySQL */
+
+  if (srv_log_group_home_dir == nullptr) {
+    srv_log_group_home_dir = default_path;
+  }
+  Fil_path::normalize(srv_log_group_home_dir);
+
+  if (strchr(srv_log_group_home_dir, ';')) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_LOG_GROUP_HOME_DIR);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  if (strchr(srv_undo_dir, ';')) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_INNODB_UNDO_DIRECTORY);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  if (!is_filename_allowed(srv_buf_dump_filename, strlen(srv_buf_dump_filename),
+                           false)) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_ILLEGAL_COLON_IN_POOL);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  /* Check that the value of system variable innodb_page_size was
+  set correctly.  Its value was put into srv_page_size. If valid,
+  return the associated srv_page_size_shift. */
+  srv_page_size_shift = page_size_validate(srv_page_size);
+  if (!srv_page_size_shift) {
+    log_errlog(ERROR_LEVEL, ER_INNODB_INVALID_PAGE_SIZE, srv_page_size);
+    return HA_ERR_INITIALIZATION;
+  }
+
+  ut_a(srv_log_buffer_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(srv_log_buffer_size > 0);
+
+  ut_a(srv_log_write_ahead_size % OS_FILE_LOG_BLOCK_SIZE == 0);
+  ut_a(srv_log_write_ahead_size > 0);
+
+  assert(innodb_change_buffering <= IBUF_USE_ALL);
+
+  /* Check that interdependent parameters have sane values. */
+  if (srv_max_buf_pool_modified_pct < srv_max_dirty_pages_pct_lwm) {
+    log_errlog(WARNING_LEVEL, ER_INNODB_DIRTY_WATER_MARK_NOT_LOW,
+               srv_max_buf_pool_modified_pct);
+    srv_max_dirty_pages_pct_lwm = srv_max_buf_pool_modified_pct;
+  }
+
+  if (srv_max_io_capacity == SRV_MAX_IO_CAPACITY_DUMMY_DEFAULT) {
+    if (srv_io_capacity >= SRV_MAX_IO_CAPACITY_LIMIT / 2) {
+      /* Avoid overflow. */
+      srv_max_io_capacity = SRV_MAX_IO_CAPACITY_LIMIT;
+    } else {
+      /* The user has not set the value. We should
+      set it based on innodb_io_capacity. */
+      srv_max_io_capacity = std::max(2 * srv_io_capacity, 2000UL);
+    }
+
+  } else if (srv_max_io_capacity < srv_io_capacity) {
+    log_errlog(WARNING_LEVEL, ER_INNODB_IO_CAPACITY_EXCEEDS_MAX,
+               srv_max_io_capacity);
+    srv_io_capacity = srv_max_io_capacity;
+  }
+
+  if (UNIV_PAGE_SIZE_DEF != srv_page_size) {
+    ib::warn(ER_IB_MSG_538)
+        << "innodb-page-size has been changed from the"
+           " default value "
+        << UNIV_PAGE_SIZE_DEF << " to " << srv_page_size << ".";
+  }
+
+  if (srv_log_write_ahead_size > srv_page_size) {
+    srv_log_write_ahead_size = srv_page_size;
+  } else {
+    ulong srv_log_write_ahead_size_tmp = OS_FILE_LOG_BLOCK_SIZE;
+
+    while (srv_log_write_ahead_size_tmp < srv_log_write_ahead_size) {
+      srv_log_write_ahead_size_tmp = srv_log_write_ahead_size_tmp * 2;
+    }
+    if (srv_log_write_ahead_size_tmp != srv_log_write_ahead_size) {
+      srv_log_write_ahead_size = srv_log_write_ahead_size_tmp / 2;
+    }
+  }
+
+  srv_buf_pool_size = srv_buf_pool_curr_size;
+
+  innodb_log_checksums_func_update(srv_log_checksums);
+
+#ifdef HAVE_LINUX_LARGE_PAGES
+  if ((os_use_large_pages = opt_large_pages)) {
+    os_large_page_size = opt_large_page_size;
+  }
+#endif /* HAVE_LINUX_LARGE_PAGES */
+
+  row_rollback_on_timeout = innobase_rollback_on_timeout;
+
+  if (innobase_open_files < 10) {
+    innobase_open_files = 300;
+    if (srv_file_per_table && table_cache_size > 300) {
+      innobase_open_files = table_cache_size;
+    }
+  }
+
+  if (innobase_open_files > (long)open_files_limit) {
+    ib::warn(ER_IB_MSG_539) << "innodb_open_files should not be greater"
+                               " than the open_files_limit.\n";
+    if (innobase_open_files > (long)table_cache_size) {
+      innobase_open_files = table_cache_size;
+    }
+  }
+
+  srv_innodb_status = innobase_create_status_file;
+
+  /* Round up ddl:fts_parser_threads to nearest power of 2 number */
+  {
+    ulong n_parser_threads = 1;
+
+    while (n_parser_threads < ddl::fts_parser_threads) {
+      n_parser_threads <<= 1;
+    }
+
+    ddl::fts_parser_threads = n_parser_threads;
+  }
+
+  /* Store the default charset-collation number of this MySQL
+  installation */
+
+  data_mysql_default_charset_coll = (ulint)default_charset_info->number;
+
+  innobase_commit_concurrency_init_default();
+
+  if (srv_force_recovery == SRV_FORCE_NO_LOG_REDO) {
+    srv_read_only_mode = true;
+  }
+
+  high_level_read_only =
+      srv_read_only_mode || srv_force_recovery > SRV_FORCE_NO_TRX_UNDO;
+
+  if (srv_read_only_mode) {
+    ib::info(ER_IB_MSG_540) << "Started in read only mode";
+
+    /* There is no write except to intrinsic table and so turn-off
+    doublewrite mechanism completely. */
+    dblwr::g_mode = dblwr::Mode::OFF;
+  }
+
+#ifdef LINUX_NATIVE_AIO
+  if (srv_use_native_aio) {
+    ib::info(ER_IB_MSG_541) << "Using Linux native AIO";
+  }
+#elif !defined _WIN32
+  /* Currently native AIO is supported only on Windows and Linux
+  and that also when the support is compiled in. In all other
+  cases, we ignore the setting of innodb_use_native_aio. */
+  srv_use_native_aio = false;
+#endif
+
+#ifndef _WIN32
+  /* Check if innodb_dedicated_server == ON and O_DIRECT is supported */
+  if (srv_dedicated_server && sysvar_source_svc != nullptr &&
+      os_is_o_direct_supported()) {
+    static const char *variable_name = "innodb_flush_method";
+    enum enum_variable_source source;
+
+    if (!sysvar_source_svc->get(variable_name, strlen(variable_name),
+                                &source)) {
+      /* If innodb_flush_method is not specified explicitly */
+      if (source == COMPILED) {
+        innodb_flush_method = static_cast<ulong>(SRV_UNIX_O_DIRECT_NO_FSYNC);
+      } else {
+        ib::warn(ER_IB_MSG_542)
+            << "Option innodb_dedicated_server"
+               " is ignored for innodb_flush_method"
+               "because innodb_flush_method="
+            << innodb_flush_method_names[innodb_flush_method]
+            << " is specified explicitly.";
+      }
+    }
+  }
+
+  srv_unix_file_flush_method =
+      static_cast<srv_unix_flush_t>(innodb_flush_method);
+  ut_ad(innodb_flush_method <= SRV_UNIX_O_DIRECT_NO_FSYNC);
+#else
+  srv_win_file_flush_method = static_cast<srv_win_flush_t>(innodb_flush_method);
+  ut_ad(innodb_flush_method <= SRV_WIN_IO_NORMAL);
+  if (srv_use_native_aio) {
+    ib::info(ER_IB_MSG_541) << "Using Windows native AIO";
+  }
+#endif /* !_WIN32 */
+
+  /* Set the maximum number of threads which can wait for a semaphore
+  inside InnoDB: this is the 'sync wait array' size, as well as the
+  maximum number of threads that can wait in the 'srv_conc array' for
+  their time to enter InnoDB. */
+
+  srv_max_n_threads = 100 * 1024;
+
+  /* This is the first time univ_page_size is used.
+  It was initialized to 16k pages before srv_page_size was set */
+  univ_page_size.copy_from(page_size_t(srv_page_size, srv_page_size, false));
+
+  srv_sys_space.set_space_id(TRX_SYS_SPACE);
+
+  /* Create the filespace flags. */
+  predefined_flags = fsp_flags_init(univ_page_size, false, false, true, false);
+  fsp_flags_set_sdi(predefined_flags);
+
+  srv_sys_space.set_flags(predefined_flags);
+
+  srv_sys_space.set_name(dict_sys_t::s_sys_space_name);
+  srv_sys_space.set_path(srv_data_home);
+
+  /* We set the temporary tablspace id later, after recovery.
+  The temp tablespace doesn't support raw devices.
+  Set the name and path. */
+  srv_tmp_space.set_name(dict_sys_t::s_temp_space_name);
+  srv_tmp_space.set_path(srv_data_home);
+
+  /* Create the filespace flags with the temp flag set. */
+  uint32_t fsp_flags =
+      fsp_flags_init(univ_page_size, false, false, false, true);
+  srv_tmp_space.set_flags(fsp_flags);
+
+  /* Set buffer pool size to default for fast startup when mysqld is
+  run with --help --verbose options. */
+  ulint srv_buf_pool_size_org = 0;
+  if (opt_help && opt_verbose && opt_validate_config &&
+      srv_buf_pool_size > srv_buf_pool_def_size) {
+    ib::warn(ER_IB_MSG_543) << "Setting innodb_buf_pool_size to "
+                            << srv_buf_pool_def_size << " for fast startup, "
+                            << "when running with --help --verbose options.";
+    srv_buf_pool_size_org = srv_buf_pool_size;
+    srv_buf_pool_size = srv_buf_pool_def_size;
+  }
+
+  innodb_buffer_pool_size_init();
+
+  innodb_undo_tablespaces_deprecate();
+
+  innodb_redo_log_capacity_init();
+
+  /* Set the original value back to show in help. */
+  if (srv_buf_pool_size_org != 0) {
+    srv_buf_pool_size_org = buf_pool_size_align(srv_buf_pool_size_org);
+    srv_buf_pool_curr_size = srv_buf_pool_size_org;
+  }
+
+  if (srv_n_page_cleaners > srv_buf_pool_instances) {
+    /* limit of page_cleaner parallelizability
+    is number of buffer pool instances. */
+    srv_n_page_cleaners = srv_buf_pool_instances;
+  }
+
+  srv_lock_table_size = 5 * (srv_buf_pool_size / UNIV_PAGE_SIZE);
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_max_dirty_pages_pct_update
+static void innodb_max_dirty_pages_pct_update(
+    THD *thd,         /*!< in: thread handle */
+    SYS_VAR *,        /*!< in: pointer to
+                                      system variable */
+    void *,           /*!< out: where the
+                      formal string goes */
+    const void *save) /*!< in: immediate result
+                      from check function */
+{
+  double in_val = *static_cast<const double *>(save);
+  if (in_val < srv_max_dirty_pages_pct_lwm) {
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "innodb_max_dirty_pages_pct cannot be"
+                        " set lower than"
+                        " innodb_max_dirty_pages_pct_lwm.");
+    push_warning_printf(thd, Sql_condition::SL_WARNING, ER_WRONG_ARGUMENTS,
+                        "Lowering"
+                        " innodb_max_dirty_page_pct_lwm to %lf",
+                        in_val);
+
+    srv_max_dirty_pages_pct_lwm = in_val;
+  }
+
+  srv_max_buf_pool_modified_pct = in_val;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/buf/buf0flu.cc
+Function: Adaptive_flush::get_pct_for_dirty
+ulint get_pct_for_dirty() {
+  double dirty_pct = buf_get_modified_ratio_pct();
+
+  if (dirty_pct == 0.0) {
+    /* No pages modified */
+    return (0);
+  }
+
+  ut_a(srv_max_dirty_pages_pct_lwm <= srv_max_buf_pool_modified_pct);
+
+  if (srv_max_dirty_pages_pct_lwm == 0) {
+    /* The user has not set the option to preflush dirty
+    pages as we approach the high water mark. */
+    if (dirty_pct >= srv_max_buf_pool_modified_pct) {
+      /* We have crossed the high water mark of dirty
+      pages In this case we start flushing at 100% of
+      innodb_io_capacity. */
+      return (100);
+    }
+  } else if (dirty_pct >= srv_max_dirty_pages_pct_lwm) {
+    /* We should start flushing pages gradually. */
+    return (static_cast<ulint>((dirty_pct * 100) /
+                               (srv_max_buf_pool_modified_pct + 1)));
+  }
+
+  return (0);
+}
+

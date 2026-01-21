@@ -1,0 +1,45 @@
+[
+    {
+        "knob_name": "sql_mode",
+        "data_matched_functions": [
+            "Field_string::val_str",
+            "handler::update_auto_increment",
+            "Field_longstr::report_if_important_data",
+            "Query_block::apply_local_transforms",
+            "MYSQLparse",
+            "Lex_input_stream::reset",
+            "Query_log_event::Query_log_event",
+            "store_key::copy",
+            "Item::save_in_field_no_warnings",
+            "Item_sum::check_sum_func"
+        ],
+        "data_matched_count": 10,
+        "control_matched_functions": [
+            "THD::binlog_flush_pending_rows_event",
+            "String::append",
+            "thd_wait_end",
+            "handler::ha_release_auto_increment",
+            "THD::pop_internal_handler",
+            "thd_wait_begin",
+            "dirname_length",
+            "handler::ha_extra",
+            "handler::ha_end_bulk_insert",
+            "handler::adjust_next_insert_id_after_explicit_value",
+            "THD::push_internal_handler",
+            "handler::ha_start_bulk_insert",
+            "Lex_input_stream::body_utf8_append",
+            "Session_tracker::get_tracker",
+            "THD::enter_stage",
+            "Field::null_offset",
+            "my_ok",
+            "fn_format",
+            "Protocol_classic::get_net",
+            "ER_THD",
+            "Query_block::push_conditions_to_derived_tables",
+            "Lex_input_stream::body_utf8_append_literal",
+            "Lex_input_stream::add_digest_token"
+        ],
+        "control_matched_count": 23,
+        "matched_count": 33
+    }
+]

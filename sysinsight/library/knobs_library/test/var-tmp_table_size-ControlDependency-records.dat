@@ -1,0 +1,38 @@
+Global Variable: System_variables.6
+Explicit Data Flow (23):
+  Instruction: %1 = load i64, i64* %tmp_table_size, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:310:22 | Function: thd_get_tmp_table_size
+  Instruction: %cmp = icmp ult i64 %1, %call, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:310:37 | Function: thd_get_tmp_table_size
+  Instruction: br i1 %cmp, label %if.then, label %if.else, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:310:7 | Function: thd_get_tmp_table_size
+  Instruction: %3 = load i64, i64* %tmp_table_size2, align 8, !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:311:27 | Function: thd_get_tmp_table_size
+  Instruction: store i64 %3, i64* %retval, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:311:5 | Function: thd_get_tmp_table_size
+  Instruction: %4 = load i64, i64* %retval, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:315:1 | Function: thd_get_tmp_table_size
+  Instruction: ret i64 %4, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_thd_internal_api.cc:315:1 | Function: thd_get_tmp_table_size
+  Instruction: %call51 = invoke i64 @_Z22thd_get_tmp_table_sizePK3THD(%class.THD* %call49)
+          to label %invoke.cont50 unwind label %lpad22, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:143:30 | Function: temptable::Handler::create
+  Instruction: store i64 %call51, i64* %per_table_limit, align 8, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:143:12 | Function: temptable::Handler::create
+  Instruction: call void @_ZSt16forward_as_tupleIJRP5TABLERPN9temptable5BlockERbRmEESt5tupleIJDpOT_EESC_(%"class.std::tuple.72.340775"* sret %ref.tmp59, %struct.TABLE** dereferenceable(8) %mysql_table.addr, %"struct.std::_Tuple_impl.983"** dereferenceable(8) %m_shared_block, i8* dereferenceable(1) %all_columns_are_fixed_size, i64* dereferenceable(8) %per_table_limit) #11, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/storage/temptable/src/handler.cc:147:9 | Function: temptable::Handler::create
+  Instruction: %33 = load i64, i64* %tmp_table_size, align 8, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2205:22 | Function: alloc_record_buffers
+  Instruction: %cmp = icmp eq i64 %33, -1, !dbg !1255354 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2205:37 | Function: alloc_record_buffers
+  Instruction: br i1 %cmp, label %if.then26, label %if.else, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2205:7 | Function: alloc_record_buffers
+  Instruction: %call32 = call dereferenceable(8) i64* @_ZSt3minIyERKT_S2_S2_(i64* dereferenceable(8) %tmp_table_size30, i64* dereferenceable(8) %max_heap_table_size), !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2209:40 | Function: alloc_record_buffers
+  Instruction: %41 = load i64, i64* %tmp_table_size34, align 8, !dbg !1255373 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2211:55 | Function: alloc_record_buffers
+  Instruction: %cond = phi i64 [ %39, %cond.true ], [ %41, %cond.false ], !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2208:34 | Function: alloc_record_buffers
+  Instruction: %div = udiv i64 %cond, %43, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2211:71 | Function: alloc_record_buffers
+  Instruction: store i64 %div, i64* %max_rows36, align 8, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2208:21 | Function: alloc_record_buffers
+  Instruction: %max_rows36 = getelementptr inbounds %struct.TABLE_SHARE.27877, %struct.TABLE_SHARE.27877* %44, i32 0, i32 36, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2208:12 | Function: alloc_record_buffers
+  Instruction: %max_rows = getelementptr inbounds %struct.TABLE_SHARE.27877, %struct.TABLE_SHARE.27877* %61, i32 0, i32 36, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2344:39 | Function: trace_tmp_table
+  Instruction: %62 = load i64, i64* %max_rows, align 8, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2344:39 | Function: trace_tmp_table
+  Instruction: %call76 = invoke dereferenceable(56) %class.Opt_trace_struct* @_ZN16Opt_trace_struct3addEPKcy(%class.Opt_trace_struct* %call74, i8* getelementptr inbounds ([19 x i8], [19 x i8]* @.str.86.17903, i64 0, i64 0), i64 %62)
+          to label %invoke.cont75 unwind label %lpad, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc:2344:10 | Function: trace_tmp_table
+  Instruction: %call = call dereferenceable(8) i64* @_ZSt3minIyERKT_S2_S2_(i64* dereferenceable(8) %tmp_table_size, i64* dereferenceable(8) %max_heap_table_size), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:129:7 | Function: Item_sum::ram_limitation
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: std::numeric_limits
+  Controlled Function: unsigned long long const& std::min
+
+Implicit Control Flow:
+
+----------------------------------------

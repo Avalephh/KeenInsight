@@ -1,0 +1,15 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_control_writer_threads
+void log_control_writer_threads(log_t &log) {
+  /* pause/resume the log writer threads based on innodb_log_writer_threads
+  value. NOTE: This function is protected by LOCK_global_system_variables
+  in mysqld by called from innodb_log_writer_threads_update() */
+  if (srv_log_writer_threads) {
+    log_resume_writer_threads(log);
+  } else {
+    log_pause_writer_threads(log);
+  }
+}
+
+

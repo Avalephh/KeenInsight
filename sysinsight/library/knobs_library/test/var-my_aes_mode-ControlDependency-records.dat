@@ -1,0 +1,117 @@
+Global Variable: System_variables.75
+Explicit Data Flow (24):
+  Instruction: %32 = load i64, i64* %my_aes_mode, align 8, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:593:49 | Function: Item_func_aes_encrypt::val_str
+  Instruction: %conv20 = trunc i64 %32 to i32, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:593:7 | Function: Item_func_aes_encrypt::val_str
+  Instruction: store i32 %conv20, i32* %aes_opmode, align 4, !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:592:17 | Function: Item_func_aes_encrypt::val_str
+  Instruction: %33 = load i32, i32* %aes_opmode, align 4, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:594:3 | Function: Item_func_aes_encrypt::val_str
+  Instruction: %cmp21 = icmp sle i32 %33, 17, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:594:3 | Function: Item_func_aes_encrypt::val_str
+  Instruction: br i1 %cmp21, label %cond.true22, label %cond.false23, !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:594:3 | Function: Item_func_aes_encrypt::val_str
+  Instruction: %35 = load i32, i32* %aes_opmode, align 4, !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:597:7 | Function: Item_func_aes_encrypt::val_str
+  Instruction: %call29 = invoke i8* @_ZN11iv_argument15retrieve_iv_ptrE13my_aes_opmodejPP4ItemPKcP3THDPb(%class.iv_argument* %iv_arg, i32 %35, i32 %37, %class.Item** %39, i8* %call27, %class.THD* %40, i8* %null_value)
+          to label %invoke.cont28 unwind label %lpad4, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:596:40 | Function: Item_func_aes_encrypt::val_str
+  Instruction: %3 = load i64, i64* %my_aes_mode, align 8, !dbg !1255326 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:634:37 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: store i64 %3, i64* %aes_opmode, align 8, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:634:9 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: %4 = load i64, i64* %aes_opmode, align 8, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:635:3 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: %cmp = icmp ule i64 %4, 17, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:635:3 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: br i1 %cmp, label %cond.true, label %cond.false, !dbg !1255327 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:635:3 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: %11 = load i64, i64* %aes_opmode, align 8, !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:638:64 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: %conv = trunc i64 %11 to i32, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:638:44 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: %call2 = call i64 @_Z15my_aes_get_sizej13my_aes_opmode(i32 %10, i32 %conv), !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:638:7 | Function: Item_func_aes_encrypt::resolve_type
+  Instruction: %31 = load i64, i64* %my_aes_mode, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:667:49 | Function: Item_func_aes_decrypt::val_str
+  Instruction: %conv20 = trunc i64 %31 to i32, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:667:7 | Function: Item_func_aes_decrypt::val_str
+  Instruction: store i32 %conv20, i32* %aes_opmode, align 4, !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:666:17 | Function: Item_func_aes_decrypt::val_str
+  Instruction: %32 = load i32, i32* %aes_opmode, align 4, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:668:3 | Function: Item_func_aes_decrypt::val_str
+  Instruction: %cmp21 = icmp sle i32 %32, 17, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:668:3 | Function: Item_func_aes_decrypt::val_str
+  Instruction: br i1 %cmp21, label %cond.true22, label %cond.false23, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:668:3 | Function: Item_func_aes_decrypt::val_str
+  Instruction: %34 = load i32, i32* %aes_opmode, align 4, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:671:7 | Function: Item_func_aes_decrypt::val_str
+  Instruction: %call31 = invoke i8* @_ZN11iv_argument15retrieve_iv_ptrE13my_aes_opmodejPP4ItemPKcP3THDPb(%class.iv_argument* %iv_arg, i32 %34, i32 %36, %class.Item** %38, i8* %call29, %class.THD* %41, i8* %null_value)
+          to label %invoke.cont30 unwind label %lpad4, !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:670:40 | Function: Item_func_aes_decrypt::val_str
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: Item_func_aes_encrypt::func_name
+  Controlled Function: iv_argument::retrieve_iv_ptr
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Item::error_str
+  Controlled Function: std::vector
+  Controlled Function: kdf_argument::kdf_argument
+  Controlled Function: iv_argument::~iv_argument
+  Controlled Function: Item_func_aes_encrypt::func_name
+  Controlled Function: String::~String
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: iv_argument::~iv_argument
+  Controlled Function: String::~String
+  Controlled Function: kdf_argument::retrieve_kdf_options[abi:cxx11]
+  Controlled Function: kdf_argument::~kdf_argument
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: Item::error_str
+  Controlled Function: String::length
+  Controlled Function: my_aes_get_size
+  Controlled Function: kdf_argument::~kdf_argument
+  Controlled Function: std::vector
+  Controlled Function: String::set_charset
+  Controlled Function: String::length
+  Controlled Function: std::vector
+  Controlled Function: String::alloc
+  Controlled Function: ER_THD
+  Controlled Function: push_warning_printf
+  Controlled Function: Item::error_str
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::length
+  Controlled Function: std::vector
+  Controlled Function: my_aes_encrypt
+  Controlled Function: String::length
+  Controlled Function: Item::error_str
+  Controlled Function: __assert_fail
+  Controlled Function: my_aes_get_size
+  Controlled Function: Item::set_data_type_string
+  Controlled Function: __assert_fail
+  Controlled Function: iv_argument::retrieve_iv_ptr
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Item::error_str
+  Controlled Function: String::set_charset
+  Controlled Function: iv_argument::~iv_argument
+  Controlled Function: String::length
+  Controlled Function: String::~String
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: iv_argument::~iv_argument
+  Controlled Function: String::~String
+  Controlled Function: String::alloc
+  Controlled Function: Item::error_str
+  Controlled Function: std::vector
+  Controlled Function: kdf_argument::kdf_argument
+  Controlled Function: kdf_argument::retrieve_kdf_options[abi:cxx11]
+  Controlled Function: kdf_argument::~kdf_argument
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: Item::error_str
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: kdf_argument::~kdf_argument
+  Controlled Function: std::vector
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::ptr
+  Controlled Function: unsigned char* pointer_cast
+  Controlled Function: String::length
+  Controlled Function: std::vector
+  Controlled Function: my_aes_decrypt
+  Controlled Function: String::length
+  Controlled Function: Item::error_str
+
+Implicit Control Flow:
+
+----------------------------------------

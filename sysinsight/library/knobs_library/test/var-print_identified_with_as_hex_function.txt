@@ -1,0 +1,229 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/auth/sql_user.cc
+Function: mysql_show_create_user
+bool mysql_show_create_user(THD *thd, LEX_USER *user_name,
+                            bool are_both_users_same) {
+  int error = 0;
+  ACL_USER *acl_user;
+  LEX *lex = thd->lex;
+  Protocol *protocol = thd->get_protocol();
+  USER_RESOURCES tmp_user_resource;
+  enum SSL_type ssl_type;
+  const char *ssl_cipher, *x509_issuer, *x509_subject;
+  static const int COMMAND_BUFFER_LENGTH = 2048;
+  char buff[COMMAND_BUFFER_LENGTH];
+  Item_string *field = nullptr;
+  String sql_text(buff, sizeof(buff), system_charset_info);
+  LEX_ALTER alter_info;
+  List_of_auth_id_refs default_roles;
+  List<LEX_USER> *old_default_roles = lex->default_roles;
+  bool hide_password_hash = false;
+
+  DBUG_TRACE;
+  Table_ref table_list("mysql", "user", TL_READ, MDL_SHARED_READ_ONLY);
+  if (are_both_users_same) {
+    hide_password_hash =
+        check_table_access(thd, SELECT_ACL, &table_list, false, UINT_MAX, true);
+  }
+
+  /*
+     Open user table so we later can read the JSON data in the user_attribute
+     field. All tables must be opened before the acl_cache_lock
+  */
+  if (open_and_lock_tables(thd, &table_list, MYSQL_LOCK_IGNORE_TIMEOUT)) {
+    if (!is_expected_or_transient_error(thd)) {
+      LogErr(ERROR_LEVEL, ER_AUTHCACHE_CANT_OPEN_AND_LOCK_PRIVILEGE_TABLES,
+             thd->get_stmt_da()->message_text());
+    }
+    return true;
+  }
+
+  Acl_cache_lock_guard acl_cache_lock(thd, Acl_cache_lock_mode::READ_MODE);
+  if (!acl_cache_lock.lock()) {
+    close_thread_tables(thd);
+    return true;
+  }
+
+  Acl_table_intact table_intact(thd);
+  if (table_intact.check(table_list.table, ACL_TABLES::TABLE_USER)) {
+    close_thread_tables(thd);
+    return true;
+  }
+
+  if (!(acl_user =
+            find_acl_user(user_name->host.str, user_name->user.str, true))) {
+    String wrong_users;
+    log_user(thd, &wrong_users, user_name, wrong_users.length() > 0);
+    my_error(ER_CANNOT_USER, MYF(0), "SHOW CREATE USER",
+             wrong_users.c_ptr_safe());
+    close_thread_tables(thd);
+    return true;
+  }
+  /* fill in plugin, auth_str from acl_user */
+  user_name->first_factor_auth_info.auth.str =
+      acl_user->credentials[PRIMARY_CRED].m_auth_string.str;
+  user_name->first_factor_auth_info.auth.length =
+      acl_user->credentials[PRIMARY_CRED].m_auth_string.length;
+  user_name->first_factor_auth_info.plugin = acl_user->plugin;
+  user_name->first_factor_auth_info.uses_identified_by_clause = true;
+  user_name->first_factor_auth_info.uses_identified_with_clause = false;
+  user_name->first_factor_auth_info.uses_authentication_string_clause = false;
+  user_name->retain_current_password = false;
+  user_name->discard_old_password = false;
+
+  /* fill in details related to MFA methods */
+  if (acl_user->m_mfa)
+    acl_user->m_mfa->get_info_for_query_rewrite(thd, user_name);
+  /* make a copy of user resources, ssl and password expire attributes */
+  tmp_user_resource = lex->mqh;
+  lex->mqh = acl_user->user_resource;
+
+  /* Set specified_limits flags so user resources are shown properly. */
+  if (lex->mqh.user_conn)
+    lex->mqh.specified_limits |= USER_RESOURCES::USER_CONNECTIONS;
+  if (lex->mqh.questions)
+    lex->mqh.specified_limits |= USER_RESOURCES::QUERIES_PER_HOUR;
+  if (lex->mqh.updates)
+    lex->mqh.specified_limits |= USER_RESOURCES::UPDATES_PER_HOUR;
+  if (lex->mqh.conn_per_hour)
+    lex->mqh.specified_limits |= USER_RESOURCES::CONNECTIONS_PER_HOUR;
+
+  ssl_type = lex->ssl_type;
+  ssl_cipher = lex->ssl_cipher;
+  x509_issuer = lex->x509_issuer;
+  x509_subject = lex->x509_subject;
+
+  lex->ssl_type = acl_user->ssl_type;
+  lex->ssl_cipher = acl_user->ssl_cipher;
+  lex->x509_issuer = acl_user->x509_issuer;
+  lex->x509_subject = acl_user->x509_subject;
+
+  alter_info = lex->alter_password;
+
+  lex->alter_password.update_password_expired_column =
+      acl_user->password_expired;
+  lex->alter_password.use_default_password_lifetime =
+      acl_user->use_default_password_lifetime;
+  lex->alter_password.expire_after_days = acl_user->password_lifetime;
+  lex->alter_password.update_account_locked_column = true;
+  lex->alter_password.account_locked = acl_user->account_locked;
+  lex->alter_password.update_password_expired_fields = true;
+
+  lex->alter_password.password_history_length =
+      acl_user->password_history_length;
+  lex->alter_password.use_default_password_history =
+      acl_user->use_default_password_history;
+  lex->alter_password.update_password_history =
+      !acl_user->use_default_password_history;
+
+  lex->alter_password.password_reuse_interval =
+      acl_user->password_reuse_interval;
+  lex->alter_password.use_default_password_reuse_interval =
+      acl_user->use_default_password_reuse_interval;
+  lex->alter_password.update_password_reuse_interval =
+      !acl_user->use_default_password_reuse_interval;
+  lex->alter_password.update_password_require_current =
+      acl_user->password_require_current;
+
+  lex->alter_password.failed_login_attempts =
+      acl_user->password_locked_state.get_failed_login_attempts();
+  lex->alter_password.password_lock_time =
+      acl_user->password_locked_state.get_password_lock_time_days();
+
+  lex->alter_password.update_failed_login_attempts =
+      lex->alter_password.failed_login_attempts != 0;
+  lex->alter_password.update_password_lock_time =
+      lex->alter_password.password_lock_time != 0;
+
+  /* send the metadata to client */
+  field = new Item_string("", 0, &my_charset_latin1);
+  field->max_length = 256;
+  strxmov(buff, "CREATE USER for ", user_name->user.str, "@",
+          user_name->host.str, NullS);
+  field->item_name.set(buff);
+  mem_root_deque<Item *> field_list(thd->mem_root);
+  field_list.push_back(field);
+  if (thd->send_result_metadata(field_list,
+                                Protocol::SEND_NUM_ROWS | Protocol::SEND_EOF)) {
+    error = 1;
+    goto err;
+  }
+  sql_text.length(0);
+  if (lex->sql_command == SQLCOM_SHOW_CREATE_USER ||
+      lex->sql_command == SQLCOM_CREATE_USER) {
+    /*
+      Recreate LEX for default roles given an ACL_USER. This will later be used
+      by rewrite_default_roles() called by Rewriter_show_create_user::rewrite()
+    */
+    get_default_roles(create_authid_from(acl_user), default_roles);
+    if (default_roles.size() > 0) {
+      LEX_STRING *tmp_user = nullptr;
+      LEX_STRING *tmp_host = nullptr;
+      /*
+        Make sure we reallocate the default_roles list when using it outside of
+        parser code so it has the same mem root as its items.
+      */
+      lex->default_roles = new (thd->mem_root) List<LEX_USER>;
+      for (auto &&role : default_roles) {
+        if (!(tmp_user = make_lex_string_root(thd->mem_root, role.first.str,
+                                              role.first.length)) ||
+            !(tmp_host = make_lex_string_root(thd->mem_root, role.second.str,
+                                              role.second.length))) {
+          error = 1;
+          goto err;
+        }
+        LEX_USER *lex_role = LEX_USER::alloc(thd, tmp_user, tmp_host);
+        if (lex_role == nullptr) {
+          error = 1;
+          goto err;
+        }
+        lex->default_roles->push_back(lex_role);
+      }
+    }
+  }
+  lex->users_list.push_back(user_name);
+  {
+    /* Read and extract JSON comments */
+    String metadata_str;
+    if (read_user_application_user_metadata_from_table(
+            user_name->user, user_name->host, &metadata_str, table_list.table,
+            thd->variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES)) {
+      error = 1;
+      goto err;
+    }
+    Show_user_params show_user_params(
+        hide_password_hash, thd->variables.print_identified_with_as_hex,
+        &metadata_str);
+    /*
+      By disabling instrumentation, we're requesting a rewrite to our
+      local buffer, sql_text. The value on the THD and those seen in
+      instrumentation remain unchanged.
+    */
+    mysql_rewrite_acl_query(thd, sql_text, Consumer_type::STDOUT,
+                            &show_user_params, false);
+  }
+
+  /* send the result row to client */
+  protocol->start_row();
+  protocol->store_string(sql_text.ptr(), sql_text.length(), sql_text.charset());
+  if (protocol->end_row()) {
+    error = 1;
+    goto err;
+  }
+
+err:
+  close_thread_tables(thd);
+  lex->default_roles = old_default_roles;
+  /* restore user resources, ssl and password expire attributes */
+  lex->mqh = tmp_user_resource;
+  lex->ssl_type = ssl_type;
+  lex->ssl_cipher = ssl_cipher;
+  lex->x509_issuer = x509_issuer;
+  lex->x509_subject = x509_subject;
+
+  lex->alter_password = alter_info;
+  if (!thd->get_stmt_da()->is_error()) my_eof(thd);
+  return error;
+}
+
+

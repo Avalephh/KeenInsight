@@ -1,0 +1,17 @@
+[
+    {
+        "knob_name": "original_commit_timestamp",
+        "data_matched_functions": [
+            "MYSQL_BIN_LOG::write_transaction"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "Log_event::write",
+            "binlog::Context::monitoring_context",
+            "MYSQL_BIN_LOG::write_cache",
+            "binlog::monitoring::Transaction_compression::update"
+        ],
+        "control_matched_count": 4,
+        "matched_count": 5
+    }
+]

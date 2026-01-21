@@ -1,0 +1,56 @@
+Global Variable: System_variables.63
+Explicit Data Flow (19):
+  Instruction: %243 = load i8, i8* %binlog_direct_non_trans_update, align 8, !dbg !1255802 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10337:36 | Function: THD::decide_logging_format
+  Instruction: %tobool442 = trunc i8 %243 to i1, !dbg !1255802 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10337:36 | Function: THD::decide_logging_format
+  Instruction: %frombool443 = zext i1 %tobool442 to i8, !dbg !1255800 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10337:10 | Function: THD::decide_logging_format
+  Instruction: store i8 %frombool443, i8* %binlog_direct, align 1, !dbg !1255800 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10337:10 | Function: THD::decide_logging_format
+  Instruction: %248 = load i8, i8* %binlog_direct, align 1, !dbg !1255807 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10339:53 | Function: THD::decide_logging_format
+  Instruction: %tobool447 = trunc i8 %248 to i1, !dbg !1255807 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10339:53 | Function: THD::decide_logging_format
+  Instruction: %call450 = invoke zeroext i1 @_ZN17Query_tables_list20is_mixed_stmt_unsafeEbbbj(%class.Query_tables_list* %246, i1 zeroext %tobool446, i1 zeroext %tobool447, i1 zeroext %tobool448, i32 %250)
+          to label %invoke.cont449 unwind label %lpad, !dbg !1255805 | Location: /root/LLVM/mysql-8.0.36/sql/binlog.cc:10339:14 | Function: THD::decide_logging_format
+  Instruction: %222 = load i8, i8* %binlog_direct_non_trans_update, align 8, !dbg !1255523 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4014:28 | Function: Query_log_event::Query_log_event
+  Instruction: %tobool254 = trunc i8 %222 to i1, !dbg !1255523 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4014:28 | Function: Query_log_event::Query_log_event
+  Instruction: %call260 = invoke zeroext i1 @_ZN17Query_tables_list20is_mixed_stmt_unsafeEbbbj(%class.Query_tables_list* %217, i1 zeroext %call251, i1 zeroext %tobool254, i1 zeroext %call257, i32 %227)
+          to label %invoke.cont259 unwind label %lpad242, !dbg !1255518 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4012:19 | Function: Query_log_event::Query_log_event
+  Instruction: %230 = load i8, i8* %binlog_direct_non_trans_update264, align 8, !dbg !1255531 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4016:26 | Function: Query_log_event::Query_log_event
+  Instruction: %tobool265 = trunc i8 %230 to i1, !dbg !1255531 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4016:26 | Function: Query_log_event::Query_log_event
+  Instruction: br i1 %tobool265, label %land.end270, label %land.rhs266, !dbg !1255532 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4016:57 | Function: Query_log_event::Query_log_event
+  Instruction: %233 = load i8, i8* %binlog_direct_non_trans_update, align 8, !dbg !1255550 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4014:28 | Function: Query_log_event::Query_log_event
+  Instruction: %tobool262 = trunc i8 %233 to i1, !dbg !1255550 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4014:28 | Function: Query_log_event::Query_log_event
+  Instruction: %call268 = invoke zeroext i1 @_ZN17Query_tables_list20is_mixed_stmt_unsafeEbbbj(%class.Query_tables_list* %228, i1 zeroext %call259, i1 zeroext %tobool262, i1 zeroext %call265, i32 %238)
+          to label %invoke.cont267 unwind label %lpad250, !dbg !1255545 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4012:19 | Function: Query_log_event::Query_log_event
+  Instruction: %241 = load i8, i8* %binlog_direct_non_trans_update272, align 8, !dbg !1255558 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4016:26 | Function: Query_log_event::Query_log_event
+  Instruction: %tobool273 = trunc i8 %241 to i1, !dbg !1255558 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4016:26 | Function: Query_log_event::Query_log_event
+  Instruction: br i1 %tobool273, label %land.end278, label %land.rhs274, !dbg !1255559 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4016:57 | Function: Query_log_event::Query_log_event
+
+Implicit Data Flow (4):
+  Instruction: %233 = phi i1 [ false, %lor.rhs261 ], [ %call269, %invoke.cont268 ], !dbg !1255535 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:0:0Query_log_event::Query_log_event
+  Instruction: %234 = phi i1 [ true, %invoke.cont259 ], [ true, %invoke.cont243 ], [ true, %lor.end235 ], [ %233, %land.end270 ] | Location: :0:0Query_log_event::Query_log_event
+  Instruction: %244 = phi i1 [ false, %lor.rhs269 ], [ %call277, %invoke.cont276 ], !dbg !1255562 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:0:0Query_log_event::Query_log_event
+  Instruction: %245 = phi i1 [ true, %invoke.cont267 ], [ true, %invoke.cont251 ], [ true, %lor.end243 ], [ %244, %land.end278 ] | Location: :0:0Query_log_event::Query_log_event
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: trans_has_updated_trans_table
+  Controlled Function: Log_event::~Log_event
+  Controlled Function: is_sql_require_primary_key_needed
+  Controlled Function: is_default_table_encryption_needed
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+  Controlled Function: trans_has_updated_trans_table
+  Controlled Function: Log_event::~Log_event
+  Controlled Function: binary_log::Query_event::~Query_event
+  Controlled Function: is_sql_require_primary_key_needed
+  Controlled Function: is_default_table_encryption_needed
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: _db_doprnt_
+
+Implicit Control Flow:
+
+----------------------------------------

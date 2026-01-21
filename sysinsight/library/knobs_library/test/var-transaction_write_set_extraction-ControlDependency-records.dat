@@ -1,0 +1,152 @@
+Global Variable: System_variables.70
+Explicit Data Flow (31):
+  Instruction: %0 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2987:22 | Function: THD::is_current_stmt_binlog_row_enabled_with_write_set_extraction
+  Instruction: %cmp = icmp ne i64 %0, 0, !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2987:55 | Function: THD::is_current_stmt_binlog_row_enabled_with_write_set_extraction
+  Instruction: br i1 %cmp, label %land.lhs.true, label %land.end, !dbg !1255284 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:2987:78 | Function: THD::is_current_stmt_binlog_row_enabled_with_write_set_extraction
+  Instruction: %6 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7829:24 | Function: binlog_log_row
+  Instruction: %cmp = icmp ne i64 %6, 0, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7829:57 | Function: binlog_log_row
+  Instruction: br i1 %cmp, label %if.then1, label %if.end45, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:7829:9 | Function: binlog_log_row
+  Instruction: %1 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_write_set_handler.cc:707:3 | Function: generate_hash_pke
+  Instruction: %cmp = icmp ne i64 %1, 0, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_write_set_handler.cc:707:3 | Function: generate_hash_pke
+  Instruction: br i1 %cmp, label %cond.true, label %cond.false, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_write_set_handler.cc:707:3 | Function: generate_hash_pke
+  Instruction: %4 = load i64, i64* %transaction_write_set_extraction2, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_write_set_handler.cc:710:22 | Function: generate_hash_pke
+  Instruction: %call4 = invoke i64 @_Z9calc_hashIPKcEmmT_m(i64 %4, i8* %call, i64 %call3)
+          to label %invoke.cont unwind label %lpad, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_write_set_handler.cc:709:17 | Function: generate_hash_pke
+  Instruction: %14 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:188:24 | Function: injector::transaction::write_row
+  Instruction: %cmp = icmp ne i64 %14, 0, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:188:57 | Function: injector::transaction::write_row
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end19, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:188:79 | Function: injector::transaction::write_row
+  Instruction: %14 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:220:24 | Function: injector::transaction::delete_row
+  Instruction: %cmp = icmp ne i64 %14, 0, !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:220:57 | Function: injector::transaction::delete_row
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end19, !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:220:79 | Function: injector::transaction::delete_row
+  Instruction: %14 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:254:24 | Function: injector::transaction::update_row
+  Instruction: %cmp = icmp ne i64 %14, 0, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:254:57 | Function: injector::transaction::update_row
+  Instruction: br i1 %cmp, label %land.lhs.true, label %if.end26, !dbg !1255353 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_injector.cc:254:79 | Function: injector::transaction::update_row
+  Instruction: %10 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_trx_tracking.cc:238:23 | Function: Writeset_trx_dependency_tracker::get_dependency
+  Instruction: %cmp11 = icmp eq i64 %8, %10, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_trx_tracking.cc:237:65 | Function: Writeset_trx_dependency_tracker::get_dependency
+  Instruction: br i1 %cmp11, label %land.lhs.true12, label %land.end, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_trx_tracking.cc:238:57 | Function: Writeset_trx_dependency_tracker::get_dependency
+  Instruction: %9 = load i64, i64* %transaction_write_set_extraction, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:744:22 | Function: prepare_transaction_context
+  Instruction: store i64 %9, i64* %transaction_write_set_extraction4, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:743:45 | Function: prepare_transaction_context
+  Instruction: %transaction_write_set_extraction4 = getelementptr inbounds %struct.Trans_context_info, %struct.Trans_context_info* %10, i32 0, i32 5, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:743:12 | Function: prepare_transaction_context
+  Instruction: %transaction_write_set_extraction = getelementptr inbounds %struct.Trans_context_info, %struct.Trans_context_info* %10, i32 0, i32 5, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_group_replication.cc:492:16 | Function: get_server_startup_prerequirements
+  Instruction: store i64 %9, i64* %transaction_write_set_extraction, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_group_replication.cc:492:49 | Function: get_server_startup_prerequirements
+  Instruction: store i64 %conv, i64* %transaction_write_set_extraction, align 8, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6745:51 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %transaction_write_set_extraction = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables6, i32 0, i32 70, !dbg !1255304 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:6745:18 | Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+  Instruction: %transaction_write_set_extraction = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables3, i32 0, i32 70, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc:744:22 | Function: prepare_transaction_context
+
+Implicit Data Flow (2):
+  Instruction: %1 = phi i1 [ false, %land.lhs.true ], [ false, %entry ], [ %lnot, %land.rhs ], !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:0:0THD::is_current_stmt_binlog_row_enabled_with_write_set_extraction
+  Instruction: %13 = phi i1 [ false, %land.lhs.true12 ], [ false, %land.lhs.true ], [ false, %lor.lhs.false9 ], [ %lnot, %land.rhs ], !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_trx_tracking.cc:0:0Writeset_trx_dependency_tracker::get_dependency
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: THD::is_current_stmt_binlog_format_row
+  Controlled Function: THD::is_current_stmt_binlog_disabled
+  Controlled Function: MY_BITMAP::MY_BITMAP
+  Controlled Function: MY_BITMAP::MY_BITMAP
+  Controlled Function: bitmap_init
+  Controlled Function: THD::is_error
+  Controlled Function: _db_dump_
+  Controlled Function: write_locked_table_maps
+  Controlled Function: likely
+  Controlled Function: my_error
+  Controlled Function: bitmap_init
+  Controlled Function: __cxa_begin_catch
+  Controlled Function: my_error
+  Controlled Function: handler::has_transactions
+  Controlled Function: Binlog_log_row_cleanup::Binlog_log_row_cleanup
+  Controlled Function: __cxa_end_catch
+  Controlled Function: __cxa_end_catch
+  Controlled Function: __clang_call_terminate
+  Controlled Function: std::array
+  Controlled Function: std::array
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: Binlog_log_row_cleanup::~Binlog_log_row_cleanup
+  Controlled Function: TABLE::mark_columns_used_by_index_no_reset
+  Controlled Function: Binlog_log_row_cleanup::~Binlog_log_row_cleanup
+  Controlled Function: __assert_fail
+  Controlled Function: add_pke
+  Controlled Function: __assert_fail
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: unsigned long calc_hash
+  Controlled Function: THD::get_transaction
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: Transaction_ctx::get_transaction_write_set_ctx
+  Controlled Function: Rpl_transaction_write_set_ctx::add_write_set
+  Controlled Function: std::vector
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: std::vector
+  Controlled Function: _db_pargs_
+  Controlled Function: _db_enabled_
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: _db_doprnt_
+  Controlled Function: injector::transaction::table::skip_hash
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: injector::transaction::table::is_transactional
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: injector::transaction::table::save_sets::~save_sets
+  Controlled Function: THD::binlog_write_row
+  Controlled Function: add_pke
+  Controlled Function: Change_server_id_scope::~Change_server_id_scope
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: injector::transaction::table::save_sets::~save_sets
+  Controlled Function: Change_server_id_scope::~Change_server_id_scope
+  Controlled Function: __cxa_begin_catch
+  Controlled Function: __cxa_end_catch
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: injector::transaction::table::skip_hash
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: injector::transaction::table::is_transactional
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: injector::transaction::table::save_sets::~save_sets
+  Controlled Function: THD::binlog_delete_row
+  Controlled Function: add_pke
+  Controlled Function: Change_server_id_scope::~Change_server_id_scope
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: injector::transaction::table::save_sets::~save_sets
+  Controlled Function: Change_server_id_scope::~Change_server_id_scope
+  Controlled Function: __cxa_begin_catch
+  Controlled Function: __cxa_end_catch
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: injector::transaction::table::skip_hash
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: injector::transaction::table::is_transactional
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: injector::transaction::table::save_sets::~save_sets
+  Controlled Function: THD::binlog_update_row
+  Controlled Function: add_pke
+  Controlled Function: Change_server_id_scope::~Change_server_id_scope
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: injector::transaction::table::save_sets::~save_sets
+  Controlled Function: Change_server_id_scope::~Change_server_id_scope
+  Controlled Function: injector::transaction::table::get_table
+  Controlled Function: __cxa_begin_catch
+  Controlled Function: __cxa_end_catch
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: add_pke
+  Controlled Function: Rpl_transaction_write_set_ctx::get_has_related_foreign_keys
+  Controlled Function: Rpl_transaction_write_set_ctx::was_write_set_limit_reached
+  Controlled Function: std::map
+  Controlled Function: std::vector
+  Controlled Function: std::__atomic_base
+  Controlled Function: std::vector
+  Controlled Function: std::vector
+  Controlled Function: bool __gnu_cxx::operator!=
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: std::map
+  Controlled Function: std::map
+  Controlled Function: std::operator!=
+  Controlled Function: Rpl_transaction_write_set_ctx::get_has_missing_keys
+  Controlled Function: std::_Rb_tree_iterator
+  Controlled Function: long const& std::min
+  Controlled Function: std::_Rb_tree_iterator
+  Controlled Function: std::_Rb_tree_iterator
+  Controlled Function: __gnu_cxx::__normal_iterator
+  Controlled Function: std::pair
+  Controlled Function: _ZNSt3mapImlSt4lessImESaISt4pairIKmlEEE6insertIS2_ImlEEENSt9enable_ifIXsr16is_constructibleIS4_T_EE5valueES2_ISt17_Rb_tree_iteratorIS4_EbEE4typeEOSA_
+  Controlled Function: std::_Rb_tree_iterator
+  Controlled Function: __gnu_cxx::__normal_iterator
+
+Implicit Control Flow:
+
+----------------------------------------

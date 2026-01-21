@@ -1,0 +1,27 @@
+Global Variable: System_variables.3
+Explicit Data Flow (16):
+  Instruction: store i32 0, i32* %dynamic_variables_size, align 4, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3085:32 | Function: cleanup_variables
+  Instruction: %dynamic_variables_size = getelementptr inbounds %struct.System_variables, %struct.System_variables* %14, i32 0, i32 3, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3085:9 | Function: cleanup_variables
+  Instruction: %dynamic_variables_size = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables14, i32 0, i32 3, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3033:18 | Function: plugin_thdvar_init
+  Instruction: store i32 0, i32* %dynamic_variables_size, align 4, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:3033:41 | Function: plugin_thdvar_init
+  Instruction: %dynamic_variables_size60 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables59, i32 0, i32 3, !dbg !1255432 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2976:18 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: store i32 %65, i32* %dynamic_variables_size60, align 4, !dbg !1255433 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2976:41 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %11 = load i32, i32* %dynamic_variables_size, align 4, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2938:29 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %idx.ext = zext i32 %11 to i64, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2937:47 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %add.ptr = getelementptr inbounds i8, i8* %9, i64 %idx.ext, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2937:47 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 1 %add.ptr, i8* align 1 %add.ptr15, i64 %conv18, i1 false), !dbg !1255324 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2937:3 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %14 = load i32, i32* %dynamic_variables_size13, align 4, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2940:29 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %idx.ext14 = zext i32 %14 to i64, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2939:56 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %add.ptr15 = getelementptr inbounds i8, i8* %12, i64 %idx.ext14, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2939:56 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %17 = load i32, i32* %dynamic_variables_size17, align 4, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2942:29 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %sub = sub i32 %15, %17, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2941:57 | Function: alloc_and_copy_thd_dynamic_variables
+  Instruction: %conv18 = zext i32 %sub to i64, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc:2941:10 | Function: alloc_and_copy_thd_dynamic_variables
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

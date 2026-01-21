@@ -1,0 +1,45 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_net_retry_count
+static bool fix_net_retry_count(sys_var *self, THD *thd, enum_var_type type) {
+  if (!self->is_global_persist(type)) {
+    // net_write_timeout is a specific property for the classic protocols
+    if (!thd->is_classic_protocol()) {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
+    thd->get_protocol_classic()->get_net()->retry_count =
+        thd->variables.net_retry_count;
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_client.cc
+Function: my_net_local_init
+void my_net_local_init(NET *net) {
+  net->max_packet = (uint)global_system_variables.net_buffer_length;
+
+  my_net_set_read_timeout(net, (uint)global_system_variables.net_read_timeout);
+  my_net_set_write_timeout(net,
+                           (uint)global_system_variables.net_write_timeout);
+
+  net->retry_count = (uint)global_system_variables.net_retry_count;
+  net->max_packet_size =
+      max<size_t>(global_system_variables.net_buffer_length,
+                  global_system_variables.max_allowed_packet);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql-common/net_serv.cc
+Function: my_net_set_retry_count
+void my_net_set_retry_count(NET *net, uint retry_count) {
+  DBUG_TRACE;
+  DBUG_PRINT("enter", ("retry_count: %d", retry_count));
+  net->retry_count = retry_count;
+  if (net->vio) net->vio->retry_count = retry_count;
+}
+
+

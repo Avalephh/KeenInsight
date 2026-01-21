@@ -1,0 +1,23 @@
+[
+    {
+        "knob_name": "session_track_schema",
+        "data_matched_functions": [
+            "Session_tracker::enabled_any",
+            "mysql_execute_command",
+            "statement_id_to_session"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "my_ok",
+            "MDL_request::init_with_source",
+            "Session_tracker::get_tracker",
+            "MDL_context::release_statement_locks",
+            "stmt_causes_implicit_commit",
+            "is_explainable_query",
+            "MDL_context::acquire_lock",
+            "MDL_context::release_transactional_locks"
+        ],
+        "control_matched_count": 8,
+        "matched_count": 11
+    }
+]

@@ -1,0 +1,290 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: read_lock_type_for_table
+thr_lock_type read_lock_type_for_table(THD *thd,
+                                       Query_tables_list *prelocking_ctx,
+                                       Table_ref *table_list,
+                                       bool routine_modifies_data) {
+  /*
+    In cases when this function is called for a sub-statement executed in
+    prelocked mode we can't rely on OPTION_BIN_LOG flag in THD::options
+    bitmap to determine that binary logging is turned on as this bit can
+    be cleared before executing sub-statement. So instead we have to look
+    at THD::variables::sql_log_bin member.
+  */
+  bool log_on = mysql_bin_log.is_open() && thd->variables.sql_log_bin;
+
+  /*
+    When we do not write to binlog or when we use row based replication,
+    it is safe to use a weaker lock.
+  */
+  if (log_on == false || thd->variables.binlog_format == BINLOG_FORMAT_ROW)
+    return TL_READ;
+
+  if ((table_list->table->s->table_category == TABLE_CATEGORY_LOG) ||
+      (table_list->table->s->table_category == TABLE_CATEGORY_RPL_INFO) ||
+      (table_list->table->s->table_category == TABLE_CATEGORY_GTID) ||
+      (table_list->table->s->table_category == TABLE_CATEGORY_PERFORMANCE))
+    return TL_READ;
+
+  // SQL queries which updates data need a stronger lock.
+  if (is_update_query(prelocking_ctx->sql_command)) return TL_READ_NO_INSERT;
+
+  /*
+    table_list is placeholder for prelocking.
+    Ignore prelocking_placeholder status for non "LOCK TABLE" statement's
+    table_list objects when routine_modifies_data is false.
+  */
+  if (table_list->prelocking_placeholder &&
+      (routine_modifies_data || thd->in_lock_tables))
+    return TL_READ_NO_INSERT;
+
+  if (thd->locked_tables_mode > LTM_LOCK_TABLES) return TL_READ_NO_INSERT;
+
+  return TL_READ;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::init
+void THD::init(void) {
+  plugin_thdvar_init(this, m_enable_plugins);
+  /*
+    variables= global_system_variables above has reset
+    variables.pseudo_thread_id to 0. We need to correct it here to
+    avoid temporary tables replication failure.
+  */
+  variables.pseudo_thread_id = m_thread_id;
+
+  /*
+    NOTE: reset_connection command will reset the THD to its default state.
+    All system variables whose scope is SESSION ONLY should be set to their
+    default values here.
+  */
+  reset_first_successful_insert_id();
+  user_time.tv_sec = user_time.tv_usec = 0;
+  start_time.tv_sec = start_time.tv_usec = 0;
+  set_time();
+  auto_inc_intervals_forced.clear();
+  {
+    ulong tmp;
+    tmp = sql_rnd_with_mutex();
+    randominit(&rand,
+               tmp + static_cast<ulong>(reinterpret_cast<uintptr_t>(&rand)),
+               tmp + (ulong)::atomic_global_query_id);
+  }
+
+  server_status = SERVER_STATUS_AUTOCOMMIT;
+  if (variables.sql_mode & MODE_NO_BACKSLASH_ESCAPES)
+    server_status |= SERVER_STATUS_NO_BACKSLASH_ESCAPES;
+
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::SESSION);
+  get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+  open_options = ha_open_options;
+  update_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY : TL_WRITE);
+  insert_lock_default =
+      (variables.low_priority_updates ? TL_WRITE_LOW_PRIORITY
+                                      : TL_WRITE_CONCURRENT_INSERT);
+  tx_isolation = (enum_tx_isolation)variables.transaction_isolation;
+  tx_read_only = variables.transaction_read_only;
+  tx_priority = 0;
+  thd_tx_priority = 0;
+  update_charset();
+  reset_current_stmt_binlog_format_row();
+  reset_binlog_local_stmt_filter();
+  memset(&status_var, 0, sizeof(status_var));
+  binlog_row_event_extra_data = nullptr;
+
+  if (variables.sql_log_bin)
+    variables.option_bits |= OPTION_BIN_LOG;
+  else
+    variables.option_bits &= ~OPTION_BIN_LOG;
+
+#if defined(ENABLED_DEBUG_SYNC)
+  /* Initialize the Debug Sync Facility. See debug_sync.cc. */
+  debug_sync_init_thread(this);
+#endif /* defined(ENABLED_DEBUG_SYNC) */
+
+  /* Initialize session_tracker and create all tracker objects */
+  session_tracker.init(this->charset());
+  session_tracker.enable(this);
+
+  owned_gtid.clear();
+  owned_sid.clear();
+  m_se_gtid_flags.reset();
+  owned_gtid.dbug_print(nullptr, "set owned_gtid (clear) in THD::init");
+
+  /*
+    This will clear the writeset session history and re-set delegate state to
+    INIT
+  */
+  rpl_thd_ctx.init();
+
+  /*
+    This variable is used to temporarily disable the password validation plugin
+    when a RANDOM PASSWORD is generated during SET PASSWORD,CREATE USER or
+    ALTER USER statements.
+  */
+  m_disable_password_validation = false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_value_options not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_value_options not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_value_options not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_sql_log_bin_after_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_sql_log_bin_after_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_sql_log_bin_after_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/thd_raii.h
+Function: Disable_sql_log_bin_guard::Disable_sql_log_bin_guard
+  explicit Disable_sql_log_bin_guard(THD *thd)
+      : m_thd(thd), m_saved_sql_log_bin(thd->variables.sql_log_bin) {
+    thd->variables.sql_log_bin = false;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/thd_raii.h
+Function: Disable_sql_log_bin_guard::
+    if (m_thd) {
+      /*
+        We can't disable auto-commit if there is ongoing transaction as this
+        might easily break statement/session transaction invariants.
+      */
+      assert(m_thd->get_transaction()->is_empty(Transaction_ctx::STMT) &&
+             m_thd->get_transaction()->is_empty(Transaction_ctx::SESSION));
+
+      m_thd->variables.option_bits &= ~OPTION_AUTOCOMMIT;
+      m_thd->variables.option_bits |= OPTION_NOT_AUTOCOMMIT;
+    }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_handler.cc
+Function: prepare_transaction_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_group_replication.cc
+Function: get_server_startup_prerequirements
+void get_server_startup_prerequirements(Trans_context_info &requirements) {
+  requirements.binlog_enabled = opt_bin_log;
+  requirements.binlog_format = global_system_variables.binlog_format;
+  requirements.binlog_checksum_options = binlog_checksum_options;
+  requirements.gtid_mode = global_gtid_mode.get();
+  requirements.log_replica_updates = opt_log_replica_updates;
+  requirements.transaction_write_set_extraction =
+      global_system_variables.transaction_write_set_extraction;
+  requirements.mi_repository_type = opt_mi_repository_id;
+  requirements.rli_repository_type = opt_rli_repository_id;
+  requirements.parallel_applier_type = mts_parallel_option;
+  requirements.parallel_applier_workers = opt_mts_replica_parallel_workers;
+  requirements.parallel_applier_preserve_commit_order =
+      opt_replica_preserve_commit_order;
+  requirements.lower_case_table_names = lower_case_table_names;
+  requirements.default_table_encryption =
+      global_system_variables.default_table_encryption;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::process_iterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_func.cc
+Function: get_var_with_binlog
+      get_var_with_binlog(thd, thd->lex->sql_command, name, &var_entry))
+    return error_str();
+  if (var_entry == nullptr) return error_str();  // No such variable
+  String *res = var_entry->val_str(&null_value, str, decimals);
+  if (res && !my_charset_same(res->charset(), collation.collation)) {
+    String tmpstr;
+    uint error;
+    if (tmpstr.copy(res->ptr(), res->length(), res->charset(),
+                    collation.collation, &error) ||
+        error > 0) {
+      char tmp[32];
+      convert_to_printable(tmp, sizeof(tmp), res->ptr(), res->length(),
+                           res->charset(), 6);
+      my_error(ER_INVALID_CHARACTER_STRING, MYF(0), collation.collation->csname,
+               tmp);
+      return error_str();
+    }
+    if (str->copy(tmpstr)) return error_str();
+    return str;
+  }
+
+

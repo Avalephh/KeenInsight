@@ -1,0 +1,550 @@
+{
+    "MySQL_Parameters": {
+        "tmp_table_size": [
+            "int",
+            "linear",
+            [
+                1024,
+                1073741824
+            ]
+        ],
+        "max_heap_table_size": [
+            "int",
+            "linear",
+            [
+                16384,
+                1073741824
+            ]
+        ],
+        "query_prealloc_size": [
+            "int",
+            "linear",
+            [
+                8192,
+                134217728
+            ]
+        ],
+        "innodb_thread_concurrency": [
+            "int",
+            "linear",
+            [
+                0,
+                1000
+            ]
+        ],
+        "sort_buffer_size": [
+            "int",
+            "linear",
+            [
+                32768,
+                134217728
+            ]
+        ],
+        "innodb_buffer_pool_size": [
+            "int",
+            "linear",
+            [
+                5242880,
+                18446744073709551615
+            ]
+        ],
+        "innodb_max_dirty_pages_pct_lwm": [
+            "int",
+            "linear",
+            [
+                0,
+                99
+            ]
+        ],
+        "innodb_compression_failure_threshold_pct": [
+            "int",
+            "linear",
+            [
+                0,
+                100
+            ]
+        ],
+        "innodb_online_alter_log_max_size": [
+            "int",
+            "linear",
+            [
+                65536,
+                18446700000000000000
+            ]
+        ],
+        "innodb_purge_batch_size": [
+            "int",
+            "linear",
+            [
+                1,
+                5000
+            ]
+        ],
+        "innodb_max_dirty_pages_pct": [
+            "int",
+            "linear",
+            [
+                0,
+                99
+            ]
+        ],
+        "innodb_lru_scan_depth": [
+            "int",
+            "linear",
+            [
+                100,
+                10240
+            ]
+        ],
+        "innodb_stats_transient_sample_pages": [
+            "int",
+            "linear",
+            [
+                1,
+                100
+            ]
+        ],
+        "div_precision_increment": [
+            "int",
+            "linear",
+            [
+                0,
+                30
+            ]
+        ],
+        "innodb_spin_wait_delay": [
+            "int",
+            "linear",
+            [
+                0,
+                1000
+            ]
+        ],
+        "innodb_compression_pad_pct_max": [
+            "int",
+            "linear",
+            [
+                0,
+                75
+            ]
+        ],
+        "innodb_concurrency_tickets": [
+            "int",
+            "linear",
+            [
+                1,
+                4294967295
+            ]
+        ],
+        "innodb_read_ahead_threshold": [
+            "int",
+            "linear",
+            [
+                0,
+                64
+            ]
+        ],
+        "innodb_change_buffer_max_size": [
+            "int",
+            "linear",
+            [
+                0,
+                50
+            ]
+        ],
+        "max_user_connections": [
+            "int",
+            "linear",
+            [
+                0,
+                4294967295
+            ]
+        ],
+        "key_cache_block_size": [
+            "int",
+            "linear",
+            [
+                512,
+                16384
+            ]
+        ],
+        "innodb_autoextend_increment": [
+            "int",
+            "linear",
+            [
+                1,
+                1000
+            ]
+        ],
+        "join_buffer_size": [
+            "int",
+            "linear",
+            [
+                128,
+                1073741824
+            ]
+        ],
+        "host_cache_size": [
+            "int",
+            "linear",
+            [
+                0,
+                65536
+            ]
+        ],
+        "innodb_adaptive_max_sleep_delay": [
+            "int",
+            "linear",
+            [
+                0,
+                1000000
+            ]
+        ],
+        "table_open_cache": [
+            "int",
+            "linear",
+            [
+                1,
+                524288
+            ]
+        ],
+        "net_write_timeout": [
+            "int",
+            "linear",
+            [
+                1,
+                120
+            ]
+        ],
+        "thread_cache_size": [
+            "int",
+            "linear",
+            [
+                0,
+                16384
+            ]
+        ],
+        "binlog_group_commit_sync_delay": [
+            "int",
+            "linear",
+            [
+                0,
+                1000000
+            ]
+        ],
+        "binlog_group_commit_sync_no_delay_count": [
+            "int",
+            "linear",
+            [
+                0,
+                100000
+            ]
+        ],
+        "innodb_log_write_ahead_size": [
+            "int",
+            "linear",
+            [
+                512,
+                16384
+            ]
+        ],
+        "innodb_max_undo_log_size": [
+            "int",
+            "linear",
+            [
+                10485760,
+                18446700000000000000
+            ]
+        ],
+        "innodb_purge_rseg_truncate_frequency": [
+            "int",
+            "linear",
+            [
+                1,
+                128
+            ]
+        ],
+        "innodb_buffer_pool_dump_pct": [
+            "int",
+            "linear",
+            [
+                0,
+                100
+            ]
+        ],
+        "range_optimizer_max_mem_size": [
+            "int",
+            "linear",
+            [
+                4096,
+                18446744073709551615
+            ]
+        ],
+        "rpl_stop_slave_timeout": [
+            "int",
+            "linear",
+            [
+                2,
+                31536000
+            ]
+        ],
+        "innodb_log_spin_cpu_abs_lwm": [
+            "int",
+            "linear",
+            [
+                0,
+                4294967295
+            ]
+        ],
+        "innodb_log_spin_cpu_pct_hwm": [
+            "int",
+            "linear",
+            [
+                0,
+                100
+            ]
+        ],
+        "innodb_log_wait_for_flush_spin_hwm": [
+            "int",
+            "linear",
+            [
+                0,
+                18446744073709551615
+            ]
+        ],
+        "max_relay_log_size": [
+            "int",
+            "linear",
+            [
+                0,
+                1073741824
+            ]
+        ],
+        "rpl_read_size": [
+            "int",
+            "linear",
+            [
+                8192,
+                4294959104
+            ]
+        ],
+        "stored_program_definition_cache": [
+            "int",
+            "linear",
+            [
+                256,
+                524288
+            ]
+        ],
+        "tablespace_definition_cache": [
+            "int",
+            "linear",
+            [
+                256,
+                524288
+            ]
+        ],
+        "temptable_max_ram": [
+            "int",
+            "linear",
+            [
+                2097152,
+                18446744073709551615
+            ]
+        ],
+        "binlog_cache_size": [
+            "int",
+            "linear",
+            [
+                4096,
+                4294967296
+            ]
+        ],
+        "innodb_flush_log_at_trx_commit": [
+            "enum",
+            "linear",
+            [
+                "0",
+                "1",
+                "2"
+            ]
+        ],
+        "innodb_io_capacity": [
+            "int",
+            "linear",
+            [
+                100,
+                2000000
+            ]
+        ],
+        "innodb_log_buffer_size": [
+            "int",
+            "linear",
+            [
+                262144,
+                4294967295
+            ]
+        ],
+        "innodb_log_file_size": [
+            "int",
+            "linear",
+            [
+                4194304,
+                1073741824
+            ]
+        ],
+        "max_connections": [
+            "int",
+            "linear",
+            [
+                1,
+                100000
+            ]
+        ],
+        "innodb_thread_sleep_delay": [
+            "int",
+            "linear",
+            [
+                0,
+                1000000
+            ]
+        ],
+        "read_buffer_size": [
+            "int",
+            "linear",
+            [
+                8192,
+                2147479552
+            ]
+        ],
+        "read_rnd_buffer_size": [
+            "int",
+            "linear",
+            [
+                1,
+                134217728
+            ]
+        ],
+        "range_alloc_block_size": [
+            "int",
+            "linear",
+            [
+                4096,
+                65536
+            ]
+        ],
+        "net_read_timeout": [
+            "int",
+            "linear",
+            [
+                1,
+                60
+            ]
+        ],
+        "bulk_insert_buffer_size": [
+            "int",
+            "linear",
+            [
+                0,
+                83886080
+            ]
+        ],
+        "low_priority_updates": [
+            "enum",
+            "linear",
+            [
+                "ON",
+                "OFF"
+            ]
+        ],
+        "innodb_adaptive_flushing": [
+            "enum",
+            "linear",
+            [
+                "ON",
+                "OFF"
+            ]
+        ],
+        "preload_buffer_size": [
+            "int",
+            "linear",
+            [
+                1024,
+                1073741824
+            ]
+        ],
+        "optimizer_search_depth": [
+            "int",
+            "linear",
+            [
+                0,
+                62
+            ]
+        ],
+        "innodb_flush_neighbors": [
+            "enum",
+            "linear",
+            [
+                "0",
+                "1",
+                "2"
+            ]
+        ],
+        "innodb_sync_array_size": [
+            "int",
+            "linear",
+            [
+                1,
+                1024
+            ]
+        ],
+        "innodb_random_read_ahead": [
+            "enum",
+            "linear",
+            [
+                "ON",
+                "OFF"
+            ]
+        ],
+        "innodb_flush_sync": [
+            "enum",
+            "linear",
+            [
+                "ON",
+                "OFF"
+            ]
+        ],
+        "sync_binlog": [
+            "int",
+            "linear",
+            [
+                0,
+                4294967295
+            ]
+        ],
+        "innodb_rollback_segments": [
+            "int",
+            "linear",
+            [
+                1,
+                128
+            ]
+        ],
+        "connect_timeout": [
+            "int",
+            "linear",
+            [
+                2,
+                31536000
+            ]
+        ],
+        "innodb_sort_buffer_size": [
+            "int",
+            "linear",
+            [
+                65536,
+                67108864
+            ]
+        ]
+    }
+}

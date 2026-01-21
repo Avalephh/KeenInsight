@@ -1,0 +1,112 @@
+Global Variable: System_variables.114
+Explicit Data Flow (62):
+  Instruction: %10 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:303:26 | Function: set_db_default_charset
+  Instruction: store %struct.CHARSET_INFO* %10, %struct.CHARSET_INFO** %default_table_charset6, align 8, !dbg !1255313 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:302:42 | Function: set_db_default_charset
+  Instruction: %default_table_charset6 = getelementptr inbounds %struct.HA_CREATE_INFO, %struct.HA_CREATE_INFO* %11, i32 0, i32 1, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/sql_db.cc:302:20 | Function: set_db_default_charset
+  Instruction: %default_table_charset = getelementptr inbounds %struct.HA_CREATE_INFO, %struct.HA_CREATE_INFO* %create_info, i32 0, i32 1, !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:535:15 | Function: Sql_cmd_create_or_drop_index_base::execute
+  Instruction: store %struct.CHARSET_INFO* %21, %struct.CHARSET_INFO** %default_table_charset, align 8, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc:535:37 | Function: Sql_cmd_create_or_drop_index_base::execute
+  Instruction: %default_table_charset = getelementptr inbounds %struct.HA_CREATE_INFO, %struct.HA_CREATE_INFO* %this1, i32 0, i32 1, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:2593:5 | Function: HA_CREATE_INFO::init_create_options_from_share
+  Instruction: store %struct.CHARSET_INFO* %11, %struct.CHARSET_INFO** %default_table_charset, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/handler.cc:2593:27 | Function: HA_CREATE_INFO::init_create_options_from_share
+  Instruction: %148 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255681 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1547:46 | Function: lex_one_token
+  Instruction: store %struct.CHARSET_INFO* %148, %struct.CHARSET_INFO** %underscore_cs, align 8, !dbg !1255682 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1547:29 | Function: lex_one_token
+  Instruction: %149 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %underscore_cs, align 8, !dbg !1255684 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1549:31 | Function: lex_one_token
+  Instruction: store %struct.CHARSET_INFO* %149, %struct.CHARSET_INFO** %charset, align 8, !dbg !1255687 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1549:29 | Function: lex_one_token
+  Instruction: %151 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %underscore_cs, align 8, !dbg !1255688 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1550:36 | Function: lex_one_token
+  Instruction: store %struct.CHARSET_INFO* %151, %struct.CHARSET_INFO** %m_underscore_cs, align 8, !dbg !1255691 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1550:34 | Function: lex_one_token
+  Instruction: %m_underscore_cs = getelementptr inbounds %class.Lex_input_stream.13525, %class.Lex_input_stream.13525* %152, i32 0, i32 38, !dbg !1255690 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1550:18 | Function: lex_one_token
+  Instruction: %m_underscore_cs685 = getelementptr inbounds %class.Lex_input_stream.13525, %class.Lex_input_stream.13525* %509, i32 0, i32 38, !dbg !1256369 | Location: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc:1815:14 | Function: lex_one_token
+  Instruction: %21 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8422:26 | Function: set_table_default_charset
+  Instruction: store %struct.CHARSET_INFO* %21, %struct.CHARSET_INFO** %default_table_charset18, align 8, !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8421:42 | Function: set_table_default_charset
+  Instruction: %default_table_charset18 = getelementptr inbounds %struct.HA_CREATE_INFO.24040, %struct.HA_CREATE_INFO.24040* %22, i32 0, i32 1, !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8421:20 | Function: set_table_default_charset
+  Instruction: %default_table_charset = getelementptr inbounds %struct.HA_CREATE_INFO.24040, %struct.HA_CREATE_INFO.24040* %create_info, i32 0, i32 1, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:18732:15 | Function: mysql_recreate_table
+  Instruction: store %struct.CHARSET_INFO* %12, %struct.CHARSET_INFO** %default_table_charset, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:18732:37 | Function: mysql_recreate_table
+  Instruction: %default_table_charset32 = getelementptr inbounds %struct.HA_CREATE_INFO.24040, %struct.HA_CREATE_INFO.24040* %31, i32 0, i32 1, !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8432:18 | Function: set_table_default_charset
+  Instruction: store %struct.CHARSET_INFO* %call31, %struct.CHARSET_INFO** %default_table_charset32, align 8, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8432:40 | Function: set_table_default_charset
+  Instruction: %11 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/create_field.cc:215:30 | Function: Create_field::init
+  Instruction: store %struct.CHARSET_INFO* %11, %struct.CHARSET_INFO** %charset, align 8, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/create_field.cc:215:13 | Function: Create_field::init
+  Instruction: %charset = getelementptr inbounds %class.Create_field, %class.Create_field* %this3, i32 0, i32 14, !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/create_field.cc:215:5 | Function: Create_field::init
+  Instruction: %charset43 = getelementptr inbounds %class.Create_field, %class.Create_field* %56, i32 0, i32 14, !dbg !1255443 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc:6559:35 | Function: innobase_rename_or_enlarge_columns_cache
+  Instruction: %57 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %charset43, align 8, !dbg !1255443 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc:6559:35 | Function: innobase_rename_or_enlarge_columns_cache
+  Instruction: %number44 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %57, i32 0, i32 0, !dbg !1255444 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc:6559:44 | Function: innobase_rename_or_enlarge_columns_cache
+  Instruction: %58 = load i32, i32* %number44, align 8, !dbg !1255444 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc:6559:44 | Function: innobase_rename_or_enlarge_columns_cache
+  Instruction: %conv45 = zext i32 %58 to i64, !dbg !1255442 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc:6559:31 | Function: innobase_rename_or_enlarge_columns_cache
+  Instruction: store i64 %conv45, i64* %new_charset, align 8, !dbg !1255441 | Location: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc:6559:17 | Function: innobase_rename_or_enlarge_columns_cache
+  Instruction: %25 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:238:31 | Function: PT_set_names::contextualize
+  Instruction: %cmp20 = icmp ne %struct.CHARSET_INFO* %23, %25, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:238:13 | Function: PT_set_names::contextualize
+  Instruction: br i1 %cmp20, label %if.then21, label %if.else24, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:237:9 | Function: PT_set_names::contextualize
+  Instruction: %27 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb423, align 8, !dbg !1255355 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:239:28 | Function: PT_set_names::contextualize
+  Instruction: store %struct.CHARSET_INFO* %27, %struct.CHARSET_INFO** %cs3, align 8, !dbg !1255356 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:239:11 | Function: PT_set_names::contextualize
+  Instruction: store %struct.CHARSET_INFO* %385, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255750 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4706:54 | Function: Query_log_event::do_apply_event
+  Instruction: %default_collation_for_utf8mb4 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables527, i32 0, i32 114, !dbg !1255749 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4706:24 | Function: Query_log_event::do_apply_event
+  Instruction: %default_collation_for_utf8mb4 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables84, i32 0, i32 114, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:26 | Function: Query_log_event::Query_log_event
+  Instruction: %104 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:26 | Function: Query_log_event::Query_log_event
+  Instruction: %number85 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %104, i32 0, i32 0, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:57 | Function: Query_log_event::Query_log_event
+  Instruction: %105 = load i32, i32* %number85, align 8, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:57 | Function: Query_log_event::Query_log_event
+  Instruction: %conv86 = trunc i32 %105 to i16, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:7 | Function: Query_log_event::Query_log_event
+  Instruction: store i16 %conv86, i16* %default_collation_for_utf8mb4_number, align 8, !dbg !1255397 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3840:40 | Function: Query_log_event::Query_log_event
+  Instruction: %default_collation_for_utf8mb4_number = getelementptr inbounds %"class.binary_log::Query_event", %"class.binary_log::Query_event"* %109, i32 0, i32 39, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3840:3 | Function: Query_log_event::Query_log_event
+  Instruction: %default_collation_for_utf8mb4_number785 = getelementptr inbounds %"class.binary_log::Query_event", %"class.binary_log::Query_event"* %this1, i32 0, i32 39, !dbg !1255756 | Location: /root/LLVM/mysql-8.0.36/libbinlogevents/src/statement_events.cpp:324:9 | Function: binary_log::Query_event::Query_event
+  Instruction: store i16 %call784, i16* %default_collation_for_utf8mb4_number785, align 8, !dbg !1255756 | Location: /root/LLVM/mysql-8.0.36/libbinlogevents/src/statement_events.cpp:324:9 | Function: binary_log::Query_event::Query_event
+  Instruction: %default_collation_for_utf8mb4_number = getelementptr inbounds %"class.binary_log::Query_event", %"class.binary_log::Query_event"* %this1, i32 0, i32 39, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/libbinlogevents/src/statement_events.cpp:136:7 | Function: binary_log::Query_event::Query_event
+  Instruction: store %struct.CHARSET_INFO* @my_charset_utf8mb4_general_ci, %struct.CHARSET_INFO** %default_collation_for_utf8mb4531, align 8, !dbg !1255755 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4710:54 | Function: Query_log_event::do_apply_event
+  Instruction: %default_collation_for_utf8mb4531 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables530, i32 0, i32 114, !dbg !1255754 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4710:24 | Function: Query_log_event::do_apply_event
+  Instruction: %93 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:26 | Function: Query_log_event::Query_log_event
+  Instruction: %number77 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %93, i32 0, i32 0, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:57 | Function: Query_log_event::Query_log_event
+  Instruction: %94 = load i32, i32* %number77, align 8, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:57 | Function: Query_log_event::Query_log_event
+  Instruction: %conv78 = trunc i32 %94 to i16, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3841:7 | Function: Query_log_event::Query_log_event
+  Instruction: store i16 %conv78, i16* %default_collation_for_utf8mb4_number, align 8, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3840:40 | Function: Query_log_event::Query_log_event
+  Instruction: %default_collation_for_utf8mb4_number = getelementptr inbounds %"class.binary_log::Query_event", %"class.binary_log::Query_event"* %98, i32 0, i32 39, !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3840:3 | Function: Query_log_event::Query_log_event
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc:83:22 | Function: dd::info_schema::build_show_character_set_query
+  Instruction: %cmp = icmp eq %struct.CHARSET_INFO* %3, @my_charset_utf8mb4_0900_ai_ci, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc:83:52 | Function: dd::info_schema::build_show_character_set_query
+  Instruction: br i1 %cmp, label %if.then2, label %if.else, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc:83:7 | Function: dd::info_schema::build_show_character_set_query
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %default_collation_for_utf8mb4, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc:209:22 | Function: dd::info_schema::build_show_collation_query
+  Instruction: %cmp = icmp eq %struct.CHARSET_INFO* %3, @my_charset_utf8mb4_0900_ai_ci, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc:209:52 | Function: dd::info_schema::build_show_collation_query
+  Instruction: br i1 %cmp, label %if.then4, label %if.else, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc:209:7 | Function: dd::info_schema::build_show_collation_query
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator new
+  Controlled Function: Item_string::Item_string
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator new
+  Controlled Function: Item_string::Item_string
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator new
+  Controlled Function: mem_root_deque
+  Controlled Function: Item::operator new
+  Controlled Function: Item_uint::Item_uint
+  Controlled Function: Item::operator delete
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item_string::Item_string
+  Controlled Function: mem_root_deque
+  Controlled Function: mem_root_deque
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item_uint::Item_uint
+  Controlled Function: mem_root_deque
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item_string::Item_string
+  Controlled Function: mem_root_deque
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator new
+  Controlled Function: Item::operator delete
+  Controlled Function: Item::operator delete
+
+Implicit Control Flow:
+
+----------------------------------------

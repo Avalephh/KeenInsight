@@ -1,0 +1,62 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0write.cc
+Function: log_wait_for_flush 
+/** Waits until redo log is flushed up to provided lsn (or greater).
+@param[in]      log     redo log
+@param[in]      lsn     wait until log.flushed_to_disk_lsn >= lsn
+@param[in,out]  interrupted     if true, was interrupted, needs retry.
+@return         statistics related to waiting inside */
+static Wait_stats log_wait_for_flush(const log_t &log, lsn_t lsn,
+                                     bool *interrupted) {
+  if (log.write_lsn.load(std::memory_order_relaxed) < lsn) {
+    os_event_set(log.writer_event);
+  }
+  os_event_set(log.flusher_event);
+
+  uint64_t max_spins = log_max_spins_when_waiting_in_user_thread(
+      srv_log_wait_for_flush_spin_delay);
+
+  if (log.flush_avg_time >= srv_log_wait_for_flush_spin_hwm) {
+    max_spins = 0;
+  }
+
+  auto stop_condition = [&log, lsn, interrupted](bool wait) {
+    log_sync_point("log_wait_for_flush_before_flushed_to_disk_lsn");
+
+    if (log.flushed_to_disk_lsn.load() >= lsn) {
+      *interrupted = false;
+      return true;
+    }
+
+    if (UNIV_UNLIKELY(
+            log.writer_threads_paused.load(std::memory_order_relaxed))) {
+      *interrupted = true;
+      return true;
+    }
+
+    if (wait) {
+      if (log.write_lsn.load(std::memory_order_relaxed) < lsn) {
+        os_event_set(log.writer_event);
+      }
+
+      os_event_set(log.flusher_event);
+    }
+
+    log_sync_point("log_wait_for_flush_before_wait");
+    return false;
+  };
+
+  const size_t slot = log_compute_flush_event_slot(log, lsn);
+
+  thd_wait_begin(nullptr, THD_WAIT_GROUP_COMMIT);
+  const auto wait_stats =
+      os_event_wait_for(log.flush_events[slot], max_spins,
+                        get_srv_log_wait_for_flush_timeout(), stop_condition);
+
+  thd_wait_end(nullptr);
+
+  MONITOR_INC_WAIT_STATS(MONITOR_LOG_ON_FLUSH_, wait_stats);
+
+  return wait_stats;
+}
+

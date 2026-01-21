@@ -1,0 +1,22 @@
+Global Variable: System_variables.104
+Explicit Data Flow (10):
+  Instruction: %14 = load i64, i64* %max_execution_time8, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:190:59 | Function: is_timer_applicable_to_statement
+  Instruction: %tobool9 = icmp ne i64 %14, 0, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:190:44 | Function: is_timer_applicable_to_statement
+  Instruction: br i1 %tobool9, label %land.rhs, label %land.end, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:190:79 | Function: is_timer_applicable_to_statement
+  Instruction: %7 = load i64, i64* %max_execution_time3, align 8, !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:165:57 | Function: get_max_execution_time
+  Instruction: %cond = phi i64 [ %5, %cond.true ], [ %7, %cond.false ], !dbg !1255282 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:164:11 | Function: get_max_execution_time
+  Instruction: ret i64 %cond, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:164:3 | Function: get_max_execution_time
+  Instruction: %call = call i64 @_ZL22get_max_execution_timeP3THD(%class.THD.22487* %0), !dbg !1255283 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:203:30 | Function: set_statement_timer
+  Instruction: store i64 %call, i64* %max_execution_time, align 8, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:203:9 | Function: set_statement_timer
+  Instruction: %9 = load i64, i64* %max_execution_time, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:212:53 | Function: set_statement_timer
+  Instruction: %call6 = call %struct.THD_timer_info* bitcast (%struct.THD_timer_info* (%class.THD*, %struct.THD_timer_info*, i64)* @_Z13thd_timer_setP3THDP14THD_timer_infom to %struct.THD_timer_info* (%class.THD.22487*, %struct.THD_timer_info*, i64)*)(%class.THD.22487* %6, %struct.THD_timer_info* %8, i64 %9), !dbg !1255290 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:212:16 | Function: set_statement_timer
+
+Implicit Data Flow (1):
+  Instruction: %17 = phi i1 [ false, %lor.lhs.false ], [ false, %land.lhs.true3 ], [ false, %land.lhs.true2 ], [ false, %land.lhs.true ], [ false, %entry ], [ %lnot, %land.rhs ], !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/sql_select.cc:0:0is_timer_applicable_to_statement
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

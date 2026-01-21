@@ -1,0 +1,1914 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Transaction_state_tracker::update
+bool Session_sysvars_tracker::update(THD *thd) {
+  if (!thd->variables.track_sysvars_ptr) return false;
+  m_enabled = orig_list->update(tool_list, thd);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Transaction_state_tracker::store
+bool Session_sysvars_tracker::store(THD *thd, String &buf) {
+  SHOW_VAR *show;
+
+  if (!(show = (SHOW_VAR *)thd->alloc(sizeof(SHOW_VAR)))) return true;
+
+  /* As its always system variable. */
+  show->type = SHOW_SYS;
+
+  /*
+    Return the variables in sorted order. This isn't a protocol requirement
+    (and thus, we don't need to care about collations), but it makes for easier
+    testing when things are deterministic and not in hash order.
+  */
+  std::vector<sysvar_node_st *> vars;
+  for (const auto &key_and_value : *orig_list) {
+    vars.push_back(key_and_value.second.get());
+  }
+  std::sort(vars.begin(), vars.end(),
+            [](const sysvar_node_st *a, const sysvar_node_st *b) {
+              return to_string(a->m_sysvar_name) < to_string(b->m_sysvar_name);
+            });
+
+  for (sysvar_node_st *node : vars) {
+    if (!node->m_changed) {
+      continue;
+    }
+    if (is_component_registered_var_name(node->m_sysvar_name.str)) {
+      /*
+        The current system variable is a component-registered one.
+        Currently, all component variables are "global" (i.e. not "session").
+        Thus, simply skip them:
+      */
+      continue;
+    }
+    auto f = [thd, &buf, show, node](const System_variable_tracker &,
+                                     sys_var *var) {
+      show->name = var->name.str;
+      show->value = (char *)var;
+
+      char val_buf[1024];
+      size_t val_length;
+      const CHARSET_INFO *charset;
+      const char *value =
+          get_one_variable(thd, show, OPT_SESSION, show->type, nullptr,
+                           &charset, val_buf, &val_length);
+
+      size_t length = net_length_size(node->m_sysvar_name.length) +
+                      node->m_sysvar_name.length + net_length_size(val_length) +
+                      val_length;
+      /* allocate 1 bytes more for session state type. */
+      uchar *to =
+          (uchar *)buf.prep_append(net_length_size(length) + 1, EXTRA_ALLOC);
+
+      /* Session state type (SESSION_TRACK_SYSTEM_VARIABLES) */
+      to = net_store_length(to, (ulonglong)SESSION_TRACK_SYSTEM_VARIABLES);
+
+      /* Length of the overall entity. */
+      net_store_length(to, (ulonglong)length);
+
+      /* System variable's name (length-encoded string). */
+      store_lenenc_string(buf, node->m_sysvar_name.str,
+                          node->m_sysvar_name.length);
+
+      DBUG_EXECUTE_IF(
+          "store_100_chars_charset_set_client_name",
+          if (!strncmp(node->m_sysvar_name.str, "character_set_client",
+                       node->m_sysvar_name.length)) {
+            value =
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789"
+                "0123456789";
+            val_length = 100;
+          });
+
+      /* System variable's value (length-encoded string). */
+      store_lenenc_string(buf, value, val_length);
+    };
+    if (System_variable_tracker::make_tracker(
+            to_string_view(node->m_sysvar_name))
+            .access_system_variable(thd, f, Suppress_not_found_error::YES)) {
+      continue;
+    }
+  }
+
+  reset();
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp_head.cc
+Function: sp_head::execute_procedure
+bool sp_head::execute_procedure(THD *thd, mem_root_deque<Item *> *args) {
+  bool err_status = false;
+  uint params = m_root_parsing_ctx->context_var_count();
+  /* Query start time may be reset in a multi-stmt SP; keep this for later. */
+  ulonglong lock_usec_before_sp_exec;
+  thd->push_lock_usec(lock_usec_before_sp_exec);
+  sp_rcontext *parent_sp_runtime_ctx = thd->sp_runtime_ctx;
+  sp_rcontext *sp_runtime_ctx_saved = thd->sp_runtime_ctx;
+  bool save_enable_slow_log = false;
+  bool save_log_general = false;
+
+  DBUG_TRACE;
+  DBUG_PRINT("info", ("procedure %s", m_name.str));
+
+  // Argument count has been validated in prepare function.
+  assert((args != nullptr ? args->size() : 0) == params);
+
+  if (!parent_sp_runtime_ctx) {
+    // Create a temporary old context. We need it to pass OUT-parameter values.
+    parent_sp_runtime_ctx =
+        sp_rcontext::create(thd, m_root_parsing_ctx, nullptr);
+
+    if (!parent_sp_runtime_ctx) return true;
+
+    parent_sp_runtime_ctx->sp = nullptr;
+    thd->sp_runtime_ctx = parent_sp_runtime_ctx;
+
+    /* set callers_arena to thd, for upper-level function to work */
+    thd->sp_runtime_ctx->callers_arena = thd;
+  }
+
+  sp_rcontext *proc_runtime_ctx =
+      sp_rcontext::create(thd, m_root_parsing_ctx, nullptr);
+
+  if (!proc_runtime_ctx) {
+    thd->sp_runtime_ctx = sp_runtime_ctx_saved;
+
+    if (!sp_runtime_ctx_saved) ::destroy(parent_sp_runtime_ctx);
+
+    return true;
+  }
+
+  proc_runtime_ctx->sp = this;
+
+  if (params > 0) {
+    auto it_args = args->begin();
+
+    DBUG_PRINT("info", (" %.*s: eval args", (int)m_name.length, m_name.str));
+
+    for (uint i = 0; i < params; ++i, ++it_args) {
+      Item *arg_item = *it_args;
+      if (!arg_item) break;
+
+      sp_variable *spvar = m_root_parsing_ctx->find_variable(i);
+
+      if (!spvar) continue;
+
+      if (spvar->mode != sp_variable::MODE_IN) {
+        Settable_routine_parameter *srp =
+            arg_item->get_settable_routine_parameter();
+
+        if (!srp) {
+          my_error(ER_SP_NOT_VAR_ARG, MYF(0), i + 1, m_qname.str);
+          err_status = true;
+          break;
+        }
+      }
+
+      if (spvar->mode == sp_variable::MODE_OUT) {
+        Item_null *null_item = new Item_null();
+
+        if (!null_item ||
+            proc_runtime_ctx->set_variable(thd, i, (Item **)&null_item)) {
+          err_status = true;
+          break;
+        }
+      } else {
+        if (proc_runtime_ctx->set_variable(thd, i, &*it_args)) {
+          err_status = true;
+          break;
+        }
+      }
+
+      if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+        TX_TRACKER_GET(tst);
+        tst->add_trx_state_from_thd(thd);
+      }
+    }
+
+    /*
+      Okay, got values for all arguments. Close tables that might be used by
+      arguments evaluation. If arguments evaluation required prelocking mode,
+      we'll leave it here.
+    */
+    thd->lex->cleanup(true);
+
+    if (!thd->in_sub_stmt) {
+      thd->get_stmt_da()->set_overwrite_status(true);
+      thd->is_error() ? trans_rollback_stmt(thd) : trans_commit_stmt(thd);
+      thd->get_stmt_da()->set_overwrite_status(false);
+    }
+
+    thd_proc_info(thd, "closing tables");
+    close_thread_tables(thd);
+    thd_proc_info(thd, nullptr);
+
+    if (!thd->in_sub_stmt) {
+      if (thd->transaction_rollback_request) {
+        trans_rollback_implicit(thd);
+        thd->mdl_context.release_transactional_locks();
+      } else if (!thd->in_multi_stmt_transaction_mode())
+        thd->mdl_context.release_transactional_locks();
+      else
+        thd->mdl_context.release_statement_locks();
+    }
+
+    thd->rollback_item_tree_changes();
+
+    DBUG_PRINT("info",
+               (" %.*s: eval args done", (int)m_name.length, m_name.str));
+  }
+  if (!(m_flags & LOG_SLOW_STATEMENTS) && thd->enable_slow_log) {
+    DBUG_PRINT("info", ("Disabling slow log for the execution"));
+    save_enable_slow_log = true;
+    thd->enable_slow_log = false;
+  }
+  if (!(m_flags & LOG_GENERAL_LOG) &&
+      !(thd->variables.option_bits & OPTION_LOG_OFF)) {
+    DBUG_PRINT("info", ("Disabling general log for the execution"));
+    save_log_general = true;
+    /* disable this bit */
+    thd->variables.option_bits |= OPTION_LOG_OFF;
+  }
+  thd->sp_runtime_ctx = proc_runtime_ctx;
+
+  Security_context *save_security_ctx = nullptr;
+  if (!err_status) err_status = set_security_ctx(thd, &save_security_ctx);
+
+  opt_trace_disable_if_no_stored_proc_func_access(thd, this);
+
+#ifdef HAVE_PSI_SP_INTERFACE
+  PSI_sp_locker_state psi_state;
+  PSI_sp_locker *locker;
+
+  locker = MYSQL_START_SP(&psi_state, m_sp_share);
+#endif
+  if (!err_status) err_status = execute(thd, true);
+#ifdef HAVE_PSI_SP_INTERFACE
+  MYSQL_END_SP(locker);
+#endif
+
+  if (save_log_general) thd->variables.option_bits &= ~OPTION_LOG_OFF;
+  if (save_enable_slow_log) thd->enable_slow_log = true;
+  /*
+    In the case when we weren't able to employ reuse mechanism for
+    OUT/INOUT parameters, we should reallocate memory. This
+    allocation should be done on the arena which will live through
+    all execution of calling routine.
+  */
+  thd->sp_runtime_ctx->callers_arena = parent_sp_runtime_ctx->callers_arena;
+
+  if (!err_status && params > 0) {
+    auto it_args = args->cbegin();
+
+    /*
+      Copy back all OUT or INOUT values to the previous frame, or
+      set global user variables
+    */
+    for (uint i = 0; i < params; i++) {
+      Item *arg_item = *it_args++;
+
+      if (!arg_item) break;
+
+      sp_variable *spvar = m_root_parsing_ctx->find_variable(i);
+
+      if (spvar->mode == sp_variable::MODE_IN) continue;
+
+      Settable_routine_parameter *srp =
+          arg_item->get_settable_routine_parameter();
+
+      assert(srp);
+
+      if (srp->set_value(thd, parent_sp_runtime_ctx,
+                         proc_runtime_ctx->get_item_addr(i))) {
+        err_status = true;
+        break;
+      }
+
+      Send_field *out_param_info = new (thd->mem_root) Send_field();
+      proc_runtime_ctx->get_item(i)->make_field(out_param_info);
+      out_param_info->db_name = m_db.str;
+      out_param_info->table_name = m_name.str;
+      out_param_info->org_table_name = m_name.str;
+      out_param_info->col_name = spvar->name.str;
+      out_param_info->org_col_name = spvar->name.str;
+
+      srp->set_out_param_info(out_param_info);
+    }
+  }
+
+  if (save_security_ctx)
+    m_security_ctx.restore_security_context(thd, save_security_ctx);
+
+  if (!sp_runtime_ctx_saved) ::destroy(parent_sp_runtime_ctx);
+
+  ::destroy(proc_runtime_ctx);
+  thd->sp_runtime_ctx = sp_runtime_ctx_saved;
+  thd->pop_lock_usec(lock_usec_before_sp_exec);
+
+  /*
+    If not inside a procedure and a function printing warning
+    messages.
+  */
+  bool need_binlog_call = mysql_bin_log.is_open() &&
+                          (thd->variables.option_bits & OPTION_BIN_LOG) &&
+                          !thd->is_current_stmt_binlog_format_row();
+  if (need_binlog_call && thd->sp_runtime_ctx == nullptr &&
+      !thd->binlog_evt_union.do_union)
+    thd->issue_unsafe_warnings();
+
+  return err_status;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp_instr.cc
+Function: sp_lex_instr::reset_lex_and_exec_core
+bool sp_lex_instr::reset_lex_and_exec_core(THD *thd, uint *nextp,
+                                           bool open_tables) {
+  /*
+    The flag is saved at the entry to the following substatement.
+    It's reset further in the common code part.
+    It's merged with the saved parent's value at the exit of this func.
+  */
+
+  unsigned int parent_unsafe_rollback_flags =
+      thd->get_transaction()->get_unsafe_rollback_flags(Transaction_ctx::STMT);
+  thd->get_transaction()->reset_unsafe_rollback_flags(Transaction_ctx::STMT);
+
+  /* Check pre-conditions. */
+
+  assert(thd->change_list.is_empty());
+
+  /*
+    Use our own lex.
+
+    Although it is saved/restored in sp_head::execute() when we are
+    entering/leaving routine, it's still should be saved/restored here,
+    in order to properly behave in case of ER_NEED_REPREPARE error
+    (when ER_NEED_REPREPARE happened, and we failed to re-parse the query).
+  */
+
+  LEX *lex_saved = thd->lex;
+  thd->lex = m_lex;
+  m_lex->thd = thd;
+
+  /* Set new query id. */
+
+  thd->set_query_id(next_query_id());
+
+  if (thd->locked_tables_mode <= LTM_LOCK_TABLES) {
+    /*
+      This statement will enter/leave prelocked mode on its own.
+      Entering prelocked mode changes table list and related members
+      of LEX, so we'll need to restore them.
+    */
+    if (m_lex_query_tables_own_last) {
+      /*
+        We've already entered/left prelocked mode with this statement.
+        Attach the list of tables that need to be prelocked and mark m_lex
+        as having such list attached.
+      */
+      *m_lex_query_tables_own_last = m_prelocking_tables;
+      m_lex->mark_as_requiring_prelocking(m_lex_query_tables_own_last);
+    }
+  }
+
+  bool error = m_lex->check_preparation_invalid(thd);
+
+  m_lex->clear_execution();
+
+  /*
+    In case a session state exists do not cache the SELECT stmt. If we
+    cache SELECT statement when session state information exists, then
+    the result sets of this SELECT are cached which contains changed
+    session information. Next time when same query is executed when there
+    is no change in session state, then result sets are picked from cache
+    which is wrong as the result sets picked from cache have changed
+    state information.
+  */
+
+  if (thd->get_protocol()->has_client_capability(CLIENT_SESSION_TRACK) &&
+      thd->session_tracker.enabled_any() && thd->session_tracker.changed_any())
+    thd->lex->safe_to_cache_query = false;
+
+  SP_instr_error_handler sp_instr_error_handler;
+  thd->push_internal_handler(&sp_instr_error_handler);
+
+  /* Open tables if needed. */
+
+  if (!error) {
+    if (open_tables) {
+      error = execute_expression(thd, nextp);
+      DBUG_PRINT("info", ("exec_expression returned: %d", error));
+    } else {
+      DEBUG_SYNC(thd, "sp_lex_instr_before_exec_core");
+      error = exec_core(thd, nextp);
+      DBUG_PRINT("info", ("exec_core returned: %d", error));
+    }
+  }
+
+  // Pop SP_instr_error_handler error handler.
+  thd->pop_internal_handler();
+
+  if (m_lex->query_tables_own_last) {
+    /*
+      We've entered and left prelocking mode when executing statement
+      stored in m_lex.
+      m_lex->query_tables(->next_global)* list now has a 'tail' - a list
+      of tables that are added for prelocking. (If this is the first
+      execution, the 'tail' was added by open_tables(), otherwise we've
+      attached it above in this function).
+      Now we'll save the 'tail', and detach it.
+    */
+    m_lex_query_tables_own_last = m_lex->query_tables_own_last;
+    m_prelocking_tables = *m_lex_query_tables_own_last;
+    *m_lex_query_tables_own_last = nullptr;
+    m_lex->mark_as_requiring_prelocking(nullptr);
+  }
+
+  /* Rollback changes to the item tree during execution. */
+
+  thd->rollback_item_tree_changes();
+
+  /*
+    Change state of current arena according to outcome of execution.
+
+    When entering this function, state is STMT_INITIALIZED_FOR_SP if this is
+    the first execution, otherwise it is STMT_EXECUTED.
+
+    When a re-prepare error is raised, the next execution will re-prepare the
+    statement. To make sure that items are created in the statement mem_root,
+    change state to STMT_INITIALIZED_FOR_SP.
+
+    When a "table exists" error occurs for CREATE TABLE ... SELECT change state
+    to STMT_INITIALIZED_FOR_SP, as if statement must be reprepared.
+
+      Why is this necessary? A useful pointer would be to note how
+      PREPARE/EXECUTE uses functions like select_like_stmt_test to implement
+      CREATE TABLE .... SELECT. The SELECT part of the DDL is resolved first.
+      Then there is an attempt to create the table. So in the execution phase,
+      if "table exists" error occurs or flush table precedes the execute, the
+      item tree of the select is re-created and followed by an attempt to create
+      the table.
+
+      But SP uses mysql_execute_command (which is used by the conventional
+      execute) after doing a parse. This creates a problem for SP since it
+      tries to preserve the item tree from the previous execution.
+
+    When execution of the statement was started (completed), change state to
+    STMT_EXECUTED.
+
+    When an error occurs before statement execution starts (m_exec_started is
+    false at this stage of execution), state is not changed.
+    (STMT_INITIALIZED_FOR_SP means the statement was never prepared,
+    STMT_EXECUTED means the statement has been prepared and executed before,
+    but some error occurred during table open or execution).
+  */
+  bool reprepare_error = error && thd->is_error() &&
+                         thd->get_stmt_da()->mysql_errno() == ER_NEED_REPREPARE;
+
+  // Unless there is an error, execution must have started (and completed)
+  assert(error || m_lex->is_exec_started());
+
+  if (reprepare_error || sp_instr_error_handler.cts_table_exists_error)
+    thd->stmt_arena->set_state(Query_arena::STMT_INITIALIZED_FOR_SP);
+  else if (m_lex->is_exec_started())
+    thd->stmt_arena->set_state(Query_arena::STMT_EXECUTED);
+
+  /*
+    Merge here with the saved parent's values
+    what is needed from the substatement gained
+  */
+
+  thd->get_transaction()->add_unsafe_rollback_flags(
+      Transaction_ctx::STMT, parent_unsafe_rollback_flags);
+
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+    TX_TRACKER_GET(tst);
+    tst->add_trx_state_from_thd(thd);
+  }
+
+  /* Restore original lex. */
+
+  thd->lex = lex_saved;
+
+  /*
+    Unlike for PS we should not call Item's destructors for newly created
+    items after execution of each instruction in stored routine. This is
+    because SP often create Item (like Item_int, Item_string etc...) when
+    they want to store some value in local variable, pass return value and
+    etc... So their life time should be longer than one instruction.
+
+    cleanup_items() is called in sp_head::execute()
+  */
+
+  return error || thd->is_error();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: check_lock_and_start_stmt not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: check_lock_and_start_stmt not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_base.cc
+Function: check_lock_and_start_stmt not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: my_eof
+void my_eof(THD *thd) {
+  thd->set_row_count_func(-1);
+  thd->get_stmt_da()->set_eof_status(thd);
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+    TX_TRACKER_GET(tst);
+    tst->add_trx_state(thd, TX_RESULT_SET);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc
+Function: mysql_execute_command
+    KILL QUERY may come after cleanup in mysql_execute_command(). Next query
+    execution is interrupted due to this. So resetting THD::killed here.
+
+    THD::killed value can not be KILL_TIMEOUT here as timer used for statement
+    max execution time is disarmed in the cleanup stage of
+    mysql_execute_command. KILL CONNECTION should terminate the connection.
+    Hence resetting THD::killed only for KILL QUERY case here.
+  */
+  if (thd->killed == THD::KILL_QUERY) thd->killed = THD::NOT_KILLED;
+  thd->set_time();
+  if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == false) {
+    /*
+      If the time has gone past end of epoch we need to shutdown the server. But
+      there is possibility of getting invalid time value on some platforms.
+      For example, gettimeofday() might return incorrect value on solaris
+      platform. Hence validating the current time with 5 iterations before
+      initiating the normal server shutdown process because of time getting
+      past 2038.
+    */
+    const int max_tries = 5;
+    LogErr(WARNING_LEVEL, ER_CONFIRMING_THE_FUTURE, max_tries);
+
+    int tries = 0;
+    while (++tries <= max_tries) {
+      thd->set_time();
+      if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == true) {
+        LogErr(WARNING_LEVEL, ER_BACK_IN_TIME, tries);
+        break;
+      }
+      LogErr(WARNING_LEVEL, ER_FUTURE_DATE, tries);
+    }
+    if (tries > max_tries) {
+      /*
+        If the time has got past epoch, we need to shut this server down.
+        We do this by making sure every command is a shutdown and we
+        have enough privileges to shut the server down
+
+        TODO: remove this when we have full 64 bit my_time_t support
+      */
+      LogErr(ERROR_LEVEL, ER_UNSUPPORTED_DATE);
+      ulong master_access = thd->security_context()->master_access();
+      thd->security_context()->set_master_access(master_access | SHUTDOWN_ACL);
+      error = true;
+      kill_mysql();
+    }
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: Sys_var_transaction_read_only::session_update
+bool Sys_var_gtid_next::session_update(THD *thd, set_var *var) {
+  DBUG_TRACE;
+  char buf[Gtid::MAX_TEXT_LENGTH + 1];
+  // Get the value
+  String str(buf, sizeof(buf), &my_charset_latin1);
+  char *res = nullptr;
+  if (!var->value) {
+    // set session gtid_next= default
+    assert(var->save_result.string_value.str);
+    assert(var->save_result.string_value.length);
+    res = var->save_result.string_value.str;
+  } else if (var->value->val_str(&str))
+    res = var->value->val_str(&str)->c_ptr_safe();
+  if (!res) {
+    my_error(ER_WRONG_VALUE_FOR_VAR, MYF(0), name.str, "NULL");
+    return true;
+  }
+  global_sid_lock->rdlock();
+  Gtid_specification spec;
+  if (spec.parse(global_sid_map, res) != RETURN_STATUS_OK) {
+    global_sid_lock->unlock();
+    return true;
+  }
+
+  bool ret = set_gtid_next(thd, spec);
+  // set_gtid_next releases global_sid_lock
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/transaction.cc
+Function: trans_reset_one_shot_chistics
+void trans_reset_one_shot_chistics(THD *thd) {
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+    TX_TRACKER_GET(tst);
+    tst->set_read_flags(thd, TX_READ_INHERIT);
+    tst->set_isol_level(thd, TX_ISOL_INHERIT);
+  }
+
+  thd->tx_isolation = (enum_tx_isolation)thd->variables.transaction_isolation;
+  thd->tx_read_only = thd->variables.transaction_read_only;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: set_tx_isolation
+bool set_tx_isolation(THD *thd, enum_tx_isolation tx_isolation, bool one_shot) {
+  TX_TRACKER_GET(tst);
+
+  if (thd->variables.session_track_transaction_info <= TX_TRACK_NONE)
+    tst = nullptr;
+
+  thd->tx_isolation = tx_isolation;
+
+  if (one_shot) {
+    assert(!thd->in_active_multi_stmt_transaction());
+    assert(!thd->in_sub_stmt);
+    enum enum_tx_isol_level l;
+    switch (thd->tx_isolation) {
+      case ISO_READ_UNCOMMITTED:
+        l = TX_ISOL_UNCOMMITTED;
+        break;
+      case ISO_READ_COMMITTED:
+        l = TX_ISOL_COMMITTED;
+        break;
+      case ISO_REPEATABLE_READ:
+        l = TX_ISOL_REPEATABLE;
+        break;
+      case ISO_SERIALIZABLE:
+        l = TX_ISOL_SERIALIZABLE;
+        break;
+      default:
+        assert(0);
+        return true;
+    }
+    if (tst) tst->set_isol_level(thd, l);
+  } else if (tst) {
+    tst->set_isol_level(thd, TX_ISOL_INHERIT);
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/lock.cc
+Function: mysql_lock_tables
+    mysql_lock_tables() will call
+    table_handler->external_lock(thd,locktype) for each table.
+    This is followed by a call to thr_multi_lock() for all tables.
+
+  - For each statement, we will call table_handler->start_stmt(THD)
+    to inform the table handler that we are using the table.
+
+    The tables used can only be tables used in LOCK TABLES or a
+    temporary table.
+
+  - When statement is done, we will call ha_commit_stmt(thd);
+
+  - When calling UNLOCK TABLES we call mysql_unlock_tables() for all
+    tables used in LOCK TABLES
+
+  If table_handler->external_lock(thd, locktype) fails, we call
+  table_handler->external_lock(thd, F_UNLCK) for each table that was locked,
+  excluding one that caused failure. That means handler must cleanup itself
+  in case external_lock() fails.
+*/
+
+#include "sql/lock.h"
+
+#include <fcntl.h>
+#include <string.h>
+#include <algorithm>
+#include <atomic>
+
+#include "lex_string.h"
+#include "m_ctype.h"
+#include "m_string.h"
+#include "my_base.h"
+#include "my_dbug.h"
+#include "my_inttypes.h"
+#include "my_sqlcommand.h"
+#include "my_sys.h"
+#include "mysql/service_mysql_alloc.h"
+#include "mysql_com.h"
+#include "mysqld_error.h"
+#include "sql/auth/auth_common.h"  // SUPER_ACL
+#include "sql/dd/types/event.h"
+#include "sql/dd/types/function.h"
+#include "sql/dd/types/procedure.h"
+#include "sql/dd/types/resource_group.h"
+#include "sql/debug_sync.h"
+#include "sql/handler.h"
+#include "sql/mysqld.h"  // opt_readonly
+#include "sql/psi_memory_key.h"
+#include "sql/session_tracker.h"
+#include "sql/sql_base.h"  // MYSQL_LOCK_LOG_TABLE
+#include "sql/sql_class.h"
+#include "sql/sql_const.h"
+#include "sql/sql_db.h"  // check_schema_readonly
+#include "sql/sql_lex.h"
+#include "sql/sql_parse.h"  // is_log_table_write_query
+#include "sql/system_variables.h"
+#include "sql/table.h"
+#include "thr_lock.h"
+
+/**
+  @defgroup Locking Locking
+  @{
+*/
+
+/* flags for get_lock_data */
+#define GET_LOCK_UNLOCK 1
+#define GET_LOCK_STORE_LOCKS 2
+
+static MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, size_t count,
+                                 uint flags);
+static int lock_external(THD *thd, TABLE **table, uint count);
+static int unlock_external(THD *thd, TABLE **table, uint count);
+static void print_lock_error(int error, const char *);
+
+/* Map the return value of thr_lock to an error from errmsg.txt */
+static int thr_lock_errno_to_mysql[] = {0, ER_LOCK_ABORTED,
+                                        ER_LOCK_WAIT_TIMEOUT, ER_LOCK_DEADLOCK};
+
+/**
+  Perform semantic checks for mysql_lock_tables.
+  @param thd The current thread
+  @param tables The tables to lock
+  @param count The number of tables to lock
+  @param flags Lock flags
+  @return 0 if all the check passed, non zero if a check failed.
+*/
+static int lock_tables_check(THD *thd, TABLE **tables, size_t count,
+                             uint flags) {
+  uint system_count = 0, i = 0;
+  /*
+    Identifies if the executed sql command can updated either a log
+    or rpl info table.
+  */
+  bool log_table_write_query = false;
+
+  DBUG_TRACE;
+
+  log_table_write_query = is_log_table_write_query(thd->lex->sql_command);
+
+  for (i = 0; i < count; i++) {
+    TABLE *t = tables[i];
+
+    /* Protect against 'fake' partially initialized TABLE_SHARE */
+    assert(t->s->table_category != TABLE_UNKNOWN_CATEGORY);
+
+    /*
+      Table I/O to performance schema tables is performed
+      only internally by the server implementation.
+      When a user is requesting a lock, the following
+      constraints are enforced:
+    */
+    if (t->s->table_category == TABLE_CATEGORY_LOG &&
+        (flags & MYSQL_LOCK_LOG_TABLE) == 0 && !log_table_write_query) {
+      /*
+        A user should not be able to prevent writes,
+        or hold any type of lock in a session,
+        since this would be a DOS attack.
+      */
+      if (t->reginfo.lock_type >= TL_READ_NO_INSERT ||
+          thd->lex->sql_command == SQLCOM_LOCK_TABLES) {
+        my_error(ER_CANT_LOCK_LOG_TABLE, MYF(0));
+        return 1;
+      }
+    }
+
+    if (t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE) {
+      if (t->s->table_category == TABLE_CATEGORY_SYSTEM) system_count++;
+
+      if (t->db_stat & HA_READ_ONLY) {
+        my_error(ER_OPEN_AS_READONLY, MYF(0), t->alias);
+        return 1;
+      }
+    }
+
+    /*
+      If we are going to lock a non-temporary table we must own metadata
+      lock of appropriate type on it (I.e. for table to be locked for
+      write we must own metadata lock of MDL_SHARED_WRITE or stronger
+      type. For table to be locked for read we must own metadata lock
+      of MDL_SHARED_READ or stronger type).
+    */
+    assert(t->s->tmp_table ||
+           thd->mdl_context.owns_equal_or_stronger_lock(
+               MDL_key::TABLE, t->s->db.str, t->s->table_name.str,
+               t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE ? MDL_SHARED_WRITE
+                                                            : MDL_SHARED_READ));
+
+    /*
+      Prevent modifications to base tables if READ_ONLY is activated.
+      In any case, read only does not apply to temporary tables and
+      performance_schema tables.
+    */
+    if (!(flags & MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY) && !t->s->tmp_table &&
+        !is_perfschema_db(t->s->db.str, t->s->db.length)) {
+      if (t->reginfo.lock_type >= TL_WRITE_ALLOW_WRITE &&
+          (check_readonly(thd, true) ||
+           check_schema_readonly(thd, t->s->db.str, t->s))) {
+        return 1;
+      }
+    }
+  }
+
+  /*
+    Locking of system tables is restricted:
+    locking a mix of system and non-system tables in the same lock
+    is prohibited, to prevent contention.
+  */
+  if ((system_count > 0) && (system_count < count)) {
+    my_error(ER_WRONG_LOCK_OF_SYSTEM_TABLE, MYF(0));
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
+  Reset lock type in lock data
+
+  @param sql_lock Lock structures to reset.
+
+  @note After a locking error we want to quit the locking of the table(s).
+        The test case in the bug report for Bug #18544 has the following
+        cases: 1. Locking error in lock_external() due to InnoDB timeout.
+        2. Locking error in get_lock_data() due to missing write permission.
+        3. Locking error in wait_if_global_read_lock() due to lock conflict.
+
+  @note In all these cases we have already set the lock type into the lock
+        data of the open table(s). If the table(s) are in the open table
+        cache, they could be reused with the non-zero lock type set. This
+        could lead to ignoring a different lock type with the next lock.
+
+  @note Clear the lock type of all lock data. This ensures that the next
+        lock request will set its lock type properly.
+*/
+
+static void reset_lock_data(MYSQL_LOCK *sql_lock) {
+  THR_LOCK_DATA **ldata, **ldata_end;
+  DBUG_TRACE;
+
+  /* Clear the lock type of all lock data to avoid reusage. */
+  for (ldata = sql_lock->locks, ldata_end = ldata + sql_lock->lock_count;
+       ldata < ldata_end; ldata++) {
+    /* Reset lock type. */
+    (*ldata)->type = TL_UNLOCK;
+  }
+}
+
+/**
+  Scan array of tables for access types; update transaction tracker
+  accordingly.
+
+   @param thd          The current thread.
+   @param tables       An array of pointers to the tables to lock.
+   @param count        The number of tables to lock.
+*/
+
+static void track_table_access(THD *thd, TABLE **tables, size_t count) {
+  TX_TRACKER_GET(tst);
+  enum enum_tx_state s;
+
+  while (count--) {
+    TABLE *t = tables[count];
+
+    if (t) {
+      s = tst->calc_trx_state(t->reginfo.lock_type,
+                              t->file->has_transactions());
+      tst->add_trx_state(thd, s);
+    }
+  }
+}
+
+/**
+  Reset lock type in lock data and free.
+
+  @param mysql_lock Lock structures to reset.
+
+*/
+
+static void reset_lock_data_and_free(MYSQL_LOCK **mysql_lock) {
+  reset_lock_data(*mysql_lock);
+  my_free(*mysql_lock);
+  *mysql_lock = nullptr;
+}
+
+/**
+   Lock tables.
+
+   @param thd          The current thread.
+   @param tables       An array of pointers to the tables to lock.
+   @param count        The number of tables to lock.
+   @param flags        Options:
+                 MYSQL_LOCK_IGNORE_GLOBAL_READ_ONLY Ignore SET GLOBAL READ_ONLY
+                 MYSQL_LOCK_IGNORE_TIMEOUT          Use maximum timeout value.
+
+   @retval  A lock structure pointer on success.
+   @retval  NULL if an error or if wait on a lock was killed.
+*/
+
+MYSQL_LOCK *mysql_lock_tables(THD *thd, TABLE **tables, size_t count,
+                              uint flags) {
+  int rc;
+  MYSQL_LOCK *sql_lock;
+  ulong timeout = (flags & MYSQL_LOCK_IGNORE_TIMEOUT)
+                      ? LONG_TIMEOUT
+                      : thd->variables.lock_wait_timeout;
+
+  DBUG_TRACE;
+
+  if (lock_tables_check(thd, tables, count, flags)) return nullptr;
+
+  if (!(sql_lock = get_lock_data(thd, tables, count, GET_LOCK_STORE_LOCKS)))
+    return nullptr;
+
+  if (!(thd->state_flags & Open_tables_state::SYSTEM_TABLES))
+    THD_STAGE_INFO(thd, stage_system_lock);
+
+  ulonglong lock_start_usec = my_micro_time();
+
+  DBUG_PRINT("info", ("thd->proc_info %s", thd->proc_info()));
+  if (sql_lock->table_count &&
+      lock_external(thd, sql_lock->table, sql_lock->table_count)) {
+    /* Clear the lock type of all lock data to avoid reusage. */
+    reset_lock_data_and_free(&sql_lock);
+    goto end;
+  }
+
+  /* Copy the lock data array. thr_multi_lock() reorders its contents. */
+  memcpy(sql_lock->locks + sql_lock->lock_count, sql_lock->locks,
+         sql_lock->lock_count * sizeof(*sql_lock->locks));
+  /* Lock on the copied half of the lock data array. */
+  rc = thr_lock_errno_to_mysql[(int)thr_multi_lock(
+      sql_lock->locks + sql_lock->lock_count, sql_lock->lock_count,
+      &thd->lock_info, timeout)];
+
+  DBUG_EXECUTE_IF("mysql_lock_tables_kill_query",
+                  thd->killed = THD::KILL_QUERY;);
+
+  if (rc) {
+    if (sql_lock->table_count)
+      (void)unlock_external(thd, sql_lock->table, sql_lock->table_count);
+    reset_lock_data_and_free(&sql_lock);
+    if (!thd->killed) my_error(rc, MYF(0));
+  }
+
+end:
+  if (!(flags & MYSQL_OPEN_IGNORE_KILLED) && thd->killed) {
+    thd->send_kill_message();
+    if (sql_lock) {
+      mysql_unlock_tables(thd, sql_lock);
+      sql_lock = nullptr;
+    }
+  }
+
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE)
+    track_table_access(thd, tables, count);
+
+  ulonglong lock_end_usec = my_micro_time();
+  thd->inc_lock_usec(lock_end_usec - lock_start_usec);
+
+  return sql_lock;
+}
+
+static int lock_external(THD *thd, TABLE **tables, uint count) {
+  uint i;
+  int lock_type, error;
+  DBUG_TRACE;
+
+  DBUG_PRINT("info", ("count %d", count));
+  for (i = 1; i <= count; i++, tables++) {
+    assert((*tables)->reginfo.lock_type >= TL_READ);
+    lock_type = F_WRLCK; /* Lock exclusive */
+    if ((*tables)->db_stat & HA_READ_ONLY ||
+        ((*tables)->reginfo.lock_type >= TL_READ &&
+         (*tables)->reginfo.lock_type <= TL_READ_NO_INSERT))
+      lock_type = F_RDLCK;
+
+    if ((error = (*tables)->file->ha_external_lock(thd, lock_type))) {
+      print_lock_error(error, (*tables)->file->table_type());
+      while (--i) {
+        tables--;
+        (*tables)->file->ha_external_lock(thd, F_UNLCK);
+        (*tables)->current_lock = F_UNLCK;
+      }
+      return error;
+    } else {
+      (*tables)->db_stat &= ~HA_BLOCK_LOCK;
+      (*tables)->current_lock = lock_type;
+    }
+  }
+  return 0;
+}
+
+void mysql_unlock_tables(THD *thd, MYSQL_LOCK *sql_lock) {
+  DBUG_TRACE;
+  if (sql_lock->lock_count)
+    thr_multi_unlock(sql_lock->locks, sql_lock->lock_count);
+  if (sql_lock->table_count)
+    (void)unlock_external(thd, sql_lock->table, sql_lock->table_count);
+  my_free(sql_lock);
+}
+
+/**
+  Unlock some of the tables locked by mysql_lock_tables.
+
+  This will work even if get_lock_data fails (next unlock will free all)
+*/
+
+void mysql_unlock_some_tables(THD *thd, TABLE **table, uint count) {
+  MYSQL_LOCK *sql_lock;
+  if ((sql_lock = get_lock_data(thd, table, count, GET_LOCK_UNLOCK)))
+    mysql_unlock_tables(thd, sql_lock);
+}
+
+/**
+  unlock all tables locked for read.
+*/
+
+void mysql_unlock_read_tables(THD *thd, MYSQL_LOCK *sql_lock) {
+  uint i, found;
+  DBUG_TRACE;
+
+  /* Move all write locks first */
+  THR_LOCK_DATA **lock = sql_lock->locks;
+  for (i = found = 0; i < sql_lock->lock_count; i++) {
+    if (sql_lock->locks[i]->type > TL_WRITE_ALLOW_WRITE) {
+      std::swap(*lock, sql_lock->locks[i]);
+      lock++;
+      found++;
+    }
+  }
+  /* unlock the read locked tables */
+  if (i != found) {
+    thr_multi_unlock(lock, i - found);
+    sql_lock->lock_count = found;
+  }
+
+  /* Then do the same for the external locks */
+  /* Move all write locked tables first */
+  TABLE **table = sql_lock->table;
+  for (i = found = 0; i < sql_lock->table_count; i++) {
+    assert(sql_lock->table[i]->lock_position == i);
+    if ((uint)sql_lock->table[i]->reginfo.lock_type > TL_WRITE_ALLOW_WRITE) {
+      std::swap(*table, sql_lock->table[i]);
+      table++;
+      found++;
+    }
+  }
+  /* Unlock all read locked tables */
+  if (i != found) {
+    (void)unlock_external(thd, table, i - found);
+    sql_lock->table_count = found;
+  }
+  /* Fix the lock positions in TABLE */
+  table = sql_lock->table;
+  found = 0;
+  for (i = 0; i < sql_lock->table_count; i++) {
+    TABLE *tbl = *table;
+    tbl->lock_position = (uint)(table - sql_lock->table);
+    tbl->lock_data_start = found;
+    found += tbl->lock_count;
+    table++;
+  }
+}
+
+/**
+  Try to find the table in the list of locked tables.
+  In case of success, unlock the table and remove it from this list.
+  If a table has more than one lock instance, removes them all.
+
+  @param  thd             thread context
+  @param  locked          list of locked tables
+  @param  table           the table to unlock
+*/
+
+void mysql_lock_remove(THD *thd, MYSQL_LOCK *locked, TABLE *table) {
+  if (locked) {
+    uint i;
+    for (i = 0; i < locked->table_count; i++) {
+      if (locked->table[i] == table) {
+        uint j, removed_locks, old_tables;
+        TABLE *tbl;
+        uint lock_data_end;
+
+        assert(table->lock_position == i);
+
+        /* Unlock the table. */
+        mysql_unlock_some_tables(thd, &table, /* table count */ 1);
+
+        /* Decrement table_count in advance, making below expressions easier */
+        old_tables = --locked->table_count;
+
+        /* The table has 'removed_locks' lock data elements in locked->locks */
+        removed_locks = table->lock_count;
+
+        /* Move down all table pointers above 'i'. */
+        memmove(reinterpret_cast<char *>(locked->table + i),
+                reinterpret_cast<char *>(locked->table + i + 1),
+                (old_tables - i) * sizeof(TABLE *));
+
+        lock_data_end = table->lock_data_start + table->lock_count;
+        /* Move down all lock data pointers above 'table->lock_data_end-1' */
+        memmove(
+            reinterpret_cast<char *>(locked->locks + table->lock_data_start),
+            reinterpret_cast<char *>(locked->locks + lock_data_end),
+            (locked->lock_count - lock_data_end) * sizeof(THR_LOCK_DATA *));
+
+        /*
+          Fix moved table elements.
+          lock_position is the index in the 'locked->table' array,
+          it must be fixed by one.
+          table->lock_data_start is pointer to the lock data for this table
+          in the 'locked->locks' array, they must be fixed by 'removed_locks',
+          the lock data count of the removed table.
+        */
+        for (j = i; j < old_tables; j++) {
+          tbl = locked->table[j];
+          tbl->lock_position--;
+          assert(tbl->lock_position == j);
+          tbl->lock_data_start -= removed_locks;
+        }
+
+        /* Finally adjust lock_count. */
+        locked->lock_count -= removed_locks;
+        break;
+      }
+    }
+  }
+}
+
+/**
+  Abort one thread / table combination.
+
+  @param thd	   Thread handler
+  @param table	   Table that should be removed from lock queue
+*/
+
+void mysql_lock_abort_for_thread(THD *thd, TABLE *table) {
+  MYSQL_LOCK *locked;
+  DBUG_TRACE;
+
+  if ((locked = get_lock_data(thd, &table, 1, GET_LOCK_UNLOCK))) {
+    for (uint i = 0; i < locked->lock_count; i++) {
+      thr_abort_locks_for_thread(locked->locks[i]->lock,
+                                 table->in_use->thread_id());
+    }
+    my_free(locked);
+  }
+}
+
+MYSQL_LOCK *mysql_lock_merge(MYSQL_LOCK *a, MYSQL_LOCK *b) {
+  MYSQL_LOCK *sql_lock;
+  TABLE **table, **end_table;
+  DBUG_TRACE;
+
+  if (!(sql_lock = (MYSQL_LOCK *)my_malloc(
+            key_memory_MYSQL_LOCK,
+            sizeof(*sql_lock) +
+                sizeof(THR_LOCK_DATA *) * (a->lock_count + b->lock_count) +
+                sizeof(TABLE *) * (a->table_count + b->table_count),
+            MYF(MY_WME))))
+    return nullptr;  // Fatal error
+  sql_lock->lock_count = a->lock_count + b->lock_count;
+  sql_lock->table_count = a->table_count + b->table_count;
+  sql_lock->locks = (THR_LOCK_DATA **)(sql_lock + 1);
+  sql_lock->table = (TABLE **)(sql_lock->locks + sql_lock->lock_count);
+  memcpy(sql_lock->locks, a->locks, a->lock_count * sizeof(*a->locks));
+  memcpy(sql_lock->locks + a->lock_count, b->locks,
+         b->lock_count * sizeof(*b->locks));
+  memcpy(sql_lock->table, a->table, a->table_count * sizeof(*a->table));
+  memcpy(sql_lock->table + a->table_count, b->table,
+         b->table_count * sizeof(*b->table));
+
+  /*
+    Now adjust lock_position and lock_data_start for all objects that was
+    moved in 'b' (as there is now all objects in 'a' before these).
+  */
+  for (table = sql_lock->table + a->table_count,
+      end_table = table + b->table_count;
+       table < end_table; table++) {
+    (*table)->lock_position += a->table_count;
+    (*table)->lock_data_start += a->lock_count;
+  }
+
+  /* Delete old, not needed locks */
+  my_free(a);
+  my_free(b);
+
+  thr_lock_merge_status(sql_lock->locks, sql_lock->lock_count);
+  return sql_lock;
+}
+
+/** Unlock a set of external. */
+
+static int unlock_external(THD *thd, TABLE **table, uint count) {
+  int error, error_code;
+  DBUG_TRACE;
+
+  error_code = 0;
+  do {
+    if ((*table)->current_lock != F_UNLCK) {
+      (*table)->current_lock = F_UNLCK;
+      if ((error = (*table)->file->ha_external_lock(thd, F_UNLCK))) {
+        error_code = error;
+        print_lock_error(error_code, (*table)->file->table_type());
+      }
+    }
+    table++;
+  } while (--count);
+  return error_code;
+}
+
+/**
+  Get lock structures from table structs and initialize locks.
+
+  @param thd                Thread handler
+  @param table_ptr          Pointer to tables that should be locks
+  @param count              Number of tables
+  @param flags              One of:
+           - GET_LOCK_UNLOCK      : If we should send TL_IGNORE to store lock
+           - GET_LOCK_STORE_LOCKS : Store lock info in TABLE
+*/
+
+static MYSQL_LOCK *get_lock_data(THD *thd, TABLE **table_ptr, size_t count,
+                                 uint flags) {
+  uint i, tables, lock_count;
+  MYSQL_LOCK *sql_lock;
+  THR_LOCK_DATA **locks, **locks_buf, **locks_start;
+  TABLE **to, **table_buf;
+  DBUG_TRACE;
+
+  assert((flags == GET_LOCK_UNLOCK) || (flags == GET_LOCK_STORE_LOCKS));
+  DBUG_PRINT("info", ("count %zu", count));
+
+  for (i = tables = lock_count = 0; i < count; i++) {
+    TABLE *t = table_ptr[i];
+
+    if (t->s->tmp_table != NON_TRANSACTIONAL_TMP_TABLE) {
+      tables += t->file->lock_count();
+      lock_count++;
+    }
+  }
+
+  /*
+    Allocating twice the number of pointers for lock data for use in
+    thr_mulit_lock(). This function reorders the lock data, but cannot
+    update the table values. So the second part of the array is copied
+    from the first part immediately before calling thr_multi_lock().
+  */
+  if (!(sql_lock = (MYSQL_LOCK *)my_malloc(
+            key_memory_MYSQL_LOCK,
+            sizeof(*sql_lock) + sizeof(THR_LOCK_DATA *) * tables * 2 +
+                sizeof(table_ptr) * lock_count,
+            MYF(0))))
+    return nullptr;
+  locks = locks_buf = sql_lock->locks = (THR_LOCK_DATA **)(sql_lock + 1);
+  to = table_buf = sql_lock->table = (TABLE **)(locks + tables * 2);
+  sql_lock->table_count = lock_count;
+
+  for (i = 0; i < count; i++) {
+    TABLE *table;
+    enum thr_lock_type lock_type;
+    THR_LOCK_DATA **org_locks = locks;
+
+    if ((table = table_ptr[i])->s->tmp_table == NON_TRANSACTIONAL_TMP_TABLE)
+      continue;
+    lock_type = table->reginfo.lock_type;
+    assert(lock_type != TL_WRITE_DEFAULT && lock_type != TL_READ_DEFAULT &&
+           lock_type != TL_WRITE_CONCURRENT_DEFAULT);
+    locks_start = locks;
+    locks = table->file->store_lock(
+        thd, locks, (flags & GET_LOCK_UNLOCK) ? TL_IGNORE : lock_type);
+    if (flags & GET_LOCK_STORE_LOCKS) {
+      table->lock_position = (uint)(to - table_buf);
+      table->lock_data_start = (uint)(locks_start - locks_buf);
+      table->lock_count = (uint)(locks - locks_start);
+    }
+    *to++ = table;
+    if (locks) {
+      for (; org_locks != locks; org_locks++) {
+        (*org_locks)->debug_print_param = (void *)table;
+        (*org_locks)->m_psi = table->file->m_psi;
+      }
+    }
+  }
+  /*
+    We do not use 'tables', because there are cases where store_lock()
+    returns less locks than lock_count() claimed. This can happen when
+    a FLUSH TABLES tries to abort locks from a MERGE table of another
+    thread. When that thread has just opened the table, but not yet
+    attached its children, it cannot return the locks. lock_count()
+    always returns the number of locks that an attached table has.
+    This is done to avoid the reverse situation: If lock_count() would
+    return 0 for a non-attached MERGE table, and that table becomes
+    attached between the calls to lock_count() and store_lock(), then
+    we would have allocated too little memory for the lock data. Now
+    we may allocate too much, but better safe than memory overrun.
+    And in the FLUSH case, the memory is released quickly anyway.
+  */
+  sql_lock->lock_count = locks - locks_buf;
+  DBUG_PRINT("info", ("sql_lock->table_count %d sql_lock->lock_count %d",
+                      sql_lock->table_count, sql_lock->lock_count));
+  return sql_lock;
+}
+
+/**
+  Obtain an exclusive metadata lock on a schema name.
+
+  @param thd         Thread handle.
+  @param db          The database name.
+
+  This function cannot be called while holding LOCK_open mutex.
+  To avoid deadlocks, we do not try to obtain exclusive metadata
+  locks in LOCK TABLES mode, since in this mode there may be
+  other metadata locks already taken by the current connection,
+  and we must not wait for MDL locks while holding locks.
+
+  @retval false  Success.
+  @retval true   Failure: we're in LOCK TABLES mode, or out of memory,
+                 or this connection was killed.
+*/
+
+bool lock_schema_name(THD *thd, const char *db) {
+  MDL_request_list mdl_requests;
+  MDL_request global_request;
+  MDL_request mdl_request;
+  MDL_request backup_lock_request;
+
+  if (thd->locked_tables_mode) {
+    my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+    return true;
+  }
+
+  if (thd->global_read_lock.can_acquire_protection()) return true;
+  MDL_REQUEST_INIT(&global_request, MDL_key::GLOBAL, "", "",
+                   MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
+  MDL_REQUEST_INIT(&mdl_request, MDL_key::SCHEMA, db, "", MDL_EXCLUSIVE,
+                   MDL_TRANSACTION);
+  MDL_REQUEST_INIT(&backup_lock_request, MDL_key::BACKUP_LOCK, "", "",
+                   MDL_INTENTION_EXCLUSIVE, MDL_TRANSACTION);
+
+  mdl_requests.push_front(&mdl_request);
+  mdl_requests.push_front(&global_request);
+  mdl_requests.push_front(&backup_lock_request);
+
+  if (thd->mdl_context.acquire_locks(&mdl_requests,
+                                     thd->variables.lock_wait_timeout))
+    return true;
+
+  /*
+    Now when we have protection against concurrent change of read_only
+    option we can safely re-check its value.
+  */
+  if (check_readonly(thd, true)) return true;
+
+  /*
+    We have an IX lock on the schema name, so we can check the read
+    only option of the schema without worrying about a concurrent
+    ALTER SCHEMA.
+  */
+  if (check_schema_readonly(thd, db)) return true;
+
+  DEBUG_SYNC(thd, "after_wait_locked_schema_name");
+  return false;
+}
+
+/**
+  Acquire IX MDL lock each tablespace name from the given set.
+
+  @param thd               - Thread invoking this function.
+  @param tablespace_set    - Set of tablespace names to be lock.
+  @param lock_wait_timeout - Lock timeout.
+  @param mem_root          - Memory root on which MDL_request objects
+                             can be allocated.
+
+  @return true - On failure
+  @return false - On Success.
+*/
+bool lock_tablespace_names(THD *thd, Tablespace_hash_set *tablespace_set,
+                           ulong lock_wait_timeout, MEM_ROOT *mem_root) {
+  // Stop if we have nothing to lock
+  if (tablespace_set->empty()) return false;
+
+  // Prepare MDL_request's for all tablespace names.
+  MDL_request_list mdl_tablespace_requests;
+  for (const std::string &tablespace : *tablespace_set) {
+    assert(!tablespace.empty());
+
+    MDL_request *tablespace_request = new (mem_root) MDL_request;
+    if (tablespace_request == nullptr) return true;
+    MDL_REQUEST_INIT(tablespace_request, MDL_key::TABLESPACE, "",
+                     tablespace.c_str(), MDL_INTENTION_EXCLUSIVE,
+                     MDL_TRANSACTION);
+    mdl_tablespace_requests.push_front(tablespace_request);
+  }
+
+  // Finally, acquire IX MDL locks.
+  if (thd->mdl_context.acquire_locks(&mdl_tablespace_requests,
+                                     lock_wait_timeout))
+    return true;
+
+  DEBUG_SYNC(thd, "after_wait_locked_tablespace_name_for_table");
+
+  return false;
+}
+
+/**
+  Obtain an exclusive metadata lock on an object name.
+
+  @param thd         Thread handle.
+  @param mdl_type    Object type (currently functions, procedures
+                     and events can be name-locked).
+  @param db          The schema the object belongs to.
+  @param name        Object name in the schema.
+
+  This function cannot be called while holding LOCK_open_mutex.
+  This invariant is enforced by asserts in MDL_context::acquire_locks.
+  To avoid deadlocks, we do not try to obtain exclusive metadata
+  locks in LOCK TABLES mode, since in this mode there may be
+  other metadata locks already taken by the current connection,
+  and we must not wait for MDL locks while holding locks.
+
+  @note name is converted to lowercase before the lock is acquired
+  since stored routine and event names are case insensitive.
+
+  @retval false  Success.
+  @retval true   Failure: we're in LOCK TABLES mode, or out of memory,
+                 or this connection was killed.
+*/
+
+bool lock_object_name(THD *thd, MDL_key::enum_mdl_namespace mdl_type,
+                      const char *db, const char *name) {
+  MDL_request_list mdl_requests;
+  MDL_request global_request;
+  MDL_request schema_request;
+  MDL_request mdl_request;
+  MDL_request backup_lock_request;
+  MDL_key mdl_key;
+
+  if (thd->locked_tables_mode) {
+    my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+    return true;
+  }
+
+  assert(name);
+
+  switch (mdl_type) {
+    case MDL_key::FUNCTION:
+      dd::Function::create_mdl_key(db, name, &mdl_key);
+      break;
+    case MDL_key::PROCEDURE:
+      dd::Procedure::create_mdl_key(db, name, &mdl_key);
+      break;
+    case MDL_key::EVENT:
+      dd::Event::create_mdl_key(db, name, &mdl_key);
+      break;
+    case MDL_key::RESOURCE_GROUPS:
+      dd::Resource_group::create_mdl_key(name, &mdl_key);
+      break;
+    default:
+      assert(false);
+      return true;
+  }
+
+  DEBUG_SYNC(thd, "before_wait_locked_pname");
+
+  if (thd->global_read_lock.can_acquire_protection()) return true;
+  MDL_REQUEST_INIT(&global_request, MDL_key::GLOBAL, "", "",
+                   MDL_INTENTION_EXCLUSIVE, MDL_STATEMENT);
+  MDL_REQUEST_INIT(&schema_request, MDL_key::SCHEMA, db, "",
+                   MDL_INTENTION_EXCLUSIVE, MDL_TRANSACTION);
+  MDL_REQUEST_INIT_BY_KEY(&mdl_request, &mdl_key, MDL_EXCLUSIVE,
+                          MDL_TRANSACTION);
+  MDL_REQUEST_INIT(&backup_lock_request, MDL_key::BACKUP_LOCK, "", "",
+                   MDL_INTENTION_EXCLUSIVE, MDL_TRANSACTION);
+
+  mdl_requests.push_front(&mdl_request);
+  mdl_requests.push_front(&schema_request);
+  mdl_requests.push_front(&global_request);
+  mdl_requests.push_front(&backup_lock_request);
+
+  if (thd->mdl_context.acquire_locks(&mdl_requests,
+                                     thd->variables.lock_wait_timeout))
+    return true;
+
+  /*
+    Now when we have protection against concurrent change of read_only
+    option we can safely re-check its value.
+  */
+  if (check_readonly(thd, true)) return true;
+
+  /*
+    We have an IX lock on the schema name, so we can check the read
+    only option of the schema without worrying about a concurrent
+    ALTER SCHEMA.
+  */
+  if (check_schema_readonly(thd, db)) return true;
+
+  DEBUG_SYNC(thd, "after_wait_locked_pname");
+  return false;
+}
+
+static void print_lock_error(int error, const char *table) {
+  DBUG_TRACE;
+
+  switch (error) {
+    case HA_ERR_LOCK_WAIT_TIMEOUT:
+      my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0), error);
+      break;
+    case HA_ERR_READ_ONLY_TRANSACTION:
+      my_error(ER_READ_ONLY_TRANSACTION, MYF(0), error);
+      break;
+    case HA_ERR_LOCK_DEADLOCK:
+      my_error(ER_LOCK_DEADLOCK, MYF(0), error);
+      break;
+    case HA_ERR_WRONG_COMMAND:
+      my_error(ER_ILLEGAL_HA, MYF(0), table);
+      break;
+    default: {
+      char errbuf[MYSYS_STRERROR_SIZE];
+      my_error(ER_CANT_LOCK, MYF(0), error,
+               my_strerror(errbuf, sizeof(errbuf), error));
+    } break;
+  }
+}
+
+std::atomic<int32> Global_read_lock::m_atomic_active_requests;
+
+/****************************************************************************
+  Handling of global read locks
+
+  Global read lock is implemented using metadata lock infrastructure.
+
+  Taking the global read lock is TWO steps (2nd step is optional; without
+  it, COMMIT of existing transactions will be allowed):
+  lock_global_read_lock() THEN make_global_read_lock_block_commit().
+
+  How blocking of threads by global read lock is achieved: that's
+  semi-automatic. We assume that any statement which should be blocked
+  by global read lock will either open and acquires write-lock on tables
+  or acquires metadata locks on objects it is going to modify. For any
+  such statement global IX metadata lock is automatically acquired for
+  its duration (in case of LOCK TABLES until end of LOCK TABLES mode).
+  And lock_global_read_lock() simply acquires global S metadata lock
+  and thus prohibits execution of statements which modify data (unless
+  they modify only temporary tables). If deadlock happens it is detected
+  by MDL subsystem and resolved in the standard fashion (by backing-off
+  metadata locks acquired so far and restarting open tables process
+  if possible).
+
+  Why does FLUSH TABLES WITH READ LOCK need to block COMMIT: because it's used
+  to read a non-moving SHOW MASTER STATUS, and a COMMIT writes to the binary
+  log.
+
+  Why getting the global read lock is two steps and not one. Because FLUSH
+  TABLES WITH READ LOCK needs to insert one other step between the two:
+  flushing tables. So the order is
+  1) lock_global_read_lock() (prevents any new table write locks, i.e. stalls
+  all new updates)
+  2) close_cached_tables() (the FLUSH TABLES), which will wait for tables
+  currently opened and being updated to close (so it's possible that there is
+  a moment where all new updates of server are stalled *and* FLUSH TABLES WITH
+  READ LOCK is, too).
+  3) make_global_read_lock_block_commit().
+  If we have merged 1) and 3) into 1), we would have had this deadlock:
+  imagine thread 1 and 2, in non-autocommit mode, thread 3, and an InnoDB
+  table t.
+  thd1: SELECT * FROM t FOR UPDATE;
+  thd2: UPDATE t SET a=1; # blocked by row-level locks of thd1
+  thd3: FLUSH TABLES WITH READ LOCK; # blocked in close_cached_tables() by the
+  table instance of thd2
+  thd1: COMMIT; # blocked by thd3.
+  thd1 blocks thd2 which blocks thd3 which blocks thd1: deadlock.
+
+  Note that we need to support that one thread does
+  FLUSH TABLES WITH READ LOCK; and then COMMIT;
+  (that's what innobackup does, for some good reason).
+  So in this exceptional case the COMMIT should not be blocked by the FLUSH
+  TABLES WITH READ LOCK.
+
+****************************************************************************/
+
+/**
+  Acquire protection against the global read lock.
+
+  Acquire an intention exclusive lock to protect against others
+  setting the global read lock. We follow the naming used by
+  the backup lock help functions when naming this function.
+
+  @param  thd                Thread context.
+  @param  lock_wait_timeout  Time to wait for lock acquisition.
+
+  @retval false   No error, meta data lock acquired.
+  @retval true    Error, meta data lock not acquired.
+*/
+
+bool acquire_shared_global_read_lock(THD *thd,
+                                     unsigned long lock_wait_timeout) {
+  // If we cannot acquire protection against GRL, err out.
+  if (thd->global_read_lock.can_acquire_protection()) return true;
+
+  MDL_request grl_request;
+  MDL_REQUEST_INIT(&grl_request, MDL_key::GLOBAL, "", "",
+                   MDL_INTENTION_EXCLUSIVE, MDL_TRANSACTION);
+
+  if (thd->mdl_context.acquire_lock(&grl_request, lock_wait_timeout))
+    return true;
+
+  /*
+    Now when we have protection against concurrent change of read_only
+    option we can safely re-check its value.
+  */
+  if (check_readonly(thd, true)) return true;
+
+  return false;
+}
+
+/**
+  Take global read lock, wait if there is protection against lock.
+
+  If the global read lock is already taken by this thread, then nothing is done.
+
+  See also "Handling of global read locks" above.
+
+  @param thd     Reference to thread.
+
+  @retval False  Success, global read lock set, commits are NOT blocked.
+  @retval True   Failure, thread was killed.
+*/
+
+bool Global_read_lock::lock_global_read_lock(THD *thd) {
+  DBUG_TRACE;
+
+  if (!m_state) {
+    MDL_request mdl_request;
+
+    assert(!thd->mdl_context.owns_equal_or_stronger_lock(MDL_key::GLOBAL, "",
+                                                         "", MDL_SHARED));
+    MDL_REQUEST_INIT(&mdl_request, MDL_key::GLOBAL, "", "", MDL_SHARED,
+                     MDL_EXPLICIT);
+
+    /* Increment static variable first to signal innodb memcached server
+       to release mdl locks held by it */
+    Global_read_lock::m_atomic_active_requests++;
+    if (thd->mdl_context.acquire_lock(&mdl_request,
+                                      thd->variables.lock_wait_timeout)) {
+      Global_read_lock::m_atomic_active_requests--;
+      return true;
+    }
+
+    m_mdl_global_shared_lock = mdl_request.ticket;
+    m_state = GRL_ACQUIRED;
+  }
+  /*
+    We DON'T set global_read_lock_blocks_commit now, it will be set after
+    tables are flushed (as the present function serves for FLUSH TABLES WITH
+    READ LOCK only). Doing things in this order is necessary to avoid
+    deadlocks (we must allow COMMIT until all tables are closed; we should not
+    forbid it before, or we can have a 3-thread deadlock if 2 do SELECT FOR
+    UPDATE and one does FLUSH TABLES WITH READ LOCK).
+  */
+  return false;
+}
+
+/**
+  Unlock global read lock.
+
+  Commits may or may not be blocked when this function is called.
+
+  See also "Handling of global read locks" above.
+
+  @param thd    Reference to thread.
+*/
+
+void Global_read_lock::unlock_global_read_lock(THD *thd) {
+  DBUG_TRACE;
+
+  assert(m_mdl_global_shared_lock && m_state);
+
+  if (m_mdl_blocks_commits_lock) {
+    thd->mdl_context.release_lock(m_mdl_blocks_commits_lock);
+    m_mdl_blocks_commits_lock = nullptr;
+  }
+  thd->mdl_context.release_lock(m_mdl_global_shared_lock);
+  Global_read_lock::m_atomic_active_requests--;
+  m_mdl_global_shared_lock = nullptr;
+  m_state = GRL_NONE;
+}
+
+/**
+  Make global read lock also block commits.
+
+  The scenario is:
+   - This thread has the global read lock.
+   - Global read lock blocking of commits is not set.
+
+  See also "Handling of global read locks" above.
+
+  @param thd     Reference to thread.
+
+  @retval False  Success, global read lock set, commits are blocked.
+  @retval True   Failure, thread was killed.
+*/
+
+bool Global_read_lock::make_global_read_lock_block_commit(THD *thd) {
+  MDL_request mdl_request;
+  DBUG_TRACE;
+  /*
+    If we didn't succeed lock_global_read_lock(), or if we already succeeded
+    make_global_read_lock_block_commit(), do nothing.
+  */
+  if (m_state != GRL_ACQUIRED) return false;
+
+  MDL_REQUEST_INIT(&mdl_request, MDL_key::COMMIT, "", "", MDL_SHARED,
+                   MDL_EXPLICIT);
+
+  if (thd->mdl_context.acquire_lock(&mdl_request,
+                                    thd->variables.lock_wait_timeout))
+    return true;
+
+  m_mdl_blocks_commits_lock = mdl_request.ticket;
+  m_state = GRL_ACQUIRED_AND_BLOCKS_COMMIT;
+
+  return false;
+}
+
+/**
+  Set explicit duration for metadata locks which are used to implement GRL.
+
+  @param thd     Reference to thread.
+*/
+
+void Global_read_lock::set_explicit_lock_duration(THD *thd) {
+  if (m_mdl_global_shared_lock)
+    thd->mdl_context.set_lock_duration(m_mdl_global_shared_lock, MDL_EXPLICIT);
+  if (m_mdl_blocks_commits_lock)
+    thd->mdl_context.set_lock_duration(m_mdl_blocks_commits_lock, MDL_EXPLICIT);
+}
+
+/**
+  @} (end of group Locking)
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc
+Function: Locked_tables_list::init_locked_tables
+bool Locked_tables_list::init_locked_tables(THD *thd) {
+  assert(thd->locked_tables_mode == LTM_NONE);
+  assert(m_locked_tables == nullptr);
+  assert(m_reopen_array == nullptr);
+  assert(m_locked_tables_count == 0);
+
+  for (TABLE *table = thd->open_tables; table;
+       table = table->next, m_locked_tables_count++) {
+    Table_ref *src_table_list = table->pos_in_table_list;
+    char *db, *table_name, *alias;
+    size_t db_len = src_table_list->db_length;
+    size_t table_name_len = src_table_list->table_name_length;
+    size_t alias_len = strlen(src_table_list->alias);
+    Table_ref *dst_table_list;
+
+    if (!multi_alloc_root(&m_locked_tables_root, &dst_table_list,
+                          sizeof(*dst_table_list), &db, db_len + 1, &table_name,
+                          table_name_len + 1, &alias, alias_len + 1, NullS)) {
+      unlock_locked_tables(nullptr);
+      return true;
+    }
+
+    memcpy(db, src_table_list->db, db_len + 1);
+    memcpy(table_name, src_table_list->table_name, table_name_len + 1);
+    memcpy(alias, src_table_list->alias, alias_len + 1);
+    /**
+      Sic: remember the *actual* table level lock type taken, to
+      acquire the exact same type in reopen_tables().
+      E.g. if the table was locked for write, src_table_list->lock_type is
+      TL_WRITE_DEFAULT, whereas reginfo.lock_type has been updated from
+      thd->update_lock_default.
+    */
+    new (dst_table_list)
+        Table_ref(table, db, db_len, table_name, table_name_len, alias,
+                  src_table_list->table->reginfo.lock_type);
+
+    dst_table_list->mdl_request.ticket = src_table_list->mdl_request.ticket;
+
+    /* Link last into the list of tables */
+    *(dst_table_list->prev_global = m_locked_tables_last) = dst_table_list;
+    m_locked_tables_last = &dst_table_list->next_global;
+    table->pos_in_locked_tables = dst_table_list;
+  }
+  if (m_locked_tables_count) {
+    /**
+      Allocate an auxiliary array to pass to mysql_lock_tables()
+      in reopen_tables(). reopen_tables() is a critical
+      path and we don't want to complicate it with extra allocations.
+    */
+    m_reopen_array = (TABLE **)m_locked_tables_root.Alloc(
+        sizeof(TABLE *) * (m_locked_tables_count + 1));
+    if (m_reopen_array == nullptr) {
+      unlock_locked_tables(nullptr);
+      return true;
+    }
+  }
+
+  if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+    TX_TRACKER_GET(tst);
+    tst->add_trx_state(thd, TX_LOCKED_TABLES);
+  }
+
+  thd->enter_locked_tables_mode(LTM_LOCK_TABLES);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/locked_tables_list.cc
+Function: Locked_tables_list::unlock_locked_tables
+void Locked_tables_list::unlock_locked_tables(THD *thd)
+
+{
+  if (thd) {
+    assert(!thd->in_sub_stmt &&
+           !(thd->state_flags & Open_tables_state::BACKUPS_AVAIL));
+    /*
+      Sic: we must be careful to not close open tables if
+      we're not in LOCK TABLES mode: unlock_locked_tables() is
+      sometimes called implicitly, expecting no effect on
+      open tables, e.g. from begin_trans().
+    */
+    if (thd->locked_tables_mode != LTM_LOCK_TABLES) return;
+
+    for (Table_ref *table_list = m_locked_tables; table_list;
+         table_list = table_list->next_global) {
+      /*
+        Clear the position in the list, the TABLE object will be
+        returned to the table cache.
+      */
+      table_list->table->pos_in_locked_tables = nullptr;
+    }
+    thd->leave_locked_tables_mode();
+
+    if (thd->variables.session_track_transaction_info > TX_TRACK_NONE) {
+      TX_TRACKER_GET(tst);
+      tst->clear_trx_state(thd, TX_LOCKED_TABLES);
+    }
+
+    assert(thd->get_transaction()->is_empty(Transaction_ctx::STMT));
+    close_thread_tables(thd);
+    /*
+      We rely on the caller to implicitly commit the
+      transaction and release transactional locks.
+    */
+  }
+  /*
+    After closing tables we can free memory used for storing lock
+    request for metadata locks and Table_ref elements.
+  */
+  m_locked_tables_root.Clear();
+  m_locked_tables = nullptr;
+  m_locked_tables_last = &m_locked_tables;
+  m_reopen_array = nullptr;
+  m_locked_tables_count = 0;
+}
+
+

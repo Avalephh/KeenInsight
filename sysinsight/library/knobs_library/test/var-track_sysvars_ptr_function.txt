@@ -1,0 +1,108 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Session_sysvars_tracker::enable
+bool Session_sysvars_tracker::enable(THD *thd) {
+  LEX_STRING var_list;
+
+  if (!thd->variables.track_sysvars_ptr) return false;
+
+  var_list.str = thd->variables.track_sysvars_ptr;
+  var_list.length = strlen(thd->variables.track_sysvars_ptr);
+
+  if (tool_list->parse_var_list(thd, var_list, true, thd->charset(), false) ==
+      true)
+    return true;
+
+  m_enabled = orig_list->update(tool_list, thd);
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/session_tracker.cc
+Function: Session_sysvars_tracker::update
+bool Session_sysvars_tracker::update(THD *thd) {
+  if (!thd->variables.track_sysvars_ptr) return false;
+  m_enabled = orig_list->update(tool_list, thd);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/security_context_imp.cc
+Function: mysql_security_context_imp::set not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/security_context_imp.cc
+Function: mysql_security_context_imp::set not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/security_context_imp.cc
+Function: mysql_security_context_imp::set not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: cleanup_variables
+static void cleanup_variables(THD *thd, struct System_variables *vars) {
+  if (thd) {
+    /* Block the Performance Schema from accessing THD::variables. */
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    plugin_var_memalloc_free(&thd->variables);
+    /* Remove references to session_sysvar_res_mgr memory before freeing it. */
+    thd->variables.track_sysvars_ptr = nullptr;
+    thd->session_sysvar_res_mgr.deinit();
+  }
+  assert(vars->table_plugin == nullptr);
+  assert(vars->temp_table_plugin == nullptr);
+
+  my_free(vars->dynamic_variables_ptr);
+  vars->dynamic_variables_ptr = nullptr;
+  vars->dynamic_variables_size = 0;
+  vars->dynamic_variables_version = 0;
+
+  if (thd) mysql_mutex_unlock(&thd->LOCK_thd_data);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: plugin_thdvar_init
+void plugin_thdvar_init(THD *thd, bool enable_plugins) {
+  plugin_ref old_table_plugin = thd->variables.table_plugin;
+  plugin_ref old_temp_table_plugin = thd->variables.temp_table_plugin;
+  DBUG_TRACE;
+
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+  cleanup_variables(thd, &thd->variables);
+
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  thd->variables = global_system_variables;
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+
+  thd->variables.dynamic_variables_version = 0;
+  thd->variables.dynamic_variables_size = 0;
+  thd->variables.dynamic_variables_ptr = nullptr;
+
+  if (enable_plugins) {
+    mysql_mutex_lock(&LOCK_plugin);
+    thd->variables.table_plugin =
+        my_intern_plugin_lock(nullptr, global_system_variables.table_plugin);
+    intern_plugin_unlock(nullptr, old_table_plugin);
+    thd->variables.temp_table_plugin = my_intern_plugin_lock(
+        nullptr, global_system_variables.temp_table_plugin);
+    intern_plugin_unlock(nullptr, old_temp_table_plugin);
+    mysql_mutex_unlock(&LOCK_plugin);
+  }
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  /* Initialize all Sys_var_charptr variables here. */
+
+  // @@session.session_track_system_variables
+  thd->session_sysvar_res_mgr.init(&thd->variables.track_sysvars_ptr);
+}
+
+

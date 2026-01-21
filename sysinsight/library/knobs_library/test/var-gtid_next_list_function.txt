@@ -1,0 +1,140 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.cc
+Function: THD::
+   Copyright (c) 2000, 2023, Oracle and/or its affiliates.
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License, version 2.0,
+   as published by the Free Software Foundation.
+
+   This program is also distributed with certain software (including
+   but not limited to OpenSSL) that is licensed under separate terms,
+   as designated in a particular file or component or in included license
+   documentation.  The authors of MySQL hereby grant you an additional
+   permission to link the program and your derivative works with the
+   separately licensed software that they have included with MySQL.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License, version 2.0, for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
+*/
+
+#include "sql/sql_class.h"
+
+#include <assert.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <algorithm>
+#include <utility>
+
+#include "field_types.h"
+#include "m_ctype.h"
+#include "m_string.h"
+#include "mutex_lock.h"
+#include "my_compiler.h"
+#include "my_dbug.h"
+#include "my_loglevel.h"
+#include "my_systime.h"
+#include "my_thread.h"
+#include "my_time.h"
+#include "mysql/components/services/bits/psi_error_bits.h"
+#include "mysql/components/services/log_builtins.h"  // LogErr
+#include "mysql/components/services/log_shared.h"
+#include "mysql/plugin_audit.h"
+#include "mysql/psi/mysql_cond.h"
+#include "mysql/psi/mysql_error.h"
+#include "mysql/psi/mysql_ps.h"
+#include "mysql/psi/mysql_stage.h"
+#include "mysql/psi/mysql_statement.h"
+#include "mysql/psi/mysql_table.h"
+#include "mysql/psi/psi_table.h"
+#include "mysql/service_mysql_alloc.h"
+#include "mysys_err.h"  // EE_OUTOFMEMORY
+#include "pfs_statement_provider.h"
+#include "rpl_source.h"  // unregister_slave
+#include "sql/auth/sql_security_ctx.h"
+#include "sql/binlog.h"
+#include "sql/check_stack.h"
+#include "sql/conn_handler/connection_handler_manager.h"  // Connection_handler_manager
+#include "sql/current_thd.h"
+#include "sql/dd/cache/dictionary_client.h"  // Dictionary_client
+#include "sql/dd/dd_kill_immunizer.h"        // dd:DD_kill_immunizer
+#include "sql/debug_sync.h"                  // DEBUG_SYNC
+#include "sql/derror.h"                      // ER_THD
+#include "sql/enum_query_type.h"
+#include "sql/error_handler.h"  // Internal_error_handler
+#include "sql/field.h"
+#include "sql/handler.h"
+#include "sql/item.h"
+#include "sql/item_func.h"        // user_var_entry
+#include "sql/lock.h"             // mysql_lock_abort_for_thread
+#include "sql/locking_service.h"  // release_all_locking_service_locks
+#include "sql/log_event.h"
+#include "sql/mdl_context_backup.h"  // MDL context backup for XA
+#include "sql/mysqld.h"              // global_system_variables ...
+#include "sql/mysqld_thd_manager.h"  // Global_THD_manager
+#include "sql/parse_location.h"
+#include "sql/protocol.h"
+#include "sql/protocol_classic.h"
+#include "sql/psi_memory_key.h"
+#include "sql/query_result.h"
+#include "sql/rpl_rli.h"  // Relay_log_info
+#include "sql/rpl_transaction_write_set_ctx.h"
+#include "sql/server_component/mysql_thd_store_imp.h"
+#include "sql/sp_cache.h"         // sp_cache_clear
+#include "sql/sp_head.h"          // sp_head
+#include "sql/sql_audit.h"        // mysql_audit_free_thd
+#include "sql/sql_backup_lock.h"  // release_backup_lock
+#include "sql/sql_base.h"         // close_temporary_tables
+#include "sql/sql_callback.h"     // MYSQL_CALLBACK
+#include "sql/sql_cmd.h"
+#include "sql/sql_handler.h"  // mysql_ha_cleanup
+#include "sql/sql_lex.h"
+#include "sql/sql_parse.h"    // is_update_query
+#include "sql/sql_plugin.h"   // plugin_thdvar_init
+#include "sql/sql_prepare.h"  // Prepared_statement
+#include "sql/sql_profile.h"
+#include "sql/sql_timer.h"  // thd_timer_destroy
+#include "sql/table.h"
+#include "sql/table_cache.h"  // table_cache_manager
+#include "sql/tc_log.h"
+#include "sql/thr_malloc.h"
+#include "sql/transaction.h"  // trans_rollback
+#include "sql/transaction_info.h"
+#include "sql/xa.h"
+#include "sql/xa/sql_cmd_xa.h"                   // Sql_cmd_xa_*
+#include "sql/xa/transaction_cache.h"            // xa::Transaction_cache
+#include "storage/perfschema/pfs_instr_class.h"  // PFS_CLASS_STAGE
+#include "storage/perfschema/terminology_use_previous.h"
+#include "template_utils.h"
+#include "thr_mutex.h"
+
+class Parse_tree_root;
+
+using std::max;
+using std::min;
+using std::unique_ptr;
+
+/*
+  The following is used to initialise Table_ident with a internal
+  table name
+*/
+char empty_c_string[1] = {0}; /* used for not defined db */
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::get_gtid_next_list
+  Gtid_set *get_gtid_next_list() {
+    return variables.gtid_next_list.is_non_null
+               ? variables.gtid_next_list.gtid_set
+               : nullptr;
+  }
+
+

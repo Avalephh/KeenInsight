@@ -1,0 +1,232 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_image not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_image not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: check_binlog_row_image not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: binlog_format_check
+static bool binlog_format_check(sys_var *self, THD *thd, set_var *var) {
+  if (check_session_admin(self, thd, var)) return true;
+
+  if (var->type == OPT_GLOBAL || var->type == OPT_PERSIST) {
+    /*
+      SET @@global.binlog_format and SET @@persist.binlog_format must be
+      disallowed if any replication channel has open temporary table(s).
+      Otherwise DROP TEMPORARY TABLE is written into binary log on slave
+      (which disobeys the simple rule: When @@session.binlog_format=
+       ROW/MIXED, the server must not write CREATE/DROP TEMPORARY TABLE
+      to the binary log) in the following case:
+        slave> SET @@global.binlog_format=STATEMENT;
+        slave> START SLAVE;
+        master> CREATE TEMPORARY TABLE t1(a INT);
+        slave> [wait for t1 to replicate]
+        slave> STOP SLAVE;
+        slave> SET @@global.binlog_format=ROW / SET @@persist.binlog_format=ROW
+        master> DROP TEMPORARY TABLE t1;
+        slave> START SLAVE;
+      Note: SET @@persist_only.binlog_format is not disallowed if any
+      replication channel has temporary table(s), since unlike PERSIST,
+      PERSIST_ONLY does not modify the runtime global system variable value.
+
+      SET @@global.binlog_format and SET @@persist.binlog_format must be
+      disallowed if any replication channel applier is running, because
+      SET @@global.binlog_format does not take effect when any replication
+      channel applier is running. SET @@global.binlog_format takes effect
+      on the channel until its applier is (re)starting.
+      Note: SET @@persist_only.binlog_format is not disallowed if any
+      replication channel applier is running, since unlike PERSIST,
+      PERSIST_ONLY does not modify the runtime global system variable value.
+    */
+    enum_slave_channel_status slave_channel_status =
+        has_any_slave_channel_open_temp_table_or_is_its_applier_running();
+    if (slave_channel_status == SLAVE_CHANNEL_APPLIER_IS_RUNNING) {
+      my_error(ER_RUNNING_APPLIER_PREVENTS_SWITCH_GLOBAL_BINLOG_FORMAT, MYF(0));
+      return true;
+    } else if (slave_channel_status == SLAVE_CHANNEL_HAS_OPEN_TEMPORARY_TABLE) {
+      my_error(ER_TEMP_TABLE_PREVENTS_SWITCH_GLOBAL_BINLOG_FORMAT, MYF(0));
+      return true;
+    }
+  }
+
+  if (!var->is_global_persist()) {
+    /*
+      SET @@session.binlog_format must be disallowed if the session has open
+      temporary table(s). Otherwise DROP TEMPORARY TABLE is written into
+      binary log (which disobeys the simple rule: When
+      @@session.binlog_format=ROW/MIXED, the server must not write
+      CREATE/DROP TEMPORARY TABLE to the binary log) in the following case:
+        SET @@session.binlog_format=STATEMENT;
+        CREATE TEMPORARY TABLE t1 (a INT);
+        SET @@session.binlog_format=ROW;
+        DROP TEMPORARY TABLE t1;
+      And more, if binlog_format=ROW/MIXED and the session has open temporary
+      table(s), these CREATE TEMPORARY TABLE are not written into the binlog,
+      so we can not switch to STATEMENT.
+    */
+    if (thd->temporary_tables) {
+      my_error(ER_TEMP_TABLE_PREVENTS_SWITCH_SESSION_BINLOG_FORMAT, MYF(0));
+      return true;
+    }
+
+    /*
+      if in a stored function/trigger, it's too late to change mode
+    */
+    if (thd->in_sub_stmt) {
+      my_error(ER_STORED_FUNCTION_PREVENTS_SWITCH_BINLOG_FORMAT, MYF(0));
+      return true;
+    }
+    /*
+      Make the session variable 'binlog_format' read-only inside a transaction.
+    */
+    if (thd->in_active_multi_stmt_transaction()) {
+      my_error(ER_INSIDE_TRANSACTION_PREVENTS_SWITCH_BINLOG_FORMAT, MYF(0));
+      return true;
+    }
+  }
+
+  /*
+    If moving to statement format, and binlog_row_value_options is set,
+    generate a warning.
+  */
+  if (var->save_result.ulonglong_value == BINLOG_FORMAT_STMT) {
+    if ((var->is_global_persist() &&
+         global_system_variables.binlog_row_value_options != 0) ||
+        (!var->is_global_persist() &&
+         thd->variables.binlog_row_value_options != 0)) {
+      push_warning_printf(thd, Sql_condition::SL_WARNING,
+                          ER_WARN_BINLOG_PARTIAL_UPDATES_DISABLED,
+                          ER_THD(thd, ER_WARN_BINLOG_PARTIAL_UPDATES_DISABLED),
+                          "binlog_format=STATEMENT", "PARTIAL_JSON");
+    }
+  }
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/table.cc
+Function: TABLE::setup_partial_update
+bool TABLE::setup_partial_update(bool logical_diffs) {
+  DBUG_TRACE;
+  assert(m_partial_update_info == nullptr);
+
+  THD *thd = current_thd;
+
+  if (!has_columns_marked_for_partial_update()) return false;
+
+  Opt_trace_context *trace = &thd->opt_trace;
+  if (trace->is_started()) {
+    Opt_trace_object trace_wrapper(trace);
+    Opt_trace_object trace_partial_update(trace, "json_partial_update");
+    trace_partial_update.add_utf8_table(pos_in_table_list);
+    Opt_trace_array columns(trace, "eligible_columns");
+    for (uint i = bitmap_get_first_set(m_partial_update_columns);
+         i != MY_BIT_NONE;
+         i = bitmap_get_next_set(m_partial_update_columns, i)) {
+      columns.add_utf8(s->field[i]->field_name);
+    }
+  }
+
+  m_partial_update_info = new (thd->mem_root)
+      Partial_update_info(this, m_partial_update_columns, logical_diffs);
+  return thd->is_error();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: THD::binlog_update_row
+int THD::binlog_update_row(TABLE *table, bool is_trans,
+                           const uchar *before_record,
+                           const uchar *after_record,
+                           const unsigned char *extra_row_info) {
+  assert(is_current_stmt_binlog_format_row() && mysql_bin_log.is_open());
+  int error = 0;
+
+  /**
+    Save a reference to the original read and write set bitmaps.
+    We will need this to restore the bitmaps at the end.
+   */
+  MY_BITMAP *old_read_set = table->read_set;
+  MY_BITMAP *old_write_set = table->write_set;
+
+  /**
+     This will remove spurious fields required during execution but
+     not needed for binlogging. This is done according to the:
+     binlog-row-image option.
+   */
+  binlog_prepare_row_images(this, table);
+
+  Row_data_memory row_data(table, before_record, after_record,
+                           variables.binlog_row_value_options);
+  if (!row_data.has_memory()) return HA_ERR_OUT_OF_MEM;
+
+  uchar *before_row = row_data.slot(0);
+  uchar *after_row = row_data.slot(1);
+
+  size_t const before_size =
+      pack_row(table, table->read_set, before_row, before_record,
+               enum_row_image_type::UPDATE_BI);
+  size_t const after_size = pack_row(
+      table, table->write_set, after_row, after_record,
+      enum_row_image_type::UPDATE_AI, variables.binlog_row_value_options);
+
+  DBUG_DUMP("before_record", before_record, table->s->reclength);
+  DBUG_DUMP("after_record", after_record, table->s->reclength);
+  DBUG_DUMP("before_row", before_row, before_size);
+  DBUG_DUMP("after_row", after_row, after_size);
+
+  partition_info *part_info = table->part_info;
+  uint32 source_part_id = binary_log::Rows_event::Extra_row_info::UNDEFINED;
+  if (part_info) {
+    uint32 new_part_id = binary_log::Rows_event::Extra_row_info::UNDEFINED;
+    longlong func_value = 0;
+    get_parts_for_update(before_record, after_record, table->record[0],
+                         part_info, &source_part_id, &new_part_id, &func_value);
+  }
+
+  Rows_log_event *const ev =
+      binlog_prepare_pending_rows_event<Update_rows_log_event>(
+          table, server_id, before_size + after_size, is_trans, extra_row_info,
+          source_part_id);
+
+  if (unlikely(ev == nullptr)) return HA_ERR_OUT_OF_MEM;
+
+  if (part_info) {
+    ev->m_extra_row_info.set_source_partition_id(source_part_id);
+  }
+
+  error = ev->add_row_data(before_row, before_size) ||
+          ev->add_row_data(after_row, after_size);
+
+  /* restore read/write set for the rest of execution */
+  table->column_bitmaps_set_no_signal(old_read_set, old_write_set);
+
+  bitmap_clear_all(&table->tmp_set);
+
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Update_rows_log_event::get_update_rows_event_type
+                     get_update_rows_event_type(thd_arg), extra_row_ndb_info),
+      binary_log::Update_rows_event(get_update_rows_event_type(thd_arg)) {
+  DBUG_TRACE;
+  DBUG_PRINT("info", ("update_rows event_type: %s", get_type_str()));
+  common_header->type_code = m_type;
+  init(tbl_arg->write_set);
+  common_header->set_is_valid(Rows_log_event::is_valid() && m_cols_ai.bitmap);
+}
+
+

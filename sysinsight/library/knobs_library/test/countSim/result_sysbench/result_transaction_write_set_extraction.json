@@ -1,0 +1,20 @@
+[
+    {
+        "knob_name": "transaction_write_set_extraction",
+        "data_matched_functions": [
+            "binlog_log_row"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "THD::binlog_update_row",
+            "bitmap_init",
+            "THD::binlog_write_row",
+            "add_pke",
+            "TABLE::mark_columns_used_by_index_no_reset",
+            "THD::binlog_delete_row",
+            "Rpl_transaction_write_set_ctx::add_write_set"
+        ],
+        "control_matched_count": 7,
+        "matched_count": 8
+    }
+]

@@ -1,0 +1,139 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: cleanup_variables
+static void cleanup_variables(THD *thd, struct System_variables *vars) {
+  if (thd) {
+    /* Block the Performance Schema from accessing THD::variables. */
+    mysql_mutex_lock(&thd->LOCK_thd_data);
+
+    plugin_var_memalloc_free(&thd->variables);
+    /* Remove references to session_sysvar_res_mgr memory before freeing it. */
+    thd->variables.track_sysvars_ptr = nullptr;
+    thd->session_sysvar_res_mgr.deinit();
+  }
+  assert(vars->table_plugin == nullptr);
+  assert(vars->temp_table_plugin == nullptr);
+
+  my_free(vars->dynamic_variables_ptr);
+  vars->dynamic_variables_ptr = nullptr;
+  vars->dynamic_variables_size = 0;
+  vars->dynamic_variables_version = 0;
+
+  if (thd) mysql_mutex_unlock(&thd->LOCK_thd_data);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: plugin_thdvar_init
+void plugin_thdvar_init(THD *thd, bool enable_plugins) {
+  plugin_ref old_table_plugin = thd->variables.table_plugin;
+  plugin_ref old_temp_table_plugin = thd->variables.temp_table_plugin;
+  DBUG_TRACE;
+
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+  cleanup_variables(thd, &thd->variables);
+
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  thd->variables = global_system_variables;
+  thd->variables.table_plugin = nullptr;
+  thd->variables.temp_table_plugin = nullptr;
+
+  thd->variables.dynamic_variables_version = 0;
+  thd->variables.dynamic_variables_size = 0;
+  thd->variables.dynamic_variables_ptr = nullptr;
+
+  if (enable_plugins) {
+    mysql_mutex_lock(&LOCK_plugin);
+    thd->variables.table_plugin =
+        my_intern_plugin_lock(nullptr, global_system_variables.table_plugin);
+    intern_plugin_unlock(nullptr, old_table_plugin);
+    thd->variables.temp_table_plugin = my_intern_plugin_lock(
+        nullptr, global_system_variables.temp_table_plugin);
+    intern_plugin_unlock(nullptr, old_temp_table_plugin);
+    mysql_mutex_unlock(&LOCK_plugin);
+  }
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  /* Initialize all Sys_var_charptr variables here. */
+
+  // @@session.session_track_system_variables
+  thd->session_sysvar_res_mgr.init(&thd->variables.track_sysvars_ptr);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_plugin.cc
+Function: alloc_and_copy_thd_dynamic_variables
+void alloc_and_copy_thd_dynamic_variables(THD *thd, bool global_lock) {
+  mysql_mutex_assert_not_owner(&LOCK_plugin);
+  mysql_rwlock_rdlock(&LOCK_system_variables_hash);
+
+  if (global_lock) mysql_mutex_lock(&LOCK_global_system_variables);
+
+  mysql_mutex_assert_owner(&LOCK_global_system_variables);
+
+  /*
+    MAINTAINER:
+    The following assert is wrong on purpose, useful to debug
+    when thd dynamic variables are expanded:
+    assert(thd->variables.dynamic_variables_ptr == NULL);
+  */
+
+  thd->variables.dynamic_variables_ptr = (char *)my_realloc(
+      key_memory_THD_variables, thd->variables.dynamic_variables_ptr,
+      global_variables_dynamic_size, MYF(MY_WME | MY_FAE | MY_ALLOW_ZERO_PTR));
+
+  /*
+    Debug hook which allows tests to check that this code is not
+    called for InnoDB after connection was created.
+  */
+  DBUG_EXECUTE_IF("verify_innodb_thdvars", assert(0););
+
+  memcpy(thd->variables.dynamic_variables_ptr +
+             thd->variables.dynamic_variables_size,
+         global_system_variables.dynamic_variables_ptr +
+             thd->variables.dynamic_variables_size,
+         global_system_variables.dynamic_variables_size -
+             thd->variables.dynamic_variables_size);
+
+  /*
+    Iterate through newly copied vars of string type with MEMALLOC
+    flag and strdup value.
+  */
+  for (const auto &key_and_value :
+       *malloced_string_type_sysvars_bookmark_hash) {
+    sys_var_pluginvar *pi;
+    sys_var *var;
+    int varoff;
+    char **thdvar, **sysvar;
+    st_bookmark *v = key_and_value.second;
+
+    if (v->version <= thd->variables.dynamic_variables_version ||
+        !(var = intern_find_sys_var(v->key + 1, v->name_len)) ||
+        var->check_if_sensitive_in_context(thd) ||
+        !(pi = var->cast_pluginvar()) ||
+        v->key[0] != (pi->plugin_var->flags & PLUGIN_VAR_TYPEMASK))
+      continue;
+
+    varoff = *(int *)(pi->plugin_var + 1);
+    thdvar = (char **)(thd->variables.dynamic_variables_ptr + varoff);
+    sysvar = (char **)(global_system_variables.dynamic_variables_ptr + varoff);
+    *thdvar = nullptr;
+    plugin_var_memalloc_session_update(thd, nullptr, thdvar, *sysvar);
+  }
+
+  if (global_lock) mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  thd->variables.dynamic_variables_version =
+      global_system_variables.dynamic_variables_version;
+  thd->variables.dynamic_variables_head =
+      global_system_variables.dynamic_variables_head;
+  thd->variables.dynamic_variables_size =
+      global_system_variables.dynamic_variables_size;
+
+  mysql_rwlock_unlock(&LOCK_system_variables_hash);
+}
+
+

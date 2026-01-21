@@ -1,0 +1,1255 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_table_apply_ops
+[[nodiscard]] static dberr_t row_log_table_apply_ops(que_thr_t *thr,
+                                                     ddl::Dup *dup,
+                                                     Alter_stage *stage) {
+  dberr_t error;
+  const ddl::mrec_t *mrec = nullptr;
+  const ddl::mrec_t *next_mrec;
+  const ddl::mrec_t *mrec_end = nullptr; /* silence bogus warning */
+  const ddl::mrec_t *next_mrec_end;
+  mem_heap_t *heap;
+  mem_heap_t *offsets_heap;
+  ulint *offsets;
+  bool has_index_lock;
+  dict_index_t *index = const_cast<dict_index_t *>(dup->m_index);
+  dict_table_t *new_table = index->online_log->table;
+  dict_index_t *new_index = new_table->first_index();
+  ulint n_fields = dict_index_get_n_fields(index);
+  ulint n_unique = dict_index_get_n_unique(new_index) + 2;
+  const ulint i = 1 + REC_OFFS_HEADER_SIZE + std::max(n_fields, n_unique);
+  const ulint trx_id_col =
+      dict_col_get_clust_pos(index->table->get_sys_col(DATA_TRX_ID), index);
+  const ulint new_trx_id_col =
+      dict_col_get_clust_pos(new_table->get_sys_col(DATA_TRX_ID), new_index);
+  trx_t *trx = thr_get_trx(thr);
+  dberr_t err;
+
+  ut_ad(index->is_clustered());
+  ut_ad(dict_index_is_online_ddl(index));
+  ut_ad(trx->mysql_thd);
+  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X));
+  ut_ad(!dict_index_is_online_ddl(new_index));
+  ut_ad(trx_id_col > 0);
+  ut_ad(trx_id_col != ULINT_UNDEFINED);
+  ut_ad(new_trx_id_col > 0);
+  ut_ad(new_trx_id_col != ULINT_UNDEFINED);
+
+  UNIV_MEM_INVALID(&mrec_end, sizeof mrec_end);
+
+  offsets = static_cast<ulint *>(
+      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, i * sizeof *offsets));
+  offsets[0] = i;
+  offsets[1] = dict_index_get_n_fields(index);
+
+  heap = mem_heap_create(UNIV_PAGE_SIZE, UT_LOCATION_HERE);
+  offsets_heap = mem_heap_create(UNIV_PAGE_SIZE, UT_LOCATION_HERE);
+  has_index_lock = true;
+
+next_block:
+  ut_ad(has_index_lock);
+  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X));
+  ut_ad(index->online_log->head.bytes == 0);
+
+  stage->inc(row_log_progress_inc_per_block());
+
+  if (trx_is_interrupted(trx)) {
+    goto interrupted;
+  }
+
+  if (index->is_corrupted()) {
+    error = DB_INDEX_CORRUPT;
+    goto func_exit;
+  }
+
+  ut_ad(dict_index_is_online_ddl(index));
+
+  error = index->online_log->error;
+
+  if (error != DB_SUCCESS) {
+    goto func_exit;
+  }
+
+  if (UNIV_UNLIKELY(index->online_log->head.blocks >
+                    index->online_log->tail.blocks)) {
+    /* Note: release-only label. */
+    ut_o(unexpected_eof:);
+    ib::error(ER_IB_MSG_960)
+        << "Unexpected end of temporary file for table " << index->table->name;
+  corruption:
+    error = DB_CORRUPTION;
+    goto func_exit;
+  }
+
+  if (index->online_log->head.blocks == index->online_log->tail.blocks) {
+    if (index->online_log->head.blocks) {
+#ifdef HAVE_FTRUNCATE
+      /* Truncate the file in order to save space. */
+      if (index->online_log->file.is_open() &&
+          ftruncate(index->online_log->file.get(), 0) == -1) {
+        perror("ftruncate");
+      }
+#endif /* HAVE_FTRUNCATE */
+      index->online_log->head.blocks = index->online_log->tail.blocks = 0;
+    }
+
+    next_mrec = index->online_log->tail.block;
+    next_mrec_end = next_mrec + index->online_log->tail.bytes;
+
+    if (next_mrec_end == next_mrec) {
+      /* End of log reached. */
+    all_done:
+      ut_ad(has_index_lock);
+      ut_ad(index->online_log->head.blocks == 0);
+      ut_ad(index->online_log->tail.blocks == 0);
+      index->online_log->head.bytes = 0;
+      index->online_log->tail.bytes = 0;
+      error = DB_SUCCESS;
+      goto func_exit;
+    }
+  } else {
+    os_offset_t ofs;
+
+    ofs = (os_offset_t)index->online_log->head.blocks * srv_sort_buf_size;
+
+    ut_ad(has_index_lock);
+    has_index_lock = false;
+    rw_lock_x_unlock(dict_index_get_lock(index));
+
+    log_free_check();
+
+    ut_ad(dict_index_is_online_ddl(index));
+
+    if (!row_log_block_allocate(index->online_log->head)) {
+      error = DB_OUT_OF_MEMORY;
+      goto func_exit;
+    }
+
+    IORequest request(IORequest::READ | IORequest::ROW_LOG);
+    ;
+
+    err = os_file_read_no_error_handling_int_fd(
+        request, index->online_log->path, index->online_log->file.get(),
+        index->online_log->head.block, ofs, srv_sort_buf_size, nullptr);
+
+    if (err != DB_SUCCESS) {
+      ib::error(ER_IB_MSG_961) << "Unable to read temporary file"
+                                  " for table "
+                               << index->table_name;
+      goto corruption;
+    }
+
+#ifdef POSIX_FADV_DONTNEED
+    /* Each block is read exactly once.  Free up the file cache. */
+    posix_fadvise(index->online_log->file.get(), ofs, srv_sort_buf_size,
+                  POSIX_FADV_DONTNEED);
+#endif /* POSIX_FADV_DONTNEED */
+
+    next_mrec = index->online_log->head.block;
+    next_mrec_end = next_mrec + srv_sort_buf_size;
+  }
+
+  /* This read is not protected by index->online_log->mutex for
+  performance reasons. We will eventually notice any error that
+  was flagged by a DML thread. */
+  error = index->online_log->error;
+
+  if (error != DB_SUCCESS) {
+    goto func_exit;
+  }
+
+  if (mrec) {
+    /* A partial record was read from the previous block.
+    Copy the temporary buffer full, as we do not know the
+    length of the record. Parse subsequent records from
+    the bigger buffer index->online_log->head.block
+    or index->online_log->tail.block. */
+
+    ut_ad(mrec == index->online_log->head.buf);
+    ut_ad(mrec_end > mrec);
+    ut_ad(mrec_end < (&index->online_log->head.buf)[1]);
+
+    memcpy((ddl::mrec_t *)mrec_end, next_mrec,
+           (&index->online_log->head.buf)[1] - mrec_end);
+    mrec =
+        row_log_table_apply_op(thr, trx_id_col, new_trx_id_col, dup, &error,
+                               offsets_heap, heap, index->online_log->head.buf,
+                               (&index->online_log->head.buf)[1], offsets);
+    if (error != DB_SUCCESS) {
+      goto func_exit;
+    } else if (UNIV_UNLIKELY(mrec == nullptr)) {
+      /* The record was not reassembled properly. */
+      goto corruption;
+    }
+    /* The record was previously found out to be
+    truncated. Now that the parse buffer was extended,
+    it should proceed beyond the old end of the buffer. */
+    ut_a(mrec > mrec_end);
+
+    index->online_log->head.bytes = mrec - mrec_end;
+    next_mrec += index->online_log->head.bytes;
+  }
+
+  ut_ad(next_mrec <= next_mrec_end);
+  /* The following loop must not be parsing the temporary
+  buffer, but head.block or tail.block. */
+
+  /* mrec!=NULL means that the next record starts from the
+  middle of the block */
+  ut_ad((mrec == nullptr) == (index->online_log->head.bytes == 0));
+
+#ifdef UNIV_DEBUG
+  if (index->online_log->head.block != nullptr &&
+      next_mrec_end == index->online_log->head.block + srv_sort_buf_size) {
+    /* If tail.bytes == 0, next_mrec_end can also be at
+    the end of tail.block. */
+    if (index->online_log->tail.bytes == 0) {
+      ut_ad(next_mrec == next_mrec_end);
+      ut_ad(index->online_log->tail.blocks == 0);
+      ut_ad(index->online_log->head.blocks == 0);
+      ut_ad(index->online_log->head.bytes == 0);
+    } else {
+      ut_ad(next_mrec ==
+            index->online_log->head.block + index->online_log->head.bytes);
+      ut_ad(index->online_log->tail.blocks > index->online_log->head.blocks);
+    }
+  } else if (next_mrec_end ==
+             index->online_log->tail.block + index->online_log->tail.bytes) {
+    ut_ad(next_mrec ==
+          index->online_log->tail.block + index->online_log->head.bytes);
+    ut_ad(index->online_log->tail.blocks == 0);
+    ut_ad(index->online_log->head.blocks == 0);
+    ut_ad(index->online_log->head.bytes <= index->online_log->tail.bytes);
+  } else {
+    ut_error;
+  }
+#endif /* UNIV_DEBUG */
+
+  mrec_end = next_mrec_end;
+
+  while (!trx_is_interrupted(trx)) {
+    if (next_mrec == next_mrec_end && has_index_lock) {
+      goto all_done;
+    }
+
+    mrec = next_mrec;
+
+    ut_ad(mrec < mrec_end);
+
+    if (!has_index_lock) {
+      /* We are applying operations from a different
+      block than the one that is being written to.
+      We do not hold index->lock in order to
+      allow other threads to concurrently buffer
+      modifications. */
+      ut_ad(mrec >= index->online_log->head.block);
+      ut_ad(mrec_end == index->online_log->head.block + srv_sort_buf_size);
+      ut_ad(index->online_log->head.bytes < srv_sort_buf_size);
+
+      /* Take the opportunity to do a redo log
+      checkpoint if needed. */
+      log_free_check();
+    } else {
+      /* We are applying operations from the last block.
+      Do not allow other threads to buffer anything,
+      so that we can finally catch up and synchronize. */
+      ut_ad(index->online_log->head.blocks == 0);
+      ut_ad(index->online_log->tail.blocks == 0);
+      ut_ad(mrec_end ==
+            index->online_log->tail.block + index->online_log->tail.bytes);
+      ut_ad(mrec >= index->online_log->tail.block);
+    }
+
+    /* This read is not protected by index->online_log->mutex
+    for performance reasons. We will eventually notice any
+    error that was flagged by a DML thread. */
+    error = index->online_log->error;
+
+    if (error != DB_SUCCESS) {
+      goto func_exit;
+    }
+
+    next_mrec =
+        row_log_table_apply_op(thr, trx_id_col, new_trx_id_col, dup, &error,
+                               offsets_heap, heap, mrec, mrec_end, offsets);
+
+    if (error != DB_SUCCESS) {
+      goto func_exit;
+    } else if (next_mrec == next_mrec_end) {
+      /* The record happened to end on a block boundary.
+      Do we have more blocks left? */
+      if (has_index_lock) {
+        /* The index will be locked while
+        applying the last block. */
+        goto all_done;
+      }
+
+      mrec = nullptr;
+    process_next_block:
+      rw_lock_x_lock(dict_index_get_lock(index), UT_LOCATION_HERE);
+      has_index_lock = true;
+
+      index->online_log->head.bytes = 0;
+      index->online_log->head.blocks++;
+      goto next_block;
+    } else if (next_mrec != nullptr) {
+      ut_ad(next_mrec < next_mrec_end);
+      index->online_log->head.bytes += next_mrec - mrec;
+    } else if (has_index_lock) {
+      /* When mrec is within tail.block, it should
+      be a complete record, because we are holding
+      index->lock and thus excluding the writer. */
+      ut_ad(index->online_log->tail.blocks == 0);
+      ut_ad(mrec_end ==
+            index->online_log->tail.block + index->online_log->tail.bytes);
+      ut_d(ut_error);
+      ut_o(goto unexpected_eof);
+    } else {
+      memcpy(index->online_log->head.buf, mrec, mrec_end - mrec);
+      mrec_end += index->online_log->head.buf - mrec;
+      mrec = index->online_log->head.buf;
+      goto process_next_block;
+    }
+  }
+
+interrupted:
+  error = DB_INTERRUPTED;
+func_exit:
+  if (!has_index_lock) {
+    rw_lock_x_lock(dict_index_get_lock(index), UT_LOCATION_HERE);
+  }
+
+  mem_heap_free(offsets_heap);
+  mem_heap_free(heap);
+  row_log_block_free(index->online_log->head);
+  ut::free(offsets);
+  return (error);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_progress_inc_per_block
+inline ulint row_log_progress_inc_per_block() {
+  /* We must increment the progress once per page (as in
+  univ_page_size, usually 16KiB). One block here is srv_sort_buf_size
+  (usually 1MiB). */
+  const ulint pages_per_block = std::max(
+      static_cast<unsigned long>(srv_sort_buf_size / univ_page_size.physical()),
+      1UL);
+
+  /* Multiply by an artificial factor of 6 to even the pace with
+  the rest of the ALTER TABLE phases, they process page_size amount
+  of data faster. */
+  return (pages_per_block * 6);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_estimate_work
+ulint row_log_estimate_work(const dict_index_t *index) {
+  if (index == nullptr || index->online_log == nullptr) {
+    return (0);
+  }
+
+  const row_log_t *l = index->online_log;
+  const ulint bytes_left = static_cast<ulint>(l->tail.total - l->head.total);
+  const ulint blocks_left = bytes_left / srv_sort_buf_size;
+
+  return (blocks_left * row_log_progress_inc_per_block());
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_table_open
+[[nodiscard]] static byte *row_log_table_open(
+    row_log_t *log, /*!< in/out: online rebuild log */
+    ulint size,     /*!< in: size of log record */
+    ulint *avail)   /*!< out: available size for log record */
+{
+  mutex_enter(&log->mutex);
+
+  UNIV_MEM_INVALID(log->tail.buf, sizeof log->tail.buf);
+
+  if (log->error != DB_SUCCESS) {
+  err_exit:
+    mutex_exit(&log->mutex);
+    return (nullptr);
+  }
+
+  if (!row_log_block_allocate(log->tail)) {
+    log->error = DB_OUT_OF_MEMORY;
+    goto err_exit;
+  }
+
+  ut_ad(log->tail.bytes < srv_sort_buf_size);
+  *avail = srv_sort_buf_size - log->tail.bytes;
+
+  if (size > *avail) {
+    /* Make sure log->tail.buf is large enough */
+    ut_ad(size <= sizeof log->tail.buf);
+    return (log->tail.buf);
+  } else {
+    return (log->tail.block + log->tail.bytes);
+  }
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_table_delete
+void row_log_table_delete(
+    const rec_t *rec,       /*!< in: clustered index leaf page record,
+                            page X-latched */
+    const dtuple_t *ventry, /*!< in: dtuple holding virtual column info */
+    dict_index_t *index,    /*!< in/out: clustered index, S-latched
+                            or X-latched */
+    const ulint *offsets,   /*!< in: rec_get_offsets(rec,index) */
+    const byte *sys)        /*!< in: DB_TRX_ID,DB_ROLL_PTR that should
+                            be logged, or NULL to use those in rec */
+{
+  ulint old_pk_extra_size;
+  ulint old_pk_size;
+  ulint mrec_size;
+  ulint avail_size;
+  mem_heap_t *heap = nullptr;
+  const dtuple_t *old_pk;
+
+  if (index->is_corrupted() || !dict_index_is_online_ddl(index) ||
+      index->online_log->error != DB_SUCCESS) {
+    return;
+  }
+
+  ut_ad(index->is_clustered());
+  ut_ad(rec_offs_validate(rec, index, offsets));
+  ut_ad(rec_offs_n_fields(offsets) == dict_index_get_n_fields(index));
+  ut_ad(rec_offs_size(offsets) <= sizeof index->online_log->tail.buf);
+  ut_ad(rw_lock_own_flagged(&index->lock,
+                            RW_LOCK_FLAG_S | RW_LOCK_FLAG_X | RW_LOCK_FLAG_SX));
+
+  dict_table_t *new_table = index->online_log->table;
+  dict_index_t *new_index = new_table->first_index();
+
+  ut_ad(new_index->is_clustered());
+  ut_ad(!dict_index_is_online_ddl(new_index));
+
+  /* Create the tuple PRIMARY KEY,DB_TRX_ID,DB_ROLL_PTR in new_table. */
+  if (index->online_log->same_pk) {
+    dtuple_t *tuple;
+    ut_ad(new_index->n_uniq == index->n_uniq);
+
+    /* The PRIMARY KEY and DB_TRX_ID,DB_ROLL_PTR are in the first
+    fields of the record. */
+    heap = mem_heap_create(
+        DATA_TRX_ID_LEN + DTUPLE_EST_ALLOC(new_index->n_uniq + 2),
+        UT_LOCATION_HERE);
+    old_pk = tuple = dtuple_create(heap, new_index->n_uniq + 2);
+    dict_index_copy_types(tuple, new_index, tuple->n_fields);
+    dtuple_set_n_fields_cmp(tuple, new_index->n_uniq);
+
+    for (ulint i = 0; i < dtuple_get_n_fields(tuple); i++) {
+      ulint len;
+      const void *field = rec_get_nth_field(nullptr, rec, offsets, i, &len);
+      dfield_t *dfield = dtuple_get_nth_field(tuple, i);
+      ut_ad(len != UNIV_SQL_NULL);
+      ut_ad(!rec_offs_nth_extern(index, offsets, i));
+      dfield_set_data(dfield, field, len);
+    }
+
+    if (sys) {
+      dfield_set_data(dtuple_get_nth_field(tuple, new_index->n_uniq), sys,
+                      DATA_TRX_ID_LEN);
+      dfield_set_data(dtuple_get_nth_field(tuple, new_index->n_uniq + 1),
+                      sys + DATA_TRX_ID_LEN, DATA_ROLL_PTR_LEN);
+    }
+  } else {
+    /* The PRIMARY KEY has changed. Translate the tuple. */
+    old_pk = row_log_table_get_pk(rec, index, offsets, nullptr, &heap);
+
+    if (!old_pk) {
+      ut_ad(index->online_log->error != DB_SUCCESS);
+      if (heap) {
+        goto func_exit;
+      }
+      return;
+    }
+  }
+
+  ut_ad(DATA_TRX_ID_LEN ==
+        dtuple_get_nth_field(old_pk, old_pk->n_fields - 2)->len);
+  ut_ad(DATA_ROLL_PTR_LEN ==
+        dtuple_get_nth_field(old_pk, old_pk->n_fields - 1)->len);
+  old_pk_size = /* because it's PK, (changed or not), version doesn't matter */
+      rec_get_serialize_size(new_index, old_pk->fields, old_pk->n_fields,
+                             nullptr, &old_pk_extra_size, MAX_ROW_VERSION);
+  ut_ad(old_pk_extra_size < 0x100);
+
+  /* 2 = 1 (extra_size) + at least 1 byte payload */
+  mrec_size = 2 + old_pk_size;
+
+  /* Check if we need to log virtual column data */
+  if (ventry->n_v_fields > 0) {
+    ulint v_extra;
+    mrec_size += rec_get_serialize_size(new_index, nullptr, 0, ventry, &v_extra,
+                                        MAX_ROW_VERSION);
+  }
+
+  if (byte *b = row_log_table_open(index->online_log, mrec_size, &avail_size)) {
+    *b++ = ROW_T_DELETE;
+    *b++ = static_cast<byte>(old_pk_extra_size);
+
+    rec_serialize_dtuple(b + old_pk_extra_size, new_index, old_pk->fields,
+                         old_pk->n_fields, nullptr, MAX_ROW_VERSION);
+
+    b += old_pk_size;
+
+    /* log virtual columns */
+    if (ventry->n_v_fields > 0) {
+      rec_serialize_dtuple(b, new_index, nullptr, 0, ventry, MAX_ROW_VERSION);
+      b += mach_read_from_2(b);
+    } else if (index->table->n_v_cols) {
+      mach_write_to_2(b, 2);
+      b += 2;
+    }
+
+    row_log_table_close(index->online_log, b, mrec_size, avail_size);
+  }
+
+func_exit:
+  mem_heap_free(heap);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_table_low
+static void row_log_table_low(const rec_t *rec, const dtuple_t *ventry,
+                              const dtuple_t *o_ventry, dict_index_t *index,
+                              const ulint *offsets, bool insert,
+                              const dtuple_t *old_pk) {
+  if (index->is_corrupted() || !dict_index_is_online_ddl(index) ||
+      index->online_log->error != DB_SUCCESS) {
+    return;
+  }
+
+  const dict_index_t *new_index = index->online_log->table->first_index();
+
+  ut_ad(index->is_clustered());
+  ut_ad(new_index->is_clustered());
+  ut_ad(!dict_index_is_online_ddl(new_index));
+  ut_ad(rec_offs_validate(rec, index, offsets));
+  ut_ad(rec_offs_n_fields(offsets) == dict_index_get_n_fields(index));
+  ut_ad(rec_offs_size(offsets) <= sizeof index->online_log->tail.buf);
+  ut_ad(rw_lock_own_flagged(&index->lock,
+                            RW_LOCK_FLAG_S | RW_LOCK_FLAG_X | RW_LOCK_FLAG_SX));
+  ut_ad(fil_page_get_type(page_align(rec)) == FIL_PAGE_INDEX);
+  ut_ad(page_is_leaf(page_align(rec)));
+  ut_ad(page_is_comp(page_align(rec)) == rec_offs_comp(offsets));
+  /* old_pk=row_log_table_get_pk() [not needed in INSERT] is a prefix
+  of the clustered index record (PRIMARY KEY,DB_TRX_ID,DB_ROLL_PTR),
+  with no information on virtual columns */
+  ut_ad(!old_pk || !insert);
+  ut_ad(!old_pk || old_pk->n_v_fields == 0);
+  ut_ad(!o_ventry || !insert);
+  ut_ad(!o_ventry || ventry);
+
+  if (!rec_offs_comp(offsets)) {
+    row_log_table_low_redundant(rec, ventry, o_ventry, index, insert, old_pk,
+                                new_index);
+    return;
+  }
+
+  ut_ad(page_is_comp(page_align(rec)));
+  ut_ad(rec_get_status(rec) == REC_STATUS_ORDINARY);
+
+  /* Check the instant to decide copying info bit or not */
+  ulint omit_size =
+      REC_N_NEW_EXTRA_BYTES -
+      (index->has_instant_cols_or_row_versions() ? REC_N_TMP_EXTRA_BYTES : 0);
+
+  ulint extra_size = rec_offs_extra_size(offsets) - omit_size;
+
+  ulint mrec_size = ROW_LOG_HEADER_SIZE + (extra_size >= 0x80) +
+                    rec_offs_size(offsets) - omit_size;
+
+  if (ventry && ventry->n_v_fields > 0) {
+    ulint v_extra = 0;
+    uint64_t rec_size = rec_get_serialize_size(new_index, nullptr, 0, ventry,
+                                               &v_extra, MAX_ROW_VERSION);
+
+    mrec_size += rec_size;
+
+    /* If there is actually nothing to be logged for new entry, then
+    there must be also nothing to do with old entry. In this case,
+    make it same with the case below, by only keep 2 bytes length marker */
+    if (rec_size > 2 && o_ventry != nullptr) {
+      mrec_size += rec_get_serialize_size(new_index, nullptr, 0, o_ventry,
+                                          &v_extra, MAX_ROW_VERSION);
+    }
+  } else if (index->table->n_v_cols) {
+    /* Always leave 2 bytes length marker for virtual column
+    data logging even if there is none of them is indexed if table
+    has virtual columns */
+    mrec_size += 2;
+  }
+
+  ulint old_pk_size;
+  ulint old_pk_extra_size;
+  if (insert || index->online_log->same_pk) {
+    ut_ad(!old_pk);
+    old_pk_extra_size = old_pk_size = 0;
+  } else {
+    ut_ad(old_pk);
+    ut_ad(old_pk->n_fields == 2 + old_pk->n_fields_cmp);
+    ut_ad(DATA_TRX_ID_LEN ==
+          dtuple_get_nth_field(old_pk, old_pk->n_fields - 2)->len);
+    ut_ad(DATA_ROLL_PTR_LEN ==
+          dtuple_get_nth_field(old_pk, old_pk->n_fields - 1)->len);
+    /* PK fields. version doesn't matter. */
+    old_pk_size =
+        rec_get_serialize_size(new_index, old_pk->fields, old_pk->n_fields,
+                               nullptr, &old_pk_extra_size, MAX_ROW_VERSION);
+    ut_ad(old_pk_extra_size < 0x100);
+    mrec_size += 1 /*old_pk_extra_size*/ + old_pk_size;
+  }
+
+  ulint avail_size;
+  if (byte *b = row_log_table_open(index->online_log, mrec_size, &avail_size)) {
+    *b++ = insert ? ROW_T_INSERT : ROW_T_UPDATE;
+
+    if (old_pk_size) {
+      ut_ad(!insert);
+
+      *b++ = static_cast<byte>(old_pk_extra_size);
+      /* PK fields. version doesn't matter. */
+      rec_serialize_dtuple(b + old_pk_extra_size, new_index, old_pk->fields,
+                           old_pk->n_fields, nullptr, MAX_ROW_VERSION);
+      b += old_pk_size;
+    }
+
+    if (extra_size < 0x80) {
+      *b++ = static_cast<byte>(extra_size);
+    } else {
+      ut_ad(extra_size < 0x8000);
+      *b++ = static_cast<byte>(0x80 | (extra_size >> 8));
+      *b++ = static_cast<byte>(extra_size);
+    }
+
+    memcpy(b, rec - rec_offs_extra_size(offsets), extra_size);
+    b += extra_size;
+    memcpy(b, rec, rec_offs_data_size(offsets));
+    b += rec_offs_data_size(offsets);
+
+    if (ventry && ventry->n_v_fields > 0) {
+      uint64_t new_v_size;
+
+      rec_serialize_dtuple(b, new_index, nullptr, 0, ventry, MAX_ROW_VERSION);
+      new_v_size = mach_read_from_2(b);
+      b += new_v_size;
+
+      /* Nothing for new entry to be logged, skip the old one too. */
+      if (new_v_size != 2 && o_ventry != nullptr) {
+        rec_serialize_dtuple(b, new_index, nullptr, 0, o_ventry,
+                             MAX_ROW_VERSION);
+        b += mach_read_from_2(b);
+      }
+    } else if (index->table->n_v_cols) {
+      /* The table contains virtual columns, but nothing
+      has changed for them, so just mark a 2 bytes length
+      field */
+      mach_write_to_2(b, 2);
+      b += 2;
+    }
+
+    row_log_table_close(index->online_log, b, mrec_size, avail_size);
+  }
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_table_open
+[[nodiscard]] static byte *row_log_table_open(
+    row_log_t *log, /*!< in/out: online rebuild log */
+    ulint size,     /*!< in: size of log record */
+    ulint *avail)   /*!< out: available size for log record */
+{
+  mutex_enter(&log->mutex);
+
+  UNIV_MEM_INVALID(log->tail.buf, sizeof log->tail.buf);
+
+  if (log->error != DB_SUCCESS) {
+  err_exit:
+    mutex_exit(&log->mutex);
+    return (nullptr);
+  }
+
+  if (!row_log_block_allocate(log->tail)) {
+    log->error = DB_OUT_OF_MEMORY;
+    goto err_exit;
+  }
+
+  ut_ad(log->tail.bytes < srv_sort_buf_size);
+  *avail = srv_sort_buf_size - log->tail.bytes;
+
+  if (size > *avail) {
+    /* Make sure log->tail.buf is large enough */
+    ut_ad(size <= sizeof log->tail.buf);
+    return (log->tail.buf);
+  } else {
+    return (log->tail.block + log->tail.bytes);
+  }
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_table_close_func 
+static void row_log_table_close_func(row_log_t *log,
+                                     IF_DEBUG(const byte *b, ) ulint size,
+                                     ulint avail) {
+  ut_ad(mutex_own(&log->mutex));
+
+  if (size >= avail) {
+    dberr_t err;
+    IORequest request(IORequest::ROW_LOG | IORequest::WRITE);
+    const os_offset_t byte_offset =
+        (os_offset_t)log->tail.blocks * srv_sort_buf_size;
+
+    if (byte_offset + srv_sort_buf_size >= srv_online_max_size) {
+      goto write_failed;
+    }
+
+    if (size == avail) {
+      ut_ad(b == &log->tail.block[srv_sort_buf_size]);
+    } else {
+      ut_ad(b == log->tail.buf + size);
+      memcpy(log->tail.block + log->tail.bytes, log->tail.buf, avail);
+    }
+
+    UNIV_MEM_ASSERT_RW(log->tail.block, srv_sort_buf_size);
+
+    if (!row_log_tmpfile(log)) {
+      log->error = DB_OUT_OF_MEMORY;
+      goto err_exit;
+    }
+
+    err = os_file_write_int_fd(request, "(modification log)", log->file.get(),
+                               log->tail.block, byte_offset, srv_sort_buf_size);
+
+    log->tail.blocks++;
+    if (err != DB_SUCCESS) {
+    write_failed:
+      log->error = DB_ONLINE_LOG_TOO_BIG;
+    }
+    UNIV_MEM_INVALID(log->tail.block, srv_sort_buf_size);
+    memcpy(log->tail.block, log->tail.buf + avail, size - avail);
+    log->tail.bytes = size - avail;
+  } else {
+    log->tail.bytes += size;
+    ut_ad(b == log->tail.block + log->tail.bytes);
+  }
+
+  log->tail.total += size;
+  UNIV_MEM_INVALID(log->tail.buf, sizeof log->tail.buf);
+err_exit:
+  mutex_exit(&log->mutex);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_block_allocate
+[[nodiscard]] static bool row_log_block_allocate(row_log_buf_t &log_buf) {
+  DBUG_TRACE;
+  if (log_buf.block == nullptr) {
+    DBUG_EXECUTE_IF("simulate_row_log_allocation_failure", return false;);
+
+    log_buf.block = static_cast<uint8_t *>(ut::malloc_large_page_withkey(
+        ut::make_psi_memory_key(mem_key_row_log_buf), srv_sort_buf_size,
+        ut::fallback_to_normal_page_t{}));
+
+    if (log_buf.block == nullptr) {
+      return false;
+    }
+  }
+  return true;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_online_op 
+void row_log_online_op(
+    dict_index_t *index,   /*!< in/out: index, S or X latched */
+    const dtuple_t *tuple, /*!< in: index tuple */
+    trx_id_t trx_id)       /*!< in: transaction ID for insert,
+                           or 0 for delete */
+{
+  byte *b;
+  ulint extra_size;
+  ulint size;
+  ulint mrec_size;
+  ulint avail_size;
+  row_log_t *log;
+
+  ut_ad(dtuple_validate(tuple));
+  ut_ad(dtuple_get_n_fields(tuple) == dict_index_get_n_fields(index));
+  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_S) ||
+        rw_lock_own(dict_index_get_lock(index), RW_LOCK_X));
+  ut_ad(!index->is_clustered());
+
+  if (index->is_corrupted()) {
+    return;
+  }
+
+  ut_ad(dict_index_is_online_ddl(index));
+
+  /* Compute the size of the record. This differs from ddl::buf_encode(),
+  because here we do not encode extra_size+1 (and reserve 0 as the
+  end-of-chunk marker). */
+
+  /* Secondary index, version doesn't matter */
+  size = rec_get_serialize_size(index, tuple->fields, tuple->n_fields, nullptr,
+                                &extra_size, MAX_ROW_VERSION);
+  ut_ad(size >= extra_size);
+  ut_ad(size <= sizeof log->tail.buf);
+
+  mrec_size = ROW_LOG_HEADER_SIZE + (extra_size >= 0x80) + size +
+              (trx_id ? DATA_TRX_ID_LEN : 0);
+
+  log = index->online_log;
+  mutex_enter(&log->mutex);
+
+  if (trx_id > log->max_trx) {
+    log->max_trx = trx_id;
+  }
+
+  if (!row_log_block_allocate(log->tail)) {
+    log->error = DB_OUT_OF_MEMORY;
+    goto err_exit;
+  }
+
+  UNIV_MEM_INVALID(log->tail.buf, sizeof log->tail.buf);
+
+  ut_ad(log->tail.bytes < srv_sort_buf_size);
+  avail_size = srv_sort_buf_size - log->tail.bytes;
+
+  if (mrec_size > avail_size) {
+    b = log->tail.buf;
+  } else {
+    b = log->tail.block + log->tail.bytes;
+  }
+
+  if (trx_id != 0) {
+    *b++ = ROW_OP_INSERT;
+    trx_write_trx_id(b, trx_id);
+    b += DATA_TRX_ID_LEN;
+  } else {
+    *b++ = ROW_OP_DELETE;
+  }
+
+  if (extra_size < 0x80) {
+    *b++ = (byte)extra_size;
+  } else {
+    ut_ad(extra_size < 0x8000);
+    *b++ = (byte)(0x80 | (extra_size >> 8));
+    *b++ = (byte)extra_size;
+  }
+
+  rec_serialize_dtuple(b + extra_size, index, tuple->fields, tuple->n_fields,
+                       nullptr, MAX_ROW_VERSION);
+  b += size;
+
+  if (mrec_size >= avail_size) {
+    dberr_t err;
+    IORequest request(IORequest::ROW_LOG | IORequest::WRITE);
+    const os_offset_t byte_offset =
+        (os_offset_t)log->tail.blocks * srv_sort_buf_size;
+
+    if (byte_offset + srv_sort_buf_size >= srv_online_max_size) {
+      goto write_failed;
+    }
+
+    if (mrec_size == avail_size) {
+      ut_ad(b == &log->tail.block[srv_sort_buf_size]);
+    } else {
+      ut_ad(b == log->tail.buf + mrec_size);
+      memcpy(log->tail.block + log->tail.bytes, log->tail.buf, avail_size);
+    }
+
+    UNIV_MEM_ASSERT_RW(log->tail.block, srv_sort_buf_size);
+
+    if (!row_log_tmpfile(log)) {
+      log->error = DB_OUT_OF_MEMORY;
+      goto err_exit;
+    }
+
+    err = os_file_write_int_fd(request, "(modification log)", log->file.get(),
+                               log->tail.block, byte_offset, srv_sort_buf_size);
+
+    log->tail.blocks++;
+    if (err != DB_SUCCESS) {
+    write_failed:
+      /* We set the flag directly instead of
+      invoking dict_set_corrupted() here,
+      because the index is not "public" yet. */
+      index->type |= DICT_CORRUPT;
+    }
+    UNIV_MEM_INVALID(log->tail.block, srv_sort_buf_size);
+    memcpy(log->tail.block, log->tail.buf + avail_size, mrec_size - avail_size);
+    log->tail.bytes = mrec_size - avail_size;
+  } else {
+    log->tail.bytes += mrec_size;
+    ut_ad(b == log->tail.block + log->tail.bytes);
+  }
+
+  UNIV_MEM_INVALID(log->tail.buf, sizeof log->tail.buf);
+err_exit:
+  mutex_exit(&log->mutex);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/row/row0log.cc
+Function: row_log_apply_ops
+static dberr_t row_log_apply_ops(const trx_t *trx, dict_index_t *index,
+                                 ddl::Dup *dup, Alter_stage *stage) {
+  dberr_t error;
+  const ddl::mrec_t *mrec = nullptr;
+  const ddl::mrec_t *next_mrec;
+  const ddl::mrec_t *mrec_end = nullptr; /* silence bogus warning */
+  const ddl::mrec_t *next_mrec_end;
+  mem_heap_t *offsets_heap;
+  mem_heap_t *heap;
+  ulint *offsets;
+  bool has_index_lock;
+  const ulint i = 1 + REC_OFFS_HEADER_SIZE + dict_index_get_n_fields(index);
+
+  ut_ad(dict_index_is_online_ddl(index));
+  ut_ad(!index->is_committed());
+  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X));
+  ut_ad(index->online_log);
+  UNIV_MEM_INVALID(&mrec_end, sizeof mrec_end);
+
+  offsets = static_cast<ulint *>(
+      ut::malloc_withkey(UT_NEW_THIS_FILE_PSI_KEY, i * sizeof *offsets));
+  offsets[0] = i;
+  offsets[1] = dict_index_get_n_fields(index);
+
+  offsets_heap = mem_heap_create(UNIV_PAGE_SIZE, UT_LOCATION_HERE);
+  heap = mem_heap_create(UNIV_PAGE_SIZE, UT_LOCATION_HERE);
+  has_index_lock = true;
+
+next_block:
+  ut_ad(has_index_lock);
+  ut_ad(rw_lock_own(dict_index_get_lock(index), RW_LOCK_X));
+  ut_ad(index->online_log->head.bytes == 0);
+
+  stage->inc(row_log_progress_inc_per_block());
+
+  if (trx_is_interrupted(trx)) {
+    goto interrupted;
+  }
+
+  error = index->online_log->error;
+  if (error != DB_SUCCESS) {
+    goto func_exit;
+  }
+
+  if (index->is_corrupted()) {
+    error = DB_INDEX_CORRUPT;
+    goto func_exit;
+  }
+
+  if (UNIV_UNLIKELY(index->online_log->head.blocks >
+                    index->online_log->tail.blocks)) {
+    /* Note: release-only label. */
+    ut_o(unexpected_eof:);
+    ib::error(ER_IB_MSG_962)
+        << "Unexpected end of temporary file for index " << index->name;
+  corruption:
+    error = DB_CORRUPTION;
+    goto func_exit;
+  }
+
+  if (index->online_log->head.blocks == index->online_log->tail.blocks) {
+    if (index->online_log->head.blocks) {
+#ifdef HAVE_FTRUNCATE
+      /* Truncate the file in order to save space. */
+      if (index->online_log->file.is_open() &&
+          ftruncate(index->online_log->file.get(), 0) == -1) {
+        perror("ftruncate");
+      }
+#endif /* HAVE_FTRUNCATE */
+      index->online_log->head.blocks = index->online_log->tail.blocks = 0;
+    }
+
+    next_mrec = index->online_log->tail.block;
+    next_mrec_end = next_mrec + index->online_log->tail.bytes;
+
+    if (next_mrec_end == next_mrec) {
+      /* End of log reached. */
+    all_done:
+      ut_ad(has_index_lock);
+      ut_ad(index->online_log->head.blocks == 0);
+      ut_ad(index->online_log->tail.blocks == 0);
+      error = DB_SUCCESS;
+      goto func_exit;
+    }
+  } else {
+    os_offset_t ofs;
+
+    ofs = (os_offset_t)index->online_log->head.blocks * srv_sort_buf_size;
+
+    ut_ad(has_index_lock);
+    has_index_lock = false;
+    rw_lock_x_unlock(dict_index_get_lock(index));
+
+    log_free_check();
+
+    if (!row_log_block_allocate(index->online_log->head)) {
+      error = DB_OUT_OF_MEMORY;
+      goto func_exit;
+    }
+
+    IORequest request(IORequest::READ | IORequest::ROW_LOG);
+    dberr_t err = os_file_read_no_error_handling_int_fd(
+        request, index->online_log->path, index->online_log->file.get(),
+        index->online_log->head.block, ofs, srv_sort_buf_size, nullptr);
+
+    if (err != DB_SUCCESS) {
+      ib::error(ER_IB_MSG_963) << "Unable to read temporary file"
+                                  " for index "
+                               << index->name;
+      goto corruption;
+    }
+
+#ifdef POSIX_FADV_DONTNEED
+    /* Each block is read exactly once.  Free up the file cache. */
+    posix_fadvise(index->online_log->file.get(), ofs, srv_sort_buf_size,
+                  POSIX_FADV_DONTNEED);
+#endif /* POSIX_FADV_DONTNEED */
+
+    next_mrec = index->online_log->head.block;
+    next_mrec_end = next_mrec + srv_sort_buf_size;
+  }
+
+  if (mrec) {
+    /* A partial record was read from the previous block.
+    Copy the temporary buffer full, as we do not know the
+    length of the record. Parse subsequent records from
+    the bigger buffer index->online_log->head.block
+    or index->online_log->tail.block. */
+
+    ut_ad(mrec == index->online_log->head.buf);
+    ut_ad(mrec_end > mrec);
+    ut_ad(mrec_end < (&index->online_log->head.buf)[1]);
+
+    memcpy((ddl::mrec_t *)mrec_end, next_mrec,
+           (&index->online_log->head.buf)[1] - mrec_end);
+    mrec = row_log_apply_op(index, dup, &error, offsets_heap, heap,
+                            has_index_lock, index->online_log->head.buf,
+                            (&index->online_log->head.buf)[1], offsets);
+    if (error != DB_SUCCESS) {
+      goto func_exit;
+    } else if (UNIV_UNLIKELY(mrec == nullptr)) {
+      /* The record was not reassembled properly. */
+      goto corruption;
+    }
+    /* The record was previously found out to be
+    truncated. Now that the parse buffer was extended,
+    it should proceed beyond the old end of the buffer. */
+    ut_a(mrec > mrec_end);
+
+    index->online_log->head.bytes = mrec - mrec_end;
+    next_mrec += index->online_log->head.bytes;
+  }
+
+  ut_ad(next_mrec <= next_mrec_end);
+  /* The following loop must not be parsing the temporary
+  buffer, but head.block or tail.block. */
+
+  /* mrec!=NULL means that the next record starts from the
+  middle of the block */
+  ut_ad((mrec == nullptr) == (index->online_log->head.bytes == 0));
+
+#ifdef UNIV_DEBUG
+  if (index->online_log->head.block != nullptr &&
+      next_mrec_end == index->online_log->head.block + srv_sort_buf_size) {
+    /* If tail.bytes == 0, next_mrec_end can also be at
+    the end of tail.block. */
+    if (index->online_log->tail.bytes == 0) {
+      ut_ad(next_mrec == next_mrec_end);
+      ut_ad(index->online_log->tail.blocks == 0);
+      ut_ad(index->online_log->head.blocks == 0);
+      ut_ad(index->online_log->head.bytes == 0);
+    } else {
+      ut_ad(next_mrec ==
+            index->online_log->head.block + index->online_log->head.bytes);
+      ut_ad(index->online_log->tail.blocks > index->online_log->head.blocks);
+    }
+  } else if (next_mrec_end ==
+             index->online_log->tail.block + index->online_log->tail.bytes) {
+    ut_ad(next_mrec ==
+          index->online_log->tail.block + index->online_log->head.bytes);
+    ut_ad(index->online_log->tail.blocks == 0);
+    ut_ad(index->online_log->head.blocks == 0);
+    ut_ad(index->online_log->head.bytes <= index->online_log->tail.bytes);
+  } else {
+    ut_error;
+  }
+#endif /* UNIV_DEBUG */
+
+  mrec_end = next_mrec_end;
+
+  while (!trx_is_interrupted(trx)) {
+    mrec = next_mrec;
+    ut_ad(mrec < mrec_end);
+
+    if (!has_index_lock) {
+      /* We are applying operations from a different
+      block than the one that is being written to.
+      We do not hold index->lock in order to
+      allow other threads to concurrently buffer
+      modifications. */
+      ut_ad(mrec >= index->online_log->head.block);
+      ut_ad(mrec_end == index->online_log->head.block + srv_sort_buf_size);
+      ut_ad(index->online_log->head.bytes < srv_sort_buf_size);
+
+      /* Take the opportunity to do a redo log
+      checkpoint if needed. */
+      log_free_check();
+    } else {
+      /* We are applying operations from the last block.
+      Do not allow other threads to buffer anything,
+      so that we can finally catch up and synchronize. */
+      ut_ad(index->online_log->head.blocks == 0);
+      ut_ad(index->online_log->tail.blocks == 0);
+      ut_ad(mrec_end ==
+            index->online_log->tail.block + index->online_log->tail.bytes);
+      ut_ad(mrec >= index->online_log->tail.block);
+    }
+
+    next_mrec = row_log_apply_op(index, dup, &error, offsets_heap, heap,
+                                 has_index_lock, mrec, mrec_end, offsets);
+
+    if (error != DB_SUCCESS) {
+      goto func_exit;
+    } else if (next_mrec == next_mrec_end) {
+      /* The record happened to end on a block boundary.
+      Do we have more blocks left? */
+      if (has_index_lock) {
+        /* The index will be locked while
+        applying the last block. */
+        goto all_done;
+      }
+
+      mrec = nullptr;
+    process_next_block:
+      rw_lock_x_lock(dict_index_get_lock(index), UT_LOCATION_HERE);
+      has_index_lock = true;
+
+      index->online_log->head.bytes = 0;
+      index->online_log->head.blocks++;
+      goto next_block;
+    } else if (next_mrec != nullptr) {
+      ut_ad(next_mrec < next_mrec_end);
+      index->online_log->head.bytes += next_mrec - mrec;
+    } else if (has_index_lock) {
+      /* When mrec is within tail.block, it should
+      be a complete record, because we are holding
+      index->lock and thus excluding the writer. */
+      ut_ad(index->online_log->tail.blocks == 0);
+      ut_ad(mrec_end ==
+            index->online_log->tail.block + index->online_log->tail.bytes);
+      ut_d(ut_error);
+      ut_o(goto unexpected_eof);
+    } else {
+      memcpy(index->online_log->head.buf, mrec, mrec_end - mrec);
+      mrec_end += index->online_log->head.buf - mrec;
+      mrec = index->online_log->head.buf;
+      goto process_next_block;
+    }
+  }
+
+interrupted:
+  error = DB_INTERRUPTED;
+func_exit:
+  if (!has_index_lock) {
+    rw_lock_x_lock(dict_index_get_lock(index), UT_LOCATION_HERE);
+  }
+
+  switch (error) {
+    case DB_SUCCESS:
+      break;
+    case DB_INDEX_CORRUPT:
+      if (((os_offset_t)index->online_log->tail.blocks + 1) *
+              srv_sort_buf_size >=
+          srv_online_max_size) {
+        /* The log file grew too big. */
+        error = DB_ONLINE_LOG_TOO_BIG;
+      }
+      [[fallthrough]];
+    default:
+      /* We set the flag directly instead of
+      invoking dict_set_corrupted() here,
+      because the index is not "public" yet. */
+      index->type |= DICT_CORRUPT;
+  }
+
+  mem_heap_free(heap);
+  mem_heap_free(offsets_heap);
+  row_log_block_free(index->online_log->head);
+  ut::free(offsets);
+  return (error);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/ut0stage.h
+Function: Alter_stage::reestimate
+inline void Alter_stage::reestimate() {
+  if (m_stages.empty()) {
+    return;
+  }
+
+  /* During the log table phase we calculate the estimate as
+  work done so far + log size remaining. */
+  if (m_cur_phase == LOG_TABLE) {
+    auto progress = m_stages.back().second.first;
+
+    mysql_stage_set_work_estimated(
+        progress,
+        mysql_stage_get_work_completed(progress) + row_log_estimate_work(m_pk));
+
+    return;
+  }
+
+  /* During the other phases we use a formula, regardless of
+  how much work has been done so far. */
+
+  /* For number of pages in the PK - if the PK has not been
+  read yet, use stat_n_leaf_pages (approximate), otherwise
+  use the exact number we gathered. */
+  const page_no_t n_pk_pages =
+      m_cur_phase != READ_PK ? m_n_pk_pages : m_pk->stat_n_leaf_pages;
+
+  /* If flush phase has not started yet and we do not know how
+  many pages are to be flushed, then use a wild guess - the
+  number of pages in the PK / 2. */
+  if (m_n_flush_pages == 0) {
+    m_n_flush_pages = n_pk_pages / 2;
+  }
+
+  uint64_t estimate =
+      n_pk_pages *
+          (1                  /* read PK */
+           + m_n_sort_indexes /* row_merge_buf_sort() inside the
+                              read PK per created index */
+           + m_n_sort_indexes * 2 /* sort & insert per created index */) +
+      m_n_flush_pages + row_log_estimate_work(m_pk);
+
+  auto progress = m_stages.back().second.first;
+  const auto completed = (uint64_t)mysql_stage_get_work_completed(progress);
+
+  /* Prevent estimate < completed */
+  mysql_stage_set_work_estimated(progress, std::max(estimate, completed));
+}
+
+

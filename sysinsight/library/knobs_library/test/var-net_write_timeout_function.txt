@@ -1,0 +1,84 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc
+Function: login_connection
+   login_connection()
+   thd        Thread handler
+
+  NOTES
+    Connection is not closed in case of errors
+
+  RETURN
+    0    ok
+    1    error
+*/
+
+static bool login_connection(THD *thd) {
+  int error;
+  DBUG_TRACE;
+  DBUG_PRINT("info",
+             ("login_connection called by thread %u", thd->thread_id()));
+
+  /* Use "connect_timeout" value during connection phase */
+  thd->get_protocol_classic()->set_read_timeout(connect_timeout, true);
+  thd->get_protocol_classic()->set_write_timeout(connect_timeout);
+
+  error = check_connection(thd);
+  thd->send_statement_status();
+
+  if (error) {  // Wrong permissions
+#ifdef _WIN32
+    if (vio_type(thd->get_protocol_classic()->get_vio()) == VIO_TYPE_NAMEDPIPE)
+      my_sleep(1000); /* must wait after eof() */
+#endif
+    return true;
+  }
+  /* Connect completed, set read/write timeouts back to default */
+  thd->get_protocol_classic()->set_read_timeout(
+      thd->variables.net_read_timeout);
+  thd->get_protocol_classic()->set_write_timeout(
+      thd->variables.net_write_timeout);
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sys_vars.cc
+Function: fix_net_write_timeout
+static bool fix_net_write_timeout(sys_var *self, THD *thd, enum_var_type type) {
+  if (!self->is_global_persist(type)) {
+    // net_read_timeout is a specific property for the classic protocols
+    if (!thd->is_classic_protocol()) {
+      my_error(ER_PLUGGABLE_PROTOCOL_COMMAND_NOT_SUPPORTED, MYF(0));
+      return true;
+    }
+    my_net_set_write_timeout(thd->get_protocol_classic()->get_net(),
+                             thd->variables.net_write_timeout);
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_connect not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_connect not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_connect not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_get_command not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_get_command not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/server_component/clone_protocol_service.cc
+Function: mysql_clone_get_command not found.
+

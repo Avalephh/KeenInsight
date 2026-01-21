@@ -1,0 +1,197 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_parse.cc
+Function: mysql_execute_command
+    KILL QUERY may come after cleanup in mysql_execute_command(). Next query
+    execution is interrupted due to this. So resetting THD::killed here.
+
+    THD::killed value can not be KILL_TIMEOUT here as timer used for statement
+    max execution time is disarmed in the cleanup stage of
+    mysql_execute_command. KILL CONNECTION should terminate the connection.
+    Hence resetting THD::killed only for KILL QUERY case here.
+  */
+  if (thd->killed == THD::KILL_QUERY) thd->killed = THD::NOT_KILLED;
+  thd->set_time();
+  if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == false) {
+    /*
+      If the time has gone past end of epoch we need to shutdown the server. But
+      there is possibility of getting invalid time value on some platforms.
+      For example, gettimeofday() might return incorrect value on solaris
+      platform. Hence validating the current time with 5 iterations before
+      initiating the normal server shutdown process because of time getting
+      past 2038.
+    */
+    const int max_tries = 5;
+    LogErr(WARNING_LEVEL, ER_CONFIRMING_THE_FUTURE, max_tries);
+
+    int tries = 0;
+    while (++tries <= max_tries) {
+      thd->set_time();
+      if (is_time_t_valid_for_timestamp(thd->query_start_in_secs()) == true) {
+        LogErr(WARNING_LEVEL, ER_BACK_IN_TIME, tries);
+        break;
+      }
+      LogErr(WARNING_LEVEL, ER_FUTURE_DATE, tries);
+    }
+    if (tries > max_tries) {
+      /*
+        If the time has got past epoch, we need to shut this server down.
+        We do this by making sure every command is a shutdown and we
+        have enough privileges to shut the server down
+
+        TODO: remove this when we have full 64 bit my_time_t support
+      */
+      LogErr(ERROR_LEVEL, ER_UNSUPPORTED_DATE);
+      ulong master_access = thd->security_context()->master_access();
+      thd->security_context()->set_master_access(master_access | SHUTDOWN_ACL);
+      error = true;
+      kill_mysql();
+    }
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc
+Function: bootstrap::run_bootstrap_thread
+bool run_bootstrap_thread(const char *file_name, MYSQL_FILE *file,
+                          bootstrap_functor boot_handler,
+                          enum_thread_type thread_type) {
+  DBUG_TRACE;
+
+  THD *thd = new THD;
+  thd->system_thread = thread_type;
+  thd->get_protocol_classic()->init_net(nullptr);
+  // Skip grants and set the system_user flag in THD.
+  thd->security_context()->skip_grants();
+
+  thd->set_new_thread_id();
+
+  handle_bootstrap_args args;
+
+  args.m_thd = thd;
+  args.m_bootstrap_handler = boot_handler;
+  args.m_file_name = file_name;
+  args.m_file = file;
+
+  // Set server default sql_mode irrespective of mysqld server command line
+  // argument.
+  thd->variables.sql_mode =
+      find_static_system_variable("sql_mode")->get_default();
+
+  // Set session server and connection collation irrespective of
+  // mysqld server command line argument.
+  thd->variables.collation_server =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+  thd->variables.collation_connection =
+      get_charset_by_name(MYSQL_DEFAULT_COLLATION_NAME, MYF(0));
+
+  // Set session transaction completion type to server default to
+  // avoid problems due to transactions being active when they are
+  // not supposed to.
+  thd->variables.completion_type =
+      find_static_system_variable("completion_type")->get_default();
+
+  /*
+    Set default value for explicit_defaults_for_timestamp variable. Bootstrap
+    thread creates dictionary tables. The creation of dictionary tables should
+    be independent of the value of explicit_defaults_for_timestamp specified by
+    the user.
+  */
+  thd->variables.explicit_defaults_for_timestamp =
+      find_static_system_variable("explicit_defaults_for_timestamp")
+          ->get_default();
+
+  /*
+    The global table encryption default setting applies to user threads.
+    Setting it false for system threads.
+  */
+  thd->variables.default_table_encryption = false;
+
+  my_thread_attr_t thr_attr;
+  my_thread_attr_init(&thr_attr);
+#ifndef _WIN32
+  pthread_attr_setscope(&thr_attr, PTHREAD_SCOPE_SYSTEM);
+#endif
+  my_thread_attr_setdetachstate(&thr_attr, MY_THREAD_CREATE_JOINABLE);
+
+  // Default stack size may be too small.
+  size_t stacksize = 0;
+  my_thread_attr_getstacksize(&thr_attr, &stacksize);
+  if (stacksize < my_thread_stack_size) {
+    if (0 != my_thread_attr_setstacksize(&thr_attr, my_thread_stack_size)) {
+      assert(false);
+    }
+  }
+
+  my_thread_handle thread_handle;
+  // What about setting THD::real_id?
+  int error = mysql_thread_create(key_thread_bootstrap, &thread_handle,
+                                  &thr_attr, handle_bootstrap, &args);
+  if (error) {
+    /* purecov: begin inspected */
+    LogErr(WARNING_LEVEL, ER_BOOTSTRAP_CANT_THREAD, errno).os_errno(errno);
+    thd->release_resources();
+    delete thd;
+    return true;
+    /* purecov: end */
+  }
+  /* Wait for thread to die */
+  my_thread_join(&thread_handle, nullptr);
+  // Free Items that were created during this execution.
+  thd->free_items();
+  delete thd;
+  return args.m_bootstrap_error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc
+Function: set_slave_thread_options
+void set_slave_thread_options(THD *thd) {
+  DBUG_TRACE;
+  /*
+     It's nonsense to constrain the slave threads with max_join_size; if a
+     query succeeded on master, we HAVE to execute it. So set
+     OPTION_BIG_SELECTS. Setting max_join_size to HA_POS_ERROR is not enough
+     (and it's not needed if we have OPTION_BIG_SELECTS) because an INSERT
+     SELECT examining more than 4 billion rows would still fail (yes, because
+     when max_join_size is 4G, OPTION_BIG_SELECTS is automatically set, but
+     only for client threads.
+  */
+  ulonglong options = thd->variables.option_bits | OPTION_BIG_SELECTS;
+  if (opt_log_replica_updates)
+    options |= OPTION_BIN_LOG;
+  else
+    options &= ~OPTION_BIN_LOG;
+  thd->variables.option_bits = options;
+  thd->variables.completion_type = 0;
+
+  /* Do not track GTIDs for slave threads to avoid performance issues. */
+  thd->variables.session_track_gtids = SESSION_TRACK_GTIDS_OFF;
+  thd->rpl_thd_ctx.session_gtids_ctx()
+      .update_tracking_activeness_from_session_variable(thd);
+
+  /*
+    Set autocommit= 1 when info tables are used and autocommit == 0 to
+    avoid trigger asserts on mysql_execute_command(THD *thd) caused by
+    info tables updates which do not commit, like Rotate, Stop and
+    skipped events handling.
+  */
+  if ((thd->variables.option_bits & OPTION_NOT_AUTOCOMMIT) &&
+      (opt_mi_repository_id == INFO_REPOSITORY_TABLE ||
+       opt_rli_repository_id == INFO_REPOSITORY_TABLE)) {
+    thd->variables.option_bits |= OPTION_AUTOCOMMIT;
+    thd->variables.option_bits &= ~OPTION_NOT_AUTOCOMMIT;
+    thd->server_status |= SERVER_STATUS_AUTOCOMMIT;
+  }
+
+  /*
+    Set thread InnoDB high priority.
+  */
+  DBUG_EXECUTE_IF("dbug_set_high_prio_sql_thread", {
+    if (thd->system_thread == SYSTEM_THREAD_SLAVE_SQL ||
+        thd->system_thread == SYSTEM_THREAD_SLAVE_WORKER)
+      thd->thd_tx_priority = 1;
+  });
+}
+
+

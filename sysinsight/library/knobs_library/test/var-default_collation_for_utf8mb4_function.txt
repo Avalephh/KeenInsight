@@ -1,0 +1,1682 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: set_db_default_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: set_db_default_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_db.cc
+Function: set_db_default_charset not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_cmd_ddl_table.cc
+Function: Sql_cmd_create_or_drop_index_base::execute
+bool Sql_cmd_create_table::execute(THD *thd) {
+  LEX *const lex = thd->lex;
+  Query_block *const query_block = lex->query_block;
+  Query_expression *const query_expression = lex->unit;
+  Table_ref *const create_table = lex->query_tables;
+  partition_info *part_info = lex->part_info;
+
+  /*
+    Code below (especially in mysql_create_table() and Query_result_create
+    methods) may modify HA_CREATE_INFO structure in LEX, so we have to
+    use a copy of this structure to make execution prepared statement-
+    safe. A shallow copy is enough as this code won't modify any memory
+    referenced from this structure.
+  */
+  HA_CREATE_INFO create_info(*lex->create_info);
+  /*
+    We need to copy alter_info for the same reasons of re-execution
+    safety, only in case of Alter_info we have to do (almost) a deep
+    copy.
+  */
+  Alter_info alter_info(*m_alter_info, thd->mem_root);
+
+  if (thd->is_error()) {
+    /* If out of memory when creating a copy of alter_info. */
+    return true;
+  }
+
+  if (((lex->create_info->used_fields & HA_CREATE_USED_DATADIR) != 0 ||
+       (lex->create_info->used_fields & HA_CREATE_USED_INDEXDIR) != 0) &&
+      check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+    my_error(ER_SPECIFIC_ACCESS_DENIED_ERROR, MYF(0), "FILE");
+    return true;
+  }
+
+  if (!thd->is_plugin_fake_ddl()) {
+    if (create_table_precheck(thd, query_expression_tables, create_table))
+      return true;
+  }
+
+  /* Might have been updated in create_table_precheck */
+  create_info.alias = create_table->alias;
+
+  /*
+    If no engine type was given, work out the default now
+    rather than at parse-time.
+  */
+  if (!(create_info.used_fields & HA_CREATE_USED_ENGINE))
+    create_info.db_type = create_info.options & HA_LEX_CREATE_TMP_TABLE
+                              ? ha_default_temp_handlerton(thd)
+                              : ha_default_handlerton(thd);
+
+  assert(create_info.db_type != nullptr);
+  if ((m_alter_info->flags & Alter_info::ANY_ENGINE_ATTRIBUTE) != 0 &&
+      ((create_info.db_type->flags & HTON_SUPPORTS_ENGINE_ATTRIBUTE) == 0 &&
+       DBUG_EVALUATE_IF("simulate_engine_attribute_support", false, true))) {
+    my_error(ER_ENGINE_ATTRIBUTE_NOT_SUPPORTED, MYF(0),
+             ha_resolve_storage_engine_name(create_info.db_type));
+    return true;
+  }
+
+  /*
+    Assign target tablespace name to enable locking in lock_table_names().
+    Reject invalid names.
+  */
+  if (create_info.tablespace) {
+    if (validate_tablespace_name_length(create_info.tablespace) ||
+        validate_tablespace_name(TS_CMD_NOT_DEFINED, create_info.tablespace,
+                                 create_info.db_type))
+      return true;
+
+    if (lex_string_strmake(thd->mem_root, &create_table->target_tablespace_name,
+                           create_info.tablespace,
+                           strlen(create_info.tablespace)))
+      return true;
+  }
+
+  // Reject invalid tablespace names specified for partitions.
+  if (validate_partition_tablespace_name_lengths(part_info) ||
+      validate_partition_tablespace_names(part_info, create_info.db_type))
+    return true;
+
+  /* Fix names if symlinked or relocated tables */
+  if (prepare_index_and_data_dir_path(thd, &create_info.data_file_name,
+                                      &create_info.index_file_name,
+                                      create_table->table_name))
+    return true;
+
+  {
+    partition_info *part = thd->lex->part_info;
+    if (part != nullptr && has_external_data_or_index_dir(*part) &&
+        check_access(thd, FILE_ACL, any_db, nullptr, nullptr, false, false)) {
+      return true;
+    }
+    if (part && !(part = thd->lex->part_info->get_clone(thd, true)))
+      return true;
+    thd->work_part_info = part;
+  }
+
+  if (part_info != nullptr && part_info->part_expr &&
+      part_info->part_expr->fixed) {  // @todo Code may be redundant
+    part_info->fixed = true;
+  }
+  bool res = false;
+
+  if (!query_block->field_list_is_empty())  // With select
+  {
+    /*
+      CREATE TABLE...IGNORE/REPLACE SELECT... can be unsafe, unless
+      ORDER BY PRIMARY KEY clause is used in SELECT statement. We therefore
+      use row based logging if mixed or row based logging is available.
+      TODO: Check if the order of the output of the select statement is
+      deterministic. Waiting for BUG#42415
+    */
+    if (lex->is_ignore())
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_IGNORE_SELECT);
+
+    if (lex->duplicates == DUP_REPLACE)
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_CREATE_REPLACE_SELECT);
+
+    /**
+      Disallow creation of foreign keys if,
+
+      - SE supports atomic DDL's.
+      - The binlogging is enabled.
+      - The binlog format is ROW.
+
+      This is done to avoid complications involved in locking,
+      updating and invalidation (in case of rollback) of DD cache
+      for parent table.
+    */
+    if ((alter_info.flags & Alter_info::ADD_FOREIGN_KEY) &&
+        (create_info.db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+        mysql_bin_log.is_open() &&
+        (thd->variables.option_bits & OPTION_BIN_LOG) &&
+        thd->variables.binlog_format == BINLOG_FORMAT_ROW) {
+      my_error(ER_FOREIGN_KEY_WITH_ATOMIC_CREATE_SELECT, MYF(0));
+      return true;
+    }
+
+    // Reject request to CREATE TABLE AS SELECT with START TRANSACTION.
+    if (create_info.m_transactional_ddl) {
+      my_error(ER_NOT_ALLOWED_WITH_START_TRANSACTION, MYF(0),
+               "with CREATE TABLE ... AS SELECT statement.");
+      return true;
+    }
+
+    /*
+      If:
+      a) we inside an SP and there was NAME_CONST substitution,
+      b) binlogging is on (STMT mode),
+      c) we log the SP as separate statements
+      raise a warning, as it may cause problems
+      (see 'NAME_CONST issues' in 'Binary Logging of Stored Programs')
+     */
+    if (thd->query_name_consts && mysql_bin_log.is_open() &&
+        thd->variables.binlog_format == BINLOG_FORMAT_STMT &&
+        !mysql_bin_log.is_query_in_union(thd, thd->query_id)) {
+      uint splocal_refs = 0;
+      /* Count SP local vars in the top-level SELECT list */
+      for (Item *item : query_block->visible_fields()) {
+        if (item->is_splocal()) splocal_refs++;
+      }
+      /*
+        If it differs from number of NAME_CONST substitution applied,
+        we may have a SOME_FUNC(NAME_CONST()) in the SELECT list,
+        that may cause a problem with binary log (see BUG#35383),
+        raise a warning.
+      */
+      if (splocal_refs != thd->query_name_consts)
+        push_warning(
+            thd, Sql_condition::SL_WARNING, ER_UNKNOWN_ERROR,
+            "Invoked routine ran a statement that may cause problems with "
+            "binary log, see 'NAME_CONST issues' in 'Binary Logging of Stored "
+            "Programs' "
+            "section of the manual.");
+    }
+
+    /*
+      Disable non-empty MERGE tables with CREATE...SELECT. Too
+      complicated. See Bug #26379. Empty MERGE tables are read-only
+      and don't allow CREATE...SELECT anyway.
+    */
+    if (create_info.used_fields & HA_CREATE_USED_UNION) {
+      my_error(ER_WRONG_OBJECT, MYF(0), create_table->db,
+               create_table->table_name, "BASE TABLE");
+      return true;
+    }
+
+    if (query_expression->is_prepared()) {
+      cleanup(thd);
+    }
+    auto cleanup_se_guard = create_scope_guard(
+        [lex] { lex->set_secondary_engine_execution_context(nullptr); });
+    if (open_tables_for_query(thd, lex->query_tables, false)) return true;
+
+    /* The table already exists */
+    if (create_table->table || create_table->is_view()) {
+      if (create_info.options & HA_LEX_CREATE_IF_NOT_EXISTS) {
+        push_warning_printf(thd, Sql_condition::SL_NOTE, ER_TABLE_EXISTS_ERROR,
+                            ER_THD(thd, ER_TABLE_EXISTS_ERROR),
+                            create_info.alias);
+        my_ok(thd);
+        return false;
+      } else {
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), create_info.alias);
+        return false;
+      }
+    }
+
+    /*
+      Remove target table from main select and name resolution
+      context. This can't be done earlier as it will break view merging in
+      statements like "CREATE TABLE IF NOT EXISTS existing_view SELECT".
+    */
+    bool link_to_local;
+    lex->unlink_first_table(&link_to_local);
+
+    /* Updating any other table is prohibited in CTS statement */
+    for (Table_ref *table = lex->query_tables; table;
+         table = table->next_global) {
+      if (table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+        lex->link_first_table_back(create_table, link_to_local);
+
+        my_error(ER_CANT_UPDATE_TABLE_IN_CREATE_TABLE_SELECT, MYF(0),
+                 table->table_name, create_info.alias);
+        return true;
+      }
+    }
+
+    Query_result_create *result;
+    if (!query_expression->is_prepared()) {
+      const Prepare_error_tracker tracker(thd);
+      Prepared_stmt_arena_holder ps_arena_holder(thd);
+      result = new (thd->mem_root)
+          Query_result_create(create_table, &query_block->fields,
+                              lex->duplicates, query_expression_tables);
+      if (result == nullptr) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+
+      // Use the hypergraph optimizer for the SELECT statement, if enabled.
+      lex->set_using_hypergraph_optimizer(
+          thd->optimizer_switch_flag(OPTIMIZER_SWITCH_HYPERGRAPH_OPTIMIZER));
+
+      if (query_expression->prepare(thd, result, nullptr, SELECT_NO_UNLOCK,
+                                    0)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+      if (!thd->stmt_arena->is_regular() && lex->save_cmd_properties(thd)) {
+        lex->link_first_table_back(create_table, link_to_local);
+        return true;
+      }
+    } else {
+      result = down_cast<Query_result_create *>(
+          query_expression->query_result() != nullptr
+              ? query_expression->query_result()
+              : query_block->query_result());
+      // Restore prepared statement properties, bind table and field information
+      lex->restore_cmd_properties();
+      bind_fields(thd->stmt_arena->item_list());
+    }
+    if (validate_use_secondary_engine(lex)) return true;
+
+    result->set_two_fields(&create_info, &alter_info);
+
+    // For objects acquired during table creation.
+    dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+
+    Ignore_error_handler ignore_handler;
+    Strict_error_handler strict_handler;
+    if (lex->is_ignore())
+      thd->push_internal_handler(&ignore_handler);
+    else if (thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+
+    res = populate_table(thd, lex);
+
+    // Count the number of statements offloaded to a secondary storage engine.
+    if (using_secondary_storage_engine() && lex->unit->is_executed())
+      ++thd->status_var.secondary_engine_execution_count;
+
+    if (lex->is_ignore() || thd->is_strict_mode()) thd->pop_internal_handler();
+    lex->cleanup(false);
+    thd->clear_current_query_costs();
+    lex->clear_values_map();
+
+    // Abort the result set if execution ended in error
+    if (res) result->abort_result_set(thd);
+
+    result->cleanup();
+
+    lex->link_first_table_back(create_table, link_to_local);
+    THD_STAGE_INFO(thd, stage_end);
+  } else {
+    Strict_error_handler strict_handler;
+    /* Push Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode())
+      thd->push_internal_handler(&strict_handler);
+    /* regular create */
+    if (create_info.options & HA_LEX_CREATE_TABLE_LIKE) {
+      /* CREATE TABLE ... LIKE ... */
+      res = mysql_create_like_table(thd, create_table, query_expression_tables,
+                                    &create_info);
+    } else {
+      /* Regular CREATE TABLE */
+      res = mysql_create_table(thd, create_table, &create_info, &alter_info);
+    }
+    /* Pop Strict_error_handler */
+    if (!lex->is_ignore() && thd->is_strict_mode()) thd->pop_internal_handler();
+    if (!res) {
+      /* in case of create temp tables if @@session_track_state_change is
+         ON then send session state notification in OK packet */
+      if (create_info.options & HA_LEX_CREATE_TMP_TABLE &&
+          thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, {});
+      my_ok(thd);
+    }
+  }
+  // The following code is required to make CREATE TABLE re-execution safe.
+  // @todo Consider refactoring this code.
+  if (part_info != nullptr) {
+    if (part_info->part_expr != nullptr &&
+        part_info->part_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->part_expr)->reset_field();
+
+    if (part_info->subpart_expr != nullptr &&
+        part_info->subpart_expr->type() == Item::FIELD_ITEM)
+      down_cast<Item_field *>(part_info->subpart_expr)->reset_field();
+  }
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/handler.cc
+Function: HA_CREATE_INFO::init_create_options_from_share
+void HA_CREATE_INFO::init_create_options_from_share(const TABLE_SHARE *share,
+                                                    uint64_t used_fields) {
+  if (!(used_fields & HA_CREATE_USED_MIN_ROWS)) min_rows = share->min_rows;
+
+  if (!(used_fields & HA_CREATE_USED_MAX_ROWS)) max_rows = share->max_rows;
+
+  if (!(used_fields & HA_CREATE_USED_AVG_ROW_LENGTH))
+    avg_row_length = share->avg_row_length;
+
+  if (!(used_fields & HA_CREATE_USED_DEFAULT_CHARSET))
+    default_table_charset = share->table_charset;
+
+  if (!(used_fields & HA_CREATE_USED_KEY_BLOCK_SIZE))
+    key_block_size = share->key_block_size;
+
+  if (!(used_fields & HA_CREATE_USED_STATS_SAMPLE_PAGES))
+    stats_sample_pages = share->stats_sample_pages;
+
+  if (!(used_fields & HA_CREATE_USED_STATS_AUTO_RECALC))
+    stats_auto_recalc = share->stats_auto_recalc;
+
+  if (!(used_fields & HA_CREATE_USED_TABLESPACE))
+    tablespace = share->tablespace;
+
+  if (storage_media == HA_SM_DEFAULT)
+    storage_media = share->default_storage_media;
+
+  /* Creation of federated table with LIKE clause needs connection string */
+  if (!(used_fields & HA_CREATE_USED_CONNECTION))
+    connect_string = share->connect_string;
+
+  if (!(used_fields & HA_CREATE_USED_COMMENT)) {
+    // Assert to check that used_fields flag and comment are in sync.
+    assert(!comment.str);
+    comment = share->comment;
+  }
+
+  if (!(used_fields & HA_CREATE_USED_COMPRESS)) {
+    // Assert to check that used_fields flag and compress are in sync
+    assert(!compress.str);
+    compress = share->compress;
+  }
+
+  if (!(used_fields & (HA_CREATE_USED_ENCRYPT))) {
+    // Assert to check that used_fields flag and encrypt_type are in sync
+    assert(!encrypt_type.str);
+    encrypt_type = share->encrypt_type;
+  }
+
+  if (!(used_fields & HA_CREATE_USED_SECONDARY_ENGINE)) {
+    assert(secondary_engine.str == nullptr);
+    secondary_engine = share->secondary_engine;
+  }
+  secondary_load = share->secondary_load;
+
+  if (!(used_fields & HA_CREATE_USED_AUTOEXTEND_SIZE)) {
+    /* m_implicit_tablespace_autoextend_size = 0 is a valid value. Hence,
+    we need a mechanism to indicate the value change. */
+    m_implicit_tablespace_autoextend_size = share->autoextend_size;
+    m_implicit_tablespace_autoextend_size_change = false;
+  }
+
+  if (engine_attribute.str == nullptr)
+    engine_attribute = share->engine_attribute;
+
+  if (secondary_engine_attribute.str == nullptr)
+    secondary_engine_attribute = share->secondary_engine_attribute;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc
+Function: lex_one_token
+static int lex_one_token(Lexer_yystype *yylval, THD *thd) {
+  uchar c = 0;
+  bool comment_closed;
+  int tokval, result_state;
+  uint length;
+  enum my_lex_states state;
+  Lex_input_stream *lip = &thd->m_parser_state->m_lip;
+  const CHARSET_INFO *cs = thd->charset();
+  const my_lex_states *state_map = cs->state_maps->main_map;
+  const uchar *ident_map = cs->ident_map;
+
+  lip->yylval = yylval;  // The global state
+
+  lip->start_token();
+  state = lip->next_state;
+  lip->next_state = MY_LEX_START;
+  for (;;) {
+    switch (state) {
+      case MY_LEX_START:  // Start of token
+        // Skip starting whitespace
+        while (state_map[c = lip->yyPeek()] == MY_LEX_SKIP) {
+          if (c == '\n') lip->yylineno++;
+
+          lip->yySkip();
+        }
+
+        /* Start of real token */
+        lip->restart_token();
+        c = lip->yyGet();
+        state = state_map[c];
+        break;
+      case MY_LEX_CHAR:  // Unknown or single char token
+      case MY_LEX_SKIP:  // This should not happen
+        if (c == '-' && lip->yyPeek() == '-' &&
+            (my_isspace(cs, lip->yyPeekn(1)) ||
+             my_iscntrl(cs, lip->yyPeekn(1)))) {
+          state = MY_LEX_COMMENT;
+          break;
+        }
+
+        if (c == '-' && lip->yyPeek() == '>')  // '->'
+        {
+          lip->yySkip();
+          lip->next_state = MY_LEX_START;
+          if (lip->yyPeek() == '>') {
+            lip->yySkip();
+            return JSON_UNQUOTED_SEPARATOR_SYM;
+          }
+          return JSON_SEPARATOR_SYM;
+        }
+
+        if (c != ')') lip->next_state = MY_LEX_START;  // Allow signed numbers
+
+        /*
+          Check for a placeholder: it should not precede a possible identifier
+          because of binlogging: when a placeholder is replaced with its value
+          in a query for the binlog, the query must stay grammatically correct.
+        */
+        if (c == '?' && lip->stmt_prepare_mode && !ident_map[lip->yyPeek()])
+          return (PARAM_MARKER);
+
+        return ((int)c);
+
+      case MY_LEX_IDENT_OR_NCHAR:
+        if (lip->yyPeek() != '\'') {
+          state = MY_LEX_IDENT;
+          break;
+        }
+        /* Found N'string' */
+        lip->yySkip();  // Skip '
+        if (!(yylval->lex_str.str = get_text(lip, 2, 1))) {
+          state = MY_LEX_CHAR;  // Read char by char
+          break;
+        }
+        yylval->lex_str.length = lip->yytoklen;
+        return (NCHAR_STRING);
+
+      case MY_LEX_IDENT_OR_DOLLAR_QUOTE:
+        state = MY_LEX_IDENT;
+        push_deprecated_warn_no_replacement(
+            lip->m_thd, "$ as the first character of an unquoted identifier");
+        break;
+
+      case MY_LEX_IDENT_OR_HEX:
+        if (lip->yyPeek() == '\'') {  // Found x'hex-number'
+          state = MY_LEX_HEX_NUMBER;
+          break;
+        }
+        [[fallthrough]];
+      case MY_LEX_IDENT_OR_BIN:
+        if (lip->yyPeek() == '\'') {  // Found b'bin-number'
+          state = MY_LEX_BIN_NUMBER;
+          break;
+        }
+        [[fallthrough]];
+      case MY_LEX_IDENT:
+        const char *start;
+        if (use_mb(cs)) {
+          result_state = IDENT_QUOTED;
+          switch (my_mbcharlen(cs, lip->yyGetLast())) {
+            case 1:
+              break;
+            case 0:
+              if (my_mbmaxlenlen(cs) < 2) break;
+              [[fallthrough]];
+            default:
+              int l =
+                  my_ismbchar(cs, lip->get_ptr() - 1, lip->get_end_of_query());
+              if (l == 0) {
+                state = MY_LEX_CHAR;
+                continue;
+              }
+              lip->skip_binary(l - 1);
+          }
+          while (ident_map[c = lip->yyGet()]) {
+            switch (my_mbcharlen(cs, c)) {
+              case 1:
+                break;
+              case 0:
+                if (my_mbmaxlenlen(cs) < 2) break;
+                [[fallthrough]];
+              default:
+                int l;
+                if ((l = my_ismbchar(cs, lip->get_ptr() - 1,
+                                     lip->get_end_of_query())) == 0)
+                  break;
+                lip->skip_binary(l - 1);
+            }
+          }
+        } else {
+          for (result_state = c; ident_map[c = lip->yyGet()]; result_state |= c)
+            ;
+          /* If there were non-ASCII characters, mark that we must convert */
+          result_state = result_state & 0x80 ? IDENT_QUOTED : IDENT;
+        }
+        length = lip->yyLength();
+        start = lip->get_ptr();
+        if (lip->ignore_space) {
+          /*
+            If we find a space then this can't be an identifier. We notice this
+            below by checking start != lex->ptr.
+          */
+          for (; state_map[c] == MY_LEX_SKIP; c = lip->yyGet()) {
+            if (c == '\n') lip->yylineno++;
+          }
+        }
+        if (start == lip->get_ptr() && c == '.' && ident_map[lip->yyPeek()])
+          lip->next_state = MY_LEX_IDENT_SEP;
+        else {  // '(' must follow directly if function
+          lip->yyUnget();
+          if ((tokval = find_keyword(lip, length, c == '('))) {
+            lip->next_state = MY_LEX_START;  // Allow signed numbers
+            return (tokval);                 // Was keyword
+          }
+          lip->yySkip();  // next state does a unget
+        }
+        yylval->lex_str = get_token(lip, 0, length);
+
+        /*
+           Note: "SELECT _bla AS 'alias'"
+           _bla should be considered as a IDENT if charset haven't been found.
+           So we don't use MYF(MY_WME) with get_charset_by_csname to avoid
+           producing an error.
+        */
+
+        if (yylval->lex_str.str[0] == '_') {
+          auto charset_name = yylval->lex_str.str + 1;
+          const CHARSET_INFO *underscore_cs =
+              get_charset_by_csname(charset_name, MY_CS_PRIMARY, MYF(0));
+          if (underscore_cs) {
+            lip->warn_on_deprecated_charset(underscore_cs, charset_name);
+            if (underscore_cs == &my_charset_utf8mb4_0900_ai_ci) {
+              /*
+                If underscore_cs is utf8mb4, and the collation of underscore_cs
+                is the default collation of utf8mb4, then update underscore_cs
+                with a value of the default_collation_for_utf8mb4 system
+                variable:
+              */
+              underscore_cs = thd->variables.default_collation_for_utf8mb4;
+            }
+            yylval->charset = underscore_cs;
+            lip->m_underscore_cs = underscore_cs;
+
+            lip->body_utf8_append(lip->m_cpp_text_start,
+                                  lip->get_cpp_tok_start() + length);
+            return (UNDERSCORE_CHARSET);
+          }
+        }
+
+        lip->body_utf8_append(lip->m_cpp_text_start);
+
+        lip->body_utf8_append_literal(thd, &yylval->lex_str, cs,
+                                      lip->m_cpp_text_end);
+
+        return (result_state);  // IDENT or IDENT_QUOTED
+
+      case MY_LEX_IDENT_SEP:  // Found ident and now '.'
+        yylval->lex_str.str = const_cast<char *>(lip->get_ptr());
+        yylval->lex_str.length = 1;
+        c = lip->yyGet();  // should be '.'
+        if (uchar next_c = lip->yyPeek(); ident_map[next_c]) {
+          lip->next_state =
+              MY_LEX_IDENT_START;  // Next is an ident (not a keyword)
+          if (next_c == '$')       // We got .$ident
+            push_deprecated_warn_no_replacement(
+                lip->m_thd,
+                "$ as the first character of an unquoted identifier");
+        } else  // Probably ` or "
+          lip->next_state = MY_LEX_START;
+
+        return ((int)c);
+
+      case MY_LEX_NUMBER_IDENT:  // number or ident which num-start
+        if (lip->yyGetLast() == '0') {
+          c = lip->yyGet();
+          if (c == 'x') {
+            while (my_isxdigit(cs, (c = lip->yyGet())))
+              ;
+            if ((lip->yyLength() >= 3) && !ident_map[c]) {
+              /* skip '0x' */
+              yylval->lex_str = get_token(lip, 2, lip->yyLength() - 2);
+              return (HEX_NUM);
+            }
+            lip->yyUnget();
+            state = MY_LEX_IDENT_START;
+            break;
+          } else if (c == 'b') {
+            while ((c = lip->yyGet()) == '0' || c == '1')
+              ;
+            if ((lip->yyLength() >= 3) && !ident_map[c]) {
+              /* Skip '0b' */
+              yylval->lex_str = get_token(lip, 2, lip->yyLength() - 2);
+              return (BIN_NUM);
+            }
+            lip->yyUnget();
+            state = MY_LEX_IDENT_START;
+            break;
+          }
+          lip->yyUnget();
+        }
+
+        while (my_isdigit(cs, (c = lip->yyGet())))
+          ;
+        if (!ident_map[c]) {  // Can't be identifier
+          state = MY_LEX_INT_OR_REAL;
+          break;
+        }
+        if (c == 'e' || c == 'E') {
+          // The following test is written this way to allow numbers of type 1e1
+          if (my_isdigit(cs, lip->yyPeek()) || (c = (lip->yyGet())) == '+' ||
+              c == '-') {  // Allow 1E+10
+            if (my_isdigit(cs,
+                           lip->yyPeek()))  // Number must have digit after sign
+            {
+              lip->yySkip();
+              while (my_isdigit(cs, lip->yyGet()))
+                ;
+              yylval->lex_str = get_token(lip, 0, lip->yyLength());
+              return (FLOAT_NUM);
+            }
+          }
+          lip->yyUnget();
+        }
+        [[fallthrough]];
+      case MY_LEX_IDENT_START:  // We come here after '.'
+        result_state = IDENT;
+        if (use_mb(cs)) {
+          result_state = IDENT_QUOTED;
+          while (ident_map[c = lip->yyGet()]) {
+            switch (my_mbcharlen(cs, c)) {
+              case 1:
+                break;
+              case 0:
+                if (my_mbmaxlenlen(cs) < 2) break;
+                [[fallthrough]];
+              default:
+                int l;
+                if ((l = my_ismbchar(cs, lip->get_ptr() - 1,
+                                     lip->get_end_of_query())) == 0)
+                  break;
+                lip->skip_binary(l - 1);
+            }
+          }
+        } else {
+          for (result_state = 0; ident_map[c = lip->yyGet()]; result_state |= c)
+            ;
+          /* If there were non-ASCII characters, mark that we must convert */
+          result_state = result_state & 0x80 ? IDENT_QUOTED : IDENT;
+        }
+        if (c == '.' && ident_map[lip->yyPeek()])
+          lip->next_state = MY_LEX_IDENT_SEP;  // Next is '.'
+
+        yylval->lex_str = get_token(lip, 0, lip->yyLength());
+
+        lip->body_utf8_append(lip->m_cpp_text_start);
+
+        lip->body_utf8_append_literal(thd, &yylval->lex_str, cs,
+                                      lip->m_cpp_text_end);
+
+        return (result_state);
+
+      case MY_LEX_USER_VARIABLE_DELIMITER:  // Found quote char
+      {
+        uint double_quotes = 0;
+        char quote_char = c;  // Used char
+        for (;;) {
+          c = lip->yyGet();
+          if (c == 0) {
+            lip->yyUnget();
+            return ABORT_SYM;  // Unmatched quotes
+          }
+
+          int var_length;
+          if ((var_length = my_mbcharlen(cs, c)) == 1) {
+            if (c == quote_char) {
+              if (lip->yyPeek() != quote_char) break;
+              c = lip->yyGet();
+              double_quotes++;
+              continue;
+            }
+          } else if (use_mb(cs)) {
+            if ((var_length = my_ismbchar(cs, lip->get_ptr() - 1,
+                                          lip->get_end_of_query())))
+              lip->skip_binary(var_length - 1);
+          }
+        }
+        if (double_quotes)
+          yylval->lex_str = get_quoted_token(
+              lip, 1, lip->yyLength() - double_quotes - 1, quote_char);
+        else
+          yylval->lex_str = get_token(lip, 1, lip->yyLength() - 1);
+        if (c == quote_char) lip->yySkip();  // Skip end `
+        lip->next_state = MY_LEX_START;
+
+        lip->body_utf8_append(lip->m_cpp_text_start);
+
+        lip->body_utf8_append_literal(thd, &yylval->lex_str, cs,
+                                      lip->m_cpp_text_end);
+
+        return (IDENT_QUOTED);
+      }
+      case MY_LEX_INT_OR_REAL:  // Complete int or incomplete real
+        if (c != '.') {         // Found complete integer number.
+          yylval->lex_str = get_token(lip, 0, lip->yyLength());
+          return int_token(yylval->lex_str.str, (uint)yylval->lex_str.length);
+        }
+        [[fallthrough]];
+      case MY_LEX_REAL:  // Incomplete real number
+        while (my_isdigit(cs, c = lip->yyGet()))
+          ;
+
+        if (c == 'e' || c == 'E') {
+          c = lip->yyGet();
+          if (c == '-' || c == '+') c = lip->yyGet();  // Skip sign
+          if (!my_isdigit(cs, c)) {                    // No digit after sign
+            state = MY_LEX_CHAR;
+            break;
+          }
+          while (my_isdigit(cs, lip->yyGet()))
+            ;
+          yylval->lex_str = get_token(lip, 0, lip->yyLength());
+          return (FLOAT_NUM);
+        }
+        yylval->lex_str = get_token(lip, 0, lip->yyLength());
+        return (DECIMAL_NUM);
+
+      case MY_LEX_HEX_NUMBER:  // Found x'hexstring'
+        lip->yySkip();         // Accept opening '
+        while (my_isxdigit(cs, (c = lip->yyGet())))
+          ;
+        if (c != '\'') return (ABORT_SYM);          // Illegal hex constant
+        lip->yySkip();                              // Accept closing '
+        length = lip->yyLength();                   // Length of hexnum+3
+        if ((length % 2) == 0) return (ABORT_SYM);  // odd number of hex digits
+        yylval->lex_str = get_token(lip,
+                                    2,            // skip x'
+                                    length - 3);  // don't count x' and last '
+        return (HEX_NUM);
+
+      case MY_LEX_BIN_NUMBER:  // Found b'bin-string'
+        lip->yySkip();         // Accept opening '
+        while ((c = lip->yyGet()) == '0' || c == '1')
+          ;
+        if (c != '\'') return (ABORT_SYM);  // Illegal hex constant
+        lip->yySkip();                      // Accept closing '
+        length = lip->yyLength();           // Length of bin-num + 3
+        yylval->lex_str = get_token(lip,
+                                    2,            // skip b'
+                                    length - 3);  // don't count b' and last '
+        return (BIN_NUM);
+
+      case MY_LEX_CMP_OP:  // Incomplete comparison operator
+        if (state_map[lip->yyPeek()] == MY_LEX_CMP_OP ||
+            state_map[lip->yyPeek()] == MY_LEX_LONG_CMP_OP)
+          lip->yySkip();
+        if ((tokval = find_keyword(lip, lip->yyLength() + 1, false))) {
+          lip->next_state = MY_LEX_START;  // Allow signed numbers
+          return (tokval);
+        }
+        state = MY_LEX_CHAR;  // Something fishy found
+        break;
+
+      case MY_LEX_LONG_CMP_OP:  // Incomplete comparison operator
+        if (state_map[lip->yyPeek()] == MY_LEX_CMP_OP ||
+            state_map[lip->yyPeek()] == MY_LEX_LONG_CMP_OP) {
+          lip->yySkip();
+          if (state_map[lip->yyPeek()] == MY_LEX_CMP_OP) lip->yySkip();
+        }
+        if ((tokval = find_keyword(lip, lip->yyLength() + 1, false))) {
+          lip->next_state = MY_LEX_START;  // Found long op
+          return (tokval);
+        }
+        state = MY_LEX_CHAR;  // Something fishy found
+        break;
+
+      case MY_LEX_BOOL:
+        if (c != lip->yyPeek()) {
+          state = MY_LEX_CHAR;
+          break;
+        }
+        lip->yySkip();
+        tokval = find_keyword(lip, 2, false);  // Is a bool operator
+        lip->next_state = MY_LEX_START;        // Allow signed numbers
+        return (tokval);
+
+      case MY_LEX_STRING_OR_DELIMITER:
+        if (thd->variables.sql_mode & MODE_ANSI_QUOTES) {
+          state = MY_LEX_USER_VARIABLE_DELIMITER;
+          break;
+        }
+        /* " used for strings */
+        [[fallthrough]];
+      case MY_LEX_STRING:  // Incomplete text string
+        if (!(yylval->lex_str.str = get_text(lip, 1, 1))) {
+          state = MY_LEX_CHAR;  // Read char by char
+          break;
+        }
+        yylval->lex_str.length = lip->yytoklen;
+
+        lip->body_utf8_append(lip->m_cpp_text_start);
+
+        lip->body_utf8_append_literal(
+            thd, &yylval->lex_str,
+            lip->m_underscore_cs ? lip->m_underscore_cs : cs,
+            lip->m_cpp_text_end);
+
+        lip->m_underscore_cs = nullptr;
+
+        return (TEXT_STRING);
+
+      case MY_LEX_COMMENT:  //  Comment
+        thd->m_parser_state->add_comment();
+        while ((c = lip->yyGet()) != '\n' && c)
+          ;
+        lip->yyUnget();        // Safety against eof
+        state = MY_LEX_START;  // Try again
+        break;
+      case MY_LEX_LONG_COMMENT: /* Long C comment? */
+        if (lip->yyPeek() != '*') {
+          state = MY_LEX_CHAR;  // Probable division
+          break;
+        }
+        thd->m_parser_state->add_comment();
+        /* Reject '/' '*', since we might need to turn off the echo */
+        lip->yyUnget();
+
+        lip->save_in_comment_state();
+
+        if (lip->yyPeekn(2) == '!') {
+          lip->in_comment = DISCARD_COMMENT;
+          /* Accept '/' '*' '!', but do not keep this marker. */
+          lip->set_echo(false);
+          lip->yySkip();
+          lip->yySkip();
+          lip->yySkip();
+
+          /*
+            The special comment format is very strict:
+            '/' '*' '!', followed by exactly
+            1 digit (major), 2 digits (minor), then 2 digits (dot).
+            32302 -> 3.23.02
+            50032 -> 5.0.32
+            50114 -> 5.1.14
+          */
+          char version_str[6];
+          if (my_isdigit(cs, (version_str[0] = lip->yyPeekn(0))) &&
+              my_isdigit(cs, (version_str[1] = lip->yyPeekn(1))) &&
+              my_isdigit(cs, (version_str[2] = lip->yyPeekn(2))) &&
+              my_isdigit(cs, (version_str[3] = lip->yyPeekn(3))) &&
+              my_isdigit(cs, (version_str[4] = lip->yyPeekn(4)))) {
+            if (!my_isspace(cs, lip->yyPeekn(5))) {
+              push_warning(thd, Sql_condition::SL_WARNING,
+                           ER_WARN_NO_SPACE_VERSION_COMMENT,
+                           ER_THD(thd, ER_WARN_NO_SPACE_VERSION_COMMENT));
+            }
+
+            version_str[5] = 0;
+            ulong version;
+            version = strtol(version_str, nullptr, 10);
+
+            if (version <= MYSQL_VERSION_ID) {
+              /* Accept 'M' 'm' 'm' 'd' 'd' */
+              lip->yySkipn(5);
+              /* Expand the content of the special comment as real code */
+              lip->set_echo(true);
+              state = MY_LEX_START;
+              break; /* Do not treat contents as a comment.  */
+            } else {
+              /*
+                Patch and skip the conditional comment to avoid it
+                being propagated infinitely (eg. to a slave).
+              */
+              char *pcom = lip->yyUnput(' ');
+              comment_closed = !consume_comment(lip, 1);
+              if (!comment_closed) {
+                *pcom = '!';
+              }
+              /* version allowed to have one level of comment inside. */
+            }
+          } else {
+            /* Not a version comment. */
+            state = MY_LEX_START;
+            lip->set_echo(true);
+            break;
+          }
+        } else {
+          if (lip->in_comment != NO_COMMENT) {
+            push_warning(
+                lip->m_thd, Sql_condition::SL_WARNING,
+                ER_WARN_DEPRECATED_SYNTAX_NO_REPLACEMENT,
+                ER_THD(lip->m_thd, ER_WARN_DEPRECATED_NESTED_COMMENT_SYNTAX));
+          }
+          lip->in_comment = PRESERVE_COMMENT;
+          lip->yySkip();  // Accept /
+          lip->yySkip();  // Accept *
+          comment_closed = !consume_comment(lip, 0);
+          /* regular comments can have zero comments inside. */
+        }
+        /*
+          Discard:
+          - regular '/' '*' comments,
+          - special comments '/' '*' '!' for a future version,
+          by scanning until we find a closing '*' '/' marker.
+
+          Nesting regular comments isn't allowed.  The first
+          '*' '/' returns the parser to the previous state.
+
+          /#!VERSI oned containing /# regular #/ is allowed #/
+
+                  Inside one versioned comment, another versioned comment
+                  is treated as a regular discardable comment.  It gets
+                  no special parsing.
+        */
+
+        /* Unbalanced comments with a missing '*' '/' are a syntax error */
+        if (!comment_closed) return (ABORT_SYM);
+        state = MY_LEX_START;  // Try again
+        lip->restore_in_comment_state();
+        break;
+      case MY_LEX_END_LONG_COMMENT:
+        if ((lip->in_comment != NO_COMMENT) && lip->yyPeek() == '/') {
+          /* Reject '*' '/' */
+          lip->yyUnget();
+          /* Accept '*' '/', with the proper echo */
+          lip->set_echo(lip->in_comment == PRESERVE_COMMENT);
+          lip->yySkipn(2);
+          /* And start recording the tokens again */
+          lip->set_echo(true);
+
+          /*
+            C-style comments are replaced with a single space (as it
+            is in C and C++).  If there is already a whitespace
+            character at this point in the stream, the space is
+            not inserted.
+
+            See also ISO/IEC 9899:1999 §5.1.1.2
+            ("Programming languages — C")
+          */
+          if (!my_isspace(cs, lip->yyPeek()) &&
+              lip->get_cpp_ptr() != lip->get_cpp_buf() &&
+              !my_isspace(cs, *(lip->get_cpp_ptr() - 1)))
+            lip->cpp_inject(' ');
+
+          lip->in_comment = NO_COMMENT;
+          state = MY_LEX_START;
+        } else
+          state = MY_LEX_CHAR;  // Return '*'
+        break;
+      case MY_LEX_SET_VAR:  // Check if ':='
+        if (lip->yyPeek() != '=') {
+          state = MY_LEX_CHAR;  // Return ':'
+          break;
+        }
+        lip->yySkip();
+        return (SET_VAR);
+      case MY_LEX_SEMICOLON:  // optional line terminator
+        state = MY_LEX_CHAR;  // Return ';'
+        break;
+      case MY_LEX_EOL:
+        if (lip->eof()) {
+          lip->yyUnget();  // Reject the last '\0'
+          lip->set_echo(false);
+          lip->yySkip();
+          lip->set_echo(true);
+          /* Unbalanced comments with a missing '*' '/' are a syntax error */
+          if (lip->in_comment != NO_COMMENT) return (ABORT_SYM);
+          lip->next_state = MY_LEX_END;  // Mark for next loop
+          return (END_OF_INPUT);
+        }
+        state = MY_LEX_CHAR;
+        break;
+      case MY_LEX_END:
+        lip->next_state = MY_LEX_END;
+        return (0);  // We found end of input last time
+
+        /* Actually real shouldn't start with . but allow them anyhow */
+      case MY_LEX_REAL_OR_POINT:
+        if (my_isdigit(cs, lip->yyPeek()))
+          state = MY_LEX_REAL;  // Real
+        else {
+          state = MY_LEX_IDENT_SEP;  // return '.'
+          lip->yyUnget();            // Put back '.'
+        }
+        break;
+      case MY_LEX_USER_END:  // end '@' of user@hostname
+        switch (state_map[lip->yyPeek()]) {
+          case MY_LEX_STRING:
+          case MY_LEX_USER_VARIABLE_DELIMITER:
+          case MY_LEX_STRING_OR_DELIMITER:
+            break;
+          case MY_LEX_USER_END:
+            lip->next_state = MY_LEX_SYSTEM_VAR;
+            break;
+          default:
+            lip->next_state = MY_LEX_HOSTNAME;
+            break;
+        }
+        yylval->lex_str.str = const_cast<char *>(lip->get_ptr());
+        yylval->lex_str.length = 1;
+        return ((int)'@');
+      case MY_LEX_HOSTNAME:  // end '@' of user@hostname
+        for (c = lip->yyGet();
+             my_isalnum(cs, c) || c == '.' || c == '_' || c == '$';
+             c = lip->yyGet())
+          ;
+        yylval->lex_str = get_token(lip, 0, lip->yyLength());
+        return (LEX_HOSTNAME);
+      case MY_LEX_SYSTEM_VAR:
+        yylval->lex_str.str = const_cast<char *>(lip->get_ptr());
+        yylval->lex_str.length = 1;
+        lip->yySkip();  // Skip '@'
+        lip->next_state =
+            (state_map[lip->yyPeek()] == MY_LEX_USER_VARIABLE_DELIMITER
+                 ? MY_LEX_START
+                 : MY_LEX_IDENT_OR_KEYWORD);
+        return ((int)'@');
+      case MY_LEX_IDENT_OR_KEYWORD:
+        /*
+          We come here when we have found two '@' in a row.
+          We should now be able to handle:
+          [(global | local | session) .]variable_name
+        */
+
+        for (result_state = 0; ident_map[c = lip->yyGet()]; result_state |= c)
+          ;
+        /* If there were non-ASCII characters, mark that we must convert */
+        result_state = result_state & 0x80 ? IDENT_QUOTED : IDENT;
+
+        if (c == '.') lip->next_state = MY_LEX_IDENT_SEP;
+        length = lip->yyLength();
+        if (length == 0) return (ABORT_SYM);  // Names must be nonempty.
+        if ((tokval = find_keyword(lip, length, false))) {
+          lip->yyUnget();   // Put back 'c'
+          return (tokval);  // Was keyword
+        }
+        yylval->lex_str = get_token(lip, 0, length);
+
+        lip->body_utf8_append(lip->m_cpp_text_start);
+
+        lip->body_utf8_append_literal(thd, &yylval->lex_str, cs,
+                                      lip->m_cpp_text_end);
+
+        return (result_state);
+    }
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_table.cc
+Function: set_table_default_charset
+    set_table_default_charset()
+    create_info        Table create information
+
+  DESCRIPTION
+    If the table character set was not given explicitly,
+    let's fetch the database default character set and
+    apply it to the table.
+*/
+
+static bool set_table_default_charset(THD *thd, HA_CREATE_INFO *create_info,
+                                      const dd::Schema &schema) {
+  /*
+    If the table character set was not given explicitly,
+    let's fetch the database default character set and
+    apply it to the table.
+  */
+  if (create_info->default_table_charset == nullptr) {
+    if (get_default_db_collation(schema, &create_info->default_table_charset))
+      return true;
+  } else {
+    assert((create_info->used_fields & HA_CREATE_USED_CHARSET) == 0 ||
+           (create_info->used_fields & HA_CREATE_USED_DEFAULT_CHARSET) ||
+           create_info->default_table_charset == create_info->table_charset);
+
+    if ((create_info->used_fields & HA_CREATE_USED_DEFAULT_CHARSET) &&
+        !(create_info->used_fields & HA_CREATE_USED_DEFAULT_COLLATE) &&
+        create_info->default_table_charset == &my_charset_utf8mb4_0900_ai_ci) {
+      create_info->default_table_charset =
+          thd->variables.default_collation_for_utf8mb4;
+
+      // ALTER TABLE ... CONVERT TO CHARACTER SET ...
+      if (create_info->used_fields & HA_CREATE_USED_CHARSET) {
+        create_info->table_charset = create_info->default_table_charset;
+      }
+    }
+  }
+
+  if (create_info->default_table_charset == nullptr)
+    create_info->default_table_charset = thd->collation();
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_table.cc
+Function: mysql_recreate_table
+    mysql_recreate_table()
+    thd        Thread handler
+    tables     Tables to recreate
+    table_copy Recreate the table by using ALTER TABLE COPY algorithm
+
+ RETURN
+    Like mysql_alter_table().
+*/
+bool mysql_recreate_table(THD *thd, Table_ref *table_list, bool table_copy) {
+  HA_CREATE_INFO create_info;
+  Alter_info alter_info(thd->mem_root);
+
+  DBUG_TRACE;
+  assert(!table_list->next_global);
+
+  /* Set lock type which is appropriate for ALTER TABLE. */
+  table_list->set_lock({TL_READ_NO_INSERT, THR_DEFAULT});
+  /* Same applies to MDL request. */
+  table_list->mdl_request.set_type(MDL_SHARED_NO_WRITE);
+
+  create_info.row_type = ROW_TYPE_NOT_USED;
+  create_info.default_table_charset = default_charset_info;
+  /* Force alter table to recreate table */
+  alter_info.flags =
+      (Alter_info::ALTER_CHANGE_COLUMN | Alter_info::ALTER_RECREATE);
+
+  if (table_copy)
+    alter_info.requested_algorithm = Alter_info::ALTER_TABLE_ALGORITHM_COPY;
+
+  const bool ret = mysql_alter_table(thd, NullS, NullS, &create_info,
+                                     table_list, &alter_info);
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/create_field.cc
+Function: Create_field::init
+bool Create_field::init(
+    THD *thd, const char *fld_name, enum_field_types fld_type,
+    const char *display_width_in_codepoints, const char *fld_decimals,
+    uint fld_type_modifier, Item *fld_default_value, Item *fld_on_update_value,
+    const LEX_CSTRING *fld_comment, const char *fld_change,
+    List<String> *fld_interval_list, const CHARSET_INFO *fld_charset,
+    bool has_explicit_collation, uint fld_geom_type,
+    Value_generator *fld_gcol_info, Value_generator *fld_default_val_expr,
+    std::optional<gis::srid_t> srid, dd::Column::enum_hidden_type hidden,
+    bool is_array_arg) {
+  uint sign_len, allowed_type_modifier = 0;
+  ulong max_field_charlength = MAX_FIELD_CHARLENGTH;
+
+  DBUG_TRACE;
+
+  assert(!(has_explicit_collation && fld_charset == nullptr));
+
+  field = nullptr;
+  field_name = fld_name;
+  flags = fld_type_modifier;
+  is_explicit_collation = (fld_charset != nullptr);
+
+  if (!has_explicit_collation && fld_charset == &my_charset_utf8mb4_0900_ai_ci)
+    charset = thd->variables.default_collation_for_utf8mb4;
+  else
+    charset = fld_charset;
+
+  auto_flags = Field::NONE;
+  is_nullable = !(fld_type_modifier & NOT_NULL_FLAG);
+  this->hidden = hidden;
+  is_array = is_array_arg;
+
+  if (fld_default_value != nullptr &&
+      fld_default_value->type() == Item::FUNC_ITEM) {
+    // We have a function default for insertions.
+    constant_default = nullptr;
+    auto_flags |= Field::DEFAULT_NOW;
+  } else {
+    // No function default for insertions. Either NULL or a constant.
+    constant_default = fld_default_value;
+  }
+
+  // ON UPDATE CURRENT_TIMESTAMP
+  if (fld_on_update_value != nullptr &&
+      fld_on_update_value->type() == Item::FUNC_ITEM)
+    auto_flags |= Field::ON_UPDATE_NOW;
+
+  // Automatic increment.
+  if (fld_type_modifier & AUTO_INCREMENT_FLAG) auto_flags |= Field::NEXT_NUMBER;
+
+  decimals = fld_decimals ? (uint)atoi(fld_decimals) : 0;
+  if (is_temporal_real_type(fld_type)) {
+    flags |= BINARY_FLAG;
+    charset = &my_charset_numeric;
+    if (decimals > DATETIME_MAX_DECIMALS) {
+      my_error(ER_TOO_BIG_PRECISION, MYF(0), decimals, fld_name,
+               DATETIME_MAX_DECIMALS);
+      return true;
+    }
+  } else if (decimals >= DECIMAL_NOT_SPECIFIED) {
+    my_error(ER_TOO_BIG_SCALE, MYF(0), decimals, fld_name,
+             static_cast<ulong>(DECIMAL_NOT_SPECIFIED - 1));
+    return true;
+  }
+
+  sql_type = fld_type;
+  change = fld_change;
+  interval = nullptr;
+  geom_type = static_cast<Field::geometry_type>(fld_geom_type);
+  interval_list.clear();
+
+  comment = *fld_comment;
+  gcol_info = fld_gcol_info;
+  stored_in_db = true;
+  m_srid = srid;
+
+  if (fld_default_val_expr) {
+    constant_default = nullptr;
+    auto_flags |= Field::GENERATED_FROM_EXPRESSION;
+    m_default_val_expr = fld_default_val_expr;
+  }
+
+  // Initialize data for a virtual field or default value expression
+  if (gcol_info || m_default_val_expr) {
+    if (gcol_info) {
+      assert(gcol_info->expr_item);
+      stored_in_db = gcol_info->get_field_stored();
+
+      /*
+        Make a field created for the real type.
+        Note that "real" and generated fields differ from each other
+        only by Field::gcol_info, which is always 0 for normal columns.
+        gcol_info is updated for fields later in procedure open_binary_frm.
+      */
+      sql_type = fld_type = gcol_info->get_real_type();
+      if (pre_validate_value_generator_expr(gcol_info->expr_item, field_name,
+                                            VGS_GENERATED_COLUMN))
+        return true;
+    } else {
+      if (pre_validate_value_generator_expr(m_default_val_expr->expr_item,
+                                            field_name, VGS_DEFAULT_EXPRESSION))
+        return true;
+    }
+  }
+
+  /*
+    Set NO_DEFAULT_VALUE_FLAG if this field doesn't have a default value
+    or an expression to generate the default value and
+    it is NOT NULL and not an AUTO_INCREMENT field.
+  */
+  if (!fld_default_value && !fld_default_val_expr &&
+      (fld_type_modifier & NOT_NULL_FLAG) &&
+      !(fld_type_modifier & AUTO_INCREMENT_FLAG)) {
+    /*
+      TIMESTAMP columns get implicit DEFAULT value when
+      explicit_defaults_for_timestamp is not set.
+    */
+    if (thd->variables.explicit_defaults_for_timestamp ||
+        !is_timestamp_type(fld_type)) {
+      flags |= NO_DEFAULT_VALUE_FLAG;
+    }
+  }
+
+  if (display_width_in_codepoints != nullptr) {
+    errno = 0;
+    const ulonglong ull_length =
+        my_strtoull(display_width_in_codepoints, nullptr, 10);
+    if ((errno != 0) || (ull_length > MAX_FIELD_BLOBLENGTH)) {
+      my_error(ER_TOO_BIG_DISPLAYWIDTH, MYF(0), fld_name,
+               static_cast<unsigned long>(MAX_FIELD_BLOBLENGTH));
+      return true;
+    }
+    m_max_display_width_in_codepoints = static_cast<size_t>(ull_length);
+    m_explicit_display_width = true;
+
+    if (m_max_display_width_in_codepoints == 0)
+      display_width_in_codepoints = nullptr; /* purecov: inspected */
+  }
+
+  sign_len = fld_type_modifier & UNSIGNED_FLAG ? 0 : 1;
+
+  switch (fld_type) {
+    case MYSQL_TYPE_TINY:
+      if (!display_width_in_codepoints)
+        m_max_display_width_in_codepoints = MAX_TINYINT_WIDTH + sign_len;
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      break;
+    case MYSQL_TYPE_SHORT:
+      if (!display_width_in_codepoints)
+        m_max_display_width_in_codepoints = MAX_SMALLINT_WIDTH + sign_len;
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      break;
+    case MYSQL_TYPE_INT24:
+      if (!display_width_in_codepoints)
+        m_max_display_width_in_codepoints = MAX_MEDIUMINT_WIDTH + sign_len;
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      break;
+    case MYSQL_TYPE_LONG:
+      if (!display_width_in_codepoints)
+        m_max_display_width_in_codepoints = MAX_INT_WIDTH + sign_len;
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      break;
+    case MYSQL_TYPE_LONGLONG:
+      if (!display_width_in_codepoints)
+        m_max_display_width_in_codepoints = MAX_BIGINT_WIDTH;
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      break;
+    case MYSQL_TYPE_NULL:
+    case MYSQL_TYPE_INVALID:
+    case MYSQL_TYPE_BOOL:
+      break;
+    case MYSQL_TYPE_NEWDECIMAL: {
+      ulong precision = static_cast<ulong>(m_max_display_width_in_codepoints);
+      my_decimal_trim(&precision, &decimals);
+      m_max_display_width_in_codepoints = precision;
+    }
+      if (m_max_display_width_in_codepoints > DECIMAL_MAX_PRECISION) {
+        my_error(ER_TOO_BIG_PRECISION, MYF(0),
+                 static_cast<int>(m_max_display_width_in_codepoints), fld_name,
+                 static_cast<ulong>(DECIMAL_MAX_PRECISION));
+        return true;
+      }
+      if (m_max_display_width_in_codepoints < decimals) {
+        my_error(ER_M_BIGGER_THAN_D, MYF(0), fld_name);
+        return true;
+      }
+      m_max_display_width_in_codepoints = my_decimal_precision_to_length(
+          m_max_display_width_in_codepoints, decimals,
+          fld_type_modifier & UNSIGNED_FLAG);
+      break;
+    case MYSQL_TYPE_VARCHAR:
+      // Note that VARCHAR fields with a long length may be converted to blob
+      // types in prepare_blob_field()
+      max_field_charlength = MAX_FIELD_VARCHARLENGTH;
+      break;
+    case MYSQL_TYPE_STRING:
+      break;
+    case MYSQL_TYPE_BLOB:
+    case MYSQL_TYPE_TINY_BLOB:
+    case MYSQL_TYPE_LONG_BLOB:
+    case MYSQL_TYPE_MEDIUM_BLOB:
+    case MYSQL_TYPE_JSON:
+      if (fld_default_value) {
+        /* Allow empty as default value. */
+        String str, *res;
+        res = fld_default_value->val_str(&str);
+        /*
+          A default other than '' is always an error, and any non-NULL
+          specified default is an error in strict mode.
+        */
+        if (res->length() || thd->is_strict_mode()) {
+          my_error(ER_BLOB_CANT_HAVE_DEFAULT, MYF(0),
+                   fld_name); /* purecov: inspected */
+          return true;
+        } else {
+          /*
+            Otherwise a default of '' is just a warning.
+          */
+          push_warning_printf(thd, Sql_condition::SL_WARNING,
+                              ER_BLOB_CANT_HAVE_DEFAULT,
+                              ER_THD(thd, ER_BLOB_CANT_HAVE_DEFAULT), fld_name);
+        }
+        constant_default = nullptr;
+      }
+
+      flags |= BLOB_FLAG;
+      break;
+    case MYSQL_TYPE_GEOMETRY:
+      if (fld_default_value) {
+        my_error(ER_BLOB_CANT_HAVE_DEFAULT, MYF(0), fld_name);
+        return true;
+      }
+      flags |= BLOB_FLAG;
+      break;
+    case MYSQL_TYPE_YEAR:
+      if (!display_width_in_codepoints ||
+          m_max_display_width_in_codepoints != 4)
+        m_max_display_width_in_codepoints = 4; /* Default length */
+      flags |= ZEROFILL_FLAG | UNSIGNED_FLAG;
+      break;
+    case MYSQL_TYPE_FLOAT:
+      /* change FLOAT(precision) to FLOAT or DOUBLE */
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      if (display_width_in_codepoints && !fld_decimals) {
+        size_t tmp_length = m_max_display_width_in_codepoints;
+        if (tmp_length > PRECISION_FOR_DOUBLE) {
+          my_error(ER_WRONG_FIELD_SPEC, MYF(0), fld_name);
+          return true;
+        } else if (tmp_length > PRECISION_FOR_FLOAT) {
+          sql_type = MYSQL_TYPE_DOUBLE;
+          m_max_display_width_in_codepoints = MAX_DOUBLE_STR_LENGTH;
+        } else
+          m_max_display_width_in_codepoints = MAX_FLOAT_STR_LENGTH;
+        decimals = DECIMAL_NOT_SPECIFIED;
+        break;
+      }
+      if (!display_width_in_codepoints && !fld_decimals) {
+        m_max_display_width_in_codepoints = MAX_FLOAT_STR_LENGTH;
+        decimals = DECIMAL_NOT_SPECIFIED;
+      }
+      if (m_max_display_width_in_codepoints < decimals &&
+          decimals != DECIMAL_NOT_SPECIFIED) {
+        my_error(ER_M_BIGGER_THAN_D, MYF(0), fld_name);
+        return true;
+      }
+      break;
+    case MYSQL_TYPE_DOUBLE:
+      allowed_type_modifier = AUTO_INCREMENT_FLAG;
+      if (!display_width_in_codepoints && !fld_decimals) {
+        m_max_display_width_in_codepoints = DBL_DIG + 7;
+        decimals = DECIMAL_NOT_SPECIFIED;
+      }
+      if (m_max_display_width_in_codepoints < decimals &&
+          decimals != DECIMAL_NOT_SPECIFIED) {
+        my_error(ER_M_BIGGER_THAN_D, MYF(0), fld_name);
+        return true;
+      }
+      break;
+    case MYSQL_TYPE_TIMESTAMP:
+      /* Add flags for TIMESTAMP for 4.0 MYD and 4.0 InnoDB compatibility */
+      flags |= ZEROFILL_FLAG | UNSIGNED_FLAG;
+      [[fallthrough]];
+    case MYSQL_TYPE_TIMESTAMP2:
+      if (display_width_in_codepoints == nullptr) {
+        m_max_display_width_in_codepoints =
+            MAX_DATETIME_WIDTH + (decimals ? (1 + decimals) : 0);
+      } else if (m_max_display_width_in_codepoints != MAX_DATETIME_WIDTH) {
+        /*
+          We support only even TIMESTAMP lengths less or equal than 14
+          and 19 as length of 4.1 compatible representation.  Silently
+          shrink it to MAX_DATETIME_COMPRESSED_WIDTH.
+        */
+        if (m_max_display_width_in_codepoints !=
+            UINT_MAX) /* avoid overflow; is safe because of min() */
+          m_max_display_width_in_codepoints =
+              ((m_max_display_width_in_codepoints + 1) / 2) * 2;
+        m_max_display_width_in_codepoints = std::min<size_t>(
+            m_max_display_width_in_codepoints, MAX_DATETIME_COMPRESSED_WIDTH);
+      }
+
+      /*
+        Since we silently rewrite down to MAX_DATETIME_COMPRESSED_WIDTH bytes,
+        the parser should not raise errors unless bizzarely large.
+       */
+      max_field_charlength = UINT_MAX;
+
+      break;
+    case MYSQL_TYPE_DATE:
+      /* Old date type. */
+      sql_type = MYSQL_TYPE_NEWDATE;
+      [[fallthrough]];
+    case MYSQL_TYPE_NEWDATE:
+      m_max_display_width_in_codepoints = MAX_DATE_WIDTH;
+      break;
+    case MYSQL_TYPE_TIME:
+    case MYSQL_TYPE_TIME2:
+      m_max_display_width_in_codepoints =
+          MAX_TIME_WIDTH + (decimals ? (1 + decimals) : 0);
+      break;
+    case MYSQL_TYPE_DATETIME:
+    case MYSQL_TYPE_DATETIME2:
+      m_max_display_width_in_codepoints =
+          MAX_DATETIME_WIDTH + (decimals ? (1 + decimals) : 0);
+      break;
+    case MYSQL_TYPE_SET:
+    case MYSQL_TYPE_ENUM: {
+      for (String &it : *fld_interval_list) {
+        interval_list.push_back(&it);
+      }
+      break;
+    }
+    case MYSQL_TYPE_VAR_STRING:
+      assert(0); /* Impossible. */
+      break;
+    case MYSQL_TYPE_BIT: {
+      if (!display_width_in_codepoints) {
+        my_error(ER_INVALID_FIELD_SIZE, MYF(0), fld_name);
+        return true;
+      }
+      if (m_max_display_width_in_codepoints > MAX_BIT_FIELD_LENGTH) {
+        my_error(ER_TOO_BIG_DISPLAYWIDTH, MYF(0), fld_name,
+                 static_cast<ulong>(MAX_BIT_FIELD_LENGTH));
+        return true;
+      }
+      break;
+    }
+    case MYSQL_TYPE_DECIMAL:
+    default:
+      assert(0); /* Was obsolete */
+  }
+
+  if (!(flags & BLOB_FLAG) &&
+      ((m_max_display_width_in_codepoints > max_field_charlength &&
+        fld_type != MYSQL_TYPE_SET && fld_type != MYSQL_TYPE_ENUM &&
+        (fld_type != MYSQL_TYPE_VARCHAR || fld_default_value)) ||
+       ((m_max_display_width_in_codepoints == 0 && m_explicit_display_width) &&
+        fld_type != MYSQL_TYPE_STRING && fld_type != MYSQL_TYPE_VARCHAR &&
+        fld_type != MYSQL_TYPE_GEOMETRY))) {
+    my_error((fld_type == MYSQL_TYPE_VAR_STRING ||
+              fld_type == MYSQL_TYPE_VARCHAR || fld_type == MYSQL_TYPE_STRING)
+                 ? ER_TOO_BIG_FIELDLENGTH
+                 : ER_TOO_BIG_DISPLAYWIDTH,
+             MYF(0), fld_name, max_field_charlength); /* purecov: inspected */
+    return true;
+  }
+  fld_type_modifier &= AUTO_INCREMENT_FLAG;
+  if ((~allowed_type_modifier) & fld_type_modifier) {
+    my_error(ER_WRONG_FIELD_SPEC, MYF(0), fld_name);
+    return true;
+  }
+
+  /*
+    After all checks were carried out we should be able guarantee that column
+    can't have AUTO_INCREMENT and DEFAULT/ON UPDATE CURRENT_TIMESTAMP at the
+    same time.
+  */
+  assert(!((auto_flags & (Field::DEFAULT_NOW | Field::ON_UPDATE_NOW |
+                          Field::GENERATED_FROM_EXPRESSION)) != 0 &&
+           (auto_flags & Field::NEXT_NUMBER) != 0));
+
+  return false; /* success */
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: innobase_rename_or_enlarge_columns_cache not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: innobase_rename_or_enlarge_columns_cache not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: innobase_rename_or_enlarge_columns_cache not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: innobase_rename_or_enlarge_columns_cache not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: innobase_rename_or_enlarge_columns_cache not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/handler0alter.cc
+Function: innobase_rename_or_enlarge_columns_cache not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc
+Function: PT_set_names::contextualize
+  Convenience function that calls Parse_tree_node::contextualize() on each of
+  the nodes that are non-NULL, stopping when a call returns true.
+*/
+template <typename Context, typename Node, typename... Nodes>
+bool contextualize_safe(Context *pc, Node node, Nodes... nodes) {
+  return contextualize_safe(pc, node) || contextualize_safe(pc, nodes...);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/libbinlogevents/src/statement_events.cpp
+Function: binary_log::Query_event::Query_event
+Query_event::Query_event(Log_event_type type_arg)
+    : Binary_log_event(type_arg),
+      query(nullptr),
+      db(nullptr),
+      user(nullptr),
+      user_len(0),
+      host(nullptr),
+      host_len(0),
+      db_len(0),
+      q_len(0) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc
+Function: dd::info_schema::build_show_character_set_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc
+Function: dd::info_schema::build_show_character_set_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc
+Function: dd::info_schema::build_show_character_set_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc
+Function: dd::info_schema::build_show_collation_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc
+Function: dd::info_schema::build_show_collation_query not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/show.cc
+Function: dd::info_schema::build_show_collation_query not found.
+

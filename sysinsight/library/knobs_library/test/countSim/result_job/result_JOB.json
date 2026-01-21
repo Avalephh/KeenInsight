@@ -1,0 +1,189 @@
+[
+    {
+        "knob_name": "tmp_table_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "table_cache_size",
+        "data_matched_functions": [
+            "mysqld_main"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "sql_mode",
+        "data_matched_functions": [
+            "store_key::copy",
+            "fields_are_memcpyable"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "thd_wait_end",
+            "thd_wait_begin"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 4
+    },
+    {
+        "knob_name": "sort_buffer_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_buffer_length",
+        "data_matched_functions": [
+            "do_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "max_sort_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_heap_table_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_connections",
+        "data_matched_functions": [
+            "mysqld_main"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "max_binlog_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "lock_wait_timeout",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "join_buffer_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "innodb_use_native_aio",
+        "data_matched_functions": [
+            "os_aio_func",
+            "AIO::reserve_slot",
+            "os_aio_handler"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "std::chrono::_V2::steady_clock::now",
+            "os_event_set"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 5
+    },
+    {
+        "knob_name": "innodb_thread_concurrency",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "trx_is_interrupted",
+            "std::chrono::_V2::steady_clock::now"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 2
+    },
+    {
+        "knob_name": "innodb_log_file_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "innodb_io_capcity",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "std::chrono::_V2::steady_clock::now"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "innodb_flush_log_at_trx_commit_ControlDependency",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "std::chrono::_V2::system_clock::now",
+            "os_event_set"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 2
+    },
+    {
+        "knob_name": "flush",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "flush_time",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_format",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_cache_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    }
+]

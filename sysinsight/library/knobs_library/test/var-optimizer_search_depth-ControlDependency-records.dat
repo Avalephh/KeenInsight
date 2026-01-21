@@ -1,0 +1,32 @@
+Global Variable: System_variables.42
+Explicit Data Flow (9):
+  Instruction: %3 = load i64, i64* %optimizer_search_depth, align 8, !dbg !1255294 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:128:58 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %conv = trunc i64 %3 to i32, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:128:43 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %call = call i32 @_ZN20Optimize_table_order22determine_search_depthEjj(i32 %conv, i32 %sub), !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:128:20 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: store i32 %call, i32* %search_depth, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:128:7 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %search_depth = getelementptr inbounds %class.Optimize_table_order.16374, %class.Optimize_table_order.16374* %this1, i32 0, i32 2, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:128:7 | Function: Optimize_table_order::Optimize_table_order
+  Instruction: %search_depth23 = getelementptr inbounds %class.Optimize_table_order.16374, %class.Optimize_table_order.16374* %this1, i32 0, i32 2, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2359:24 | Function: Optimize_table_order::greedy_search
+  Instruction: %30 = load i32, i32* %search_depth23, align 8, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2359:24 | Function: Optimize_table_order::greedy_search
+  Instruction: %cmp24 = icmp ule i32 %29, %30, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2359:21 | Function: Optimize_table_order::greedy_search
+  Instruction: br i1 %cmp24, label %if.then26, label %lor.lhs.false, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc:2359:37 | Function: Optimize_table_order::greedy_search
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: _db_keyword_
+  Controlled Function: Optimize_table_order::check_interleaving_with_nj
+  Controlled Function: Table_map_restorer::~Table_map_restorer
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: Table_map_restorer::~Table_map_restorer
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: __assert_fail
+  Controlled Function: _db_keyword_
+  Controlled Function: Optimize_table_order::recalculate_lateral_deps_incrementally
+  Controlled Function: Optimize_table_order::best_extension_by_limited_search
+  Controlled Function: __assert_fail
+
+Implicit Control Flow:
+
+----------------------------------------

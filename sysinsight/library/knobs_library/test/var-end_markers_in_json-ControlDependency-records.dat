@@ -1,0 +1,19 @@
+Global Variable: System_variables.8
+Explicit Data Flow (6):
+  Instruction: %17 = load i8, i8* %end_markers_in_json, align 8, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:217:37 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %tobool22 = trunc i8 %17 to i1, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:217:37 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %call30 = invoke zeroext i1 @_ZN17Opt_trace_context5startEbbbbllmy(%class.Opt_trace_context* %13, i1 zeroext %tobool19, i1 zeroext %tobool20, i1 zeroext %tobool22, i1 zeroext %tobool24, i64 %20, i64 %22, i64 %24, i64 %26)
+          to label %invoke.cont29 unwind label %lpad, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/opt_trace2server.cc:216:16 | Function: Opt_trace_start::Opt_trace_start
+  Instruction: %10 = load i8, i8* %end_markers_in_json, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/opt_explain_json.cc:2042:43 | Function: Explain_format_JSON::end_context
+  Instruction: %tobool = trunc i8 %10 to i1, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/opt_explain_json.cc:2042:43 | Function: Explain_format_JSON::end_context
+  Instruction: %call = invoke zeroext i1 @_ZN17Opt_trace_context5startEbbbbllmy(%class.Opt_trace_context* %json, i1 zeroext true, i1 zeroext false, i1 zeroext %tobool, i1 zeroext false, i64 0, i64 1, i64 -1, i64 128)
+          to label %invoke.cont unwind label %lpad, !dbg !1255302 | Location: /root/LLVM/mysql-8.0.36/sql/opt_explain_json.cc:2040:14 | Function: Explain_format_JSON::end_context
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

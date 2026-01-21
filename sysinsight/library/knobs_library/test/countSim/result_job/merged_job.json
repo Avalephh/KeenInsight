@@ -1,0 +1,1491 @@
+[
+    {
+        "knob_name": "optimizer_search_depth",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "sql_mode",
+        "data_matched_functions": [
+            "store_key::copy",
+            "fields_are_memcpyable"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "thd_wait_begin",
+            "thd_wait_end"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 4
+    },
+    {
+        "knob_name": "auto_increment_increment",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "use_secondary_engine",
+        "data_matched_functions": [
+            "Sql_cmd_dml::execute"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "select_into_buffer_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_force_recovery",
+        "data_matched_functions": [
+            "Clone_persist_gtid::flush_gtids",
+            "srv_purge_coordinator_thread",
+            "srv_worker_thread",
+            "row_search_mvcc",
+            "buf_page_io_complete",
+            "btr_cur_search_to_nth_level"
+        ],
+        "data_matched_count": 6,
+        "control_matched_functions": [
+            "ha_innobase::build_template",
+            "trx_purge",
+            "que_thr_move_to_run_state_for_mysql",
+            "os_event_set",
+            "fsp_is_undo_tablespace",
+            "fil_space_get",
+            "fil_space_release",
+            "buf_page_get_known_nowait",
+            "Compression::is_compressed_page",
+            "btr_pcur_t::store_position",
+            "srv_release_threads",
+            "que_thr_stop_for_mysql_no_error",
+            "thd_to_innodb_session",
+            "buf_page_t::was_stale",
+            "row_sel_store_mysql_rec",
+            "buf_LRU_free_page",
+            "fil_space_acquire_silent",
+            "mtr_t::commit",
+            "ibuf_merge_or_delete_for_page",
+            "MVCC::is_view_active",
+            "mtr_t::start",
+            "std::chrono::_V2::system_clock::now",
+            "fsp_is_system_temporary"
+        ],
+        "control_matched_count": 23,
+        "matched_count": 29
+    },
+    {
+        "knob_name": "track_sysvars_ptr",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "session_track_schema",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "secondary_engine_cost_threshold",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_buffer_length",
+        "data_matched_functions": [
+            "do_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "group_replication_consistency",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "session_track_gtids",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_error_count",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "default_collation_for_utf8mb4",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "dynamic_variables_head",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_retry_count",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "low_priority_updates",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_heap_table_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "immediate_server_version",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "xa_detach_on_prepare",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_rows_query_log_events",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "table_plugin",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "strmake_root"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "lc_messages",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_user_connections",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "lc_time_names",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "session_track_transaction_info",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "time_zone",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "query_prealloc_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "new_mode",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "show_gipk_in_create_table_and_information_schema",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "Field::set_notnull"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "internal_tmp_mem_storage_engine",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "group_concat_max_len",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "explain_format",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_wait_timeout",
+        "data_matched_functions": [
+            "do_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "character_set_filesystem",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_unix_file_flush_method",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "show_old_temporals",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "option_bits",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "cte_max_recursion_depth",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "TableRowIterator::HandleError",
+            "handler::ha_rnd_next"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 2
+    },
+    {
+        "knob_name": "collation_database",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_points_in_geometry",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "conn_mem_limit",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "character_set_results",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "generated_random_password_length",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "dynamic_variables_ptr",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "my_aes_mode",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "keep_files_on_create",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "conn_mem_chunk_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "transaction_read_only",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_allowed_packet",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "String::copy"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "optimizer_trace_features",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "pseudo_thread_id",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "session_track_state_change",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "div_precincrement",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "range_optimizer_max_mem_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_row_value_options",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "auto_increment_offset",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "information_schema_stats_expiry",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "collation_server",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "read_buff_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "collation_connection",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "profiling_history_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "big_tables",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "sysdate_is_now",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "dynamic_variables_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "gtid_next",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "max_sort_length",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_switch",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_adaptive_flushing",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "min_examined_row_limit",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "default_table_encryption",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "original_server_version",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "select_into_disk_sync_delay",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "bulk_insert_buff_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "join_buff_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "tmp_table_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "table_cache_size",
+        "data_matched_functions": [
+            "mysqld_main"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "sql_mode",
+        "data_matched_functions": [
+            "store_key::copy",
+            "fields_are_memcpyable"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "thd_wait_end",
+            "thd_wait_begin"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 4
+    },
+    {
+        "knob_name": "sort_buffer_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_buffer_length",
+        "data_matched_functions": [
+            "do_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "max_sort_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_heap_table_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_connections",
+        "data_matched_functions": [
+            "mysqld_main"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "max_binlog_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "lock_wait_timeout",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "join_buffer_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "innodb_use_native_aio",
+        "data_matched_functions": [
+            "os_aio_func",
+            "AIO::reserve_slot",
+            "os_aio_handler"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "std::chrono::_V2::steady_clock::now",
+            "os_event_set"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 5
+    },
+    {
+        "knob_name": "innodb_thread_concurrency",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "trx_is_interrupted",
+            "std::chrono::_V2::steady_clock::now"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 2
+    },
+    {
+        "knob_name": "innodb_log_file_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "innodb_io_capcity",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "std::chrono::_V2::steady_clock::now"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "innodb_flush_log_at_trx_commit_ControlDependency",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "std::chrono::_V2::system_clock::now",
+            "os_event_set"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 2
+    },
+    {
+        "knob_name": "flush",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "flush_time",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_format",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_cache_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "transaction_isolation",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_prune_level",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_trx_compression_level_zstd",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "tmp_table_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "trans_alloc_block_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "print_identified_with_as_hex",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_execution_time",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_trace_limit",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "query_alloc_block_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "parser_max_mem_size",
+        "data_matched_functions": [
+            "parse_sql"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "rbr_exec_mode_options",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "terminology_use_previous",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "sql_log_bin",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_interactive_timeout",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "show_create_table_skip_secondary_engine",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_trace_max_mem_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_purge_threads",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "explicit_defaults_for_timestamp",
+        "data_matched_functions": [
+            "fields_are_memcpyable"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "show_create_table_verbosity",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "sql_generate_invisible_primary_key",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_write_timeout",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "sortbuff_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "range_alloc_block_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_insert_delayed_threads",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "eq_range_index_dive_limit",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "trans_prealloc_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "completion_type",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "windowing_use_high_precision",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "old_alter_table",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "lock_wait_timeout",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_thread_sleep_delay",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "preload_buff_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_direct_non_trans_update",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_trace",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "temp_table_plugin",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [
+            "strmake_root"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "select_limit",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "transaction_write_set_extraction",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_purge_batch_size",
+        "data_matched_functions": [
+            "srv_purge_coordinator_thread"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "trx_purge"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 2
+    },
+    {
+        "knob_name": "select_into_disk_sync",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "default_week_format",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "require_row_format",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_trace_offset",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "optimizer_max_subgraph_pairs",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "updatable_views_with_limit",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_length_for_sort_data",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_log_buffer_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_file_per_table",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "pseudo_replica_mode",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "sql_require_primary_key",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "read_rnd_buff_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_trx_compression_type",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "long_query_time_double",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_format",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "dynamic_variables_version",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_spin_wait_delay",
+        "data_matched_functions": [
+            "rw_lock_x_lock_func",
+            "rw_lock_s_lock_spin"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "ut_delay"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 3
+    },
+    {
+        "knob_name": "srv_fast_shutdown",
+        "data_matched_functions": [
+            "Clone_persist_gtid::periodic_write",
+            "srv_purge_coordinator_thread"
+        ],
+        "data_matched_count": 2,
+        "control_matched_functions": [
+            "trx_purge",
+            "Clone_persist_gtid::flush_gtids",
+            "os_event_set",
+            "srv_release_threads"
+        ],
+        "control_matched_count": 4,
+        "matched_count": 6
+    },
+    {
+        "knob_name": "binlog_row_image",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "resultset_metadata",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "conn_global_mem_tracking",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_sp_recursion_depth",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "debug_sensitive_session_str",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_seeks_for_key",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "net_read_timeout",
+        "data_matched_functions": [
+            "do_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "original_commit_timestamp",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "histogram_generation_max_mem_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_max_purge_lag",
+        "data_matched_functions": [
+            "trx_purge"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 1
+    },
+    {
+        "knob_name": "long_query_time",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "dynamic_variables_allocs",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "max_join_size",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "gtid_next_list",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "end_markers_in_json",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "binlog_trx_compression",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "ssl_fips_mode",
+        "data_matched_functions": [],
+        "data_matched_count": 0,
+        "control_matched_functions": [],
+        "control_matched_count": 0,
+        "matched_count": 0
+    },
+    {
+        "knob_name": "srv_use_native_aio",
+        "data_matched_functions": [
+            "AIO::reserve_slot",
+            "os_aio_func",
+            "os_aio_handler"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "os_event_set",
+            "std::chrono::_V2::steady_clock::now"
+        ],
+        "control_matched_count": 2,
+        "matched_count": 5
+    },
+    {
+        "knob_name": "character_set_client",
+        "data_matched_functions": [
+            "mysql_execute_command"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "String::copy"
+        ],
+        "control_matched_count": 1,
+        "matched_count": 2
+    }
+]

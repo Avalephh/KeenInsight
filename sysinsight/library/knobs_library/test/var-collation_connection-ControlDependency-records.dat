@@ -1,0 +1,415 @@
+Global Variable: System_variables.92
+Explicit Data Flow (286):
+  Instruction: store %struct.CHARSET_INFO* %4, %struct.CHARSET_INFO** %collation_connection6, align 8, !dbg !1255297 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2014:39 | Function: set_var_collation_client::update
+  Instruction: %collation_connection6 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables5, i32 0, i32 92, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/set_var.cc:2014:18 | Function: set_var_collation_client::update
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables16, i32 0, i32 92, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:341:18 | Function: ndb_create_thd
+  Instruction: store %struct.CHARSET_INFO* %25, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc:341:39 | Function: ndb_create_thd
+  Instruction: %collation_connection145 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables144, i32 0, i32 92, !dbg !1255427 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:924:18 | Function: dd::upgrade_57::fix_view_cols_and_deps
+  Instruction: store %struct.CHARSET_INFO* %71, %struct.CHARSET_INFO** %collation_connection145, align 8, !dbg !1255428 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:924:39 | Function: dd::upgrade_57::fix_view_cols_and_deps
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1879:43 | Function: THD::update_charset
+  Instruction: %call5 = call zeroext i1 @_ZN6String16needs_conversionEmPK12CHARSET_INFOS2_Pm(i64 0, %struct.CHARSET_INFO* %2, %struct.CHARSET_INFO* %3, i64* %not_used), !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/sql_class.cc:1878:8 | Function: THD::update_charset
+  Instruction: store %struct.CHARSET_INFO* %13, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:411:41 | Function: thd_init_client_charset
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables8, i32 0, i32 92, !dbg !1255314 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:411:20 | Function: thd_init_client_charset
+  Instruction: store %struct.CHARSET_INFO* %20, %struct.CHARSET_INFO** %collation_connection17, align 8, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:422:80 | Function: thd_init_client_charset
+  Instruction: %collation_connection17 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables16, i32 0, i32 92, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/sql_connect.cc:422:59 | Function: thd_init_client_charset
+  Instruction: %38 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:781:46 | Function: Prepared_statement::insert_parameters
+  Instruction: %cond = phi %struct.CHARSET_INFO* [ %35, %cond.true33 ], [ %38, %cond.false36 ], !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:779:17 | Function: Prepared_statement::insert_parameters
+  Instruction: %cond39 = phi %struct.CHARSET_INFO* [ bitcast (%struct.CHARSET_INFO.298396* @my_charset_bin to %struct.CHARSET_INFO*), %cond.true ], [ %cond, %cond.end ], !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:777:11 | Function: Prepared_statement::insert_parameters
+  Instruction: invoke void @_ZN10Item_param20set_collation_actualEPK12CHARSET_INFO(%class.Item_param* %28, %struct.CHARSET_INFO* %cond39)
+          to label %invoke.cont40 unwind label %lpad, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:776:14 | Function: Prepared_statement::insert_parameters
+  Instruction: %5 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255301 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1709:48 | Function: get_dynamic_sql_string
+  Instruction: store %struct.CHARSET_INFO* %5, %struct.CHARSET_INFO** %to_cs, align 8, !dbg !1255298 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1709:25 | Function: get_dynamic_sql_string
+  Instruction: %29 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %to_cs, align 8, !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1749:52 | Function: get_dynamic_sql_string
+  Instruction: %call41 = invoke zeroext i1 @_ZN6String16needs_conversionEmPK12CHARSET_INFOS2_Pm(i64 %call37, %struct.CHARSET_INFO* %call39, %struct.CHARSET_INFO* %29, i64* %unused)
+          to label %invoke.cont40 unwind label %lpad, !dbg !1255358 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1748:24 | Function: get_dynamic_sql_string
+  Instruction: %32 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %to_cs, align 8, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:53 | Function: get_dynamic_sql_string
+  Instruction: %mbmaxlen = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %32, i32 0, i32 23, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:60 | Function: get_dynamic_sql_string
+  Instruction: %33 = load i32, i32* %mbmaxlen, align 4, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:60 | Function: get_dynamic_sql_string
+  Instruction: %conv = zext i32 %33 to i64, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:53 | Function: get_dynamic_sql_string
+  Instruction: %mul = mul i64 %call45, %conv, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:51 | Function: get_dynamic_sql_string
+  Instruction: %cond = phi i64 [ %mul, %invoke.cont44 ], [ %call48, %invoke.cont47 ], !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:12 | Function: get_dynamic_sql_string
+  Instruction: store i64 %cond, i64* %len, align 8, !dbg !1255368 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1751:9 | Function: get_dynamic_sql_string
+  Instruction: %39 = load i64, i64* %len, align 8, !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1753:52 | Function: get_dynamic_sql_string
+  Instruction: %add = add i64 %39, 1, !dbg !1255373 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1753:56 | Function: get_dynamic_sql_string
+  Instruction: %call51 = invoke noalias i8* @_ZN8MEM_ROOT5AllocEm(%struct.MEM_ROOT* %38, i64 %add)
+          to label %invoke.cont50 unwind label %lpad, !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1753:46 | Function: get_dynamic_sql_string
+  Instruction: %42 = load i64, i64* %len, align 8, !dbg !1255386 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1757:41 | Function: get_dynamic_sql_string
+  Instruction: %call64 = invoke i64 @_Z16copy_and_convertPcmPK12CHARSET_INFOPKcmS2_Pj(i8* %41, i64 %42, %struct.CHARSET_INFO* %43, i8* %call58, i64 %call60, %struct.CHARSET_INFO* %call62, i32* %dummy_errors)
+          to label %invoke.cont63 unwind label %lpad, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1757:13 | Function: get_dynamic_sql_string
+  Instruction: store i64 %call64, i64* %len, align 8, !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1757:11 | Function: get_dynamic_sql_string
+  Instruction: %51 = load i64, i64* %len, align 8, !dbg !1255404 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1762:15 | Function: get_dynamic_sql_string
+  Instruction: %arrayidx = getelementptr inbounds i8, i8* %50, i64 %51, !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1762:5 | Function: get_dynamic_sql_string
+  Instruction: store i8 0, i8* %arrayidx, align 1, !dbg !1255405 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1762:20 | Function: get_dynamic_sql_string
+  Instruction: %52 = load i64, i64* %len, align 8, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1763:18 | Function: get_dynamic_sql_string
+  Instruction: store i64 %52, i64* %53, align 8, !dbg !1255408 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1763:16 | Function: get_dynamic_sql_string
+  Instruction: %call10 = invoke i8* @_ZL22get_dynamic_sql_stringP3LEXPm(%struct.LEX.17600* %14, i64* %query_len)
+          to label %invoke.cont9 unwind label %lpad, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1806:23 | Function: mysql_sql_stmt_prepare
+  Instruction: %43 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %to_cs, align 8, !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/sql/sql_prepare.cc:1757:46 | Function: get_dynamic_sql_string
+  Instruction: store %struct.CHARSET_INFO* %2, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:213:39 | Function: Default_object_creation_ctx::change_env
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables2, i32 0, i32 92, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:213:18 | Function: Default_object_creation_ctx::change_env
+  Instruction: %5 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:198:38 | Function: Default_object_creation_ctx::Default_object_creation_ctx
+  Instruction: store %struct.CHARSET_INFO* %5, %struct.CHARSET_INFO** %m_connection_cl, align 8, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:198:7 | Function: Default_object_creation_ctx::Default_object_creation_ctx
+  Instruction: %m_connection_cl = getelementptr inbounds %class.Default_object_creation_ctx, %class.Default_object_creation_ctx* %this1, i32 0, i32 2, !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:198:7 | Function: Default_object_creation_ctx::Default_object_creation_ctx
+  Instruction: %m_connection_cl = getelementptr inbounds %class.Default_object_creation_ctx, %class.Default_object_creation_ctx* %4, i32 0, i32 2, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:244:48 | Function: Stored_routine_creation_ctx::clone
+  Instruction: %5 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %m_connection_cl, align 8, !dbg !1255286 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:244:48 | Function: Stored_routine_creation_ctx::clone
+  Instruction: invoke void @_ZN27Stored_routine_creation_ctxC2EPK12CHARSET_INFOS2_S2_(%class.Trigger_creation_ctx* %1, %struct.CHARSET_INFO* %3, %struct.CHARSET_INFO* %5, %struct.CHARSET_INFO* %7)
+          to label %invoke.cont unwind label %lpad, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:244:7 | Function: Stored_routine_creation_ctx::clone
+  Instruction: store %struct.CHARSET_INFO* %70, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255457 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2461:41 | Function: fix_value_generator_fields
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 92, !dbg !1255456 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2461:20 | Function: fix_value_generator_fields
+  Instruction: store %struct.CHARSET_INFO* %83, %struct.CHARSET_INFO** %collation_connection86, align 8, !dbg !1255483 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2474:41 | Function: fix_value_generator_fields
+  Instruction: %collation_connection86 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables85, i32 0, i32 92, !dbg !1255482 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2474:20 | Function: fix_value_generator_fields
+  Instruction: %20 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:209:26 | Function: Trigger::create_from_parser
+  Instruction: %m_coll_name = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %20, i32 0, i32 5, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:209:48 | Function: Trigger::create_from_parser
+  Instruction: %21 = load i8*, i8** %m_coll_name, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:209:48 | Function: Trigger::create_from_parser
+  Instruction: %call19 = call zeroext i1 @_Z18lex_string_strmakeP8MEM_ROOTP17MYSQL_LEX_CSTRINGPKcm(%struct.MEM_ROOT* %mem_root14, %class.Simple_cstring* %connection_cl_name, i8* %21, i64 %call18), !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:207:7 | Function: Trigger::create_from_parser
+  Instruction: %23 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection16, align 8, !dbg !1255332 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:210:33 | Function: Trigger::create_from_parser
+  Instruction: %m_coll_name17 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %23, i32 0, i32 5, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:210:55 | Function: Trigger::create_from_parser
+  Instruction: %24 = load i8*, i8** %m_coll_name17, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:210:55 | Function: Trigger::create_from_parser
+  Instruction: %call18 = call i64 @strlen(i8* %24) #21, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/trigger.cc:210:11 | Function: Trigger::create_from_parser
+  Instruction: %16 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc:64:40 | Function: Trigger_creation_ctx::create
+  Instruction: %call27 = call zeroext i1 @_Z17resolve_collationPKcPK12CHARSET_INFOPS3_(i8* %14, %struct.CHARSET_INFO* %16, %struct.CHARSET_INFO** %connection_cl), !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/trigger_creation_ctx.cc:63:7 | Function: Trigger_creation_ctx::create
+  Instruction: %11687 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1271981 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:10582:52 | Function: MYSQLparse
+  Instruction: invoke void @_ZN11Item_stringC2ERK7YYLTYPEPKcmPK12CHARSET_INFO10Derivationj(%class.Item_string* %11681, %struct.YYLTYPE* dereferenceable(32) %yyloc, i8* %11683, i64 %11685, %struct.CHARSET_INFO* %11687, i32 4, i32 3)
+          to label %invoke.cont16592 unwind label %lpad16591, !dbg !1271982 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:10581:23 | Function: MYSQLparse
+  Instruction: %11721 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection16635, align 8, !dbg !1272009 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:10589:52 | Function: MYSQLparse
+  Instruction: invoke void @_ZN11Item_stringC2ERK7YYLTYPEPKcmPK12CHARSET_INFO10Derivationj(%class.Item_string* %11715, %struct.YYLTYPE* dereferenceable(32) %yyloc, i8* %11717, i64 %11719, %struct.CHARSET_INFO* %11721, i32 4, i32 3)
+          to label %invoke.cont16637 unwind label %lpad16636, !dbg !1272010 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:10588:23 | Function: MYSQLparse
+  Instruction: %14206 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection20169, align 8, !dbg !1274910 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:11610:36 | Function: MYSQLparse
+  Instruction: %cond20171 = phi %struct.CHARSET_INFO* [ %14204, %cond.true20163 ], [ %14206, %cond.false20167 ], !dbg !1274904 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:11609:60 | Function: MYSQLparse
+  Instruction: %call20172 = call %struct.CHARSET_INFO* @_Z17get_bin_collationPK12CHARSET_INFO(%struct.CHARSET_INFO* %cond20171), !dbg !1274911 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:11609:42 | Function: MYSQLparse
+  Instruction: %17958 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection26227, align 8, !dbg !1280694 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14649:49 | Function: MYSQLparse
+  Instruction: invoke void @_ZN6StringC2EPcmPK12CHARSET_INFO(%class.String* %17952, i8* %17954, i64 %17956, %struct.CHARSET_INFO* %17958)
+          to label %invoke.cont26229 unwind label %lpad26228, !dbg !1280695 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14648:37 | Function: MYSQLparse
+  Instruction: %18568 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection27182, align 8, !dbg !1281469 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14980:78 | Function: MYSQLparse
+  Instruction: %call27192 = call zeroext i1 bitcast (i1 (%class.THD*, %class.Simple_cstring*, %struct.CHARSET_INFO*, i8*, i64, %struct.CHARSET_INFO*, i1)* @_ZN3THD14convert_stringEP16MYSQL_LEX_STRINGPK12CHARSET_INFOPKcmS4_b to i1 (%class.THD.45743*, %class.Simple_cstring*, %struct.CHARSET_INFO*, i8*, i64, %struct.CHARSET_INFO*, i1)*)(%class.THD.45743* %18566, %class.Simple_cstring* %lex_str27180, %struct.CHARSET_INFO* %18568, i8* %18570, i64 %18572, %struct.CHARSET_INFO* %call27191, i1 zeroext false), !dbg !1281480 | Location: /var/lib/pb2/sb_1-13695792-1702404738.83/mysql-8.0.36-release-export-3709429_gpl/sql/sql_yacc.yy:14980:24 | Function: MYSQLparse
+  Instruction: store %struct.CHARSET_INFO* %call23, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:383:39 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables24, i32 0, i32 92, !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/bootstrap.cc:383:18 | Function: bootstrap::run_bootstrap_thread
+  Instruction: %12 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255319 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3959:59 | Function: Item_param::set_str
+  Instruction: %cond = phi %struct.CHARSET_INFO* [ %9, %cond.true6 ], [ %12, %cond.false9 ], !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3957:30 | Function: Item_param::set_str
+  Instruction: %cond11 = phi %struct.CHARSET_INFO* [ bitcast (%struct.CHARSET_INFO.298396* @my_charset_bin to %struct.CHARSET_INFO*), %cond.true ], [ %cond, %cond.end ], !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3955:24 | Function: Item_param::set_str
+  Instruction: invoke void @_ZN10Item_param20set_collation_actualEPK12CHARSET_INFO(%class.Item_param* %this1, %struct.CHARSET_INFO* %cond11)
+          to label %invoke.cont12 unwind label %lpad, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3955:3 | Function: Item_param::set_str
+  Instruction: %2 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255280 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:1653:33 | Function: Item::default_charset
+  Instruction: ret %struct.CHARSET_INFO* %2, !dbg !1255281 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:1653:3 | Function: Item::default_charset
+  Instruction: %call7 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/item.h:1233:51 | Function: Item::propagate_type
+  Instruction: call void @_ZN15Type_propertiesC2E16enum_field_typesPK12CHARSET_INFO(%class.Type_properties* %ref.tmp, i32 %5, %struct.CHARSET_INFO* %call7), !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/item.h:1233:30 | Function: Item::propagate_type
+  Instruction: %call8 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255292 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3681:19 | Function: Item_param::fix_fields
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO(%class.DTCollation* %collation, %struct.CHARSET_INFO* %call8), !dbg !1255293 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:3681:15 | Function: Item_param::fix_fields
+  Instruction: %call3 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:9627:38 | Function: Item_cache_int::val_str
+  Instruction: %call4 = call zeroext i1 @_ZN6String7set_intExbPK12CHARSET_INFO(%class.String* %4, i64 %5, i1 zeroext %tobool2, %struct.CHARSET_INFO* %call3), !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:9627:8 | Function: Item_cache_int::val_str
+  Instruction: %call3 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255328 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:10000:34 | Function: Item_cache_real::val_str
+  Instruction: %call4 = call zeroext i1 @_ZN6String8set_realEdjPK12CHARSET_INFO(%class.String* %4, double %5, i32 %conv2, %struct.CHARSET_INFO* %call3), !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:10000:8 | Function: Item_cache_real::val_str
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3746:43 | Function: Item_func_case::val_real
+  Instruction: call void @_ZN12StringBufferILm766EEC2EPK12CHARSET_INFO(%class.StringBuffer.23816* %dummy_str, %struct.CHARSET_INFO* %call), !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3746:33 | Function: Item_func_case::val_real
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3727:43 | Function: Item_func_case::val_int
+  Instruction: call void @_ZN12StringBufferILm766EEC2EPK12CHARSET_INFO(%class.StringBuffer.23816* %dummy_str, %struct.CHARSET_INFO* %call), !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3727:33 | Function: Item_func_case::val_int
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255382 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3765:43 | Function: Item_func_case::val_decimal
+  Instruction: call void @_ZN12StringBufferILm766EEC2EPK12CHARSET_INFO(%class.StringBuffer.23816* %dummy_str, %struct.CHARSET_INFO* %call), !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3765:33 | Function: Item_func_case::val_decimal
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3785:40 | Function: Item_func_case::val_json
+  Instruction: call void @_ZN6StringC2EPcmPK12CHARSET_INFO(%class.String* %dummy_str, i8* %arraydecay, i64 766, %struct.CHARSET_INFO* %call), !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3785:10 | Function: Item_func_case::val_json
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255371 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3806:40 | Function: Item_func_case::get_date
+  Instruction: call void @_ZN6StringC2EPcmPK12CHARSET_INFO(%class.String* %dummy_str, i8* %arraydecay, i64 766, %struct.CHARSET_INFO* %call), !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3806:10 | Function: Item_func_case::get_date
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3820:40 | Function: Item_func_case::get_time
+  Instruction: call void @_ZN6StringC2EPcmPK12CHARSET_INFO(%class.String* %dummy_str, i8* %arraydecay, i64 766, %struct.CHARSET_INFO* %call), !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/item_cmpfunc.cc:3820:10 | Function: Item_func_case::get_time
+  Instruction: %call7 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5929:27 | Function: Item_func_set_user_var::resolve_type
+  Instruction: store %struct.CHARSET_INFO* %call7, %struct.CHARSET_INFO** %collation9, align 8, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5929:25 | Function: Item_func_set_user_var::resolve_type
+  Instruction: %collation9 = getelementptr inbounds %class.DTCollation, %class.DTCollation* %collation8, i32 0, i32 0, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5929:15 | Function: Item_func_set_user_var::resolve_type
+  Instruction: %collation835 = getelementptr inbounds %class.DTCollation, %class.DTCollation* %collation834, i32 0, i32 0, !dbg !1256131 | Location: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_cond.cc:1043:49 | Function: ndb_serialize_cond
+  Instruction: %call4 = invoke %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv()
+          to label %invoke.cont3 unwind label %lpad, !dbg !1255405 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6318:38 | Function: Item_func_set_user_var::update
+  Instruction: %call6 = invoke zeroext i1 @_ZN22Item_func_set_user_var11update_hashEPKvj11Item_resultPK12CHARSET_INFO10Derivationb(%class.Item_func_set_user_var* %this1, i8* %7, i32 8, i32 1, %struct.CHARSET_INFO* %call4, i32 2, i1 zeroext false)
+          to label %invoke.cont5 unwind label %lpad, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6317:13 | Function: Item_func_set_user_var::update
+  Instruction: %call10 = invoke %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv()
+          to label %invoke.cont9 unwind label %lpad, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6324:25 | Function: Item_func_set_user_var::update
+  Instruction: %call12 = invoke zeroext i1 @_ZN22Item_func_set_user_var11update_hashEPKvj11Item_resultPK12CHARSET_INFO10Derivationb(%class.Item_func_set_user_var* %this1, i8* %8, i32 8, i32 2, %struct.CHARSET_INFO* %call10, i32 2, i1 zeroext %tobool)
+          to label %invoke.cont11 unwind label %lpad, !dbg !1255415 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6323:13 | Function: Item_func_set_user_var::update
+  Instruction: %call48 = invoke %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv()
+          to label %invoke.cont47 unwind label %lpad, !dbg !1255448 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6343:27 | Function: Item_func_set_user_var::update
+  Instruction: %call50 = invoke zeroext i1 @_ZN22Item_func_set_user_var11update_hashEPKvj11Item_resultPK12CHARSET_INFO10Derivationb(%class.Item_func_set_user_var* %this1, i8* %17, i32 72, i32 4, %struct.CHARSET_INFO* %call48, i32 2, i1 zeroext false)
+          to label %invoke.cont49 unwind label %lpad, !dbg !1255449 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6342:15 | Function: Item_func_set_user_var::update
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255389 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5879:22 | Function: Item_func_set_user_var::set_entry
+  Instruction: %cond = phi %struct.CHARSET_INFO* [ %call, %cond.true4 ], [ %9, %cond.false ], !dbg !1255385 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5878:16 | Function: Item_func_set_user_var::set_entry
+  Instruction: %cond11 = phi %struct.CHARSET_INFO* [ %cond, %cond.end ], [ null, %cond.false9 ], !dbg !1255384 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5877:9 | Function: Item_func_set_user_var::set_entry
+  Instruction: store %struct.CHARSET_INFO* %cond11, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255383 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5876:25 | Function: Item_func_set_user_var::set_entry
+  Instruction: %12 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5885:37 | Function: Item_func_set_user_var::set_entry
+  Instruction: %call13 = call %class.user_var_entry* @_ZL12get_variableP3THDRK11Name_stringPK12CHARSET_INFO(%class.THD* %11, %class.Name_string* dereferenceable(16) %name, %struct.CHARSET_INFO* %12), !dbg !1255397 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:5885:13 | Function: Item_func_set_user_var::set_entry
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/item_gtid_func.cc:290:17 | Function: Item_func_gtid_subtract::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation, %struct.CHARSET_INFO* %call2, i32 4, i32 1), !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/item_gtid_func.cc:290:13 | Function: Item_func_gtid_subtract::resolve_type
+  Instruction: %call7 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:230:28 | Function: Item_func_md5::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %11, i32 32, %struct.CHARSET_INFO* %call7), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:230:3 | Function: Item_func_md5::resolve_type
+  Instruction: %call7 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:260:44 | Function: Item_func_sha::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %11, i32 40, %struct.CHARSET_INFO* %call7), !dbg !1255347 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:260:3 | Function: Item_func_sha::resolve_type
+  Instruction: %call18 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:360:54 | Function: Item_func_sha2::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %22, i32 128, %struct.CHARSET_INFO* %call18), !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:360:7 | Function: Item_func_sha2::resolve_type
+  Instruction: %call20 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255372 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:363:54 | Function: Item_func_sha2::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %23, i32 96, %struct.CHARSET_INFO* %call20), !dbg !1255371 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:363:7 | Function: Item_func_sha2::resolve_type
+  Instruction: %call22 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:369:54 | Function: Item_func_sha2::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %24, i32 64, %struct.CHARSET_INFO* %call22), !dbg !1255374 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:369:7 | Function: Item_func_sha2::resolve_type
+  Instruction: %call24 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:373:54 | Function: Item_func_sha2::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %25, i32 56, %struct.CHARSET_INFO* %call24), !dbg !1255377 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:373:7 | Function: Item_func_sha2::resolve_type
+  Instruction: %call25 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255381 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:376:54 | Function: Item_func_sha2::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %26, i32 64, %struct.CHARSET_INFO* %call25), !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:376:7 | Function: Item_func_sha2::resolve_type
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:762:17 | Function: Item_func_to_base64::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation, %struct.CHARSET_INFO* %call2, i32 4, i32 1), !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:762:13 | Function: Item_func_to_base64::resolve_type
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255341 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1000:54 | Function: Item_func_statement_digest::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %2, i32 64, %struct.CHARSET_INFO* %call2), !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:1000:3 | Function: Item_func_statement_digest::resolve_type
+  Instruction: %call14 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255376 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2194:24 | Function: Item_func_format::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %14, i32 %add13, %struct.CHARSET_INFO* %call14), !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2193:3 | Function: Item_func_format::resolve_type
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2635:17 | Function: Item_func_space::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation, %struct.CHARSET_INFO* %call2, i32 4, i32 1), !dbg !1255308 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2635:13 | Function: Item_func_space::resolve_type
+  Instruction: %call47 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255395 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2899:55 | Function: Item_func_bin_to_uuid::val_str_ascii
+  Instruction: call void @_ZN6String3setEPcmPK12CHARSET_INFO(%class.String* %35, i8* %arraydecay46, i64 36, %struct.CHARSET_INFO* %call47), !dbg !1255396 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2899:8 | Function: Item_func_bin_to_uuid::val_str_ascii
+  Instruction: %call5 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2862:24 | Function: Item_func_bin_to_uuid::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %4, i32 36, %struct.CHARSET_INFO* %call5), !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2861:3 | Function: Item_func_bin_to_uuid::resolve_type
+  Instruction: %call119 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255444 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3067:51 | Function: Item_func_conv::val_str
+  Instruction: %call120 = call zeroext i1 @_ZN6String4copyEPKcmPK12CHARSET_INFO(%class.String* %93, i8* %arraydecay117, i64 %sub.ptr.sub, %struct.CHARSET_INFO* %call119), !dbg !1255445 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3067:30 | Function: Item_func_conv::val_str
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255289 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2997:41 | Function: Item_func_conv::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %2, i32 65, %struct.CHARSET_INFO* %call2), !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:2997:3 | Function: Item_func_conv::resolve_type
+  Instruction: %call4 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255343 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3363:50 | Function: Item_func_hex::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %7, i32 16, %struct.CHARSET_INFO* %call4), !dbg !1255342 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3363:5 | Function: Item_func_hex::resolve_type
+  Instruction: %call7 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255348 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3365:52 | Function: Item_func_hex::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %8, i32 %mul, %struct.CHARSET_INFO* %call7), !dbg !1255344 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3365:5 | Function: Item_func_hex::resolve_type
+  Instruction: %call20 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:3458:25 | Function: Item_sum_bit::update_field
+  Instruction: %call23 = call i32 %21(%class.Field.71219* %19, i8* %call17, i64 %call19, %struct.CHARSET_INFO* %call20), !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/item_sum.cc:3457:19 | Function: Item_sum_bit::update_field
+  Instruction: %call100 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255426 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2536:49 | Function: Item_date_add_interval::resolve_type
+  Instruction: call void @_ZN4Item18set_data_type_charEjPK12CHARSET_INFO(%class.Item* %66, i32 29, %struct.CHARSET_INFO* %call100), !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2536:5 | Function: Item_date_add_interval::resolve_type
+  Instruction: %call52 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255375 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:3037:49 | Function: Item_func_add_time::resolve_type
+  Instruction: call void @_ZN4Item18set_data_type_charEjPK12CHARSET_INFO(%class.Item* %46, i32 29, %struct.CHARSET_INFO* %call52), !dbg !1255373 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:3037:5 | Function: Item_func_add_time::resolve_type
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255338 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.h:1635:30 | Function: Item_func_get_format::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %2, i32 17, %struct.CHARSET_INFO* %call), !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.h:1635:5 | Function: Item_func_get_format::resolve_type
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/item_inetfunc.h:75:37 | Function: Item_func_inet_ntoa::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %2, i32 31, %struct.CHARSET_INFO* %call2), !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/item_inetfunc.h:75:5 | Function: Item_func_inet_ntoa::resolve_type
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/item_inetfunc.h:157:37 | Function: Item_func_inet6_ntoa::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %2, i32 39, %struct.CHARSET_INFO* %call2), !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/item_inetfunc.h:157:5 | Function: Item_func_inet6_ntoa::resolve_type
+  Instruction: %call5 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255345 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:3246:17 | Function: Item_func_as_wkt::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation, %struct.CHARSET_INFO* %call5, i32 4, i32 1), !dbg !1255346 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:3246:13 | Function: Item_func_as_wkt::resolve_type
+  Instruction: %call2 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255337 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.h:355:30 | Function: Item_func_geometry_type::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %2, i32 15, %struct.CHARSET_INFO* %call2), !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.h:355:5 | Function: Item_func_geometry_type::resolve_type
+  Instruction: %call = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255359 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:2726:24 | Function: Item_func_geohash::resolve_type
+  Instruction: call void @_ZN4Item20set_data_type_stringEjPK12CHARSET_INFO(%class.Item* %1, i32 %2, %struct.CHARSET_INFO* %call), !dbg !1255357 | Location: /root/LLVM/mysql-8.0.36/sql/item_geofunc.cc:2725:3 | Function: Item_func_geohash::resolve_type
+  Instruction: %call63 = invoke %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv()
+          to label %invoke.cont62 unwind label %lpad30, !dbg !1255442 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2459:52 | Function: fix_value_generator_fields
+  Instruction: store %struct.CHARSET_INFO* %call63, %struct.CHARSET_INFO** %saved_collation_connection, align 8, !dbg !1255441 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2459:23 | Function: fix_value_generator_fields
+  Instruction: %64 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %saved_collation_connection, align 8, !dbg !1255443 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2460:7 | Function: fix_value_generator_fields
+  Instruction: %cmp65 = icmp ne %struct.CHARSET_INFO* %64, %67, !dbg !1255448 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2460:34 | Function: fix_value_generator_fields
+  Instruction: br i1 %cmp65, label %if.then66, label %if.end69, !dbg !1255449 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2460:7 | Function: fix_value_generator_fields
+  Instruction: %83 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %saved_collation_connection, align 8, !dbg !1255479 | Location: /root/LLVM/mysql-8.0.36/sql/table.cc:2474:43 | Function: fix_value_generator_fields
+  Instruction: %call25 = call %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv(), !dbg !1255386 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:2543:11 | Function: agg_item_collations
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %38, %struct.CHARSET_INFO* %call25, i32 4, i32 1), !dbg !1255387 | Location: /root/LLVM/mysql-8.0.36/sql/item.cc:2543:7 | Function: agg_item_collations
+  Instruction: %call18 = invoke %struct.CHARSET_INFO* @_ZN4Item15default_charsetEv()
+          to label %invoke.cont17 unwind label %lpad, !dbg !1255350 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6663:27 | Function: get_var_with_binlog
+  Instruction: invoke void @_ZN11DTCollation3setEPK12CHARSET_INFO(%class.DTCollation* %collation, %struct.CHARSET_INFO* %call18)
+          to label %invoke.cont19 unwind label %lpad, !dbg !1255351 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:6663:23 | Function: get_var_with_binlog
+  Instruction: %134 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/item_create.cc:2107:46 | Function: create_func_cast
+  Instruction: store %struct.CHARSET_INFO* %134, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255391 | Location: /root/LLVM/mysql-8.0.36/sql/item_create.cc:2107:29 | Function: create_func_cast
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2926:48 | Function: Item_func_bit::resolve_type
+  Instruction: store %struct.CHARSET_INFO* %3, %struct.CHARSET_INFO** %save_cs, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2926:23 | Function: Item_func_bit::resolve_type
+  Instruction: store %struct.CHARSET_INFO* bitcast (%struct.CHARSET_INFO.298396* @my_charset_bin to %struct.CHARSET_INFO*), %struct.CHARSET_INFO** %collation_connection3, align 8, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2927:39 | Function: Item_func_bit::resolve_type
+  Instruction: %collation_connection3 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables2, i32 0, i32 92, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2927:18 | Function: Item_func_bit::resolve_type
+  Instruction: store %struct.CHARSET_INFO* %12, %struct.CHARSET_INFO** %collation_connection14, align 8, !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2934:39 | Function: Item_func_bit::resolve_type
+  Instruction: %collation_connection14 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables13, i32 0, i32 92, !dbg !1255365 | Location: /root/LLVM/mysql-8.0.36/sql/item_func.cc:2934:18 | Function: Item_func_bit::resolve_type
+  Instruction: %14 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3834:34 | Function: Item_func_quote::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO(%class.DTCollation* %collation11, %struct.CHARSET_INFO* %14), !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/item_strfunc.cc:3834:15 | Function: Item_func_quote::resolve_type
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1277:43 | Function: Item_func_monthname::resolve_type
+  Instruction: store %struct.CHARSET_INFO* %3, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255315 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1277:23 | Function: Item_func_monthname::resolve_type
+  Instruction: %4 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255321 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1278:45 | Function: Item_func_monthname::resolve_type
+  Instruction: %call2 = call i32 @_Z21my_charset_repertoirePK12CHARSET_INFO(%struct.CHARSET_INFO* %4), !dbg !1255322 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1278:23 | Function: Item_func_monthname::resolve_type
+  Instruction: store i32 %call2, i32* %repertoire, align 4, !dbg !1255320 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1278:10 | Function: Item_func_monthname::resolve_type
+  Instruction: %9 = load i32, i32* %repertoire, align 4, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1280:43 | Function: Item_func_monthname::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation, %struct.CHARSET_INFO* %8, i32 4, i32 %9), !dbg !1255331 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1280:13 | Function: Item_func_monthname::resolve_type
+  Instruction: %8 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1280:17 | Function: Item_func_monthname::resolve_type
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255367 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1478:43 | Function: Item_func_dayname::resolve_type
+  Instruction: store %struct.CHARSET_INFO* %3, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255364 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1478:23 | Function: Item_func_dayname::resolve_type
+  Instruction: %4 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255370 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1479:45 | Function: Item_func_dayname::resolve_type
+  Instruction: %call2 = call i32 @_Z21my_charset_repertoirePK12CHARSET_INFO(%struct.CHARSET_INFO* %4), !dbg !1255371 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1479:23 | Function: Item_func_dayname::resolve_type
+  Instruction: store i32 %call2, i32* %repertoire, align 4, !dbg !1255369 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1479:10 | Function: Item_func_dayname::resolve_type
+  Instruction: %9 = load i32, i32* %repertoire, align 4, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1481:43 | Function: Item_func_dayname::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation, %struct.CHARSET_INFO* %8, i32 4, i32 %9), !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1481:13 | Function: Item_func_dayname::resolve_type
+  Instruction: %8 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255378 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:1481:17 | Function: Item_func_dayname::resolve_type
+  Instruction: %10 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255303 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2192:43 | Function: Item_func_date_format::resolve_type
+  Instruction: store %struct.CHARSET_INFO* %10, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255300 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2192:23 | Function: Item_func_date_format::resolve_type
+  Instruction: %18 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2196:17 | Function: Item_func_date_format::resolve_type
+  Instruction: call void @_ZN11DTCollation3setEPK12CHARSET_INFO10Derivationj(%class.DTCollation* %collation10, %struct.CHARSET_INFO* %18, i32 %20, i32 %21), !dbg !1255323 | Location: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc:2196:13 | Function: Item_func_date_format::resolve_type
+  Instruction: %7 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255312 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:492:47 | Function: PTI_text_literal_text_string::itemize
+  Instruction: store %struct.CHARSET_INFO* %7, %struct.CHARSET_INFO** %cs_con, align 8, !dbg !1255309 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:492:23 | Function: PTI_text_literal_text_string::itemize
+  Instruction: %32 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs_con, align 8, !dbg !1255352 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:504:29 | Function: PTI_text_literal_text_string::itemize
+  Instruction: call void @_ZN11Item_string4initEPKcmPK12CHARSET_INFO10Derivationj(%class.Item_string* %29, i8* %30, i64 %31, %struct.CHARSET_INFO* %32, i32 4, i32 %33), !dbg !1255349 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:504:3 | Function: PTI_text_literal_text_string::itemize
+  Instruction: %24 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255333 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:517:49 | Function: PTI_text_literal_concat::itemize
+  Instruction: store %struct.CHARSET_INFO* %24, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:517:25 | Function: PTI_text_literal_concat::itemize
+  Instruction: %25 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255334 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:519:30 | Function: PTI_text_literal_concat::itemize
+  Instruction: %call14 = call i32 @_Z20my_string_repertoirePK12CHARSET_INFOPKcm(%struct.CHARSET_INFO* %25, i8* %27, i64 %29), !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_items.cc:519:9 | Function: PTI_text_literal_concat::itemize
+  Instruction: %23 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255362 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:3427:29 | Function: PT_json_table_column_with_path::contextualize
+  Instruction: store %struct.CHARSET_INFO* %23, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255363 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:3427:8 | Function: PT_json_table_column_with_path::contextualize
+  Instruction: %42 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255380 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:3441:18 | Function: PT_json_table_column_with_path::contextualize
+  Instruction: %call69 = call zeroext i1 bitcast (i1 (%class.Create_field*, %class.THD*, i8*, i32, i8*, i8*, i32, %class.Item*, %class.Item*, %class.Simple_cstring*, i8*, %class.List*, %struct.CHARSET_INFO*, i1, i32, %class.Value_generator*, %class.Value_generator*, i64, i32, i1)* @_ZN12Create_field4initEP3THDPKc16enum_field_typesS3_S3_jP4ItemS6_PK17MYSQL_LEX_CSTRINGS3_P4ListI6StringEPK12CHARSET_INFObjP15Value_generatorSI_St8optionalIjEN2dd6Column16enum_hidden_typeEb to i1 (%class.Create_field.90341*, %class.THD.90714*, i8*, i32, i8*, i8*, i32, %class.Item*, %class.Item*, %class.Simple_cstring*, i8*, %class.List*, %struct.CHARSET_INFO*, i1, i32, %class.Value_generator*, %class.Value_generator*, i64, i32, i1)*)(%class.Create_field.90341* %24, %class.THD.90714* %26, i8* %27, i32 %29, i8* %call49, i8* %call53, i32 %conv, %class.Item* null, %class.Item* null, %class.Simple_cstring* @_ZL10EMPTY_CSTR.34843, i8* null, %class.List* %call61, %struct.CHARSET_INFO* %42, i1 zeroext %cmp63, i32 %call67, %class.Value_generator* null, %class.Value_generator* null, i64 %49, i32 1, i1 zeroext false), !dbg !1255366 | Location: /root/LLVM/mysql-8.0.36/sql/parse_tree_nodes.cc:3430:13 | Function: PT_json_table_column_with_path::contextualize
+  Instruction: %36 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255335 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:208:37 | Function: Stored_routine_creation_ctx::load_from_db
+  Instruction: %call36 = call zeroext i1 @_Z14load_collationP8MEM_ROOTP5FieldPK12CHARSET_INFOPS5_(%struct.MEM_ROOT* %31, %class.Field* %34, %struct.CHARSET_INFO* %36, %struct.CHARSET_INFO** %connection_cl), !dbg !1255336 | Location: /root/LLVM/mysql-8.0.36/sql/sp.cc:206:7 | Function: Stored_routine_creation_ctx::load_from_db
+  Instruction: store %struct.CHARSET_INFO* %call347, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255594 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4629:53 | Function: Query_log_event::do_apply_event
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables349, i32 0, i32 92, !dbg !1255593 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4629:32 | Function: Query_log_event::do_apply_event
+  Instruction: %110 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %number96 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %110, i32 0, i32 0, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %111 = load i32, i32* %number96, align 8, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %cmp97 = icmp ult i32 %111, 65536, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: br i1 %cmp97, label %cond.true98, label %cond.false99, !dbg !1255379 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %133 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection130, align 8, !dbg !1255392 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:45 | Function: Query_log_event::Query_log_event
+  Instruction: %number131 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %133, i32 0, i32 0, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:67 | Function: Query_log_event::Query_log_event
+  Instruction: %134 = load i32, i32* %number131, align 8, !dbg !1255393 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:67 | Function: Query_log_event::Query_log_event
+  Instruction: %conv132 = trunc i32 %134 to i16, !dbg !1255390 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:26 | Function: Query_log_event::Query_log_event
+  Instruction: invoke void @_Z9int2storePct(i8* %add.ptr128, i16 zeroext %conv132)
+          to label %invoke.cont133 unwind label %lpad, !dbg !1255394 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:3 | Function: Query_log_event::Query_log_event
+  Instruction: %121 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %number104 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %121, i32 0, i32 0, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %122 = load i32, i32* %number104, align 8, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %cmp105 = icmp ult i32 %122, 65536, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: br i1 %cmp105, label %cond.true106, label %cond.false107, !dbg !1255406 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3868:3 | Function: Query_log_event::Query_log_event
+  Instruction: %144 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection138, align 8, !dbg !1255419 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:45 | Function: Query_log_event::Query_log_event
+  Instruction: %number139 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %144, i32 0, i32 0, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:67 | Function: Query_log_event::Query_log_event
+  Instruction: %145 = load i32, i32* %number139, align 8, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:67 | Function: Query_log_event::Query_log_event
+  Instruction: %conv140 = trunc i32 %145 to i16, !dbg !1255417 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:26 | Function: Query_log_event::Query_log_event
+  Instruction: invoke void @_Z9int2storePct(i8* %add.ptr136, i16 zeroext %conv140)
+          to label %invoke.cont141 unwind label %lpad32, !dbg !1255421 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3872:3 | Function: Query_log_event::Query_log_event
+  Instruction: store %struct.CHARSET_INFO* %2, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255306 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:4036:39 | Function: set_slave_thread_default_charset
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables1, i32 0, i32 92, !dbg !1255305 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:4036:18 | Function: set_slave_thread_default_charset
+  Instruction: %172 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255472 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc:337:22 | Function: dd::set_event_attributes
+  Instruction: %number133 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %172, i32 0, i32 0, !dbg !1255473 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc:337:44 | Function: dd::set_event_attributes
+  Instruction: %173 = load i32, i32* %number133, align 8, !dbg !1255473 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc:337:44 | Function: dd::set_event_attributes
+  Instruction: %conv134 = zext i32 %173 to i64, !dbg !1255470 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc:337:7 | Function: dd::set_event_attributes
+  Instruction: call void %175(%"class.dd::Tablespace"* %170, i64 %conv134), !dbg !1255474 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc:336:10 | Function: dd::set_event_attributes
+  Instruction: %86 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255401 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc:375:22 | Function: dd::fill_dd_routine_info
+  Instruction: %number78 = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %86, i32 0, i32 0, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc:375:44 | Function: dd::fill_dd_routine_info
+  Instruction: %87 = load i32, i32* %number78, align 8, !dbg !1255402 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc:375:44 | Function: dd::fill_dd_routine_info
+  Instruction: %conv79 = zext i32 %87 to i64, !dbg !1255399 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc:375:7 | Function: dd::fill_dd_routine_info
+  Instruction: invoke void %89(%"class.dd::Tablespace"* %84, i64 %conv79)
+          to label %invoke.cont82 unwind label %lpad, !dbg !1255403 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_routine.cc:374:12 | Function: dd::fill_dd_routine_info
+  Instruction: %61 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255412 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_trigger.cc:319:38 | Function: dd::load_triggers
+  Instruction: store %struct.CHARSET_INFO* %61, %struct.CHARSET_INFO** %connection_cs, align 8, !dbg !1255413 | Location: /root/LLVM/mysql-8.0.36/sql/dd/dd_trigger.cc:319:21 | Function: dd::load_triggers
+  Instruction: %7 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:154:38 | Function: dd::upgrade::Routine_event_context_guard::Routine_event_context_guard
+  Instruction: store %struct.CHARSET_INFO* %7, %struct.CHARSET_INFO** %m_connection_cl, align 8, !dbg !1255318 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:154:19 | Function: dd::upgrade::Routine_event_context_guard::Routine_event_context_guard
+  Instruction: %m_connection_cl = getelementptr inbounds %"class.dd::upgrade::Routine_event_context_guard", %"class.dd::upgrade::Routine_event_context_guard"* %this1, i32 0, i32 4, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:154:3 | Function: dd::upgrade::Routine_event_context_guard::Routine_event_context_guard
+  Instruction: %m_connection_cl = getelementptr inbounds %"class.dd::upgrade::Routine_event_context_guard", %"class.dd::upgrade::Routine_event_context_guard"* %this1, i32 0, i32 4, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:160:43 | Function: dd::upgrade::Routine_event_context_guard::~Routine_event_context_guard
+  Instruction: %4 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %m_connection_cl, align 8, !dbg !1255307 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:160:43 | Function: dd::upgrade::Routine_event_context_guard::~Routine_event_context_guard
+  Instruction: store %struct.CHARSET_INFO* %4, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:160:41 | Function: dd::upgrade::Routine_event_context_guard::~Routine_event_context_guard
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables5, i32 0, i32 92, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:160:20 | Function: dd::upgrade::Routine_event_context_guard::~Routine_event_context_guard
+  Instruction: store %struct.CHARSET_INFO* %call7, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255330 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:763:39 | Function: dd::upgrade::invalid_routine
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables8, i32 0, i32 92, !dbg !1255329 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc:763:18 | Function: dd::upgrade::invalid_routine
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255291 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:430:43 | Function: 
+  Instruction: store %struct.CHARSET_INFO* %3, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255288 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:430:23 | Function: 
+  Instruction: %52 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255420 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:476:41 | Function: 
+  Instruction: store %struct.CHARSET_INFO* %52, %struct.CHARSET_INFO** %collation_connection71, align 8, !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:476:39 | Function: 
+  Instruction: %collation_connection71 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables70, i32 0, i32 92, !dbg !1255423 | Location: /root/LLVM/mysql-8.0.36/sql/dd/info_schema/metadata.cc:476:18 | Function: 
+  Instruction: %56 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255360 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc:282:37 | Function: dd::upgrade_57::load_event_creation_context
+  Instruction: %call113 = call zeroext i1 @_Z14load_collationP8MEM_ROOTP5FieldPK12CHARSET_INFOPS5_(%struct.MEM_ROOT* %51, %class.Field* %54, %struct.CHARSET_INFO* %56, %struct.CHARSET_INFO** %connection_cl), !dbg !1255361 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc:281:7 | Function: dd::upgrade_57::load_event_creation_context
+  Instruction: store %struct.CHARSET_INFO* %call77, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255459 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/routine.cc:369:39 | Function: dd::upgrade_57::migrate_routine_to_dd
+  Instruction: %collation_connection = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables78, i32 0, i32 92, !dbg !1255458 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/routine.cc:369:18 | Function: dd::upgrade_57::migrate_routine_to_dd
+  Instruction: %44 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255497 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:383:43 | Function: dd::upgrade_57::Trigger_loader::load_triggers
+  Instruction: %m_coll_name = getelementptr inbounds %struct.CHARSET_INFO, %struct.CHARSET_INFO* %44, i32 0, i32 5, !dbg !1255498 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:383:65 | Function: dd::upgrade_57::Trigger_loader::load_triggers
+  Instruction: %45 = load i8*, i8** %m_coll_name, align 8, !dbg !1255498 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:383:65 | Function: dd::upgrade_57::Trigger_loader::load_triggers
+  Instruction: invoke void @_ZL14lex_string_setP16MYSQL_LEX_STRINGPc(%class.Simple_cstring* @_ZN2dd10upgrade_57L26default_connection_cl_nameE, i8* %45)
+          to label %invoke.cont96 unwind label %lpad13, !dbg !1255499 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:381:5 | Function: dd::upgrade_57::Trigger_loader::load_triggers
+  Instruction: %3 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %collation_connection, align 8, !dbg !1255299 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:856:43 | Function: dd::upgrade_57::fix_view_cols_and_deps
+  Instruction: store %struct.CHARSET_INFO* %3, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255296 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:856:23 | Function: dd::upgrade_57::fix_view_cols_and_deps
+  Instruction: %71 = load %struct.CHARSET_INFO*, %struct.CHARSET_INFO** %cs, align 8, !dbg !1255424 | Location: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/table.cc:924:41 | Function: dd::upgrade_57::fix_view_cols_and_deps
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: int2store
+  Controlled Function: int2store
+  Controlled Function: int2store
+  Controlled Function: Log_event::~Log_event
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: __assert_fail
+  Controlled Function: sqlcom_can_generate_row_events
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: THD::is_current_stmt_binlog_format_row
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: is_atomic_ddl
+  Controlled Function: THD::get_transaction
+  Controlled Function: stmt_has_updated_trans_table
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: is_sql_require_primary_key_needed
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: __assert_fail
+  Controlled Function: is_default_table_encryption_needed
+  Controlled Function: trans_has_updated_trans_table
+  Controlled Function: THD::get_transaction
+  Controlled Function: Query_tables_list::is_mixed_stmt_unsafe
+  Controlled Function: Transaction_ctx::is_active
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: trans_has_updated_trans_table
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: _db_pargs_
+  Controlled Function: xid_t::is_null
+  Controlled Function: _db_enabled_
+  Controlled Function: __assert_fail
+  Controlled Function: _db_doprnt_
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: xid_t::get_my_xid
+  Controlled Function: xid_t::is_null
+  Controlled Function: xid_t::get_my_xid
+  Controlled Function: __assert_fail
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: int2store
+  Controlled Function: int2store
+  Controlled Function: int2store
+  Controlled Function: Log_event::~Log_event
+  Controlled Function: binary_log::Query_event::~Query_event
+  Controlled Function: String::length
+  Controlled Function: String::ptr
+  Controlled Function: __assert_fail
+  Controlled Function: sqlcom_can_generate_row_events
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: THD::is_current_stmt_binlog_format_row
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: is_atomic_ddl
+  Controlled Function: THD::get_transaction
+  Controlled Function: stmt_has_updated_trans_table
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: is_sql_require_primary_key_needed
+  Controlled Function: THD::in_multi_stmt_transaction_mode
+  Controlled Function: __assert_fail
+  Controlled Function: is_default_table_encryption_needed
+  Controlled Function: trans_has_updated_trans_table
+  Controlled Function: THD::get_transaction
+  Controlled Function: Query_tables_list::is_mixed_stmt_unsafe
+  Controlled Function: Transaction_ctx::is_active
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: __assert_fail
+  Controlled Function: trans_has_updated_trans_table
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: _db_pargs_
+  Controlled Function: xid_t::is_null
+  Controlled Function: _db_enabled_
+  Controlled Function: __assert_fail
+  Controlled Function: _db_doprnt_
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+  Controlled Function: xid_t::get_my_xid
+  Controlled Function: xid_t::is_null
+  Controlled Function: xid_t::get_my_xid
+  Controlled Function: __assert_fail
+  Controlled Function: Transaction_ctx::xid_state
+  Controlled Function: XID_STATE::get_xid
+
+Implicit Control Flow:
+
+----------------------------------------

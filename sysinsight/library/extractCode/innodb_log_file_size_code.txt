@@ -1,0 +1,762 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_init
+static void innodb_redo_log_capacity_init() {
+  DBUG_TRACE;
+
+  ut_a(MB % UNIV_PAGE_SIZE == 0);
+  ut_a(srv_redo_log_capacity % MB == 0);
+  ut_a(srv_redo_log_capacity > 0);
+
+  srv_redo_log_capacity_used = srv_redo_log_capacity;
+
+  if (sysvar_source_svc == nullptr) {
+    return;
+  }
+
+  const bool file_size_set = innodb_log_file_size_is_set();
+
+  const bool n_files_set = innodb_log_n_files_is_set();
+
+  bool capacity_set = innodb_redo_log_capacity_is_set();
+
+  if (capacity_set) {
+    if (file_size_set) {
+      ib::warn(ER_IB_MSG_LOG_PARAMS_FILE_SIZE_UNUSED);
+    }
+    if (n_files_set) {
+      ib::warn(ER_IB_MSG_LOG_PARAMS_N_FILES_UNUSED);
+    }
+  } else {
+    if (file_size_set || n_files_set) {
+      srv_redo_log_capacity_used = srv_log_file_size * srv_log_n_files;
+      capacity_set = true;  // do not change it in dedicated_server mode
+      ib::warn(ER_IB_MSG_LOG_PARAMS_LEGACY_USAGE, srv_redo_log_capacity_used);
+    }
+  }
+
+  if (srv_dedicated_server) {
+    double auto_buf_pool_size_in_gb;
+    static const char *var_name_buf_pool_size = "innodb_buffer_pool_size";
+    enum enum_variable_source source;
+
+    auto_buf_pool_size_in_gb = static_cast<double>(srv_buf_pool_size / GB);
+
+    /* If user has set buffer pool size in .cnf, we will not use it as base
+    line for log_file_size auto tuning, instead, we will get the value of
+    possible tuned buffer pool size. */
+    if (!sysvar_source_svc->get(
+            var_name_buf_pool_size,
+            static_cast<unsigned int>(strlen(var_name_buf_pool_size)),
+            &source)) {
+      if (source != COMPILED) {
+        double server_mem = get_sys_mem();
+
+#ifdef UNIV_DEBUG_DEDICATED
+        server_mem = srv_debug_system_mem_size / GB;
+#endif /* UNIV_DEBUG_DEDICATED */
+
+        if (server_mem < 1.0) {
+          ;
+        } else if (server_mem <= 4.0) {
+          auto_buf_pool_size_in_gb = static_cast<double>(server_mem * 0.5);
+        } else
+          auto_buf_pool_size_in_gb = static_cast<double>(server_mem * 0.75);
+      }
+    }
+
+    if (!capacity_set) {
+      /* We update srv_redo_log_capacity (underlying sysvar variable),
+      because that is what innodb_dedicated_server is expected to do. */
+      if (auto_buf_pool_size_in_gb < 1.0) {
+        ut_ad(srv_redo_log_capacity == 100 * 1024 * 1024);
+      } else if (auto_buf_pool_size_in_gb < 8.0) {
+        srv_redo_log_capacity =
+            static_cast<ulong>(round(auto_buf_pool_size_in_gb)) * 512ULL * MB;
+      } else if (auto_buf_pool_size_in_gb <= 128.0) {
+        srv_redo_log_capacity =
+            static_cast<ulong>(round(auto_buf_pool_size_in_gb * 0.75)) * GB;
+      } else {
+        constexpr os_offset_t LOG_CAPACITY_FOR_BIG_DEDICATED_SERVER = 128 * GB;
+
+        static_assert(
+            LOG_CAPACITY_FOR_BIG_DEDICATED_SERVER <= LOG_CAPACITY_MAX,
+            "Redo log capacity, for the dedicated server, is too big.");
+
+        srv_redo_log_capacity = LOG_CAPACITY_FOR_BIG_DEDICATED_SERVER;
+      }
+      srv_redo_log_capacity_used = srv_redo_log_capacity;
+
+    } else {
+      ut_a(srv_redo_log_capacity_used % MB == 0);
+      ib::warn(ER_IB_MSG_LOG_PARAMS_DEDICATED_SERVER_IGNORED,
+               ulonglong{srv_redo_log_capacity_used / MB});
+    }
+  }
+
+  if (capacity_set && srv_read_only_mode) {
+    ib::warn(ER_IB_WRN_IGNORE_REDO_LOG_CAPACITY);
+  }
+
+  ut_a(LOG_CAPACITY_MIN <= srv_redo_log_capacity_used);
+  ut_a(srv_redo_log_capacity_used <= LOG_CAPACITY_MAX);
+  ut_a(srv_redo_log_capacity_used % MB == 0);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/handler/ha_innodb.cc
+Function: innodb_redo_log_capacity_update not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0log.cc
+Function: log_sys_init 
+Function: log_sys_init
+dberr_t log_sys_init(bool expect_no_files, lsn_t flushed_lsn,
+                     lsn_t &new_files_lsn) {
+  ut_a(log_is_data_lsn(flushed_lsn));
+  ut_a(log_sys == nullptr);
+
+  new_files_lsn = 0;
+
+  Log_files_context log_files_ctx{srv_log_group_home_dir,
+                                  Log_files_ruleset::PRE_8_0_30};
+
+  std::string root_path;
+  bool found_files_in_root{false};
+  dberr_t err =
+      log_sys_check_directory(log_files_ctx, root_path, found_files_in_root);
+
+  /* Report error if innodb_log_group_home_dir / datadir has not been found or
+  could not be listed. It's a proper decision for all redo format versions:
+    - older formats store there ib_logfile* files directly,
+    - newer formats store there #innodb_redo subdirectory. */
+  if (err != DB_SUCCESS) {
+    ib::error(ER_IB_MSG_LOG_INIT_DIR_LIST_FAILED, root_path.c_str());
+    return err;
+  }
+
+  Log_file_handle::s_on_before_read = [](Log_file_id, Log_file_type file_type,
+                                         os_offset_t, os_offset_t read_size) {
+    ut_a(file_type == Log_file_type::NORMAL);
+    ut_a(srv_is_being_started);
+#ifndef UNIV_HOTBACKUP
+    srv_stats.data_read.add(read_size);
+#endif /* !UNIV_HOTBACKUP */
+  };
+
+  Log_file_handle::s_on_before_write =
+      [](Log_file_id file_id, Log_file_type file_type, os_offset_t write_offset,
+         os_offset_t write_size) {
+        ut_a(!srv_read_only_mode);
+        if (!srv_is_being_started) {
+          ut_a(log_sys != nullptr);
+          auto file = log_sys->m_files.file(file_id);
+          if (file_type == Log_file_type::NORMAL) {
+            ut_a(file != log_sys->m_files.end());
+            ut_a((file_id == log_sys->m_current_file.m_id &&
+                  write_offset + write_size <= file->m_size_in_bytes) ||
+                 write_offset + write_size <= LOG_FILE_HDR_SIZE);
+          } else {
+            ut_a(file == log_sys->m_files.end());
+            ut_a(file_id == log_sys->m_current_file.next_id());
+          }
+        }
+#ifndef UNIV_HOTBACKUP
+        srv_stats.data_written.add(write_size);
+#endif
+      };
+
+#ifndef _WIN32
+  Log_file_handle::s_skip_fsyncs =
+      (srv_unix_file_flush_method == SRV_UNIX_O_DSYNC ||
+       srv_unix_file_flush_method == SRV_UNIX_NOSYNC);
+#endif /* !_WIN32 */
+
+  if (!found_files_in_root) {
+    log_files_ctx =
+        Log_files_context{srv_log_group_home_dir, Log_files_ruleset::CURRENT};
+
+    std::string subdir_path;
+    bool found_files_in_subdir{false};
+    err = log_sys_check_directory(log_files_ctx, subdir_path,
+                                  found_files_in_subdir);
+
+    switch (err) {
+      case DB_SUCCESS:
+        if (expect_no_files && found_files_in_subdir) {
+          ib::error(ER_IB_MSG_LOG_INIT_DIR_NOT_EMPTY_WONT_INITIALIZE,
+                    subdir_path.c_str());
+          return DB_ERROR;
+        }
+        if (!srv_read_only_mode) {
+          /* The problem is that a lot of people is not aware
+          that sending SHUTDOWN command does not end when the
+          server is no longer running, but earlier (obvious!).
+          Starting MySQL without waiting on previous instance
+          stopped, seems a bad idea and it often led to
+          quick failures here if we did not retry. */
+          for (size_t retries = 0;; ++retries) {
+            const auto remove_unused_files_ret =
+                log_remove_unused_files(log_files_ctx);
+            if (remove_unused_files_ret.first == DB_SUCCESS) {
+              break;
+            }
+            ut_a(retries < 300);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+          }
+        }
+        break;
+      case DB_NOT_FOUND:
+        /* The #innodb_redo directory has not been found. */
+        if (expect_no_files) {
+          /* InnoDB needs to create new directory #innodb_redo. */
+          if (!os_file_create_directory(subdir_path.c_str(), false)) {
+            return DB_ERROR;
+          }
+        } else {
+          /* InnoDB does not start if neither ib_logfile* files were found,
+          nor the #innodb_redo directory was found. User should be informed
+          about the problem and decide to either:
+            - use older version of MySQL (<= 8.0.29) and do a non-fast shutdown,
+            - or create the missing #innodb_redo */
+          ib::error(ER_IB_MSG_LOG_INIT_DIR_MISSING_SUBDIR, LOG_DIRECTORY_NAME,
+                    log_pre_8_0_30::FILE_BASE_NAME, root_path.c_str());
+          return DB_ERROR;
+        }
+        break;
+      default:
+        ib::error(ER_IB_MSG_LOG_INIT_DIR_LIST_FAILED, subdir_path.c_str());
+        return err;
+    }
+
+  } else {
+    /* Found existing files in old location for redo files (PRE_8_0_30).
+    If expected to see no files (and create new), return error emitting
+    the error message. */
+    if (expect_no_files) {
+      ib::error(ER_IB_MSG_LOG_INIT_DIR_NOT_EMPTY_WONT_INITIALIZE,
+                root_path.c_str());
+      return DB_ERROR;
+    }
+  }
+
+  log_sys_create();
+  ut_a(log_sys != nullptr);
+  log_t &log = *log_sys;
+
+  bool is_concurrency_margin_safe;
+  log_concurrency_margin(
+      Log_files_capacity::soft_logical_capacity_for_hard(
+          Log_files_capacity::hard_logical_capacity_for_physical(
+              srv_redo_log_capacity_used)),
+      is_concurrency_margin_safe);
+
+  if (!is_concurrency_margin_safe) {
+    os_offset_t min_redo_log_capacity = srv_redo_log_capacity_used;
+    os_offset_t max_redo_log_capacity = LOG_CAPACITY_MAX;
+    while (min_redo_log_capacity < max_redo_log_capacity) {
+      const os_offset_t capacity_to_check =
+          (min_redo_log_capacity + max_redo_log_capacity) / 2;
+
+      log_concurrency_margin(
+          Log_files_capacity::soft_logical_capacity_for_hard(
+              Log_files_capacity::hard_logical_capacity_for_physical(
+                  capacity_to_check)),
+          is_concurrency_margin_safe);
+
+      if (is_concurrency_margin_safe) {
+        max_redo_log_capacity = capacity_to_check;
+      } else {
+        min_redo_log_capacity = capacity_to_check + 1;
+      }
+    }
+
+    /* The innodb_redo_log_capacity is always rounded to 1M */
+    min_redo_log_capacity =
+        ut_uint64_align_up(min_redo_log_capacity, 1024UL * 1024);
+
+    ib::error(ER_IB_MSG_LOG_PARAMS_CONCURRENCY_MARGIN_UNSAFE,
+              ulonglong{srv_redo_log_capacity_used / 1024 / 1024},
+              ulong{srv_thread_concurrency},
+              ulonglong{min_redo_log_capacity / 1024 / 1024},
+              INNODB_PARAMETERS_MSG);
+
+    return DB_ERROR;
+  }
+
+  log.m_files_ctx = std::move(log_files_ctx);
+
+  if (expect_no_files) {
+    ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+    ut_a(!srv_read_only_mode);
+
+    ut_a(log.m_files_ctx.m_files_ruleset == Log_files_ruleset::CURRENT);
+
+    new_files_lsn = flushed_lsn;
+    return log_files_create(log, flushed_lsn);
+  }
+
+  if (srv_force_recovery >= SRV_FORCE_NO_LOG_REDO) {
+    return DB_SUCCESS;
+  }
+
+  Log_files_dict files{log.m_files_ctx};
+  Log_format format;
+  std::string creator_name;
+  Log_flags log_flags;
+  Log_uuid log_uuid;
+
+  ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+
+  auto res = log_files_find_and_analyze(
+      srv_read_only_mode, log.m_encryption_metadata, files, format,
+      creator_name, log_flags, log_uuid);
+  switch (res) {
+    case Log_files_find_result::FOUND_VALID_FILES:
+      log.m_format = format;
+      log.m_creator_name = creator_name;
+      log.m_log_flags = log_flags;
+      log.m_log_uuid = log_uuid;
+      log.m_files = std::move(files);
+      break;
+
+    case Log_files_find_result::FOUND_UNINITIALIZED_FILES:
+      ut_a(format == Log_format::CURRENT);
+      [[fallthrough]];
+    case Log_files_find_result::FOUND_NO_FILES:
+      ut_a(log.m_files_ctx.m_files_ruleset == Log_files_ruleset::CURRENT);
+      ut_a(files.empty());
+
+      if (srv_read_only_mode) {
+        ut_a(srv_force_recovery < SRV_FORCE_NO_LOG_REDO);
+        ib::error(ER_IB_MSG_LOG_FILES_CREATE_AND_READ_ONLY_MODE);
+        return DB_ERROR;
+      }
+
+      {
+        const auto ret = log_remove_files(log.m_files_ctx);
+        ut_a(ret.first == DB_SUCCESS);
+      }
+      new_files_lsn =
+          flushed_lsn % OS_FILE_LOG_BLOCK_SIZE == LOG_BLOCK_HDR_SIZE
+              ? flushed_lsn
+              : ut_uint64_align_up(flushed_lsn, OS_FILE_LOG_BLOCK_SIZE) +
+                    LOG_BLOCK_HDR_SIZE;
+      return log_files_create(log, new_files_lsn);
+
+    case Log_files_find_result::SYSTEM_ERROR:
+    case Log_files_find_result::FOUND_CORRUPTED_FILES:
+    case Log_files_find_result::FOUND_DISABLED_FILES:
+    case Log_files_find_result::FOUND_VALID_FILES_BUT_MISSING_NEWEST:
+      return DB_ERROR;
+  }
+
+  /* Check format of the redo log and emit information to the error log,
+  if the format was not the newest one. */
+  err = log_sys_check_format(log);
+  if (err != DB_SUCCESS) {
+    return err;
+  }
+
+  /* Check creator of log files and mark fields of recv_sys: is_cloned_db,
+  is_meb_db if needed. */
+  err = log_sys_handle_creator(log);
+  if (err != DB_SUCCESS) {
+    return err;
+  }
+
+  if (log_file_header_check_flag(log_flags, LOG_HEADER_FLAG_NO_LOGGING)) {
+    auto result = mtr_t::s_logging.disable(nullptr);
+    /* Currently never fails. */
+    ut_a(result == 0);
+    srv_redo_log = false;
+  }
+
+  return DB_SUCCESS;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc
+Function: Log_files_capacity::update_target
+void Log_files_capacity::update_target() {
+  const os_offset_t target_physical_capacity = srv_redo_log_capacity_used;
+  if (m_target_physical_capacity == target_physical_capacity) {
+    /* Target has not been changed since last call to update_target().
+    Return now to avoid emitting messages to the error log. */
+    return;
+  }
+  if (target_physical_capacity == 0) {
+    /* There is no target. No resize is needed. This allows to use
+    Log_files_capacity in external tools which don't need to resize
+    the redo log. */
+    return;
+  }
+
+  /* Target has been changed (the innodb_redo_log_capacity has been changed),
+  so first: cancel any resize operation which possibly is in progress. */
+  cancel_resize();
+
+  /* There is no resize in progress now. */
+  ut_a(m_resize_mode == Log_resize_mode::NONE);
+  ut_a(m_current_physical_capacity == m_target_physical_capacity);
+
+  /* Start a new resize if needed. Note, that user could have started
+  a downsize operation and then reset the innodb_redo_log_capacity to its
+  previous value (equal to m_current_physical_capacity). In such case,
+  it is enough that the cancel_resize() emitted message to the error log,
+  and all the required work has already been done by the cancel_resize(). */
+  if (target_physical_capacity != m_current_physical_capacity) {
+    m_target_physical_capacity = target_physical_capacity;
+
+    ib::info(ER_IB_MSG_LOG_FILES_RESIZE_REQUESTED,
+             ulonglong{m_current_physical_capacity} / (1024 * 1024UL),
+             ulonglong{m_target_physical_capacity} / (1024 * 1024UL));
+
+    if (m_target_physical_capacity < m_current_physical_capacity) {
+      m_resize_mode = Log_resize_mode::RESIZING_DOWN;
+    } else {
+      ut_a(m_resize_mode == Log_resize_mode::NONE);
+      m_current_physical_capacity = m_target_physical_capacity;
+      ib::info(ER_IB_MSG_LOG_FILES_RESIZE_FINISHED,
+               ulonglong{m_current_physical_capacity} / (1024 * 1024UL));
+    }
+  }
+
+  ut_a(m_target_physical_capacity <= m_current_physical_capacity);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc
+Function: Log_files_capacity::current_physical_capacity
+os_offset_t Log_files_capacity::current_physical_capacity() const {
+  return m_current_physical_capacity;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc
+Function: Log_files_capacity::next_file_earlier_margin
+lsn_t Log_files_capacity::next_file_earlier_margin(
+    os_offset_t physical_capacity) {
+  const auto file_size = next_file_size(physical_capacity);
+  return ut_uint64_align_up(
+      ceil(LOG_NEXT_FILE_EARLIER_MARGIN / 100.0 * file_size),
+      OS_FILE_LOG_BLOCK_SIZE);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_capacity.cc
+Function: Log_files_capacity::initialize
+void Log_files_capacity::initialize(const Log_files_dict &files,
+                                    lsn_t current_logical_size,
+                                    lsn_t current_checkpoint_age) {
+  m_resize_mode = Log_resize_mode::NONE;
+  m_current_physical_capacity = LOG_CAPACITY_MAX;
+
+  os_offset_t min_t = LOG_CAPACITY_MIN, max_t = LOG_CAPACITY_MAX;
+
+  /* One could compute the m_target_physical_capacity backward by reverting
+  computations made by criteria inside is_target_reached_for_resizing_down(),
+  but the binary-search-based approach seems safer and is fast enough. */
+  while (min_t / 1024 * 1024UL < max_t / 1024 * 1024UL) {
+    m_target_physical_capacity =
+        ut_uint64_align_down((min_t + max_t) / 2, 1024 * 1024UL);
+
+    if (is_target_reached_for_resizing_down(files, current_logical_size)) {
+      max_t = m_target_physical_capacity;
+    } else {
+      min_t = m_target_physical_capacity + 1024 * 1024UL;
+    }
+  }
+
+  /* In external tools, which don't need to resize the redo log,
+  there is srv_redo_log_capacity == srv_redo_log_capacity_used == 0
+  (no target for redo size). */
+  ut_a(LOG_CAPACITY_MIN <= srv_redo_log_capacity_used ||
+       (srv_redo_log_capacity == 0 && srv_redo_log_capacity_used == 0));
+
+  m_target_physical_capacity = m_current_physical_capacity =
+      std::max(max_t, os_offset_t{srv_redo_log_capacity_used});
+
+  ut_a(is_target_reached_for_resizing_down(files, current_logical_size));
+
+  update_exposed(
+      hard_logical_capacity_for_physical(m_current_physical_capacity));
+
+  update(files, current_logical_size, current_checkpoint_age);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h
+Function: Log_files_capacity::Log_files_capacity not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h
+Function: Log_files_capacity::Log_files_capacity not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h
+Function: Log_files_capacity::Log_files_capacity not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/log0files_capacity.h
+Function: Log_files_capacity::Log_files_capacity not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files::is_consumption_needed
+bool is_consumption_needed(const log_t &log) {
+  DBUG_EXECUTE_IF("log_force_consumption", return true;);
+  const auto current_size = physical_size(log, log.m_capacity.next_file_size());
+  const auto target_capacity = log.m_capacity.target_physical_capacity();
+  const auto current_capacity = log.m_capacity.current_physical_capacity();
+
+  ut_a(current_size <= current_capacity);
+
+  return /* case 1. */ log.m_requested_files_consumption ||
+         /* case 2. */ log.m_unused_files_count == 0 ||
+         /* case 3. */ target_capacity < current_capacity ||
+         /* case 4. */ current_size < current_capacity;
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files_next_file_size
+static os_offset_t log_files_next_file_size(const log_t &log) {
+  log_files_access_allowed_validate(log);
+
+  const os_offset_t file_size = log.m_capacity.next_file_size();
+
+  if (log.m_capacity.current_physical_capacity() <
+      log_files_size_of_existing_files(log.m_files) + file_size) {
+    /* Note: it might happen if the log_files_governor hasn't yet
+    consumed (or processed all consumed) log files. However, it's
+    safe to wait after releasing m_files_mutex in case this function
+    returned 0, because the log_files_governor will be able to consume
+    and process the required files, so there is no cycle. */
+#ifdef UNIV_DEBUG
+    const lsn_t oldest_lsn = log_files_oldest_needed_lsn(log);
+    const auto oldest_file = log.m_files.begin();
+    ut_a(oldest_file != log.m_files.end());
+    ut_a(!oldest_file->contains(oldest_lsn));
+#endif
+    return 0;
+  }
+  return file_size;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files::physical_capacity_allows_to_recycle
+static bool physical_capacity_allows_to_recycle(const log_t &log,
+                                                os_offset_t removed_file_size,
+                                                os_offset_t unused_file_size) {
+  const auto current_total_physical_size = physical_size(log, unused_file_size);
+
+  const auto planned_total_physical_size =
+      current_total_physical_size + unused_file_size - removed_file_size;
+
+  return planned_total_physical_size <=
+         log.m_capacity.current_physical_capacity();
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files::might_recycle_file
+static bool might_recycle_file(const log_t &log, os_offset_t removed_file_size,
+                               os_offset_t unused_file_size) {
+  return number_of_files_allows_to_recycle(log) &&
+         physical_capacity_allows_to_recycle(log, removed_file_size,
+                                             unused_file_size);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files_process_consumed_file
+static bool log_files_process_consumed_file(log_t &log, Log_file_id file_id) {
+  log_files_write_allowed_validate(log);
+  const auto file = log.m_files.file(file_id);
+  ut_a(file != log.m_files.end());
+  ut_a(file->m_consumed);
+  log_files_validate_current_file(log);
+
+  const os_offset_t unused_file_size = log.m_capacity.next_file_size();
+
+  if (log_files::might_recycle_file(log, file->m_size_in_bytes,
+                                    unused_file_size)) {
+    return log_files_recycle_file(log, file_id, unused_file_size);
+  } else {
+    return log_files_remove_consumed_file(log, file_id);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files::physical_capacity_allows_to_create
+static bool physical_capacity_allows_to_create(const log_t &log,
+                                               os_offset_t unused_file_size) {
+  return physical_capacity_allows_to_recycle(log, 0, unused_file_size);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files::might_create_unused_file
+static bool might_create_unused_file(const log_t &log, 
+                                     os_offset_t unused_file_size) {
+  return number_of_files_allows_to_create(log) &&
+         physical_capacity_allows_to_create(log, unused_file_size);
+}
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/log/log0files_governor.cc
+Function: log_files_create_next_as_unused_if_needed
+static void log_files_create_next_as_unused_if_needed(log_t &log) {
+  log_files_access_allowed_validate(log);
+  log_files_validate_current_file(log);
+
+  const os_offset_t unused_file_size = log.m_capacity.next_file_size();
+
+  if (!log_files::might_create_unused_file(log, unused_file_size)) {
+    return;
+  }
+
+  const Log_file_id file_id = log_files_next_unused_id(log);
+
+  const dberr_t err =
+      log_create_unused_file(log.m_files_ctx, file_id, unused_file_size);
+
+  if (err == DB_SUCCESS) {
+    log.m_unused_files_count++;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/clone0snapshot.h
+Function: Clone_Snapshot::init_disk_estimate not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/clone0snapshot.h
+Function: Clone_Snapshot::init_disk_estimate not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/include/clone0snapshot.h
+Function: Clone_Snapshot::init_disk_estimate not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc
+Function: Clone_Snapshot::set_state_info
+void Clone_Snapshot::set_state_info(Clone_Desc_State *state_desc) {
+  ut_ad(mutex_own(&m_snapshot_mutex));
+
+  m_snapshot_state = state_desc->m_state;
+  m_num_current_chunks = state_desc->m_num_chunks;
+
+  if (m_snapshot_state == CLONE_SNAPSHOT_FILE_COPY) {
+    m_num_data_chunks = state_desc->m_num_chunks;
+    m_data_bytes_disk = state_desc->m_estimate_disk;
+    m_data_file_vector.resize(state_desc->m_num_files, nullptr);
+
+    m_monitor.init_state(srv_stage_clone_file_copy.m_key, m_enable_pfs);
+    m_monitor.add_estimate(state_desc->m_estimate);
+    m_monitor.change_phase();
+
+  } else if (m_snapshot_state == CLONE_SNAPSHOT_PAGE_COPY) {
+    m_num_pages = state_desc->m_num_files;
+
+    m_monitor.init_state(srv_stage_clone_page_copy.m_key, m_enable_pfs);
+    m_monitor.add_estimate(state_desc->m_estimate);
+    m_monitor.change_phase();
+
+  } else if (m_snapshot_state == CLONE_SNAPSHOT_REDO_COPY) {
+    m_num_redo_chunks = state_desc->m_num_chunks;
+    m_redo_file_vector.resize(state_desc->m_num_files, nullptr);
+
+    m_monitor.init_state(srv_stage_clone_redo_copy.m_key, m_enable_pfs);
+    m_monitor.add_estimate(state_desc->m_estimate);
+    m_monitor.change_phase();
+
+  } else if (m_snapshot_state == CLONE_SNAPSHOT_DONE) {
+    ut_ad(m_num_current_chunks == 0);
+    m_monitor.init_state(PSI_NOT_INSTRUMENTED, m_enable_pfs);
+
+  } else {
+    ut_d(ut_error);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/clone/clone0snapshot.cc
+Function: Clone_Snapshot::get_state_info
+void Clone_Snapshot::get_state_info(bool do_estimate,
+                                    Clone_Desc_State *state_desc) {
+  state_desc->m_state = m_snapshot_state;
+  state_desc->m_num_chunks = m_num_current_chunks;
+
+  state_desc->m_is_start = true;
+  state_desc->m_is_ack = false;
+
+  if (do_estimate) {
+    state_desc->m_estimate = m_monitor.get_estimate();
+    state_desc->m_estimate_disk = m_data_bytes_disk;
+  } else {
+    state_desc->m_estimate = 0;
+    state_desc->m_estimate_disk = 0;
+  }
+
+  switch (m_snapshot_state) {
+    case CLONE_SNAPSHOT_FILE_COPY:
+      state_desc->m_num_files = num_data_files();
+      break;
+
+    case CLONE_SNAPSHOT_PAGE_COPY:
+      state_desc->m_num_files = m_num_pages;
+      break;
+
+    case CLONE_SNAPSHOT_REDO_COPY:
+      state_desc->m_num_files = num_redo_files();
+      break;
+
+    case CLONE_SNAPSHOT_DONE:
+    case CLONE_SNAPSHOT_INIT:
+      state_desc->m_num_files = 0;
+      break;
+
+    default:
+      state_desc->m_num_files = 0;
+      ut_d(ut_error);
+  }
+}
+

@@ -1,0 +1,610 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: THD::decide_logging_format
+int THD::decide_logging_format(Table_ref *tables) {
+  DBUG_TRACE;
+  DBUG_PRINT("info", ("query: %s", query().str));
+  DBUG_PRINT("info", ("variables.binlog_format: %lu", variables.binlog_format));
+  DBUG_PRINT("info", ("lex->get_stmt_unsafe_flags(): 0x%x",
+                      lex->get_stmt_unsafe_flags()));
+
+#if defined(ENABLED_DEBUG_SYNC)
+  if (!is_attachable_ro_transaction_active())
+    DEBUG_SYNC(this, "begin_decide_logging_format");
+#endif
+
+  reset_binlog_local_stmt_filter();
+
+  /*
+    We should not decide logging format if the binlog is closed or
+    binlogging is off, or if the statement is filtered out from the
+    binlog by filtering rules.
+  */
+  if (mysql_bin_log.is_open() && (variables.option_bits & OPTION_BIN_LOG) &&
+      !(variables.binlog_format == BINLOG_FORMAT_STMT &&
+        !binlog_filter->db_ok(m_db.str))) {
+    /*
+      Compute one bit field with the union of all the engine
+      capabilities, and one with the intersection of all the engine
+      capabilities.
+    */
+    handler::Table_flags flags_write_some_set = 0;
+    handler::Table_flags flags_access_some_set = 0;
+    handler::Table_flags flags_write_all_set =
+        HA_BINLOG_ROW_CAPABLE | HA_BINLOG_STMT_CAPABLE;
+
+    /*
+       If different types of engines are about to be updated.
+       For example: Innodb and Falcon; Innodb and MyIsam.
+    */
+    bool multi_write_engine = false;
+    /*
+       If different types of engines are about to be accessed
+       and any of them is about to be updated. For example:
+       Innodb and Falcon; Innodb and MyIsam.
+    */
+    bool multi_access_engine = false;
+    /*
+      Track if statement creates or drops a temporary table
+      and log in ROW if it does.
+*/
+    bool is_create_drop_temp_table = false;
+    /*
+       Identifies if a table is changed.
+    */
+    bool is_write = false;
+    /*
+       A pointer to a previous table that was changed.
+    */
+    TABLE *prev_write_table = nullptr;
+    /*
+       A pointer to a previous table that was accessed.
+    */
+    TABLE *prev_access_table = nullptr;
+    /*
+      True if at least one table is transactional.
+    */
+    bool write_to_some_transactional_table = false;
+    /*
+      True if at least one table is non-transactional.
+    */
+    bool write_to_some_non_transactional_table = false;
+    /*
+       True if all non-transactional tables that has been updated
+       are temporary.
+    */
+    bool write_all_non_transactional_are_tmp_tables = true;
+    /**
+      The number of tables used in the current statement,
+      that should be replicated.
+    */
+    uint replicated_tables_count = 0;
+    /**
+      The number of tables written to in the current statement,
+      that should not be replicated.
+      A table should not be replicated when it is considered
+      'local' to a MySQL instance.
+      Currently, these tables are:
+      - mysql.slow_log
+      - mysql.general_log
+      - mysql.slave_relay_log_info
+      - mysql.slave_master_info
+      - mysql.slave_worker_info
+      - performance_schema.*
+      - TODO: information_schema.*
+      In practice, from this list, only performance_schema.* tables
+      are written to by user queries.
+    */
+    uint non_replicated_tables_count = 0;
+    /**
+      Indicate whether we already reported a warning
+      on modifying gtid_executed table.
+    */
+    int warned_gtid_executed_table = 0;
+#ifndef NDEBUG
+    {
+      DBUG_PRINT("debug", ("prelocked_mode: %s",
+                           get_locked_tables_mode_name(locked_tables_mode)));
+    }
+#endif
+
+    if (variables.binlog_format != BINLOG_FORMAT_ROW && tables) {
+      /*
+        DML statements that modify a table with an auto_increment column based
+        on rows selected from a table are unsafe as the order in which the rows
+        are fetched from the select tables cannot be determined and may differ
+        on master and slave.
+       */
+      if (has_write_table_with_auto_increment_and_query_block(tables))
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_WRITE_AUTOINC_SELECT);
+
+      if (has_write_table_auto_increment_not_first_in_pk(tables))
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_AUTOINC_NOT_FIRST);
+
+      /*
+        A query that modifies autoinc column in sub-statement can make the
+        master and slave inconsistent.
+        We can solve these problems in mixed mode by switching to binlogging
+        if at least one updated table is used by sub-statement
+       */
+      if (lex->requires_prelocking() &&
+          has_write_table_with_auto_increment(lex->first_not_own_table()))
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_AUTOINC_COLUMNS);
+
+      /*
+        A query that modifies a table with a non-deterministic column default
+        expression in a substatement, can make the master and the slave
+        inconsistent. Switch to row logging in mixed mode, and raise a warning
+        in statement mode.
+      */
+      if (lex->requires_prelocking() &&
+          has_write_table_with_nondeterministic_default(
+              lex->first_not_own_table()))
+        lex->set_stmt_unsafe(
+            LEX::BINLOG_STMT_UNSAFE_DEFAULT_EXPRESSION_IN_SUBSTATEMENT);
+
+      /*
+        A DML or DDL statement is unsafe if it reads a ACL table while
+        modifying the table, because SE skips acquiring row locks.
+        Therefore rows seen by DML or DDL may not have same effect on slave.
+
+        We skip checking the same under lock tables mode, because we do
+        not skip row locks on ACL table in this mode.
+      */
+      if (has_acl_table_read(this, tables)) {
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_ACL_TABLE_READ_IN_DML_DDL);
+      }
+    }
+
+    /*
+      Get the capabilities vector for all involved storage engines and
+      mask out the flags for the binary log.
+    */
+    for (Table_ref *table = tables; table; table = table->next_global) {
+      if (table->is_placeholder()) {
+        /*
+          Detect if this is a CREATE TEMPORARY or DROP of a
+          temporary table. This will be used later in determining whether to
+          log in ROW or STMT if MIXED replication is being used.
+        */
+        if (!is_create_drop_temp_table && !table->table &&
+            ((lex->sql_command == SQLCOM_CREATE_TABLE &&
+              (lex->create_info->options & HA_LEX_CREATE_TMP_TABLE)) ||
+             ((lex->sql_command == SQLCOM_DROP_TABLE ||
+               lex->sql_command == SQLCOM_TRUNCATE) &&
+              find_temporary_table(this, table)))) {
+          is_create_drop_temp_table = true;
+        }
+        continue;
+      }
+      handler::Table_flags const flags = table->table->file->ha_table_flags();
+
+      DBUG_PRINT("info", ("table: %s; ha_table_flags: 0x%llx",
+                          table->table_name, flags));
+
+      if (table->table->no_replicate) {
+        if (!warned_gtid_executed_table) {
+          warned_gtid_executed_table =
+              gtid_state->warn_or_err_on_modify_gtid_table(this, table);
+          /*
+            Do not allow users to modify the gtid_executed table
+            explicitly by a XA transaction.
+          */
+          if (warned_gtid_executed_table == 2) return -1;
+        }
+        /*
+          The statement uses a table that is not replicated.
+          The following properties about the table:
+          - persistent / transient
+          - transactional / non transactional
+          - temporary / permanent
+          - read or write
+          - multiple engines involved because of this table
+          are not relevant, as this table is completely ignored.
+          Because the statement uses a non replicated table,
+          using STATEMENT format in the binlog is impossible.
+          Either this statement will be discarded entirely,
+          or it will be logged (possibly partially) in ROW format.
+        */
+        lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_SYSTEM_TABLE);
+
+        if (table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+          non_replicated_tables_count++;
+          continue;
+        }
+      }
+
+      replicated_tables_count++;
+
+      bool trans = table->table->file->has_transactions();
+
+      if (table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+        write_to_some_transactional_table =
+            write_to_some_transactional_table || trans;
+
+        write_to_some_non_transactional_table =
+            write_to_some_non_transactional_table || !trans;
+
+        if (prev_write_table &&
+            prev_write_table->file->ht != table->table->file->ht)
+          multi_write_engine = true;
+
+        if (table->table->s->tmp_table)
+          lex->set_stmt_accessed_table(
+              trans ? LEX::STMT_WRITES_TEMP_TRANS_TABLE
+                    : LEX::STMT_WRITES_TEMP_NON_TRANS_TABLE);
+        else
+          lex->set_stmt_accessed_table(trans
+                                           ? LEX::STMT_WRITES_TRANS_TABLE
+                                           : LEX::STMT_WRITES_NON_TRANS_TABLE);
+
+        /*
+         Non-transactional updates are allowed when row binlog format is
+         used and all non-transactional tables are temporary.
+         Binlog format is checked on THD::is_dml_gtid_compatible() method.
+        */
+        if (!trans)
+          write_all_non_transactional_are_tmp_tables =
+              write_all_non_transactional_are_tmp_tables &&
+              table->table->s->tmp_table;
+
+        flags_write_all_set &= flags;
+        flags_write_some_set |= flags;
+        is_write = true;
+
+        prev_write_table = table->table;
+
+        /*
+          It should be marked unsafe if a table which uses a fulltext parser
+          plugin is modified. See also bug#48183.
+        */
+        if (!lex->is_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_FULLTEXT_PLUGIN)) {
+          if (fulltext_unsafe_set(table->table->s))
+            lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_FULLTEXT_PLUGIN);
+        }
+        /*
+          INSERT...ON DUPLICATE KEY UPDATE on a table with more than one unique
+          keys can be unsafe. Check for it if the flag is already not marked for
+          the given statement.
+        */
+        if (!lex->is_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_INSERT_TWO_KEYS) &&
+            lex->sql_command == SQLCOM_INSERT &&
+            lex->duplicates == DUP_UPDATE) {
+          uint keys = table->table->s->keys, i = 0, unique_keys = 0;
+          for (KEY *keyinfo = table->table->s->key_info;
+               i < keys && unique_keys <= 1; i++, keyinfo++) {
+            if (keyinfo->flags & HA_NOSAME) unique_keys++;
+          }
+          if (unique_keys > 1)
+            lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_INSERT_TWO_KEYS);
+        }
+      }
+      if (lex->get_using_match()) {
+        if (fulltext_unsafe_set(table->table->s))
+          lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_FULLTEXT_PLUGIN);
+      }
+
+      flags_access_some_set |= flags;
+
+      if (lex->sql_command != SQLCOM_CREATE_TABLE ||
+          (lex->sql_command == SQLCOM_CREATE_TABLE &&
+           ((lex->create_info->options & HA_LEX_CREATE_TMP_TABLE) ||
+            (table->lock_descriptor().type < TL_WRITE_ALLOW_WRITE)))) {
+        if (table->table->s->tmp_table)
+          lex->set_stmt_accessed_table(
+              trans ? LEX::STMT_READS_TEMP_TRANS_TABLE
+                    : LEX::STMT_READS_TEMP_NON_TRANS_TABLE);
+        else
+          lex->set_stmt_accessed_table(trans ? LEX::STMT_READS_TRANS_TABLE
+                                             : LEX::STMT_READS_NON_TRANS_TABLE);
+      }
+
+      if (prev_access_table &&
+          prev_access_table->file->ht != table->table->file->ht)
+        multi_access_engine = true;
+
+      prev_access_table = table->table;
+    }
+    assert(!is_write || write_to_some_transactional_table ||
+           write_to_some_non_transactional_table);
+    /*
+      write_all_non_transactional_are_tmp_tables may be true if any
+      non-transactional table was not updated, so we fix its value here.
+    */
+    write_all_non_transactional_are_tmp_tables =
+        write_all_non_transactional_are_tmp_tables &&
+        write_to_some_non_transactional_table;
+
+    DBUG_PRINT("info", ("flags_write_all_set: 0x%llx", flags_write_all_set));
+    DBUG_PRINT("info", ("flags_write_some_set: 0x%llx", flags_write_some_set));
+    DBUG_PRINT("info",
+               ("flags_access_some_set: 0x%llx", flags_access_some_set));
+    DBUG_PRINT("info", ("multi_write_engine: %d", multi_write_engine));
+    DBUG_PRINT("info", ("multi_access_engine: %d", multi_access_engine));
+
+    int error = 0;
+    int unsafe_flags;
+
+    /*
+      With transactional data dictionary, CREATE TABLE runs as one statement
+      in a multi-statement transaction internally. Revert this for the
+      purposes of determining mixed statement safety.
+    */
+    const bool multi_stmt_trans = lex->sql_command != SQLCOM_CREATE_TABLE &&
+                                  in_multi_stmt_transaction_mode();
+    bool trans_table = trans_has_updated_trans_table(this);
+    bool binlog_direct = variables.binlog_direct_non_trans_update;
+
+    if (lex->is_mixed_stmt_unsafe(multi_stmt_trans, binlog_direct, trans_table,
+                                  tx_isolation))
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_MIXED_STATEMENT);
+    else if (multi_stmt_trans && trans_table && !binlog_direct &&
+             lex->stmt_accessed_table(LEX::STMT_WRITES_NON_TRANS_TABLE))
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_NONTRANS_AFTER_TRANS);
+
+    /*
+      If more than one engine is involved in the statement and at
+      least one is doing it's own logging (is *self-logging*), the
+      statement cannot be logged atomically, so we generate an error
+      rather than allowing the binlog to become corrupt.
+    */
+    if (multi_write_engine && (flags_write_some_set & HA_HAS_OWN_BINLOGGING))
+      my_error((error = ER_BINLOG_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE),
+               MYF(0));
+    else if (multi_access_engine &&
+             flags_access_some_set & HA_HAS_OWN_BINLOGGING)
+      lex->set_stmt_unsafe(
+          LEX::BINLOG_STMT_UNSAFE_MULTIPLE_ENGINES_AND_SELF_LOGGING_ENGINE);
+
+    /* XA is unsafe for statements */
+    if (is_write &&
+        !get_transaction()->xid_state()->has_state(XID_STATE::XA_NOTR))
+      lex->set_stmt_unsafe(LEX::BINLOG_STMT_UNSAFE_XA);
+
+    DBUG_EXECUTE_IF("make_stmt_only_engines",
+                    { flags_write_all_set = HA_BINLOG_STMT_CAPABLE; };);
+
+    /* both statement-only and row-only engines involved */
+    if ((flags_write_all_set &
+         (HA_BINLOG_STMT_CAPABLE | HA_BINLOG_ROW_CAPABLE)) == 0) {
+      /*
+        1. Error: Binary logging impossible since both row-incapable
+           engines and statement-incapable engines are involved
+      */
+      my_error((error = ER_BINLOG_ROW_ENGINE_AND_STMT_ENGINE), MYF(0));
+    }
+    /* statement-only engines involved */
+    else if ((flags_write_all_set & HA_BINLOG_ROW_CAPABLE) == 0) {
+      if (lex->is_stmt_row_injection()) {
+        /*
+          4. Error: Cannot execute row injection since table uses
+             storage engine limited to statement-logging
+        */
+        my_error((error = ER_BINLOG_ROW_INJECTION_AND_STMT_ENGINE), MYF(0));
+      } else if (variables.binlog_format == BINLOG_FORMAT_ROW &&
+                 sqlcom_can_generate_row_events(this->lex->sql_command)) {
+        /*
+          2. Error: Cannot modify table that uses a storage engine
+             limited to statement-logging when BINLOG_FORMAT = ROW
+        */
+        my_error((error = ER_BINLOG_ROW_MODE_AND_STMT_ENGINE), MYF(0));
+      } else if (variables.binlog_format == BINLOG_FORMAT_MIXED &&
+                 ((unsafe_flags = lex->get_stmt_unsafe_flags()) != 0)) {
+        /*
+          3. Error: Cannot execute statement: binlogging of unsafe
+             statement is impossible when storage engine is limited to
+             statement-logging and BINLOG_FORMAT = MIXED.
+        */
+        for (int unsafe_type = 0; unsafe_type < LEX::BINLOG_STMT_UNSAFE_COUNT;
+             unsafe_type++)
+          if (unsafe_flags & (1 << unsafe_type))
+            my_error(
+                (error = ER_BINLOG_UNSAFE_AND_STMT_ENGINE), MYF(0),
+                ER_THD_NONCONST(current_thd,
+                                LEX::binlog_stmt_unsafe_errcode[unsafe_type]));
+      } else if (is_write &&
+                 ((unsafe_flags = lex->get_stmt_unsafe_flags()) != 0)) {
+        /*
+          7. Warning: Unsafe statement logged as statement due to
+             binlog_format = STATEMENT
+        */
+        binlog_unsafe_warning_flags |= unsafe_flags;
+        DBUG_PRINT("info", ("Scheduling warning to be issued by "
+                            "binlog_query: '%s'",
+                            ER_THD(current_thd, ER_BINLOG_UNSAFE_STATEMENT)));
+        DBUG_PRINT("info", ("binlog_unsafe_warning_flags: 0x%x",
+                            binlog_unsafe_warning_flags));
+      }
+      /* log in statement format! */
+    }
+    /* no statement-only engines */
+    else {
+      /* binlog_format = STATEMENT */
+      if (variables.binlog_format == BINLOG_FORMAT_STMT) {
+        if (lex->is_stmt_row_injection()) {
+          /*
+            6. Error: Cannot execute row injection since
+               BINLOG_FORMAT = STATEMENT
+          */
+          my_error((error = ER_BINLOG_ROW_INJECTION_AND_STMT_MODE), MYF(0));
+        } else if ((flags_write_all_set & HA_BINLOG_STMT_CAPABLE) == 0 &&
+                   sqlcom_can_generate_row_events(this->lex->sql_command)) {
+          /*
+            5. Error: Cannot modify table that uses a storage engine
+               limited to row-logging when binlog_format = STATEMENT
+          */
+          my_error((error = ER_BINLOG_STMT_MODE_AND_ROW_ENGINE), MYF(0), "");
+        } else if (is_write &&
+                   (unsafe_flags = lex->get_stmt_unsafe_flags()) != 0) {
+          /*
+            7. Warning: Unsafe statement logged as statement due to
+               binlog_format = STATEMENT
+          */
+          binlog_unsafe_warning_flags |= unsafe_flags;
+          DBUG_PRINT("info", ("Scheduling warning to be issued by "
+                              "binlog_query: '%s'",
+                              ER_THD(current_thd, ER_BINLOG_UNSAFE_STATEMENT)));
+          DBUG_PRINT("info", ("binlog_unsafe_warning_flags: 0x%x",
+                              binlog_unsafe_warning_flags));
+        }
+        /* log in statement format! */
+      }
+      /* No statement-only engines and binlog_format != STATEMENT.
+         I.e., nothing prevents us from row logging if needed. */
+      else {
+        if (lex->is_stmt_unsafe() || lex->is_stmt_row_injection() ||
+            lex->is_stmt_unsafe_with_mixed_mode() ||
+            (flags_write_all_set & HA_BINLOG_STMT_CAPABLE) == 0 ||
+            lex->stmt_accessed_table(LEX::STMT_READS_TEMP_TRANS_TABLE) ||
+            lex->stmt_accessed_table(LEX::STMT_READS_TEMP_NON_TRANS_TABLE) ||
+            is_create_drop_temp_table) {
+#ifndef NDEBUG
+          int flags = lex->get_stmt_unsafe_flags();
+          DBUG_PRINT("info", ("setting row format for unsafe statement"));
+          for (int i = 0; i < Query_tables_list::BINLOG_STMT_UNSAFE_COUNT;
+               i++) {
+            if (flags & (1 << i))
+              DBUG_PRINT(
+                  "info",
+                  ("unsafe reason: %s",
+                   ER_THD_NONCONST(
+                       current_thd,
+                       Query_tables_list::binlog_stmt_unsafe_errcode[i])));
+          }
+          DBUG_PRINT("info",
+                     ("is_row_injection=%d", lex->is_stmt_row_injection()));
+          DBUG_PRINT("info", ("stmt_capable=%llu",
+                              (flags_write_all_set & HA_BINLOG_STMT_CAPABLE)));
+          DBUG_PRINT("info", ("lex->is_stmt_unsafe_with_mixed_mode = %d",
+                              lex->is_stmt_unsafe_with_mixed_mode()));
+#endif
+          /* log in row format! */
+          set_current_stmt_binlog_format_row_if_mixed();
+        }
+      }
+    }
+
+    if (non_replicated_tables_count > 0) {
+      if ((replicated_tables_count == 0) || !is_write) {
+        DBUG_PRINT("info",
+                   ("decision: no logging, no replicated table affected"));
+        set_binlog_local_stmt_filter();
+      } else {
+        if (!is_current_stmt_binlog_format_row()) {
+          my_error((error = ER_BINLOG_STMT_MODE_AND_NO_REPL_TABLES), MYF(0));
+        } else {
+          clear_binlog_local_stmt_filter();
+        }
+      }
+    } else {
+      clear_binlog_local_stmt_filter();
+    }
+
+    if (!error &&
+        !is_dml_gtid_compatible(write_to_some_transactional_table,
+                                write_to_some_non_transactional_table,
+                                write_all_non_transactional_are_tmp_tables))
+      error = 1;
+
+    if (error) {
+      DBUG_PRINT("info", ("decision: no logging since an error was generated"));
+      return -1;
+    }
+
+    if (is_write &&
+        lex->sql_command != SQLCOM_END /* rows-event applying by slave */) {
+      /*
+        Master side of DML in the STMT format events parallelization.
+        All involving table db:s are stored in a abc-ordered name list.
+        In case the number of databases exceeds MAX_DBS_IN_EVENT_MTS maximum
+        the list gathering breaks since it won't be sent to the slave.
+      */
+      for (Table_ref *table = tables; table; table = table->next_global) {
+        if (table->is_placeholder()) continue;
+
+        assert(table->table);
+
+        if (table->table->s->is_referenced_by_foreign_key()) {
+          /*
+             FK-referenced dbs can't be gathered currently. The following
+             event will be marked for sequential execution on slave.
+          */
+          binlog_accessed_db_names = nullptr;
+          add_to_binlog_accessed_dbs("");
+          break;
+        }
+        if (!is_current_stmt_binlog_format_row())
+          add_to_binlog_accessed_dbs(table->db);
+      }
+    }
+    DBUG_PRINT("info",
+               ("decision: logging in %s format",
+                is_current_stmt_binlog_format_row() ? "ROW" : "STATEMENT"));
+
+    if (variables.binlog_format == BINLOG_FORMAT_ROW &&
+        (lex->sql_command == SQLCOM_UPDATE ||
+         lex->sql_command == SQLCOM_UPDATE_MULTI ||
+         lex->sql_command == SQLCOM_DELETE ||
+         lex->sql_command == SQLCOM_DELETE_MULTI)) {
+      String table_names;
+      /*
+        Generate a warning for UPDATE/DELETE statements that modify a
+        BLACKHOLE table, as row events are not logged in row format.
+      */
+      for (Table_ref *table = tables; table; table = table->next_global) {
+        if (table->is_placeholder()) continue;
+        if (table->table->file->ht->db_type == DB_TYPE_BLACKHOLE_DB &&
+            table->lock_descriptor().type >= TL_WRITE_ALLOW_WRITE) {
+          table_names.append(table->table_name);
+          table_names.append(",");
+        }
+      }
+      if (!table_names.is_empty()) {
+        bool is_update = (lex->sql_command == SQLCOM_UPDATE ||
+                          lex->sql_command == SQLCOM_UPDATE_MULTI);
+        /*
+          Replace the last ',' with '.' for table_names
+        */
+        table_names.replace(table_names.length() - 1, 1, ".", 1);
+        push_warning_printf(
+            this, Sql_condition::SL_WARNING, WARN_ON_BLOCKHOLE_IN_RBR,
+            ER_THD(this, WARN_ON_BLOCKHOLE_IN_RBR),
+            is_update ? "UPDATE" : "DELETE", table_names.c_ptr());
+      }
+    }
+  } else {
+    DBUG_PRINT(
+        "info",
+        ("decision: no logging since "
+         "mysql_bin_log.is_open() = %d "
+         "and (options & OPTION_BIN_LOG) = 0x%llx "
+         "and binlog_format = %lu "
+         "and binlog_filter->db_ok(db) = %d",
+         mysql_bin_log.is_open(), (variables.option_bits & OPTION_BIN_LOG),
+         variables.binlog_format, binlog_filter->db_ok(m_db.str)));
+
+    for (Table_ref *table = tables; table; table = table->next_global) {
+      if (!table->is_placeholder() && table->table->no_replicate &&
+          gtid_state->warn_or_err_on_modify_gtid_table(this, table))
+        break;
+    }
+  }
+
+#if defined(ENABLED_DEBUG_SYNC)
+  if (!is_attachable_ro_transaction_active())
+    DEBUG_SYNC(this, "end_decide_logging_format");
+#endif
+
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+

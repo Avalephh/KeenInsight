@@ -1,0 +1,2102 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_table.cc
+Function: mysql_alter_table
+bool mysql_alter_table(THD *thd, const char *new_db, const char *new_name,
+                       HA_CREATE_INFO *create_info, Table_ref *table_list,
+                       Alter_info *alter_info) {
+  DBUG_TRACE;
+
+  /*
+    Check if we attempt to alter mysql.slow_log or
+    mysql.general_log table and return an error if
+    it is the case.
+    TODO: this design is obsolete and will be removed.
+  */
+  enum_log_table_type table_kind =
+      query_logger.check_if_log_table(table_list, false);
+
+  if (table_kind != QUERY_LOG_NONE) {
+    /* Disable alter of enabled query log tables */
+    if (query_logger.is_log_table_enabled(table_kind)) {
+      my_error(ER_BAD_LOG_STATEMENT, MYF(0), "ALTER");
+      return true;
+    }
+
+    /* Disable alter of log tables to unsupported engine */
+    if ((create_info->used_fields & HA_CREATE_USED_ENGINE) &&
+        (!create_info->db_type || /* unknown engine */
+         !(create_info->db_type->flags & HTON_SUPPORT_LOG_TABLES))) {
+      my_error(ER_UNSUPORTED_LOG_ENGINE, MYF(0));
+      return true;
+    }
+
+    if (alter_info->flags & Alter_info::ALTER_PARTITION) {
+      my_error(ER_WRONG_USAGE, MYF(0), "PARTITION", "log table");
+      return true;
+    }
+  }
+
+  // Reject request to ALTER TABLE with START TRANSACTION.
+  if (create_info->m_transactional_ddl) {
+    my_error(ER_NOT_ALLOWED_WITH_START_TRANSACTION, MYF(0),
+             "with ALTER TABLE command.");
+    return true;
+  }
+
+  if (alter_info->with_validation != Alter_info::ALTER_VALIDATION_DEFAULT &&
+      !(alter_info->flags &
+        (Alter_info::ALTER_ADD_COLUMN | Alter_info::ALTER_CHANGE_COLUMN))) {
+    my_error(ER_WRONG_USAGE, MYF(0), "ALTER", "WITH VALIDATION");
+    return true;
+  }
+
+  if ((alter_info->flags & Alter_info::ALTER_ADD_COLUMN) ==
+      Alter_info::ALTER_ADD_COLUMN) {
+    for (auto create_field : alter_info->create_list) {
+      if (create_field.m_default_val_expr) {
+        // ALTER TABLE .. DEFAULT (NDF function) should be rejected for mixed or
+        // row binlog_format. For statement binlog_format it should be allowed
+        // to continue and warning should be logged and/or pushed to the client
+        if ((thd->variables.option_bits & OPTION_BIN_LOG) &&
+            thd->lex->is_stmt_unsafe(
+                Query_tables_list::BINLOG_STMT_UNSAFE_SYSTEM_FUNCTION)) {
+          if (thd->variables.binlog_format == BINLOG_FORMAT_STMT) {
+            LogErr(WARNING_LEVEL, ER_SERVER_BINLOG_UNSAFE_SYSTEM_FUNCTION,
+                   "ALTER TABLE .. DEFAULT (NDF function)");
+            push_warning(thd, Sql_condition::SL_WARNING,
+                         ER_BINLOG_UNSAFE_SYSTEM_FUNCTION,
+                         ER_THD(thd, ER_BINLOG_UNSAFE_SYSTEM_FUNCTION));
+            break;
+          } else {
+            my_error(ER_BINLOG_UNSAFE_SYSTEM_FUNCTION, MYF(0));
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  // LOCK clause doesn't make any sense for ALGORITHM=INSTANT.
+  if (alter_info->requested_algorithm ==
+          Alter_info::ALTER_TABLE_ALGORITHM_INSTANT &&
+      alter_info->requested_lock != Alter_info::ALTER_TABLE_LOCK_DEFAULT) {
+    my_error(ER_WRONG_USAGE, MYF(0), "ALGORITHM=INSTANT",
+             "LOCK=NONE/SHARED/EXCLUSIVE");
+    return true;
+  }
+
+  THD_STAGE_INFO(thd, stage_init);
+
+  // Reject invalid usage of the 'mysql' tablespace.
+  if (dd::invalid_tablespace_usage(thd, table_list->db, table_list->table_name,
+                                   create_info))
+    return true;
+
+  /*
+    Assign target tablespace name to enable locking in lock_table_names().
+    Reject invalid name lengths. Names will be validated after the table is
+    opened and the SE (needed for SE specific validation) is identified.
+  */
+  if (create_info->tablespace) {
+    if (validate_tablespace_name_length(create_info->tablespace)) return true;
+
+    if (lex_string_strmake(thd->mem_root, &table_list->target_tablespace_name,
+                           create_info->tablespace,
+                           strlen(create_info->tablespace))) {
+      my_error(ER_OUT_OF_RESOURCES, MYF(ME_FATALERROR));
+      return true;
+    }
+  }
+
+  /* Validate that AUTOEXTEND_SIZE option is not specified for
+  temporary tables */
+  if (is_temporary_table(table_list)) {
+    if (create_info->m_implicit_tablespace_autoextend_size > 0) {
+      my_error(ER_CANNOT_USE_AUTOEXTEND_SIZE_CLAUSE, MYF(0), "temporary");
+      return true;
+    }
+  }
+
+  /*
+    Reject invalid tablespace name lengths specified for partitions.
+    Names will be validated after the table has been opened.
+  */
+  if (validate_partition_tablespace_name_lengths(thd->lex->part_info))
+    return true;
+
+  /*
+    Assign the partition info, so that the locks on tablespaces
+    assigned for any new partitions added would be acquired during
+    open_table.
+  */
+  thd->work_part_info = thd->lex->part_info;
+
+  /*
+    Code below can handle only base tables so ensure that we won't open a view.
+    Note that RENAME TABLE the only ALTER clause which is supported for views
+    has been already processed.
+  */
+  table_list->required_type = dd::enum_table_type::BASE_TABLE;
+
+  /*
+    If we are about to ALTER non-temporary table we need to get permission
+    from/notify interested storage engines.
+  */
+  Table_ddl_hton_notification_guard notification_guard{
+      thd, &table_list->mdl_request.key, HA_ALTER_DDL};
+
+  if (!is_temporary_table(table_list) && notification_guard.notify())
+    return true;
+
+  Alter_table_prelocking_strategy alter_prelocking_strategy;
+
+  DEBUG_SYNC(thd, "alter_table_before_open_tables");
+  uint tables_opened;
+  bool error = open_tables(thd, &table_list, &tables_opened, 0,
+                           &alter_prelocking_strategy);
+
+  DEBUG_SYNC(thd, "alter_opened_table");
+
+  if (error) return true;
+
+  // If we are removing a functional index, add any related hidden generated
+  // columns to the drop list as well.
+  if (handle_drop_functional_index(thd, alter_info, table_list)) {
+    return true;
+  }
+
+  // If we are renaming a functional index, rename any related hidden generated
+  // columns as well.
+  if (alter_info->flags & Alter_info::ALTER_RENAME_INDEX) {
+    if (handle_rename_functional_index(thd, alter_info, table_list)) {
+      return true; /* purecov: deadcode */
+    }
+  }
+
+  // Check tablespace name validity for the relevant engine.
+  {
+    // If there is no target handlerton, use the current.
+    const handlerton *target_handlerton = create_info->db_type;
+    if (target_handlerton == nullptr)
+      target_handlerton = table_list->table->file->ht;
+
+    /*
+      Reject invalid tablespace names for the relevant engine, if the ALTER
+      statement changes either tablespace or engine. We do this after the table
+      has been opened because we need the handlerton and tablespace information.
+      No need to validate if neither engine nor tablespace is changed, then the
+      validation was done when the table was created.
+    */
+    if (create_info->tablespace || create_info->db_type) {
+      // If there is no target table level tablespace, use the current.
+      const char *target_tablespace = create_info->tablespace;
+      if (target_tablespace == nullptr)
+        target_tablespace = table_list->table->s->tablespace;
+
+      // Check the tablespace/engine combination.
+      assert(target_handlerton);
+      if (target_tablespace != nullptr &&
+          validate_tablespace_name(TS_CMD_NOT_DEFINED, target_tablespace,
+                                   target_handlerton))
+        return true;
+    }
+
+    // Reject invalid tablespace names specified for partitions.
+    if (validate_partition_tablespace_names(thd->lex->part_info,
+                                            target_handlerton))
+      return true;
+  }
+
+  if (validate_secondary_engine_option(thd, *alter_info, *create_info,
+                                       *table_list->table))
+    return true;
+
+  if (lock_trigger_names(thd, table_list)) return true;
+
+  /*
+    If we're in LOCK TABLE mode, we must lock the target tablespace name
+    as well as the currently used tablesapces (since these may have been
+    introduced by a previous ALTER while already in LOCK TABLE mode).
+  */
+  if (thd->locked_tables_mode &&
+      get_and_lock_tablespace_names(thd, table_list, nullptr,
+                                    thd->variables.lock_wait_timeout, MYF(0))) {
+    return true;
+  }
+
+  if (table_list->table->s->db_type() != create_info->db_type &&
+      (alter_info->flags & Alter_info::ALTER_OPTIONS) &&
+      (create_info->used_fields & HA_CREATE_USED_ENGINE)) {
+    handlerton *actual_hton = get_viable_handlerton_for_alter(
+        thd, *create_info, table_list->table->s->db_type());
+    if (actual_hton == nullptr) return true;
+
+    create_info->db_type = actual_hton;
+  }
+
+  const handlerton *hton = create_info->db_type;
+  if (hton == nullptr) {
+    hton = table_list->table->s->db_type();
+  }
+  assert(hton != nullptr);
+  if ((alter_info->flags & Alter_info::ANY_ENGINE_ATTRIBUTE) != 0 &&
+      ((hton->flags & HTON_SUPPORTS_ENGINE_ATTRIBUTE) == 0 &&
+       DBUG_EVALUATE_IF("simulate_engine_attribute_support", false, true))) {
+    my_error(ER_ENGINE_ATTRIBUTE_NOT_SUPPORTED, MYF(0),
+             ha_resolve_storage_engine_name(hton));
+    return true;
+  }
+
+  TABLE *table = table_list->table;
+  table->use_all_columns();
+  MDL_ticket *mdl_ticket = table->mdl_ticket;
+
+  /*
+    Prohibit changing of the UNION list of a non-temporary MERGE table
+    under LOCK tables. It would be quite difficult to reuse a shrunk
+    set of tables from the old table or to open a new TABLE object for
+    an extended list and verify that they belong to locked tables.
+  */
+  if ((thd->locked_tables_mode == LTM_LOCK_TABLES ||
+       thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES) &&
+      (create_info->used_fields & HA_CREATE_USED_UNION) &&
+      (table->s->tmp_table == NO_TMP_TABLE)) {
+    my_error(ER_LOCK_OR_ACTIVE_TRANSACTION, MYF(0));
+    return true;
+  }
+
+  Alter_table_ctx alter_ctx(thd, table_list, tables_opened, new_db, new_name);
+
+  /*
+    Acquire and keep schema locks until commit time, so the DD layer can
+    safely assert that we have proper MDL on objects stored in the DD.
+  */
+  dd::Schema_MDL_locker mdl_locker_1(thd), mdl_locker_2(thd);
+  const dd::Schema *schema = nullptr;
+  const dd::Schema *new_schema = nullptr;
+  const dd::Table *old_table_def = nullptr;
+  /*
+    This releaser allows us to keep uncommitted DD objects cached
+    in the Dictionary_client until commit time.
+  */
+  dd::cache::Dictionary_client::Auto_releaser releaser(thd->dd_client());
+  if (mdl_locker_1.ensure_locked(alter_ctx.db) ||
+      mdl_locker_2.ensure_locked(alter_ctx.new_db) ||
+      thd->dd_client()->acquire(alter_ctx.db, &schema) ||
+      thd->dd_client()->acquire(alter_ctx.new_db, &new_schema))
+    return true;
+
+  if ((table->s->tmp_table == NO_TMP_TABLE) &&
+      thd->dd_client()->acquire(alter_ctx.db, alter_ctx.table_name,
+                                &old_table_def))
+    return true;
+
+  // If this is a temporary table, the schema might not exist even
+  // if we have successfully opened the table
+  if (schema == nullptr) {
+    assert(table->s->tmp_table);
+    my_error(ER_BAD_DB_ERROR, MYF(0), alter_ctx.db);
+    return true;
+  }
+
+  assert((table->s->tmp_table != NO_TMP_TABLE) || old_table_def != nullptr);
+
+  if (new_schema == nullptr) {
+    my_error(ER_BAD_DB_ERROR, MYF(0), alter_ctx.new_db);
+    return true;
+  }
+
+  /*
+    Add old and new (if any) databases to the list of accessed databases
+    for this statement. Needed for MTS.
+  */
+  thd->add_to_binlog_accessed_dbs(alter_ctx.db);
+  if (alter_ctx.is_database_changed())
+    thd->add_to_binlog_accessed_dbs(alter_ctx.new_db);
+
+  // Ensure that triggers are in the same schema as their subject table.
+  if (alter_ctx.is_database_changed() && old_table_def != nullptr &&
+      old_table_def->has_trigger()) {
+    my_error(ER_TRG_IN_WRONG_SCHEMA, MYF(0));
+    return true;
+  }
+
+  /* Check that we are not trying to rename to an existing table */
+  if (alter_ctx.is_table_renamed()) {
+    if (table->s->tmp_table != NO_TMP_TABLE) {
+      if (find_temporary_table(thd, alter_ctx.new_db, alter_ctx.new_name)) {
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), alter_ctx.new_alias);
+        return true;
+      }
+    } else {
+      MDL_request_list mdl_requests;
+
+      mdl_requests.push_front(&alter_ctx.target_mdl_request);
+      /*
+        If we are moving the table to a different database, we also
+        need IX lock on the database name so that the target database
+        is protected by MDL while the table is moved.
+      */
+      if (alter_ctx.is_database_changed())
+        mdl_requests.push_front(&alter_ctx.target_db_mdl_request);
+
+      /*
+        Global intention exclusive lock must have been already acquired when
+        table to be altered was open, so there is no need to do it here.
+      */
+      assert(thd->mdl_context.owns_equal_or_stronger_lock(
+          MDL_key::GLOBAL, "", "", MDL_INTENTION_EXCLUSIVE));
+
+      if (thd->mdl_context.acquire_locks(&mdl_requests,
+                                         thd->variables.lock_wait_timeout))
+        return true;
+
+      DEBUG_SYNC(thd, "locked_table_name");
+      /*
+        Table maybe does not exist, but we got an exclusive lock
+        on the name, now we can safely try to find out for sure.
+      */
+      const dd::Abstract_table *at = nullptr;
+      if (thd->dd_client()->acquire(alter_ctx.new_db, alter_ctx.new_name, &at))
+        return true;
+
+      if (at != nullptr) {
+        /* Table will be closed in do_command() */
+        my_error(ER_TABLE_EXISTS_ERROR, MYF(0), alter_ctx.new_alias);
+        return true;
+      }
+    }
+  }
+
+  if (!create_info->db_type) {
+    if (table->part_info && create_info->used_fields & HA_CREATE_USED_ENGINE) {
+      /*
+        This case happens when the user specified
+        ENGINE = x where x is a non-existing storage engine
+        We set create_info->db_type to default_engine_type
+        to ensure we don't change underlying engine type
+        due to a erroneously given engine name.
+      */
+      create_info->db_type = table->part_info->default_engine_type;
+    } else
+      create_info->db_type = table->s->db_type();
+  }
+
+  if (check_engine(alter_ctx.new_db, alter_ctx.new_name, create_info))
+    return true;
+
+  /*
+    Do not allow change of storage engine if table participates in a foreign
+    key. Even in cases when both source and target storage engines support
+    foreign keys the fine details of what is supported might differ.
+  */
+  if (create_info->db_type != table->s->db_type() && old_table_def != nullptr &&
+      (old_table_def->foreign_keys().size() ||
+       old_table_def->foreign_key_parents().size())) {
+    my_error(ER_FK_CANNOT_CHANGE_ENGINE, MYF(0));
+    return true;
+  }
+
+  /*
+   If foreign key is added then check permission to access parent table.
+
+   In function "check_fk_parent_table_access", create_info->db_type is used
+   to identify whether engine supports FK constraint or not. Since
+   create_info->db_type is set here, check to parent table access is delayed
+   till this point for the alter operation.
+  */
+  if ((alter_info->flags & Alter_info::ADD_FOREIGN_KEY) &&
+      check_fk_parent_table_access(thd, create_info, alter_info))
+    return true;
+
+  Foreign_key_parents_invalidator fk_invalidator;
+
+  if (table->s->tmp_table == NO_TMP_TABLE) {
+    MDL_request_list mdl_requests;
+
+    if (collect_fk_parents_for_new_fks(
+            thd, table_list->db, table_list->table_name, alter_info,
+            MDL_SHARED_UPGRADABLE, nullptr, &mdl_requests, nullptr))
+      return true;
+
+    /*
+      Acquire SU locks on parent and child tables so we can access
+      their definition while checking if this ALTER TABLE will break
+      any FKs involving them.
+
+      TODO: Refine set of ALTER TABLE commands for which we do this.
+            This is obviously necessary for ADD/DROP KEY and COLUMN
+            modifications. But are there any other operations which
+            might affect indexes somehow?
+    */
+    if (!is_simple_rename_or_index_change(alter_info)) {
+      if (collect_fk_parents_for_all_fks(thd, old_table_def, nullptr,
+                                         MDL_SHARED_UPGRADABLE, &mdl_requests,
+                                         nullptr))
+        return true;
+
+      if (create_info->db_type != table->s->db_type()) {
+        /*
+          By changing table's storage engine we might be introducing parent
+          table for previously orphan foreign keys in the new SE. We need
+          to lock child tables of such orphan foreign keys. OTOH it is safe
+          to assume that if SE is changed table can't be parent in any
+          foreign keys in old SE.
+
+          Note that here and in other similar places we assume that ALTER
+          TABLE which combines change of SE and renaming of table is executed
+          by changing SE first and then performing rename (this is closer to
+          ALTER TABLE real implementation). Because of this such ALTER TABLEs
+          need to pick up orphan foreign keys associated with old table names
+          as well. Thus we use old table name to get list of orphans.
+        */
+        assert(old_table_def->foreign_key_parents().size() == 0);
+
+        if (collect_fk_children(thd, table_list->db, table_list->table_name,
+                                create_info->db_type, MDL_SHARED_UPGRADABLE,
+                                &mdl_requests))
+          return true;
+      } else {
+        if (collect_fk_children(thd, old_table_def, MDL_SHARED_UPGRADABLE,
+                                &mdl_requests))
+          return true;
+      }
+
+      if (alter_ctx.is_table_renamed() &&
+          collect_fk_children(thd, alter_ctx.new_db, alter_ctx.new_alias,
+                              create_info->db_type, MDL_SHARED_UPGRADABLE,
+                              &mdl_requests))
+        return true;
+    }
+
+    /*
+      Lock names of foreign keys to be dropped.
+
+      Note that we can't lock names of foreign keys to be added yet
+      because database in which they will be created depends on ALTER
+      TABLE algorithm we are going to choose later.
+    */
+    if (collect_fk_names_for_dropped_fks(thd, table_list->db, alter_info,
+                                         old_table_def, &mdl_requests))
+      return true;
+
+    /*
+      Under LOCK TABLES all parent tables must be locked at least in READ
+      mode. Otherwise, our ALTER TABLE will leave after itself child table
+      locked for WRITE, without corresponding parent tables locked and thus
+      without ability to perform FK checks when child table is modified.
+    */
+    if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+        thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES) {
+      MDL_request_list::Iterator it(mdl_requests);
+      MDL_request *mdl_request;
+
+      while ((mdl_request = it++) != nullptr) {
+        if (mdl_request->key.mdl_namespace() != MDL_key::TABLE) continue;
+
+        if (!thd->mdl_context.owns_equal_or_stronger_lock(
+                MDL_key::TABLE, mdl_request->key.db_name(),
+                mdl_request->key.name(), MDL_SHARED_READ_ONLY)) {
+          my_error(ER_TABLE_NOT_LOCKED, MYF(0), mdl_request->key.name());
+          return true;
+        }
+      }
+    }
+
+    if (!mdl_requests.is_empty() &&
+        thd->mdl_context.acquire_locks(&mdl_requests,
+                                       thd->variables.lock_wait_timeout))
+      return true;
+
+    DEBUG_SYNC(thd, "alter_table_after_mdl_lock_fk");
+
+    /*
+      If we are executing ALTER TABLE RENAME under LOCK TABLES we also need
+      to check that all previously orphan tables which reference new table
+      name through foreign keys are locked for write. Otherwise this ALTER
+      will leave after itself parent table locked for WRITE without child
+      tables locked for WRITE. This will break FK LOCK TABLES invariants if
+      some of previously orphan FKs have referential actions which update
+      child table.
+
+      The same should be done when we are going to add parent table to
+      previously orphan foreign keys by changing table storage engine.
+
+      In theory, we can reduce chance of MDL deadlocks by also checking at
+      this stage that all child and parent tables for FKs in which this
+      table participates are locked for WRITE (as we will have to acquire
+      to exclusive MDLs on these tables later). But this is, probably, too
+      severe restriction since many 3rd-party online ALTER tools use ALTER
+      TABLE RENAME under LOCK TABLES and are unaware of it.
+    */
+    if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+        thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES) {
+      MDL_request_list orphans_mdl_requests;
+
+      if (create_info->db_type != table->s->db_type()) {
+        assert(old_table_def->foreign_key_parents().size() == 0);
+        if (collect_fk_children(thd, table_list->db, table_list->table_name,
+                                create_info->db_type, MDL_EXCLUSIVE,
+                                &orphans_mdl_requests))
+          return true;
+      }
+      if (alter_ctx.is_table_renamed() &&
+          collect_fk_children(thd, alter_ctx.new_db, alter_ctx.new_alias,
+                              create_info->db_type, MDL_EXCLUSIVE,
+                              &orphans_mdl_requests))
+        return true;
+
+      if (!orphans_mdl_requests.is_empty()) {
+        MDL_request_list::Iterator it(orphans_mdl_requests);
+        MDL_request *mdl_request;
+
+        while ((mdl_request = it++) != nullptr) {
+          if (mdl_request->key.mdl_namespace() != MDL_key::TABLE) continue;
+
+          if (!thd->mdl_context.owns_equal_or_stronger_lock(
+                  MDL_key::TABLE, mdl_request->key.db_name(),
+                  mdl_request->key.name(), MDL_SHARED_NO_READ_WRITE)) {
+            my_error(ER_TABLE_NOT_LOCKED_FOR_WRITE, MYF(0),
+                     mdl_request->key.name());
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  /*
+   If this is an ALTER TABLE and no explicit row type specified reuse
+   the table's row type.
+   Note : this is the same as if the row type was specified explicitly.
+  */
+  if (create_info->row_type == ROW_TYPE_NOT_USED) {
+    /* ALTER TABLE without explicit row type */
+    create_info->row_type = table->s->row_type;
+  } else {
+    /* ALTER TABLE with specific row type */
+    create_info->used_fields |= HA_CREATE_USED_ROW_FORMAT;
+  }
+
+  DBUG_PRINT("info", ("old type: %s  new type: %s",
+                      ha_resolve_storage_engine_name(table->s->db_type()),
+                      ha_resolve_storage_engine_name(create_info->db_type)));
+  if (ha_check_storage_engine_flag(table->s->db_type(),
+                                   HTON_ALTER_NOT_SUPPORTED) ||
+      ha_check_storage_engine_flag(create_info->db_type,
+                                   HTON_ALTER_NOT_SUPPORTED)) {
+    DBUG_PRINT("info", ("doesn't support alter"));
+    my_error(ER_ILLEGAL_HA, MYF(0), table_list->table_name);
+    return true;
+  }
+
+  THD_STAGE_INFO(thd, stage_setup);
+
+  if (is_simple_rename_or_index_change(alter_info) && !table->s->tmp_table) {
+    // This requires X-lock, no other lock levels supported.
+    if (alter_info->requested_lock != Alter_info::ALTER_TABLE_LOCK_DEFAULT &&
+        alter_info->requested_lock != Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE) {
+      my_error(ER_ALTER_OPERATION_NOT_SUPPORTED, MYF(0), "LOCK=NONE/SHARED",
+               "LOCK=EXCLUSIVE");
+      return true;
+    }
+    return simple_rename_or_index_change(thd, *new_schema, table_list,
+                                         alter_info->keys_onoff, &alter_ctx);
+  }
+
+  /* We have to do full alter table. */
+  bool partition_changed = false;
+  partition_info *new_part_info = nullptr;
+  {
+    if (prep_alter_part_table(thd, table, alter_info, create_info, &alter_ctx,
+                              &partition_changed, &new_part_info)) {
+      return true;
+    }
+  }
+
+  /*
+    Store all columns that are going to be dropped, since we need this list
+    when removing column statistics later. The reason we need to store it here,
+    is that 'mysql_prepare_alter_table' may remove some of the columns from
+    the drop_list.
+  */
+  histograms::columns_set columns;
+  for (const auto column : alter_info->drop_list) {
+    if (column->type == Alter_drop::COLUMN) columns.emplace(column->name);
+  }
+  const Alter_column *alter = nullptr;
+  uint i = 0;
+  while (i < alter_info->alter_list.size()) {
+    alter = alter_info->alter_list[i];
+    if (alter->change_type() == Alter_column::Type::RENAME_COLUMN)
+      columns.emplace(alter->name);
+    i++;
+  }
+
+  Create_field *create_field;
+  List_iterator<Create_field> list_it(alter_info->create_list);
+  while ((create_field = list_it++)) {
+    if (create_field->change != nullptr) columns.emplace(create_field->change);
+  }
+
+  /*
+    Type of a constraint marked for DROP with DROP CONSTRAINT clause is unknown.
+    Resolve type of a constraint by name.
+  */
+  Drop_constraint_type_resolver drop_constraint_type_resolver(alter_info);
+  if (drop_constraint_type_resolver.is_type_resolution_needed() &&
+      (drop_constraint_type_resolver.resolve_constraints_type(thd, table,
+                                                              old_table_def)))
+    return true;
+
+  /*
+    Type of a constraint marked for ALTER with ALTER CONSTRAINT clause is
+    unknown. Resolve type of a constraint by name.
+  */
+  Enforce_constraint_type_resolver enforce_constraint_type_resolver(alter_info);
+  if (enforce_constraint_type_resolver.is_type_resolution_needed() &&
+      (enforce_constraint_type_resolver.resolve_constraints_type(
+          thd, table, old_table_def)))
+    return true;
+
+  // Prepare check constraints for alter table operation.
+  if (prepare_check_constraints_for_alter(thd, table, alter_info, &alter_ctx))
+    return true;
+
+  if (mysql_prepare_alter_table(thd, old_table_def, table, create_info,
+                                alter_info, &alter_ctx)) {
+    return true;
+  }
+
+  // Check restrictions on ALTER TABLE operations that affects GIPK and PK.
+  if (check_primary_key_alter_restrictions(thd, create_info->db_type,
+                                           alter_info, table))
+    return true;
+
+  /*
+    Check if we are changing the SRID specification on a geometry column that
+    has a spatial index. If that is the case, reject the change since allowing
+    geometries with different SRIDs in a spatial index will make the index
+    useless.
+  */
+  if (!is_alter_geometry_column_valid(alter_info)) return true;
+
+  if (set_table_default_charset(thd, create_info, *schema)) return true;
+
+  /*
+    Use copy algorithm if:
+    - old_alter_table system variable is set without in-place requested using
+      the ALGORITHM clause.
+    - Or if in-place is impossible for given operation.
+    - Changes to partitioning needs to be handled using table copying
+      algorithm unless the engine supports partitioning changes using
+      in-place API (because it supports auto-partitioning or simply
+      can do partitioning changes using in-place using mark-up in
+      partition_info object).
+  */
+  if ((thd->variables.old_alter_table &&
+       alter_info->requested_algorithm !=
+           Alter_info::ALTER_TABLE_ALGORITHM_INPLACE &&
+       alter_info->requested_algorithm !=
+           Alter_info::ALTER_TABLE_ALGORITHM_INSTANT) ||
+      is_inplace_alter_impossible(table, create_info, alter_info) ||
+      (partition_changed &&
+       !(table->s->db_type()->partition_flags() & HA_USE_AUTO_PARTITION) &&
+       !new_part_info)) {
+    if (alter_info->requested_algorithm ==
+        Alter_info::ALTER_TABLE_ALGORITHM_INPLACE) {
+      my_error(ER_ALTER_OPERATION_NOT_SUPPORTED, MYF(0), "ALGORITHM=INPLACE",
+               "ALGORITHM=COPY");
+      return true;
+    }
+    if (alter_info->requested_algorithm ==
+        Alter_info::ALTER_TABLE_ALGORITHM_INSTANT) {
+      my_error(ER_ALTER_OPERATION_NOT_SUPPORTED, MYF(0), "ALGORITHM=INSTANT",
+               "ALGORITHM=COPY");
+      return true;
+    }
+    alter_info->requested_algorithm = Alter_info::ALTER_TABLE_ALGORITHM_COPY;
+  }
+
+  /*
+    If 'avoid_temporal_upgrade' mode is not enabled, then the
+    pre MySQL 5.6.4 old temporal types if present is upgraded to the
+    current format.
+  */
+
+  mysql_mutex_lock(&LOCK_global_system_variables);
+  bool check_temporal_upgrade = !avoid_temporal_upgrade;
+  mysql_mutex_unlock(&LOCK_global_system_variables);
+
+  if (check_temporal_upgrade) {
+    if (upgrade_old_temporal_types(thd, alter_info)) return true;
+  }
+
+  /*
+    ALTER TABLE ... ENGINE to the same engine is a common way to
+    request table rebuild. Set ALTER_RECREATE flag to force table
+    rebuild.
+  */
+  if (create_info->db_type == table->s->db_type() &&
+      create_info->used_fields & HA_CREATE_USED_ENGINE)
+    alter_info->flags |= Alter_info::ALTER_RECREATE;
+
+  /*
+    If the old table had partitions and we are doing ALTER TABLE ...
+    engine= <new_engine>, the new table must preserve the original
+    partitioning. This means that the new engine is still the
+    partitioning engine, not the engine specified in the parser.
+    This is discovered in prep_alter_part_table, which in such case
+    updates create_info->db_type.
+    It's therefore important that the assignment below is done
+    after prep_alter_part_table.
+  */
+  handlerton *new_db_type = create_info->db_type;
+  handlerton *old_db_type = table->s->db_type();
+  TABLE *new_table = nullptr;
+  ha_rows copied = 0, deleted = 0;
+
+  /*
+    Handling of symlinked tables:
+    If no rename:
+      Create new data file and index file on the same disk as the
+      old data and index files.
+      Copy data.
+      Rename new data file over old data file and new index file over
+      old index file.
+      Symlinks are not changed.
+
+   If rename:
+      Create new data file and index file on the same disk as the
+      old data and index files.  Create also symlinks to point at
+      the new tables.
+      Copy data.
+      At end, rename intermediate tables, and symlinks to intermediate
+      table, to final table name.
+      Remove old table and old symlinks
+
+    If rename is made to another database:
+      Create new tables in new database.
+      Copy data.
+      Remove old table and symlinks.
+  */
+  char index_file[FN_REFLEN], data_file[FN_REFLEN];
+
+  if (!alter_ctx.is_database_changed()) {
+    if (create_info->index_file_name) {
+      /* Fix index_file_name to have 'tmp_name' as basename */
+      my_stpcpy(index_file, alter_ctx.tmp_name);
+      create_info->index_file_name =
+          fn_same(index_file, create_info->index_file_name, 1);
+    }
+    if (create_info->data_file_name) {
+      /* Fix data_file_name to have 'tmp_name' as basename */
+      my_stpcpy(data_file, alter_ctx.tmp_name);
+      create_info->data_file_name =
+          fn_same(data_file, create_info->data_file_name, 1);
+    }
+  } else {
+    /* Ignore symlink if db is changed. */
+    create_info->data_file_name = create_info->index_file_name = nullptr;
+  }
+
+  DEBUG_SYNC(thd, "alter_table_before_create_table_no_lock");
+  DBUG_EXECUTE_IF("sleep_before_create_table_no_lock", my_sleep(100000););
+  /*
+    Promote first timestamp column, when explicit_defaults_for_timestamp
+    is not set
+  */
+  if (!thd->variables.explicit_defaults_for_timestamp)
+    promote_first_timestamp_column(&alter_info->create_list);
+
+  /*
+    Create .FRM for new version of table with a temporary name.
+    We don't log the statement, it will be logged later.
+
+    Keep information about keys in newly created table as it
+    will be used later to construct Alter_inplace_info object
+    and by fill_alter_inplace_info() call.
+  */
+  KEY *key_info;
+  uint key_count;
+  FOREIGN_KEY *fk_key_info = nullptr;
+  uint fk_key_count = 0;
+
+  Alter_info::enum_enable_or_disable keys_onoff =
+      ((alter_info->keys_onoff == Alter_info::LEAVE_AS_IS &&
+        table->file->indexes_are_disabled())
+           ? Alter_info::DISABLE
+           : alter_info->keys_onoff);
+
+  /*
+    Take the X metadata lock on temporary name used for new version of
+    the table. This ensures that concurrent I_S queries won't try to open it.
+  */
+
+  MDL_request tmp_name_mdl_request;
+  bool is_tmp_table = (table->s->tmp_table != NO_TMP_TABLE);
+
+  // Avoid these tables to be visible by I_S/SHOW queries.
+  create_info->m_hidden = !is_tmp_table;
+
+  if (!is_tmp_table) {
+    MDL_REQUEST_INIT(&tmp_name_mdl_request, MDL_key::TABLE, alter_ctx.new_db,
+                     alter_ctx.tmp_name, MDL_EXCLUSIVE, MDL_STATEMENT);
+    if (thd->mdl_context.acquire_lock(&tmp_name_mdl_request,
+                                      thd->variables.lock_wait_timeout))
+      return true;
+  }
+
+  // Stop if we have invalid encryption clause.
+  if (!is_tmp_table && validate_table_encryption(thd, create_info)) return true;
+
+  /*
+    For temporary tables or tables in SEs supporting atomic DDL dd::Table
+    object describing new version of table. This object will be created in
+    memory in create_table_impl() and will not be put into the on-disk DD
+    and DD Object Cache.
+
+    We become responsible for destroying this dd::Table object (for
+    temporary tables until we pass its ownership to the TABLE_SHARE).
+  */
+  std::unique_ptr<dd::Table> non_dd_table_def;
+
+  {
+    Disable_binlog_guard binlog_guard(thd);
+    /* Prevent intermediate commits to invoke commit order */
+    Implicit_substatement_state_guard substatement_guard(
+        thd, enum_implicit_substatement_guard_mode ::
+                 DISABLE_GTID_AND_SPCO_IF_SPCO_ACTIVE);
+    error = create_table_impl(
+        thd, *new_schema, alter_ctx.new_db, alter_ctx.tmp_name,
+        alter_ctx.table_name, alter_ctx.get_tmp_path(), create_info, alter_info,
+        true, 0, true, true,
+        /*
+          If target SE supports atomic DDL do not store
+          new table version in on-disk DD.
+          It is not required to rollback statement in
+          case of error and allows to keep correct names
+          for pre-existing foreign keys in the dd::Table
+          object for new table version.
+         */
+        (new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL), nullptr, &key_info,
+        &key_count, keys_onoff, &fk_key_info, &fk_key_count, alter_ctx.fk_info,
+        alter_ctx.fk_count, old_table_def,
+        alter_ctx.fk_max_generated_name_number, &non_dd_table_def, nullptr);
+  }
+
+  if (error) {
+    /*
+      Play it safe, rollback possible changes to the data-dictionary,
+      so failed mysql_alter_table()/mysql_recreate_table() do not
+      require rollback in the caller. Also do full rollback in unlikely
+      case we have THD::transaction_rollback_request.
+    */
+    trans_rollback_stmt(thd);
+    trans_rollback(thd);
+    return true;
+  }
+
+  /*
+    Atomic replacement of the table is possible only if both old and new
+    storage engines support DDL atomicity.
+  */
+  bool atomic_replace = (new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+                        (old_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL);
+
+  /* Remember that we have not created table in storage engine yet. */
+  bool no_ha_table = true;
+
+  /* Indicates special case when we do ALTER TABLE which is really no-op. */
+  bool is_noop = false;
+
+  /*
+    Indicates special case involving non-atomic ALTER TABLE which adds
+    foreign keys and then fails at the late stage. Such ALTER TABLE still
+    requires FK parent invalidation even despite of error.
+  */
+  bool invalidate_fk_parents_on_error = false;
+
+  dd::Encrypt_result old_er{false, false};
+  dd::Encrypt_result new_er{false, false};
+
+  /*
+    If we are ALTERing non-temporary table in SE not supporting atomic DDL
+    we don't have dd::Table object describing new version of table yet.
+    Retrieve it now.
+  */
+  dd::Table *table_def = non_dd_table_def.get();
+  if (!table_def) {
+    if (thd->dd_client()->acquire_for_modification(
+            alter_ctx.new_db, alter_ctx.tmp_name, &table_def))
+      goto err_new_table_cleanup;
+
+    set_check_constraints_alter_mode(table_def, alter_info);
+
+    assert(table_def);
+  }
+
+  if (!is_tmp_table) {
+    // Check for usage of prefix key index in PARTITION BY KEY() function.
+    dd::warn_on_deprecated_prefix_key_partition(
+        thd, alter_ctx.db, alter_ctx.table_name, table_def, false);
+  }
+
+  if (remove_secondary_engine(thd, *table_list, *create_info, old_table_def))
+    goto err_new_table_cleanup;
+
+  // If we are changing the tablespace or the table encryption type.
+  if (old_table_def &&
+      (create_info->used_fields & HA_CREATE_USED_TABLESPACE ||
+       create_info->used_fields & HA_CREATE_USED_ENCRYPT ||
+       create_info->used_fields & HA_CREATE_USED_AUTOEXTEND_SIZE ||
+       alter_ctx.is_database_changed())) {
+    bool source_is_general_tablespace{false};
+    bool source_encrytion_type{false};
+    bool destination_is_general_tablespace{false};
+    bool destination_encrytion_type{false};
+
+    // Determine source tablespace type and encryption type.
+    old_er = dd::is_tablespace_encrypted(thd, *old_table_def,
+                                         &source_is_general_tablespace);
+    if (old_er.error) {
+      goto err_new_table_cleanup;
+    }
+    source_encrytion_type = old_er.value;
+    if (!source_is_general_tablespace &&
+        old_table_def->options().exists("encrypt_type")) {
+      dd::String_type et;
+      (void)old_table_def->options().get("encrypt_type", &et);
+      assert(et.empty() == false);
+      source_encrytion_type = is_encrypted(et);
+    }
+
+    // Determine destination tablespace type and encryption type.
+    new_er = dd::is_tablespace_encrypted(thd, *table_def,
+                                         &destination_is_general_tablespace);
+    if (new_er.error) {
+      goto err_new_table_cleanup;
+    }
+    destination_encrytion_type = new_er.value;
+    if (!destination_is_general_tablespace &&
+        table_def->options().exists("encrypt_type")) {
+      dd::String_type et;
+      (void)table_def->options().get("encrypt_type", &et);
+      assert(et.empty() == false);
+      destination_encrytion_type = is_encrypted(et);
+    }
+
+    /*
+      Disallow converting a general tablespace to a file-per-table
+      tablespace without a explicit ENCRYPTION clause.
+    */
+    if (source_is_general_tablespace && source_encrytion_type == true &&
+        !destination_is_general_tablespace &&
+        !(create_info->used_fields & HA_CREATE_USED_ENCRYPT)) {
+      my_error(ER_TARGET_TABLESPACE_UNENCRYPTED, MYF(0));
+      goto err_new_table_cleanup;
+    }
+
+    /*
+      Disallow moving encrypted table (using general or file-per-table
+      tablespace) to a unencrypted general tablespace.
+    */
+    if (source_encrytion_type && destination_is_general_tablespace &&
+        !destination_encrytion_type) {
+      my_error(ER_TARGET_TABLESPACE_UNENCRYPTED, MYF(0));
+      goto err_new_table_cleanup;
+    }
+
+    /*
+      Check table encryption privilege, if table encryption type differ
+      from schema encryption type.
+    */
+    if (new_schema->default_encryption() != destination_encrytion_type) {
+      // Ignore privilege check and show warning if database is same and
+      // table encryption type is not changed.
+      bool show_warning = !alter_ctx.is_database_changed() &&
+                          source_encrytion_type == destination_encrytion_type;
+
+      if (!show_warning && opt_table_encryption_privilege_check) {
+        if (check_table_encryption_admin_access(thd)) {
+          my_error(ER_CANNOT_SET_TABLE_ENCRYPTION, MYF(0));
+          return true;
+        }
+      } else if (new_schema->default_encryption() &&
+                 !destination_encrytion_type) {
+        push_warning(thd, Sql_condition::SL_WARNING,
+                     WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB,
+                     ER_THD(thd, WARN_UNENCRYPTED_TABLE_IN_ENCRYPTED_DB));
+      }
+    }
+  }
+
+  if (old_table_def) {
+    if (is_checked_for_upgrade(*old_table_def)) {
+      DBUG_PRINT("admin", ("Transfering upgrade mark "
+                           "from Table %s (%llu) to Table %s (%llu)",
+                           old_table_def->name().c_str(), old_table_def->id(),
+                           table_def->name().c_str(), table_def->id()));
+      table_def->mark_as_checked_for_upgrade();
+    }
+  }
+
+  /*
+    Check if new table definition is compatible with foreign keys
+    on other tales which reference this one. We want to do this
+    before starting potentially expensive main phases of COPYing
+    or INPLACE ALTER TABLE.
+  */
+  if (!is_tmp_table) {
+    if (new_db_type != old_db_type) {
+      /*
+        By changing table's storage engine we might be introducing parent
+        table for previously orphan foreign keys in the new SE. We need
+        to lock child tables of such orphan foreign keys. OTOH it is safe
+        to assume that if SE is changed table can't be parent in any
+        foreign keys in old SE.
+
+        We assume that ALTER TABLE which combines change of SE and renaming
+        of table is executed by changing SE first and then performing rename
+        (this is closer to ALTER TABLE real implementation). So such ALTER
+        TABLEs  need to pick up orphan foreign keys associated with old table
+        names as well. Thus we use old table name in the below check.
+      */
+      assert(old_table_def->foreign_key_parents().size() == 0);
+
+      if (check_fk_children_after_parent_def_change(
+              thd, table_list->db, table_list->table_name, nullptr, nullptr,
+              new_db_type, table_def))
+        goto err_new_table_cleanup;
+    } else {
+      if (check_fk_children_after_parent_def_change(
+              thd, table_list->db, table_list->table_name, new_db_type,
+              old_table_def, table_def, alter_info))
+        goto err_new_table_cleanup;
+    }
+
+    if (alter_ctx.is_table_renamed() &&
+        check_fk_children_after_parent_def_change(
+            thd, alter_ctx.new_db, alter_ctx.new_alias, table_list->db,
+            table_list->table_name, new_db_type, table_def))
+      goto err_new_table_cleanup;
+  }
+
+  if (alter_info->requested_algorithm !=
+      Alter_info::ALTER_TABLE_ALGORITHM_COPY) {
+    Alter_inplace_info ha_alter_info(create_info, alter_info,
+                                     alter_ctx.error_if_not_empty, key_info,
+                                     key_count, thd->work_part_info);
+    TABLE *altered_table = nullptr;
+    bool use_inplace = true;
+
+    /* Fill the Alter_inplace_info structure. */
+    if (fill_alter_inplace_info(thd, table, &ha_alter_info))
+      goto err_new_table_cleanup;
+
+    DBUG_EXECUTE_IF("innodb_index_drop_count_zero", {
+      if (ha_alter_info.index_drop_count) {
+        my_error(ER_ALTER_OPERATION_NOT_SUPPORTED, MYF(0), "Index rebuild",
+                 "Without rebuild");
+        return true;
+      }
+    };);
+
+    DBUG_EXECUTE_IF("innodb_index_drop_count_one", {
+      if (ha_alter_info.index_drop_count != 1) {
+        my_error(ER_ALTER_OPERATION_NOT_SUPPORTED, MYF(0), "Index change",
+                 "Index rebuild");
+        return true;
+      }
+    };);
+
+    // We assume that the table is non-temporary.
+    assert(!table->s->tmp_table);
+
+    if (!(altered_table = open_table_uncached(
+              thd, alter_ctx.get_tmp_path(), alter_ctx.new_db,
+              alter_ctx.tmp_name, true, false, *table_def)))
+      goto err_new_table_cleanup;
+
+    /* Set markers for fields in TABLE object for altered table. */
+    update_altered_table(ha_alter_info, altered_table);
+
+    /*
+      Mark all columns in 'altered_table' as used to allow usage
+      of its record[0] buffer and Field objects during in-place
+      ALTER TABLE.
+    */
+    altered_table->column_bitmaps_set_no_signal(&altered_table->s->all_set,
+                                                &altered_table->s->all_set);
+
+    set_column_static_defaults(altered_table, alter_info->create_list);
+
+    if (ha_alter_info.handler_flags == 0) {
+      /*
+        No-op ALTER, no need to call handler API functions.
+
+        If this code path is entered for an ALTER statement that
+        should not be a real no-op, new handler flags should be added
+        and fill_alter_inplace_info() adjusted.
+
+        Note that we can end up here if an ALTER statement has clauses
+        that cancel each other out (e.g. ADD/DROP identically index).
+
+        Also note that we ignore the LOCK clause here.
+      */
+      close_temporary_table(thd, altered_table, true, false);
+
+      if (!(create_info->db_type->flags & HTON_SUPPORTS_ATOMIC_DDL)) {
+        // Delete temporary table object from data dictionary.
+        bool result = dd::drop_table(thd, alter_ctx.new_db, alter_ctx.tmp_name,
+                                     *table_def);
+        (void)trans_intermediate_ddl_commit(thd, result);
+      }
+
+      is_noop = true;
+      goto end_inplace_noop;
+    }
+
+    // Ask storage engine whether to use copy or in-place
+    enum_alter_inplace_result inplace_supported =
+        table->file->check_if_supported_inplace_alter(altered_table,
+                                                      &ha_alter_info);
+
+    // If INSTANT was requested but it is not supported, report error.
+    if (alter_info->requested_algorithm ==
+            Alter_info::ALTER_TABLE_ALGORITHM_INSTANT &&
+        inplace_supported != HA_ALTER_INPLACE_INSTANT &&
+        inplace_supported != HA_ALTER_ERROR) {
+      ha_alter_info.report_unsupported_error("ALGORITHM=INSTANT",
+                                             "ALGORITHM=COPY/INPLACE");
+      close_temporary_table(thd, altered_table, true, false);
+      goto err_new_table_cleanup;
+    }
+
+    switch (inplace_supported) {
+      case HA_ALTER_INPLACE_EXCLUSIVE_LOCK:
+        // If SHARED lock and no particular algorithm was requested, use COPY.
+        if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_SHARED &&
+            alter_info->requested_algorithm ==
+                Alter_info::ALTER_TABLE_ALGORITHM_DEFAULT) {
+          use_inplace = false;
+        }
+        // Otherwise, if weaker lock was requested, report error.
+        else if (alter_info->requested_lock ==
+                     Alter_info::ALTER_TABLE_LOCK_NONE ||
+                 alter_info->requested_lock ==
+                     Alter_info::ALTER_TABLE_LOCK_SHARED) {
+          ha_alter_info.report_unsupported_error("LOCK=NONE/SHARED",
+                                                 "LOCK=EXCLUSIVE");
+          close_temporary_table(thd, altered_table, true, false);
+          goto err_new_table_cleanup;
+        }
+        break;
+      case HA_ALTER_INPLACE_SHARED_LOCK_AFTER_PREPARE:
+      case HA_ALTER_INPLACE_SHARED_LOCK:
+        // If weaker lock was requested, report error.
+        if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE) {
+          ha_alter_info.report_unsupported_error("LOCK=NONE", "LOCK=SHARED");
+          close_temporary_table(thd, altered_table, true, false);
+          goto err_new_table_cleanup;
+        }
+        break;
+      case HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE:
+      case HA_ALTER_INPLACE_NO_LOCK:
+      case HA_ALTER_INPLACE_INSTANT:
+        /*
+          Note that any instant operation is also in fact in-place operation.
+
+          It is totally safe to execute operation using instant algorithm if it
+          has no drawbacks as compared to in-place algorithm even if user
+          explicitly asked for ALGORITHM=INPLACE. Doing so, also allows to
+          keep code in engines which support only limited subset of in-place
+          ALTER TABLE operations as instant metadata only changes simple.
+
+          If instant algorithm has some downsides to in-place algorithm and user
+          explicitly asks for ALGORITHM=INPLACE it is responsibility of storage
+          engine to fallback to in-place algorithm execution by returning
+          HA_ALTER_INPLACE_NO_LOCK or HA_ALTER_INPLACE_NO_LOCK_AFTER_PREPARE.
+        */
+        break;
+      case HA_ALTER_INPLACE_NOT_SUPPORTED:
+        // If INPLACE was requested, report error.
+        if (alter_info->requested_algorithm ==
+            Alter_info::ALTER_TABLE_ALGORITHM_INPLACE) {
+          ha_alter_info.report_unsupported_error("ALGORITHM=INPLACE",
+                                                 "ALGORITHM=COPY");
+          close_temporary_table(thd, altered_table, true, false);
+          goto err_new_table_cleanup;
+        }
+        // COPY with LOCK=NONE is not supported, no point in trying.
+        if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE) {
+          ha_alter_info.report_unsupported_error("LOCK=NONE", "LOCK=SHARED");
+          close_temporary_table(thd, altered_table, true, false);
+          goto err_new_table_cleanup;
+        }
+        // Otherwise use COPY
+        use_inplace = false;
+        break;
+      case HA_ALTER_ERROR:
+      default:
+        close_temporary_table(thd, altered_table, true, false);
+        goto err_new_table_cleanup;
+    }
+
+    if (use_inplace) {
+      if (mysql_inplace_alter_table(thd, *schema, *new_schema, old_table_def,
+                                    table_def, table_list, table, altered_table,
+                                    &ha_alter_info, inplace_supported,
+                                    &alter_ctx, columns, fk_key_info,
+                                    fk_key_count, &fk_invalidator)) {
+        return true;
+      }
+
+      goto end_inplace;
+    } else {
+      close_temporary_table(thd, altered_table, true, false);
+    }
+  }
+
+  /* ALTER TABLE using copy algorithm. */
+
+  /* Check if ALTER TABLE is compatible with foreign key definitions. */
+  if (fk_check_copy_alter_table(thd, table_list, old_table_def, alter_info))
+    goto err_new_table_cleanup;
+
+  if (!table->s->tmp_table) {
+    MDL_request_list mdl_requests;
+
+    // COPY algorithm doesn't work with concurrent writes.
+    if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_NONE) {
+      my_error(ER_ALTER_OPERATION_NOT_SUPPORTED_REASON, MYF(0), "LOCK=NONE",
+               ER_THD(thd, ER_ALTER_OPERATION_NOT_SUPPORTED_REASON_COPY),
+               "LOCK=SHARED");
+      goto err_new_table_cleanup;
+    }
+
+    // If EXCLUSIVE lock is requested, upgrade already.
+    if (alter_info->requested_lock == Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE &&
+        wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
+      goto err_new_table_cleanup;
+
+    /*
+      Otherwise upgrade to SHARED_NO_WRITE.
+      Note that under LOCK TABLES, we will already have SHARED_NO_READ_WRITE.
+    */
+    if (alter_info->requested_lock != Alter_info::ALTER_TABLE_LOCK_EXCLUSIVE &&
+        thd->mdl_context.upgrade_shared_lock(mdl_ticket, MDL_SHARED_NO_WRITE,
+                                             thd->variables.lock_wait_timeout))
+      goto err_new_table_cleanup;
+
+    DEBUG_SYNC(thd, "alter_table_copy_after_lock_upgrade");
+
+    /*
+      COPY algorithm creates new table version in the new database.
+      So if new database differs from old one we need to lock all
+      foreign key names in new table version. If it is the same as
+      the old one we need to lock only names of foreign keys added.
+
+      Also if table is renamed we need to acquire locks on all foreign
+      key names involved (taking into account adjustment of auto-generated
+      names).
+    */
+    if (alter_ctx.is_database_changed()) {
+      if (collect_fk_names(thd, alter_ctx.new_db, table_def, &mdl_requests))
+        goto err_new_table_cleanup;
+    } else {
+      if (collect_fk_names_for_new_fks(
+              thd, alter_ctx.new_db, table_list->table_name, alter_info,
+              new_db_type,
+              get_fk_max_generated_name_number(table_list->table_name,
+                                               old_table_def, new_db_type),
+              &mdl_requests))
+        goto err_new_table_cleanup;
+    }
+
+    if (alter_ctx.is_table_renamed() &&
+        collect_fk_names_for_rename_table(
+            thd, table_list->db, table_list->table_name, table_def, new_db_type,
+            alter_ctx.new_db, alter_ctx.new_name, &mdl_requests))
+      goto err_new_table_cleanup;
+
+    /*
+      Acquire SRO locks on parent tables for newly added foreign keys
+      in order to prevent concurrent DML on them.
+
+      This is temporary workaround to the problem caused by the fact that
+      InnoDB makes such foreign keys visible in its internal dictionary
+      cache before ALTER TABLE commit. So such DML can result in access
+      to our temporary table without prior acquisition of metadata lock
+      on it (which would have blocked such access normally). As result
+      our ALTER TABLE can fail due to locks acquired by these accesses.
+
+      Long-term the problem should be solved by adjusting InnoDB code
+      to avoid making such uncommitted changes visible to other
+      connections.
+    */
+    if (collect_fk_parents_for_new_fks(
+            thd, table_list->db, table_list->table_name, alter_info,
+            MDL_SHARED_READ_ONLY, nullptr, &mdl_requests, nullptr))
+      goto err_new_table_cleanup;
+
+    if (!mdl_requests.is_empty() &&
+        thd->mdl_context.acquire_locks(&mdl_requests,
+                                       thd->variables.lock_wait_timeout))
+      goto err_new_table_cleanup;
+
+    /*
+      Check if ALTER TABLE results in any foreign key name conflicts
+      before starting potentially expensive copying operation.
+    */
+    if (!dd::get_dictionary()->is_dd_table_name(table_list->db,
+                                                table_list->table_name) &&
+        (new_db_type->flags & HTON_SUPPORTS_FOREIGN_KEYS)) {
+      if (alter_ctx.is_database_changed()) {
+        /*
+          If new table version was created schema different from the old one
+          we need to check names for both pre-existing and newly added foreign
+          keys.
+        */
+        for (FOREIGN_KEY *fk = fk_key_info; fk < fk_key_info + fk_key_count;
+             ++fk) {
+          bool exists;
+          if (thd->dd_client()->check_foreign_key_exists(*new_schema, fk->name,
+                                                         &exists))
+            goto err_new_table_cleanup;
+
+          if (exists) {
+            my_error(ER_FK_DUP_NAME, MYF(0), fk->name);
+            goto err_new_table_cleanup;
+          }
+        }
+      } else {
+        /* Otherwise we can limit our check to newly added foreign keys only. */
+        for (FOREIGN_KEY *fk = fk_key_info + alter_ctx.fk_count;
+             fk < fk_key_info + fk_key_count; ++fk) {
+          bool exists;
+          if (thd->dd_client()->check_foreign_key_exists(*new_schema, fk->name,
+                                                         &exists))
+            goto err_new_table_cleanup;
+
+          if (exists) {
+            my_error(ER_FK_DUP_NAME, MYF(0), fk->name);
+            goto err_new_table_cleanup;
+          }
+        }
+      }
+
+      if (alter_ctx.is_table_renamed() &&
+          check_fk_names_before_rename(thd, table_list, *table_def, new_db_type,
+                                       *new_schema, alter_ctx))
+        goto err_new_table_cleanup;
+    }
+  }
+
+  {
+    if (ha_create_table(thd, alter_ctx.get_tmp_path(), alter_ctx.new_db,
+                        alter_ctx.tmp_name, create_info, false, true,
+                        table_def))
+      goto err_new_table_cleanup;
+
+    /* Mark that we have created table in storage engine. */
+    no_ha_table = false;
+
+    if (create_info->options & HA_LEX_CREATE_TMP_TABLE) {
+      if (thd->decide_logging_format(table_list) ||
+          !open_table_uncached(thd, alter_ctx.get_tmp_path(), alter_ctx.new_db,
+                               alter_ctx.tmp_name, true, true, *table_def))
+        goto err_new_table_cleanup;
+      /* in case of alter temp table send the tracker in OK packet */
+      if (thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+              ->is_enabled())
+        thd->session_tracker.get_tracker(SESSION_STATE_CHANGE_TRACKER)
+            ->mark_as_changed(thd, {});
+    }
+
+    /* Open the table since we need to copy the data. */
+    if (table->s->tmp_table != NO_TMP_TABLE) {
+      Table_ref tbl(alter_ctx.new_db, alter_ctx.tmp_name, TL_READ_NO_INSERT);
+      /* Table is in thd->temporary_tables */
+      (void)open_temporary_table(thd, &tbl);
+      new_table = tbl.table;
+      /* Transfer dd::Table ownership to temporary table's share. */
+      new_table->s->tmp_table_def = non_dd_table_def.release();
+    } else {
+      /* table is a normal table: Create temporary table in same directory */
+      /* Open our intermediate table. */
+      new_table =
+          open_table_uncached(thd, alter_ctx.get_tmp_path(), alter_ctx.new_db,
+                              alter_ctx.tmp_name, true, true, *table_def);
+    }
+    if (!new_table) goto err_new_table_cleanup;
+    /*
+      Note: In case of MERGE table, we do not attach children. We do not
+      copy data for MERGE tables. Only the children have data.
+    */
+
+    // It's now safe to take the table level lock.
+    if (lock_tables(thd, table_list, alter_ctx.tables_opened, 0))
+      goto err_new_table_cleanup;
+  }
+
+  /*
+    We do not copy data for MERGE tables. Only the children have data.
+    MERGE tables have HA_NO_COPY_ON_ALTER set.
+  */
+  if (!(new_table->file->ha_table_flags() & HA_NO_COPY_ON_ALTER)) {
+    new_table->next_number_field = new_table->found_next_number_field;
+    THD_STAGE_INFO(thd, stage_copy_to_tmp_table);
+    DBUG_EXECUTE_IF("abort_copy_table", {
+      my_error(ER_LOCK_WAIT_TIMEOUT, MYF(0));
+      goto err_new_table_cleanup;
+    });
+
+    if (copy_data_between_tables(thd, thd->m_stage_progress_psi, table,
+                                 new_table, alter_info->create_list, &copied,
+                                 &deleted, alter_info->keys_onoff, &alter_ctx))
+      goto err_new_table_cleanup;
+
+    DEBUG_SYNC(thd, "alter_after_copy_table");
+  } else {
+    /* Should be MERGE only */
+    assert(new_table->file->ht->db_type == DB_TYPE_MRG_MYISAM);
+    if (!table->s->tmp_table &&
+        wait_while_table_is_used(thd, table, HA_EXTRA_FORCE_REOPEN))
+      goto err_new_table_cleanup;
+    THD_STAGE_INFO(thd, stage_manage_keys);
+    DEBUG_SYNC(thd, "alter_table_manage_keys");
+    alter_table_manage_keys(thd, table, table->file->indexes_are_disabled(),
+                            alter_info->keys_onoff);
+    assert(!(new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL));
+
+    /* Prevent intermediate commits to invoke commit order */
+    Implicit_substatement_state_guard substatement_guard(
+        thd, enum_implicit_substatement_guard_mode ::
+                 DISABLE_GTID_AND_SPCO_IF_SPCO_ACTIVE);
+
+    if (trans_commit_stmt(thd) || trans_commit_implicit(thd))
+      goto err_new_table_cleanup;
+  }
+
+  if (table->s->tmp_table != NO_TMP_TABLE) {
+    /* Close lock if this is a transactional table */
+    if (thd->lock) {
+      if (thd->locked_tables_mode != LTM_LOCK_TABLES &&
+          thd->locked_tables_mode != LTM_PRELOCKED_UNDER_LOCK_TABLES) {
+        mysql_unlock_tables(thd, thd->lock);
+        thd->lock = nullptr;
+      } else {
+        /*
+          If LOCK TABLES list is not empty and contains this table,
+          unlock the table and remove the table from this list.
+        */
+        mysql_lock_remove(thd, thd->lock, table);
+      }
+    }
+    /* Remove link to old table and rename the new one */
+    close_temporary_table(thd, table, true, true);
+    /* Should pass the 'new_name' as we store table name in the cache */
+    if (rename_temporary_table(thd, new_table, alter_ctx.new_db,
+                               alter_ctx.new_name))
+      goto err_new_table_cleanup;
+    /*
+      We don't replicate alter table statement on temporary tables
+      in RBR mode.
+    */
+    if (!thd->is_current_stmt_binlog_format_row() &&
+        write_bin_log(thd, true, thd->query().str, thd->query().length)) {
+      /*
+        We can't revert replacement of old table version with a new one
+        at this point. So, if possible, commit the statement to avoid
+        new table version being emptied by statement rollback.
+      */
+      if (!thd->transaction_rollback_request) {
+        (void)trans_commit_stmt(thd);
+        (void)trans_commit_implicit(thd);
+      }
+      return true;
+    }
+
+    // Do implicit commit for consistency with non-temporary table case/
+    if (trans_commit_stmt(thd) || trans_commit_implicit(thd)) return true;
+
+    goto end_temporary;
+  }
+
+  /*
+    Close the intermediate table that will be the new table, but do
+    not delete it! Even though MERGE tables do not have their children
+    attached here it is safe to call close_temporary_table().
+  */
+  close_temporary_table(thd, new_table, true, false);
+  new_table = nullptr;
+
+  DEBUG_SYNC(thd, "alter_table_before_rename_result_table");
+  DBUG_EXECUTE_IF("exit_after_alter_table_before_rename", {
+    my_error(ER_UNKNOWN_ERROR, MYF(0));
+    return true;
+  });
+
+  /*
+    Data is copied. Now we:
+    1) Wait until all other threads will stop using old version of table
+       by upgrading shared metadata lock to exclusive one.
+    2) Close instances of table open by this thread and replace them
+       with placeholders to simplify reopen process.
+    3) Rename the old table to a temp name, rename the new one to the
+       old name.
+    4) If we are under LOCK TABLES and don't do ALTER TABLE ... RENAME
+       we reopen new version of table.
+    5) Write statement to the binary log.
+    6) If we are under LOCK TABLES and do ALTER TABLE ... RENAME we
+       remove placeholders and release metadata locks.
+    7) If we are not not under LOCK TABLES we rely on the caller
+      (mysql_execute_command()) to release metadata locks.
+  */
+
+  THD_STAGE_INFO(thd, stage_rename_result_table);
+
+  if (wait_while_table_is_used(thd, table, HA_EXTRA_PREPARE_FOR_RENAME))
+    goto err_new_table_cleanup;
+
+  if (collect_and_lock_fk_tables_for_complex_alter_table(
+          thd, table_list, old_table_def, &alter_ctx, alter_info, old_db_type,
+          new_db_type, &fk_invalidator))
+    goto err_new_table_cleanup;
+
+  /*
+    To ensure DDL atomicity after this point support from both old and
+    new engines is necessary. If either of them lacks such support let
+    us commit transaction so changes to data-dictionary are more closely
+    reflect situations in SEs.
+
+    Also if new SE supports atomic DDL then we have not stored new table
+    definition in on-disk data-dictionary so far. It is time to do this
+    now if ALTER TABLE as a whole won't be atomic.
+  */
+  if (!atomic_replace) {
+    if ((new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+        thd->dd_client()->store(non_dd_table_def.get()))
+      goto err_new_table_cleanup;
+
+    /* Prevent intermediate commits to invoke commit order */
+    Implicit_substatement_state_guard substatement_guard(thd);
+
+    if (trans_commit_stmt(thd) || trans_commit_implicit(thd))
+      goto err_new_table_cleanup;
+
+    // Safety, in-memory dd::Table is no longer totally correct.
+    non_dd_table_def.reset();
+  }
+
+  char backup_name[32];
+  assert(sizeof(my_thread_id) == 4);
+  snprintf(backup_name, sizeof(backup_name), "%s2-%lx-%x", tmp_file_prefix,
+           current_pid, thd->thread_id());
+  if (lower_case_table_names) my_casedn_str(files_charset_info, backup_name);
+
+  close_all_tables_for_name(thd, table->s, false, nullptr);
+  table_list->table = table = nullptr; /* Safety */
+
+  /*
+    Rename the old version to temporary name to have a backup in case
+    anything goes wrong while renaming the new table.
+
+    Take the X metadata lock on this temporary name too. This ensures that
+    concurrent I_S queries won't try to open it. Assert to ensure we do not
+    come here when ALTERing temporary table.
+  */
+  {
+    assert(!is_tmp_table);
+    MDL_request backup_name_mdl_request;
+    MDL_REQUEST_INIT(&backup_name_mdl_request, MDL_key::TABLE, alter_ctx.db,
+                     backup_name, MDL_EXCLUSIVE, MDL_STATEMENT);
+    dd::cache::Dictionary_client::Auto_releaser releaser_2(thd->dd_client());
+    const dd::Table *backup_table = nullptr;
+
+    if (thd->mdl_context.acquire_lock(&backup_name_mdl_request,
+                                      thd->variables.lock_wait_timeout) ||
+        thd->dd_client()->acquire(alter_ctx.db, backup_name, &backup_table)) {
+      /* purecov: begin tested */
+      /*
+        We need to clear THD::transaction_rollback_request (which might
+        be set due to MDL deadlock) before attempting to remove new version
+        of table.
+      */
+      if (thd->transaction_rollback_request) {
+        trans_rollback_stmt(thd);
+        trans_rollback(thd);
+      }
+
+      if (!atomic_replace) {
+        (void)quick_rm_table(thd, new_db_type, alter_ctx.new_db,
+                             alter_ctx.tmp_name, FN_IS_TMP);
+      }
+      goto err_with_mdl;
+      /* purecov: end */
+    }
+
+    if (backup_table != nullptr) {
+      /* purecov: begin tested */
+      my_error(ER_TABLE_EXISTS_ERROR, MYF(0), backup_name);
+
+      if (!atomic_replace) {
+        (void)quick_rm_table(thd, new_db_type, alter_ctx.new_db,
+                             alter_ctx.tmp_name, FN_IS_TMP);
+      }
+      goto err_with_mdl;
+      /* purecov: end */
+    }
+  }
+
+  if (mysql_rename_table(thd, old_db_type, alter_ctx.db, alter_ctx.table_name,
+                         alter_ctx.db, alter_ctx.table_name, *schema,
+                         alter_ctx.db, backup_name,
+                         FN_TO_IS_TMP | (atomic_replace ? NO_DD_COMMIT : 0) |
+                             NO_FK_RENAME | NO_CC_RENAME)) {
+    // Rename to temporary name failed, delete the new table, abort ALTER.
+    if (!atomic_replace) {
+      /*
+        In non-atomic mode situations when the SE has requested rollback
+        should be handled already, by executing rollback right inside
+        mysql_rename_table() call.
+      */
+      assert(!thd->transaction_rollback_request);
+      (void)quick_rm_table(thd, new_db_type, alter_ctx.new_db,
+                           alter_ctx.tmp_name, FN_IS_TMP);
+    }
+    goto err_with_mdl;
+  }
+
+  /*
+    The below code assumes that only SE capable of atomic DDL support FK.
+    This is somewhat simplifies error handling below.
+
+    Note that we need to handle FKs atomically with this rename in order
+    to handle scenario when, for example, MyISAM table is altered to InnoDB
+    SE and some FKs are added at the same time.
+  */
+  assert(!(new_db_type->flags & HTON_SUPPORTS_FOREIGN_KEYS) ||
+         (new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL));
+
+  /*
+    We also assume that we can't have non-atomic ALTER TABLE which
+    will preserve any foreign keys (i.e. such ALTER TABLE can only
+    drop all foreign keys on the table, or add new foreign keys to
+    table which previously didn't have any).
+  */
+  assert(atomic_replace || alter_ctx.fk_count == 0);
+
+  /*
+    If both old and new SEs support atomic DDL then we have not stored
+    new table definition in on-disk data-dictionary so far. It is time
+    to do this now. However, before doing this we need to rename foreign
+    keys in old table definition to temporary names to avoid conflicts
+    with duplicate names.
+  */
+  if (atomic_replace) {
+    if (alter_ctx.fk_count > 0 &&
+        adjust_foreign_key_names_for_old_table_version(thd, alter_ctx.db,
+                                                       backup_name))
+      goto err_with_mdl;
+
+    if (thd->dd_client()->store(non_dd_table_def.get())) goto err_with_mdl;
+
+    // Safety, in-memory dd::Table is no longer totally correct.
+    non_dd_table_def.reset();
+  }
+
+  // Rename the new table to the correct name.
+  if (mysql_rename_table(
+          thd, new_db_type, alter_ctx.new_db, alter_ctx.tmp_name, alter_ctx.db,
+          alter_ctx.table_name, *new_schema, alter_ctx.new_db,
+          alter_ctx.new_alias,
+          (FN_FROM_IS_TMP |
+           ((new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) ? NO_DD_COMMIT
+                                                            : 0) |
+           (alter_ctx.is_table_renamed() ? 0 : NO_FK_RENAME | NO_CC_RENAME))) ||
+      ((new_db_type->flags & HTON_SUPPORTS_FOREIGN_KEYS) &&
+       adjust_fks_for_complex_alter_table(thd, table_list, &alter_ctx,
+                                          alter_info, new_db_type,
+                                          &fk_invalidator)) ||
+      /*
+        Try commit changes if ALTER TABLE as whole is not atomic and we have
+        not done this in the above mysql_rename_table() call.
+      */
+      (!atomic_replace && (new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+       trans_intermediate_ddl_commit(thd, false))) {
+    // Rename failed, delete the temporary table.
+    if (!atomic_replace) {
+      if (new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) {
+        /*
+          If ALTER TABLE as whole is not atomic and the above rename or
+          FK changes have failed without cleaning up after themselves,
+          we need to do this now.
+        */
+        (void)trans_intermediate_ddl_commit(thd, true);
+      }
+
+      /*
+        In non-atomic mode situations when the SE has requested rollback
+        should be handled already.
+      */
+      assert(!thd->transaction_rollback_request);
+
+      (void)quick_rm_table(thd, new_db_type, alter_ctx.new_db,
+                           alter_ctx.tmp_name, FN_IS_TMP);
+
+      // Restore the backup of the original table to its original name.
+      // If the operation fails, we need to retry it to avoid leaving
+      // the dictionary inconsistent.
+      //
+      // This hack might become unnecessary once InnoDB stops acquiring
+      // gap locks on DD tables (which might cause deadlocks).
+      uint retries = 20;
+      while (retries-- &&
+             mysql_rename_table(
+                 thd, old_db_type, alter_ctx.db, backup_name, alter_ctx.db,
+                 backup_name, *schema, alter_ctx.db, alter_ctx.alias,
+                 FN_FROM_IS_TMP | NO_FK_CHECKS | NO_FK_RENAME | NO_CC_RENAME))
+        ;
+    }
+    goto err_with_mdl;
+  }
+
+  /*
+    If ALTER TABLE is non-atomic and fails after this point it can add
+    foreign keys and such addition won't be reverted. So we need to
+    invalidate table objects for foreign key parents even on error.
+  */
+  if (!atomic_replace) invalidate_fk_parents_on_error = true;
+
+  // Handle trigger name, check constraint names and histograms statistics.
+  {
+    dd::Table *backup_table = nullptr;
+    dd::Table *new_dd_table = nullptr;
+    if (thd->dd_client()->acquire_for_modification(alter_ctx.db, backup_name,
+                                                   &backup_table) ||
+        thd->dd_client()->acquire_for_modification(
+            alter_ctx.new_db, alter_ctx.new_alias, &new_dd_table))
+      goto err_with_mdl;
+    assert(backup_table != nullptr && new_dd_table != nullptr);
+
+    /*
+      Check if this is an ALTER command that will cause histogram statistics to
+      become invalid. If that is the case; remove the histogram statistics.
+
+      This will take care of scenarios when COPY alter is used, but not INPLACE.
+      Do this before the commit for non-transactional tables, because the
+      new_dd_table is invalidated on commit.
+    */
+    if (alter_table_drop_histograms(thd, table_list, alter_info, create_info,
+                                    columns, backup_table, new_dd_table))
+      goto err_with_mdl; /* purecov: deadcode */
+
+    bool update = (new_dd_table->check_constraints()->size() > 0);
+    // Set mode for new_dd_table's check constraints.
+    set_check_constraints_alter_mode(new_dd_table, alter_info);
+
+    /*
+      Check constraint names are unique per schema, we cannot create them while
+      both table version exists. Adjust check constraint names in old table
+      version.
+    */
+    if (adjust_check_constraint_names_for_old_table_version(thd, alter_ctx.db,
+                                                            backup_table))
+      goto err_with_mdl;
+
+    // Reset check constraint's mode.
+    reset_check_constraints_alter_mode(new_dd_table);
+
+    /*
+      Since trigger names have to be unique per schema, we cannot
+      create them while both the old and the tmp version of the
+      table exist.
+    */
+    if (backup_table->has_trigger()) {
+      new_dd_table->copy_triggers(backup_table);
+      backup_table->drop_all_triggers();
+      update = true;
+    }
+    if (!is_checked_for_upgrade(*new_dd_table) &&
+        is_checked_for_upgrade(*backup_table)) {
+      new_dd_table->mark_as_checked_for_upgrade();
+      update = true;
+    }
+    if (update) {
+      if (thd->dd_client()->update(backup_table) ||
+          thd->dd_client()->update(new_dd_table))
+        goto err_with_mdl;
+
+      /* Prevent intermediate commits to invoke commit order */
+      Implicit_substatement_state_guard substatement_guard(thd);
+      if (!atomic_replace && (trans_commit_stmt(thd) || trans_commit(thd)))
+        goto err_with_mdl;
+    }
+  }
+
+  // If the ALTER command was a rename, rename any existing histograms.
+  if (alter_ctx.is_table_renamed() &&
+      rename_histograms(thd, table_list->db, table_list->table_name, new_db,
+                        new_name)) {
+    goto err_with_mdl; /* purecov: deadcode */
+  }
+
+  // ALTER TABLE succeeded, delete the backup of the old table.
+  if (quick_rm_table(thd, old_db_type, alter_ctx.db, backup_name,
+                     FN_IS_TMP | (atomic_replace ? NO_DD_COMMIT : 0))) {
+    /*
+      The fact that deletion of the backup failed is not critical
+      error, but still worth reporting as it might indicate serious
+      problem with server.
+
+      TODO: In !atomic_replace case we might need to do FK parents
+            invalidation here. However currently our FKs are not
+            even named correctly at this point, so we postpone
+            fixing this issue until we solve FK naming problem.
+    */
+    goto err_with_mdl;
+  }
+
+end_inplace_noop:
+
+  THD_STAGE_INFO(thd, stage_end);
+
+  DBUG_EXECUTE_IF("sleep_alter_before_main_binlog", my_sleep(6000000););
+  DEBUG_SYNC(thd, "alter_table_before_main_binlog");
+
+  ha_binlog_log_query(thd, create_info->db_type, LOGCOM_ALTER_TABLE,
+                      thd->query().str, thd->query().length, alter_ctx.db,
+                      alter_ctx.table_name);
+
+  assert(!(mysql_bin_log.is_open() &&
+           thd->is_current_stmt_binlog_format_row() &&
+           (create_info->options & HA_LEX_CREATE_TMP_TABLE)));
+
+  /*
+    If this is no-op ALTER TABLE we don't have transaction started.
+    We can't use binlog's trx cache in this case as it requires active
+    transaction with valid XID.
+  */
+  if (write_bin_log(thd, true, thd->query().str, thd->query().length,
+                    atomic_replace && !is_noop))
+    goto err_with_mdl;
+
+  if (!is_noop) {
+    Uncommitted_tables_guard uncommitted_tables(thd);
+
+    uncommitted_tables.add_table(table_list);
+
+    if (update_referencing_views_metadata(thd, table_list, new_db, new_name,
+                                          !atomic_replace, &uncommitted_tables))
+      goto err_with_mdl;
+
+    if (alter_ctx.is_table_renamed())
+      tdc_remove_table(thd, TDC_RT_REMOVE_ALL, alter_ctx.new_db,
+                       alter_ctx.new_name, false);
+  }
+
+  // Commit if it was not done before in order to be able to reopen tables.
+  if (atomic_replace && (trans_commit_stmt(thd) || trans_commit_implicit(thd)))
+    goto err_with_mdl;
+
+  if ((new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) && new_db_type->post_ddl)
+    new_db_type->post_ddl(thd);
+  if ((old_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) && old_db_type->post_ddl)
+    old_db_type->post_ddl(thd);
+
+#ifndef WORKAROUND_TO_BE_REMOVED_BY_WL6049
+  {
+    Table_ref table_list_reopen(alter_ctx.new_db, alter_ctx.new_name,
+                                alter_ctx.new_alias, TL_READ);
+    table_list_reopen.mdl_request.ticket =
+        alter_ctx.is_table_renamed() ? alter_ctx.target_mdl_request.ticket
+                                     : mdl_ticket;
+
+    Open_table_context ot_ctx(thd, MYSQL_OPEN_REOPEN);
+
+    if (open_table(thd, &table_list_reopen, &ot_ctx)) return true;
+
+    assert(table_list_reopen.table == thd->open_tables);
+    close_thread_table(thd, &thd->open_tables);
+  }
+#endif
+
+end_inplace:
+
+  fk_invalidator.invalidate(thd);
+
+  if (alter_ctx.is_table_renamed())
+    thd->locked_tables_list.rename_locked_table(
+        table_list, alter_ctx.new_db, alter_ctx.new_name,
+        alter_ctx.target_mdl_request.ticket);
+
+  {
+    bool reopen_error = thd->locked_tables_list.reopen_tables(thd);
+
+    if (thd->locked_tables_mode == LTM_LOCK_TABLES ||
+        thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES) {
+      if (alter_ctx.is_table_renamed()) {
+        /*
+          Release metadata lock on old table name and keep the lock
+          on the new one. We have to ignore reopen_error in this case
+          as we will mess up FK invariants for LOCK TABLES otherwise.
+        */
+        thd->mdl_context.release_all_locks_for_name(mdl_ticket);
+        thd->mdl_context.set_lock_duration(alter_ctx.target_mdl_request.ticket,
+                                           MDL_EXPLICIT);
+        alter_ctx.target_mdl_request.ticket->downgrade_lock(
+            MDL_SHARED_NO_READ_WRITE);
+        if (alter_ctx.is_database_changed())
+          thd->mdl_context.set_lock_duration(
+              alter_ctx.target_db_mdl_request.ticket, MDL_EXPLICIT);
+      } else
+        mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
+    }
+
+    if (reopen_error) return true;
+  }
+
+end_temporary:
+  snprintf(alter_ctx.tmp_name, sizeof(alter_ctx.tmp_name),
+           ER_THD(thd, ER_INSERT_INFO), (long)(copied + deleted), (long)deleted,
+           (long)thd->get_stmt_da()->current_statement_cond_count());
+  my_ok(thd, copied + deleted, 0L, alter_ctx.tmp_name);
+  return false;
+
+err_new_table_cleanup:
+  if (create_info->options & HA_LEX_CREATE_TMP_TABLE) {
+    if (new_table)
+      close_temporary_table(thd, new_table, true, true);
+    else if (!no_ha_table)
+      rm_temporary_table(thd, new_db_type, alter_ctx.get_tmp_path(),
+                         non_dd_table_def.get());
+  } else {
+    /* close_temporary_table() frees the new_table pointer. */
+    if (new_table) close_temporary_table(thd, new_table, true, false);
+
+    if (!(new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL)) {
+      if (no_ha_table)  // Only remove from DD.
+      {
+        dd::cache::Dictionary_client::Auto_releaser releaser_3(
+            thd->dd_client());
+        const dd::Table *drop_table_def = nullptr;
+        if (!thd->dd_client()->acquire(alter_ctx.new_db, alter_ctx.tmp_name,
+                                       &drop_table_def)) {
+          assert(drop_table_def != nullptr);
+          bool result = dd::drop_table(thd, alter_ctx.new_db,
+                                       alter_ctx.tmp_name, *drop_table_def);
+          (void)trans_intermediate_ddl_commit(thd, result);
+        }
+      } else  // Remove from both DD and SE.
+        (void)quick_rm_table(thd, new_db_type, alter_ctx.new_db,
+                             alter_ctx.tmp_name, FN_IS_TMP);
+    } else {
+      trans_rollback_stmt(thd);
+      /*
+        Full rollback in case we have THD::transaction_rollback_request
+        and to synchronize DD state in cache and on disk (as statement
+        rollback doesn't clear DD cache of modified uncommitted objects).
+      */
+      trans_rollback(thd);
+    }
+    if ((new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) &&
+        new_db_type->post_ddl)
+      new_db_type->post_ddl(thd);
+  }
+
+  if (alter_ctx.error_if_not_empty &
+      Alter_table_ctx::GEOMETRY_WITHOUT_DEFAULT) {
+    my_error(ER_INVALID_USE_OF_NULL, MYF(0));
+  }
+
+  /*
+    No default value was provided for a DATE/DATETIME field, the
+    current sql_mode doesn't allow the '0000-00-00' value and
+    the table to be altered isn't empty.
+    Report error here. Ignore error checkin for push_zero_date_warning()
+    as we return true right below.
+  */
+  if ((alter_ctx.error_if_not_empty &
+       Alter_table_ctx::DATETIME_WITHOUT_DEFAULT) &&
+      (thd->variables.sql_mode & MODE_NO_ZERO_DATE) &&
+      thd->get_stmt_da()->current_row_for_condition()) {
+    (void)push_zero_date_warning(thd, alter_ctx.datetime_field);
+  }
+  return true;
+
+err_with_mdl:
+  /*
+    An error happened while we were holding exclusive name metadata lock
+    on table being altered. Before releasing locks we need to rollback
+    changes to the data-dictionary, storage angine and binary log (if
+    they were not committed earlier) and execute post DDL hooks.
+    We also try to reopen old version of the table under LOCK TABLES
+    if possible.
+  */
+
+  trans_rollback_stmt(thd);
+  /*
+    Full rollback in case we have THD::transaction_rollback_request
+    and to synchronize DD state in cache and on disk (as statement
+    rollback doesn't clear DD cache of modified uncommitted objects).
+  */
+  trans_rollback(thd);
+  if ((new_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) && new_db_type->post_ddl)
+    new_db_type->post_ddl(thd);
+  if ((old_db_type->flags & HTON_SUPPORTS_ATOMIC_DDL) && old_db_type->post_ddl)
+    old_db_type->post_ddl(thd);
+
+  if (atomic_replace) {
+    /*
+      If both old and new storage engines support atomic DDL all changes
+      were reverted at this point. So we can safely try to reopen table
+      under old name.
+    */
+  } else {
+    /*
+      If ALTER TABLE ... RENAME ... ALGORITHM=COPY is non-atomic we can't
+      be sure that rename step was reverted, so we simply remove table
+      from the list of locked tables.
+    */
+    if (alter_ctx.is_table_renamed())
+      thd->locked_tables_list.unlink_all_closed_tables(thd, nullptr, 0);
+  }
+
+  /*
+    ALTER TABLE which changes table storage engine from MyISAM to InnoDB
+    and adds foreign keys at the same time can fail after installing
+    new table version. In this case we still need to invalidate table
+    objects for parent tables to avoid creating discrepancy between
+    data-dictionary and cache contents.
+  */
+  if (invalidate_fk_parents_on_error) fk_invalidator.invalidate(thd);
+
+  (void)thd->locked_tables_list.reopen_tables(thd);
+
+  if ((thd->locked_tables_mode == LTM_LOCK_TABLES ||
+       thd->locked_tables_mode == LTM_PRELOCKED_UNDER_LOCK_TABLES)) {
+    /*
+      Non-atomic ALTER TABLE ... RENAME ... ALGORITHM=COPY can add
+      foreign keys if at the same time SE is changed from, e.g.,
+      MyISAM to InnoDB. Since releasing metadata locks on old or new
+      table name can break FK invariants for LOCK TABLES in various
+      scenarios we keep both of them.
+    */
+    if (!atomic_replace && alter_ctx.is_table_renamed()) {
+      thd->mdl_context.set_lock_duration(alter_ctx.target_mdl_request.ticket,
+                                         MDL_EXPLICIT);
+      alter_ctx.target_mdl_request.ticket->downgrade_lock(
+          MDL_SHARED_NO_READ_WRITE);
+      if (alter_ctx.is_database_changed())
+        thd->mdl_context.set_lock_duration(
+            alter_ctx.target_db_mdl_request.ticket, MDL_EXPLICIT);
+    }
+    mdl_ticket->downgrade_lock(MDL_SHARED_NO_READ_WRITE);
+  }
+
+  return true;
+}
+
+

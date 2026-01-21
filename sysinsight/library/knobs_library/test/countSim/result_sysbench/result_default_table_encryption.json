@@ -1,0 +1,25 @@
+[
+    {
+        "knob_name": "default_table_encryption",
+        "data_matched_functions": [
+            "Query_log_event::write"
+        ],
+        "data_matched_count": 1,
+        "control_matched_functions": [
+            "String::append",
+            "MEM_ROOT::ClearForReuse",
+            "dd::get_dictionary",
+            "THD::update_slow_query_status",
+            "lock_table_names",
+            "THD::enter_stage",
+            "Diagnostics_area::reset_diagnostics_area",
+            "log_slow_statement",
+            "my_ok",
+            "gtid_pre_statement_checks",
+            "ER_THD",
+            "Query_logger::general_log_write"
+        ],
+        "control_matched_count": 12,
+        "matched_count": 13
+    }
+]

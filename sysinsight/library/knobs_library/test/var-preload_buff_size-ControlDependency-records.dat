@@ -1,0 +1,14 @@
+Global Variable: System_variables.46
+Explicit Data Flow (2):
+  Instruction: %21 = bitcast i64* %preload_buff_size to i8*, !dbg !1255339 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/ha_myisam.cc:1195:20 | Function: ha_myisam::preload_keys
+  Instruction: %call17 = invoke i32 @_Z8mi_extraP7MI_INFO17ha_extra_functionPv(%struct.MI_INFO* %19, i32 29, i8* %21)
+          to label %invoke.cont16 unwind label %lpad, !dbg !1255340 | Location: /root/LLVM/mysql-8.0.36/storage/myisam/ha_myisam.cc:1194:3 | Function: ha_myisam::preload_keys
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+
+Implicit Control Flow:
+
+----------------------------------------

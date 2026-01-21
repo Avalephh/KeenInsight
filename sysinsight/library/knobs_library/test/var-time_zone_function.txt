@@ -1,0 +1,1066 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/mysqld.cc
+Function: show_max_used_connections_time
+static int show_max_used_connections_time(THD *thd, SHOW_VAR *var, char *buff) {
+  MYSQL_TIME max_used_connections_time;
+  var->type = SHOW_CHAR;
+  var->value = buff;
+  thd->variables.time_zone->gmt_sec_to_TIME(
+      &max_used_connections_time,
+      Connection_handler_manager::max_used_connections_time);
+  my_datetime_to_str(max_used_connections_time, buff, 0);
+  return 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_class.h
+Function: THD::time_zone
+  inline Time_zone *time_zone() {
+    time_zone_used = true;
+    return variables.time_zone;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_time.cc
+Function: str_to_datetime_with_warn
+bool str_to_datetime_with_warn(String *str, MYSQL_TIME *l_time,
+                               my_time_flags_t flags) {
+  MYSQL_TIME_STATUS status;
+  THD *thd = current_thd;
+  if (thd->variables.sql_mode & MODE_NO_ZERO_DATE) flags |= TIME_NO_ZERO_DATE;
+  if (thd->variables.sql_mode & MODE_INVALID_DATES) flags |= TIME_INVALID_DATES;
+  if (thd->is_fsp_truncate_mode()) flags |= TIME_FRAC_TRUNCATE;
+  bool ret_val = propagate_datetime_overflow(
+      thd, &status.warnings, str_to_datetime(str, l_time, flags, &status));
+  if (ret_val || status.warnings) {
+    if (make_truncated_value_warning(current_thd, Sql_condition::SL_WARNING,
+                                     ErrConvString(str), l_time->time_type,
+                                     NullS))
+      return true;
+    if (ret_val) status.squelch_deprecation();
+  }
+  check_deprecated_datetime_format(current_thd, str->charset(), status);
+
+  if (ret_val) return true;
+  return convert_time_zone_displacement(thd->time_zone(), l_time);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_time.cc
+Function: str_to_time_with_warn
+bool str_to_time_with_warn(String *str, MYSQL_TIME *l_time) {
+  MYSQL_TIME_STATUS status;
+  my_time_flags_t flags = 0;
+  THD *thd = current_thd;
+
+  if (current_thd->is_fsp_truncate_mode()) flags = TIME_FRAC_TRUNCATE;
+
+  bool ret_val = propagate_datetime_overflow(
+      current_thd, &status.warnings, str_to_time(str, l_time, flags, &status));
+  if (ret_val || status.warnings) {
+    if (make_truncated_value_warning(thd, Sql_condition::SL_WARNING,
+                                     ErrConvString(str), MYSQL_TIMESTAMP_TIME,
+                                     NullS))
+      return true;
+  }
+  check_deprecated_datetime_format(current_thd, str->charset(), status);
+  if (!ret_val)
+    if (convert_time_zone_displacement(thd->time_zone(), l_time)) return true;
+
+  return ret_val;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_time.cc
+Function: time_to_datetime
+void time_to_datetime(THD *thd, const MYSQL_TIME *ltime, MYSQL_TIME *ltime2) {
+  thd->variables.time_zone->gmt_sec_to_TIME(
+      ltime2, static_cast<my_time_t>(thd->query_start_in_secs()));
+  ltime2->hour = ltime2->minute = ltime2->second = ltime2->second_part = 0;
+  ltime2->time_type = MYSQL_TIMESTAMP_DATE;
+  mix_date_and_time(ltime2, *ltime);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_time.cc
+Function: gmt_time_to_local_time
+ulonglong gmt_time_to_local_time(ulonglong gmt_time) {
+  MYSQL_TIME time;
+  bool not_used;
+
+  THD *thd = current_thd;
+  Time_zone *tz = thd->variables.time_zone;
+
+  // Convert longlong time to MYSQL_TIME format
+  my_longlong_to_datetime_with_warn(gmt_time, &time, MYF(0));
+
+  // Convert MYSQL_TIME to epoc second according to GMT time_zone.
+  my_time_t timestamp;
+  timestamp = my_tz_OFFSET0->TIME_to_gmt_sec(&time, &not_used);
+
+  // Convert epoc seconds to local time
+  tz->gmt_sec_to_TIME(&time, timestamp);
+
+  // Return ulonglong value from MYSQL_TIME
+  return TIME_to_ulonglong_datetime(time);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql-common/json_dom.cc
+Function: Json_datetime::from_packed_to_key
+void Json_datetime::from_packed_to_key(const char *from, enum_field_types ft,
+                                       uchar *to, uint8 dec) {
+  MYSQL_TIME ltime;
+  TIME_from_longlong_packed(&ltime, ft, sint8korr(from));
+
+  switch (ft) {
+    case MYSQL_TYPE_TIME:
+      my_time_packed_to_binary(sint8korr(from), to, dec);
+      break;
+    case MYSQL_TYPE_DATETIME:
+      my_datetime_packed_to_binary(sint8korr(from), to, dec);
+      break;
+    case MYSQL_TYPE_DATE:
+      TIME_from_longlong_date_packed(&ltime, sint8korr(from));
+      my_date_to_binary(&ltime, to);
+      break;
+    case MYSQL_TYPE_TIMESTAMP: {
+      my_timeval tm;
+      int warnings = 0;
+      TIME_from_longlong_datetime_packed(&ltime, sint8korr(from));
+      datetime_with_no_zero_in_date_to_timeval(
+          &ltime, *current_thd->time_zone(), &tm, &warnings);
+      // Assume that since the value was properly stored, there're no warnings
+      assert(!warnings);
+      my_timestamp_to_binary(&tm, to, dec);
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field::get_timestamp
+bool Field::get_timestamp(my_timeval *tm, int *warnings) const {
+  MYSQL_TIME ltime;
+  assert(!is_null());
+  return get_date(&ltime, TIME_FUZZY_DATE) ||
+         datetime_to_timeval(&ltime, *current_thd->time_zone(), tm, warnings);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_temporal::store
+type_conversion_status Field::store(const char *to, size_t length,
+                                    const CHARSET_INFO *cs,
+                                    enum_check_fields check_level) {
+  THD *thd = current_thd;
+  enum_check_fields old_check_level = thd->check_for_truncated_fields;
+  thd->check_for_truncated_fields = check_level;
+  const type_conversion_status res = store(to, length, cs);
+  thd->check_for_truncated_fields = old_check_level;
+  return res;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_timestamp::store_internal
+type_conversion_status Field_timestamp::store_internal(const MYSQL_TIME *ltime,
+                                                       int *warnings) {
+  THD *thd = current_thd;
+  my_timeval tm;
+  convert_TIME_to_timestamp(ltime, *thd->time_zone(), &tm, warnings);
+  const type_conversion_status error =
+      time_warning_to_type_conversion_status(*warnings);
+  store_timestamp_internal(&tm);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_timestamp::get_date_internal
+  return get_date_internal(&ltime) ? 0
+                                   : TIME_to_longlong_datetime_packed(ltime);
+}
+
+longlong Field_temporal_with_date::val_time_temporal() const {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_timestampf::store_internal
+type_conversion_status Field_timestamp::store_internal(const MYSQL_TIME *ltime,
+                                                       int *warnings) {
+  THD *thd = current_thd;
+  my_timeval tm;
+  convert_TIME_to_timestamp(ltime, *thd->time_zone(), &tm, warnings);
+  const type_conversion_status error =
+      time_warning_to_type_conversion_status(*warnings);
+  store_timestamp_internal(&tm);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_timestampf::get_date_internal
+  return get_date_internal(&ltime) ? 0
+                                   : TIME_to_longlong_datetime_packed(ltime);
+}
+
+longlong Field_temporal_with_date::val_time_temporal() const {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_datetimef::store_internal
+type_conversion_status Field_timestamp::store_internal(const MYSQL_TIME *ltime,
+                                                       int *warnings) {
+  THD *thd = current_thd;
+  my_timeval tm;
+  convert_TIME_to_timestamp(ltime, *thd->time_zone(), &tm, warnings);
+  const type_conversion_status error =
+      time_warning_to_type_conversion_status(*warnings);
+  store_timestamp_internal(&tm);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_timef::store_internal
+type_conversion_status Field_timestamp::store_internal(const MYSQL_TIME *ltime,
+                                                       int *warnings) {
+  THD *thd = current_thd;
+  my_timeval tm;
+  convert_TIME_to_timestamp(ltime, *thd->time_zone(), &tm, warnings);
+  const type_conversion_status error =
+      time_warning_to_type_conversion_status(*warnings);
+  store_timestamp_internal(&tm);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_newdate::store_internal
+type_conversion_status Field_timestamp::store_internal(const MYSQL_TIME *ltime,
+                                                       int *warnings) {
+  THD *thd = current_thd;
+  my_timeval tm;
+  convert_TIME_to_timestamp(ltime, *thd->time_zone(), &tm, warnings);
+  const type_conversion_status error =
+      time_warning_to_type_conversion_status(*warnings);
+  store_timestamp_internal(&tm);
+  return error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_datetimef::store_timestamp_internal
+void Field_timestamp::store_timestamp_internal(const my_timeval *tm) {
+  if (table && table->s->db_low_byte_first)
+    int4store(ptr, tm->m_tv_sec);
+  else
+    longstore(ptr, (uint32)tm->m_tv_sec);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/field.cc
+Function: Field_datetime::store_timestamp_internal
+void Field_timestamp::store_timestamp_internal(const my_timeval *tm) {
+  if (table && table->s->db_low_byte_first)
+    int4store(ptr, tm->m_tv_sec);
+  else
+    longstore(ptr, (uint32)tm->m_tv_sec);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_at_time_zone::get_date
+bool Item_temporal_hybrid_func::get_date(MYSQL_TIME *ltime,
+                                         my_time_flags_t fuzzy_date) {
+  MYSQL_TIME tm;
+  if (val_datetime(&tm, fuzzy_date)) {
+    assert(null_value == true);
+    return true;
+  }
+  if (data_type() == MYSQL_TYPE_TIME || tm.time_type == MYSQL_TIMESTAMP_TIME)
+    time_to_datetime(current_thd, &tm, ltime);
+  else
+    *ltime = tm;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_curtime_local::time_zone
+Time_zone *Item_func_curdate_local::time_zone() {
+  return current_thd->time_zone();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_curdate_local::time_zone
+Time_zone *Item_func_curdate_local::time_zone() {
+  return current_thd->time_zone();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_now_local::time_zone
+Time_zone *Item_func_curdate_local::time_zone() {
+  return current_thd->time_zone();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_sysdate_local::get_date
+bool Item_temporal_hybrid_func::get_date(MYSQL_TIME *ltime,
+                                         my_time_flags_t fuzzy_date) {
+  MYSQL_TIME tm;
+  if (val_datetime(&tm, fuzzy_date)) {
+    assert(null_value == true);
+    return true;
+  }
+  if (data_type() == MYSQL_TYPE_TIME || tm.time_type == MYSQL_TIMESTAMP_TIME)
+    time_to_datetime(current_thd, &tm, ltime);
+  else
+    *ltime = tm;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_from_unixtime::get_date
+bool Item_temporal_hybrid_func::get_date(MYSQL_TIME *ltime,
+                                         my_time_flags_t fuzzy_date) {
+  MYSQL_TIME tm;
+  if (val_datetime(&tm, fuzzy_date)) {
+    assert(null_value == true);
+    return true;
+  }
+  if (data_type() == MYSQL_TYPE_TIME || tm.time_type == MYSQL_TIMESTAMP_TIME)
+    time_to_datetime(current_thd, &tm, ltime);
+  else
+    *ltime = tm;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_internal_update_time::get_date
+bool Item_temporal_hybrid_func::get_date(MYSQL_TIME *ltime,
+                                         my_time_flags_t fuzzy_date) {
+  MYSQL_TIME tm;
+  if (val_datetime(&tm, fuzzy_date)) {
+    assert(null_value == true);
+    return true;
+  }
+  if (data_type() == MYSQL_TYPE_TIME || tm.time_type == MYSQL_TIMESTAMP_TIME)
+    time_to_datetime(current_thd, &tm, ltime);
+  else
+    *ltime = tm;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_timefunc.cc
+Function: Item_func_internal_check_time::get_date
+bool Item_temporal_hybrid_func::get_date(MYSQL_TIME *ltime,
+                                         my_time_flags_t fuzzy_date) {
+  MYSQL_TIME tm;
+  if (val_datetime(&tm, fuzzy_date)) {
+    assert(null_value == true);
+    return true;
+  }
+  if (data_type() == MYSQL_TYPE_TIME || tm.time_type == MYSQL_TIMESTAMP_TIME)
+    time_to_datetime(current_thd, &tm, ltime);
+  else
+    *ltime = tm;
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/event_parse_data.cc
+Function: Event_parse_data::init_execute_at
+    Event_parse_data::init_execute_at()
+      thd  Thread
+
+  RETURN VALUE
+    0               OK
+    ER_WRONG_VALUE  Wrong value for execute at (reported)
+*/
+
+int Event_parse_data::init_execute_at(THD *thd) {
+  MYSQL_TIME ltime;
+  my_time_t ltime_utc;
+
+  DBUG_TRACE;
+
+  if (!item_execute_at) return 0;
+
+  if (ResolveScalarItem(thd, &item_execute_at)) {
+    return ER_WRONG_VALUE;
+  }
+
+  /* no starts and/or ends in case of execute_at */
+  DBUG_PRINT("info", ("starts_null && ends_null should be 1 is %d",
+                      (starts_null && ends_null)));
+  assert(starts_null && ends_null);
+
+  if ((item_execute_at->get_date(&ltime, TIME_NO_ZERO_DATE))) goto wrong_value;
+
+  bool is_in_dst_gap_ignored;
+  ltime_utc = thd->time_zone()->TIME_to_gmt_sec(&ltime, &is_in_dst_gap_ignored);
+
+  if (!ltime_utc) {
+    DBUG_PRINT("error", ("Execute AT after year 2037"));
+    goto wrong_value;
+  }
+
+  check_if_in_the_past(thd, ltime_utc);
+
+  execute_at_null = false;
+  execute_at = ltime_utc;
+  return 0;
+
+wrong_value:
+  report_bad_value(thd, "AT", item_execute_at);
+  return ER_WRONG_VALUE;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/event_parse_data.cc
+Function: Event_parse_data::init_starts
+    Event_parse_data::init_starts()
+      expr      how much?
+
+  NOTES
+    Note that activation time is not execution time.
+    EVERY 5 MINUTE STARTS "2004-12-12 10:00:00" means that
+    the event will be executed every 5 minutes but this will
+    start at the date shown above. Expressions are possible :
+    DATE_ADD(NOW(), INTERVAL 1 DAY)  -- start tomorrow at
+    same time.
+
+  RETURN VALUE
+    0                OK
+    ER_WRONG_VALUE  Starts before now
+*/
+
+int Event_parse_data::init_starts(THD *thd) {
+  MYSQL_TIME ltime;
+  my_time_t ltime_utc;
+
+  DBUG_TRACE;
+  if (!item_starts) return 0;
+
+  if (ResolveScalarItem(thd, &item_starts)) {
+    return ER_WRONG_VALUE;
+  }
+
+  if ((item_starts->get_date(&ltime, TIME_NO_ZERO_DATE))) goto wrong_value;
+
+  bool is_in_dst_gap_ignored;
+  ltime_utc = thd->time_zone()->TIME_to_gmt_sec(&ltime, &is_in_dst_gap_ignored);
+
+  if (!ltime_utc) goto wrong_value;
+
+  DBUG_PRINT("info", ("now: %ld  starts: %ld", (long)thd->query_start_in_secs(),
+                      (long)ltime_utc));
+
+  starts_null = false;
+  starts = ltime_utc;
+  return 0;
+
+wrong_value:
+  report_bad_value(thd, "STARTS", item_starts);
+  return ER_WRONG_VALUE;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/event_parse_data.cc
+Function: Event_parse_data::init_ends
+    Event_parse_data::init_ends()
+      thd       THD
+
+  NOTES
+    Note that activation time is not execution time.
+    EVERY 5 MINUTE ENDS "2004-12-12 10:00:00" means that
+    the event will be executed every 5 minutes but this will
+    end at the date shown above. Expressions are possible :
+    DATE_ADD(NOW(), INTERVAL 1 DAY)  -- end tomorrow at
+    same time.
+
+  RETURN VALUE
+    0                  OK
+    EVEX_BAD_PARAMS    Error (reported)
+*/
+
+int Event_parse_data::init_ends(THD *thd) {
+  MYSQL_TIME ltime;
+  my_time_t ltime_utc;
+
+  DBUG_TRACE;
+  if (!item_ends) return 0;
+
+  if (ResolveScalarItem(thd, &item_ends)) {
+    return EVEX_BAD_PARAMS;
+  }
+
+  DBUG_PRINT("info", ("convert to TIME"));
+
+  if ((item_ends->get_date(&ltime, TIME_NO_ZERO_DATE))) goto error_bad_params;
+
+  bool is_in_dst_gap_ignored;
+  ltime_utc = thd->time_zone()->TIME_to_gmt_sec(&ltime, &is_in_dst_gap_ignored);
+  if (!ltime_utc) goto error_bad_params;
+
+  /* Check whether ends is after starts */
+  DBUG_PRINT("info", ("ENDS after STARTS?"));
+  if (!starts_null && starts >= ltime_utc) goto error_bad_params;
+
+  check_if_in_the_past(thd, ltime_utc);
+
+  ends_null = false;
+  ends = ltime_utc;
+  return 0;
+
+error_bad_params:
+  my_error(ER_EVENT_ENDS_BEFORE_STARTS, MYF(0));
+  return EVEX_BAD_PARAMS;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_const_folding.cc
+Function: analyze_timestamp_field_constant not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_const_folding.cc
+Function: analyze_timestamp_field_constant not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_const_folding.cc
+Function: analyze_timestamp_field_constant not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_const_folding.cc
+Function: analyze_timestamp_field_constant not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/event_data_objects.cc
+Function: Event_job_data::execute
+bool Event_job_data::execute(THD *thd, bool drop) {
+  String sp_sql;
+  Security_context event_sctx, *save_sctx = nullptr;
+  mem_root_deque<Item *> empty_item_list(thd->mem_root);
+  bool ret = true;
+  sql_digest_state *parent_digest = thd->m_digest;
+  PSI_statement_locker *parent_locker = thd->m_statement_psi;
+
+  DBUG_TRACE;
+
+  mysql_reset_thd_for_next_command(thd);
+
+  /*
+    MySQL parser currently assumes that current database is either
+    present in THD or all names in all statements are fully specified.
+    And yet not fully specified names inside stored programs must be
+    be supported, even if the current database is not set:
+    CREATE PROCEDURE db1.p1() BEGIN CREATE TABLE t1; END//
+    -- in this example t1 should be always created in db1 and the statement
+    must parse even if there is no current database.
+
+    To support this feature and still address the parser limitation,
+    we need to set the current database here.
+    We don't have to call mysql_change_db, since the checks performed
+    in it are unnecessary for the purpose of parsing, and
+    mysql_change_db will be invoked anyway later, to activate the
+    procedure database before it's executed.
+  */
+  thd->set_db(m_schema_name);
+
+  lex_start(thd);
+
+  if (event_sctx.change_security_context(thd, m_definer_user, m_definer_host,
+                                         m_schema_name.str, &save_sctx)) {
+    LogErr(ERROR_LEVEL, ER_EVENT_EXECUTION_FAILED_CANT_AUTHENTICATE_USER,
+           m_definer.str, m_schema_name.str, m_event_name.str);
+    goto end;
+  }
+
+  /*
+    In case the definer user has SYSTEM_USER privilege then make THD
+    non-killable through the users who do not have SYSTEM_USER privilege,
+    OR vice-versa.
+    Recalculate the connection_admin flag state as well (CONNECTION_ADMIN
+    privilege).
+    Note - Do not forget to reset the flags after the saved security
+    context is restored.
+  */
+  if (save_sctx) {
+    set_system_user_flag(thd);
+    set_connection_admin_flag(thd);
+  }
+
+  if (check_access(thd, EVENT_ACL, m_schema_name.str, nullptr, nullptr, false,
+                   false)) {
+    /*
+      This aspect of behavior is defined in the worklog,
+      and this is how triggers work too: if TRIGGER
+      privilege is revoked from trigger definer,
+      triggers are not executed.
+    */
+    LogErr(ERROR_LEVEL, ER_EVENT_EXECUTION_FAILED_USER_LOST_EVEN_PRIVILEGE,
+           m_definer.str, m_schema_name.str, m_event_name.str);
+    goto end;
+  }
+
+  /*
+    Set up global thread attributes to reflect the properties of
+    this Event. We can simply reset these instead of usual
+    backup/restore employed in stored programs since we know that
+    this is a top level statement and the worker thread is
+    allocated exclusively to execute this event.
+  */
+
+  thd->variables.sql_mode = m_sql_mode;
+  thd->variables.time_zone = m_time_zone;
+
+  if (construct_sp_sql(thd, &sp_sql)) goto end;
+
+  /*
+    If enabled, log the quoted form to performance_schema.error_log.
+    We enclose it in faux guillemets to differentiate the enclosing
+    quotation seen in the log from the SQL-level quotation from
+    construct_sp_sql()'s (which calls append_identifier() in sql_show,
+    and thus ultimately get_quote_char_for_identifier() which evaluates
+    thd->variables.sql_mode & MODE_ANSI_QUOTES).
+
+    We're logging with a priority of SYSTEM_LEVEL so we won't have to
+    worry abot log_error_verbosity. (ERROR_LEVEL would also achieve
+    that, but then mysql-test-run.pl would rightfully complain about
+    the error in the log.)
+  */
+  DBUG_EXECUTE_IF("log_event_query_string", {
+    LEX_STRING sm1;
+    LEX_STRING sm2;
+    sql_mode_string_representation(thd, thd->variables.sql_mode, &sm1);
+    sql_mode_string_representation(thd, m_sql_mode, &sm2);
+    LogEvent()
+        .errcode(ER_CONDITIONAL_DEBUG)
+        .prio(SYSTEM_LEVEL)
+        .message("Query string to be compiled: \"%s\"/\"%s\" >>%s<<\n", sm1.str,
+                 sm2.str, sp_sql.c_ptr_safe());
+  });
+
+  thd->set_query(sp_sql.c_ptr_safe(), sp_sql.length());
+
+  {
+    Parser_state parser_state;
+
+    if (parser_state.init(thd, thd->query().str, thd->query().length)) goto end;
+
+    thd->m_digest = nullptr;
+    thd->m_statement_psi = nullptr;
+    if (parse_sql(thd, &parser_state, m_creation_ctx)) {
+      LogErr(ERROR_LEVEL, ER_EVENT_ERROR_DURING_COMPILATION,
+             thd->is_fatal_error() ? "fatal " : "", m_schema_name.str,
+             m_event_name.str);
+      thd->m_digest = parent_digest;
+      thd->m_statement_psi = parent_locker;
+      goto end;
+    }
+    thd->m_digest = parent_digest;
+    thd->m_statement_psi = parent_locker;
+  }
+
+  {
+    sp_head *sphead = thd->lex->sphead;
+
+    assert(sphead);
+
+    if (thd->enable_slow_log) sphead->m_flags |= sp_head::LOG_SLOW_STATEMENTS;
+    sphead->m_flags |= sp_head::LOG_GENERAL_LOG;
+
+    sphead->set_info(0, 0, &thd->lex->sp_chistics, m_sql_mode);
+    sphead->set_creation_ctx(m_creation_ctx);
+    sphead->optimize();
+
+    sphead->m_type = enum_sp_type::EVENT;
+#ifdef HAVE_PSI_SP_INTERFACE
+    sphead->m_sp_share = MYSQL_GET_SP_SHARE(
+        to_uint(enum_sp_type::EVENT), m_schema_name.str, m_schema_name.length,
+        m_event_name.str, m_event_name.length);
+#endif
+
+    ret = sphead->execute_procedure(thd, &empty_item_list);
+    /*
+      There is no pre-locking and therefore there should be no
+      tables open and locked left after execute_procedure.
+    */
+  }
+
+end:
+  if (drop && !thd->is_fatal_error()) {
+    /*
+      We must do it here since here we're under the right authentication
+      ID of the event definer.
+    */
+    LogErr(INFORMATION_LEVEL, ER_EVENT_DROPPING, m_schema_name.str,
+           m_event_name.str);
+    /*
+      Construct a query for the binary log, to ensure the event is dropped
+      on the slave
+    */
+    if (construct_drop_event_sql(thd, &sp_sql, m_schema_name, m_event_name))
+      ret = true;
+    else {
+      ulong saved_master_access;
+
+      thd->set_query(sp_sql.c_ptr_safe(), sp_sql.length());
+      /*
+        Drop should be executed as a separate transaction.
+        Commit any open transaction before executing the drop event.
+      */
+      ret = trans_commit_stmt(thd) || trans_commit(thd);
+
+      // Prevent InnoDB from automatically committing the InnoDB transaction
+      // after updating the data-dictionary table.
+      Disable_autocommit_guard autocommit_guard(thd);
+
+      /*
+        NOTE: even if we run in read-only mode, we should be able to lock
+        the mysql.event table for writing. In order to achieve this, we
+        should call mysql_lock_tables() under the super-user.
+
+        Same goes for transaction access mode.
+        Temporarily reset it to read-write.
+      */
+
+      saved_master_access = thd->security_context()->master_access();
+      thd->security_context()->set_master_access(saved_master_access |
+                                                 SUPER_ACL);
+      bool save_tx_read_only = thd->tx_read_only;
+      thd->tx_read_only = false;
+
+      ret = Events::drop_event(thd, m_schema_name, m_event_name, false);
+
+      thd->tx_read_only = save_tx_read_only;
+      thd->security_context()->set_master_access(saved_master_access);
+    }
+  }
+
+  if (save_sctx) {
+    event_sctx.restore_security_context(thd, save_sctx);
+    /* Restore the original values in THD */
+    set_system_user_flag(thd);
+    set_connection_admin_flag(thd);
+  }
+
+  thd->lex->cleanup(true);
+  thd->end_statement();
+  thd->cleanup_after_query();
+  /* Avoid races with SHOW PROCESSLIST */
+  thd->reset_query();
+
+  DBUG_PRINT("info", ("EXECUTED %s.%s  ret: %d", m_schema_name.str,
+                      m_event_name.str, ret));
+
+  return ret;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/upgrade_57/event.cc
+Function: dd::upgrade_57::load_event_creation_context not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/auth/sql_authentication.cc
+Function: check_password_lifetime
+static bool check_password_lifetime(THD *thd, const ACL_USER *acl_user) {
+  bool password_time_expired = false;
+
+  if (likely(acl_user != nullptr) && !acl_user->password_expired &&
+      acl_user->password_last_changed.time_type != MYSQL_TIMESTAMP_ERROR &&
+      auth_plugin_is_built_in(acl_user->plugin.str) &&
+      (acl_user->use_default_password_lifetime ||
+       acl_user->password_lifetime)) {
+    MYSQL_TIME cur_time, password_change_by;
+    Interval interval;
+
+    thd->set_time();
+    thd->variables.time_zone->gmt_sec_to_TIME(
+        &cur_time, static_cast<my_time_t>(thd->query_start_in_secs()));
+    password_change_by = acl_user->password_last_changed;
+    memset(&interval, 0, sizeof(interval));
+
+    if (!acl_user->use_default_password_lifetime)
+      interval.day = acl_user->password_lifetime;
+    else {
+      MUTEX_LOCK(lock, &LOCK_default_password_lifetime);
+      interval.day = default_password_lifetime;
+    }
+    if (interval.day) {
+      if (!date_add_interval_with_warn(thd, &password_change_by, INTERVAL_DAY,
+                                       interval))
+        password_time_expired =
+            my_time_compare(password_change_by, cur_time) >= 0 ? false : true;
+      else {
+        assert(false);
+        /* Make the compiler happy. */
+      }
+    }
+  }
+  DBUG_EXECUTE_IF("force_password_interval_expire", {
+    if (!acl_user->use_default_password_lifetime && acl_user->password_lifetime)
+      password_time_expired = true;
+  });
+  DBUG_EXECUTE_IF("force_password_interval_expire_for_time_type", {
+    if (acl_user->password_last_changed.time_type != MYSQL_TIMESTAMP_ERROR)
+      password_time_expired = true;
+  });
+  return password_time_expired;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/auth/acl_table_user.cc
+Function: replace_user_table
+int replace_user_table(THD *thd, TABLE *table, LEX_USER *combo, ulong rights,
+                       bool revoke_grant, bool can_create_user,
+                       acl_table::Pod_user_what_to_update &what_to_update,
+                       Restrictions *restrictions /*= nullptr*/,
+                       I_multi_factor_auth *mfa /*= nullptr*/) {
+  acl_table::Acl_table_user_writer user_table(
+      thd, table, combo, rights, revoke_grant, can_create_user, what_to_update,
+      restrictions, mfa);
+
+  LEX *lex = thd->lex;
+  if (lex->alter_user_attribute !=
+      enum_alter_user_attribute::ALTER_USER_COMMENT_NOT_USED) {
+    std::string json_blob;
+    json_blob.append(lex->alter_user_comment_text.str,
+                     lex->alter_user_comment_text.length);
+
+    user_table.replace_user_application_user_metadata([=](TABLE *table_inner) {
+      assert(!thd->is_error());
+      if (replace_user_metadata(json_blob,
+                                lex->alter_user_attribute ==
+                                    enum_alter_user_attribute::
+                                        ALTER_USER_COMMENT /* expect text */,
+                                table_inner)) {
+        return true;  // An error occurred and DA was set.
+                      // Stop transaction.
+      }
+      return false;
+    });
+  }
+  acl_table::Acl_table_user_writer_status return_value;
+
+  DBUG_TRACE;
+  assert(assert_acl_cache_write_lock(thd));
+
+  return_value = user_table.driver();
+
+  if (!(return_value.error || return_value.skip_cache_update)) {
+    bool old_row_exists = (user_table.get_operation_mode() ==
+                           acl_table::Acl_table_operation::OP_UPDATE);
+    bool builtin_plugin =
+        auth_plugin_is_built_in(combo->first_factor_auth_info.plugin.str);
+    bool update_password = (what_to_update.m_what & PLUGIN_ATTR);
+
+    /*
+      Convert the time when the password was changed from timeval
+      structure to MYSQL_TIME format, to store it in cache.
+    */
+    MYSQL_TIME password_change_time;
+
+    if (builtin_plugin && (update_password || !old_row_exists))
+      thd->variables.time_zone->gmt_sec_to_TIME(
+          &password_change_time,
+          (my_time_t)return_value.password_change_timestamp.m_tv_sec);
+    else
+      password_change_time.time_type = MYSQL_TIMESTAMP_ERROR;
+    clear_and_init_db_cache(); /* Clear privilege cache */
+    if (old_row_exists) {
+      acl_update_user(
+          combo->user.str, combo->host.str, lex->ssl_type, lex->ssl_cipher,
+          lex->x509_issuer, lex->x509_subject, &lex->mqh,
+          return_value.updated_rights, combo->first_factor_auth_info.plugin,
+          combo->first_factor_auth_info.auth, return_value.second_cred,
+          password_change_time, combo->alter_status, return_value.restrictions,
+          what_to_update, return_value.password_lock.failed_login_attempts,
+          return_value.password_lock.password_lock_time_days,
+          return_value.multi_factor);
+    } else
+      acl_insert_user(thd, combo->user.str, combo->host.str, lex->ssl_type,
+                      lex->ssl_cipher, lex->x509_issuer, lex->x509_subject,
+                      &lex->mqh, return_value.updated_rights,
+                      combo->first_factor_auth_info.plugin,
+                      combo->first_factor_auth_info.auth, password_change_time,
+                      combo->alter_status, return_value.restrictions,
+                      return_value.password_lock.failed_login_attempts,
+                      return_value.password_lock.password_lock_time_days,
+                      return_value.multi_factor);
+  }
+  return return_value.error;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::do_apply_event
+  Query_log_event::do_apply_event()
+*/
+int Query_log_event::do_apply_event(Relay_log_info const *rli) {
+  return do_apply_event(rli, query, q_len);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/log_event.cc
+Function: Query_log_event::Query_log_event
+Query_log_event::Query_log_event()
+    : binary_log::Query_event(),
+      Log_event(header(), footer()),
+      data_buf(nullptr) {}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/dd_event.cc
+Function: dd::set_event_attributes
+  set_event_attributes(thd, schema, event.get(), event_name, event_body,
+                       event_body_utf8, definer, event_data, false);
+
+  return thd->dd_client()->store(event.get());
+}
+
+bool update_event(THD *thd, Event *event, const dd::Schema &schema,
+                  const dd::Schema *new_schema,
+                  const String_type &new_event_name,
+                  const String_type &new_event_body,
+                  const String_type &new_event_body_utf8,
+                  const LEX_USER *definer, Event_parse_data *event_data) {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/dictionary_client.cc
+Function: dd::cache::Timestamp_timezone_guard::Timestamp_timezone_guard
+  Timestamp_timezone_guard(THD *thd) : m_thd(thd) {
+    m_tz = m_thd->variables.time_zone;
+    m_thd->variables.time_zone = my_tz_OFFSET0;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/cache/dictionary_client.cc
+Function: dd::cache::Timestamp_timezone_guard::
+    if (!table || is_prefix(table->name().c_str(), tmp_file_prefix))
+      return true;
+
+    // Likewise, if there is no schema, we cannot have a proper lock.
+    // This may in theory happen during bootstrapping since the meta data for
+    // the system schema is not stored yet; however, this is prevented by
+    // surrounding code calling this function only if
+    // '!thd->is_dd_system_thread' i.e., this is not a bootstrapping thread.
+    assert(!thd->is_dd_system_thread());
+    assert(schema);
+
+    // We must take l_c_t_n into account when reconstructing the MDL key
+    // from the schema and table name, and we need buffers for this purpose.
+    char table_name_buf[NAME_LEN + 1];
+    char schema_name_buf[NAME_LEN + 1];
+
+    const char *table_name = table->name().c_str();
+    const char *schema_name = dd::Object_table_definition_impl::fs_name_case(
+        schema->name(), schema_name_buf);
+
+    // Information schema tables and views are always locked in upper
+    // case independently of lower_case_table_names. At this point, the
+    // table name should aldready be converted to upper case. This is
+    // asserted in the mdl system when checking the lock below. For non-
+    // I_S tables, the table name must be converted to the appropriate
+    // character case.
+    if (my_strcasecmp(system_charset_info, schema->name().c_str(),
+                      "information_schema")) {
+      table_name = dd::Object_table_definition_impl::fs_name_case(
+          table->name(), table_name_buf);
+    }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::Routine_event_context_guard::Routine_event_context_guard
+Routine_event_context_guard::Routine_event_context_guard(THD *thd)
+    : m_thd(thd) {
+  m_thd = thd;
+  m_sql_mode = m_thd->variables.sql_mode;
+  m_client_cs = m_thd->variables.character_set_client;
+  m_connection_cl = m_thd->variables.collation_connection;
+  m_saved_time_zone = m_thd->variables.time_zone;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/dd/impl/upgrade/server.cc
+Function: dd::upgrade::Routine_event_context_guard::
+  if (should_log_error(error))
+    LogEvent()
+        .type(LOG_TYPE_ERROR)
+        .subsys(LOG_SUBSYSTEM_TAG)
+        .prio(ERROR_LEVEL)
+        .errcode(ER_ERROR_INFO_FROM_DA)
+        .verbatim(str);
+}
+
+void Bootstrap_error_handler::set_abort_on_error(uint error) {
+
+

@@ -1,0 +1,81 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/innobase/srv/srv0srv.cc
+Function: srv_do_purge
+static ulint srv_do_purge(ulint *n_total_purged) {
+  ulint n_pages_purged;
+
+  static ulint count = 0;
+  static ulint n_use_threads = 0;
+  static uint64_t rseg_history_len = 0;
+  ulint old_activity_count = srv_get_activity_count();
+  bool need_explicit_truncate = false;
+
+  const auto n_threads = srv_threads.m_purge_workers_n;
+
+  ut_a(n_threads > 0);
+  ut_ad(!srv_read_only_mode);
+
+  /* Purge until there are no more records to purge and there is
+  no change in configuration or server state. If the user has
+  configured more than one purge thread then we treat that as a
+  pool of threads and only use the extra threads if purge can't
+  keep up with updates. */
+
+  if (n_use_threads == 0) {
+    n_use_threads = n_threads;
+  }
+
+  do {
+    if (trx_sys->rseg_history_len.load() > rseg_history_len ||
+        (srv_max_purge_lag > 0 && rseg_history_len > srv_max_purge_lag)) {
+      /* History length is now longer than what it was
+      when we took the last snapshot. Use more threads. */
+
+      if (n_use_threads < n_threads) {
+        ++n_use_threads;
+      }
+
+    } else if (srv_check_activity(old_activity_count) && n_use_threads > 1) {
+      /* History length same or smaller since last snapshot,
+      use fewer threads. */
+
+      --n_use_threads;
+
+      old_activity_count = srv_get_activity_count();
+    }
+
+    /* Ensure that the purge threads are less than what
+    was configured. */
+
+    ut_a(n_use_threads > 0);
+    ut_a(n_use_threads <= n_threads);
+
+    /* Take a snapshot of the history list before purge. */
+    if ((rseg_history_len = trx_sys->rseg_history_len.load()) == 0) {
+      break;
+    }
+
+    bool do_truncate = need_explicit_truncate ||
+                       srv_shutdown_state.load() == SRV_SHUTDOWN_PURGE ||
+                       (++count % srv_purge_rseg_truncate_frequency) == 0;
+
+    n_pages_purged =
+        trx_purge(n_use_threads, srv_purge_batch_size, do_truncate);
+
+    *n_total_purged += n_pages_purged;
+
+    need_explicit_truncate = (n_pages_purged == 0);
+    if (need_explicit_truncate) {
+      undo::spaces->s_lock();
+      need_explicit_truncate =
+          (undo::spaces->find_first_inactive_explicit(nullptr) != nullptr);
+      undo::spaces->s_unlock();
+    }
+  } while (purge_sys->state == PURGE_STATE_RUN &&
+           (n_pages_purged > 0 || need_explicit_truncate) &&
+           !srv_purge_should_exit(n_pages_purged));
+
+  return rseg_history_len;
+}
+
+

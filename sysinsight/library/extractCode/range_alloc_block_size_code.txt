@@ -1,0 +1,1861 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: make_join_query_block
+static bool make_join_query_block(JOIN *join, Item *cond) {
+  assert(cond == nullptr || cond->is_bool_func());
+  THD *thd = join->thd;
+  Opt_trace_context *const trace = &thd->opt_trace;
+  DBUG_TRACE;
+  ASSERT_BEST_REF_IN_JOIN_ORDER(join);
+
+  // Add IS NOT NULL conditions to table conditions:
+  if (add_not_null_conds(join)) return true;
+
+  /*
+    Extract constant conditions that are part of the WHERE clause.
+    Constant parts of join conditions from outer joins are attached to
+    the appropriate table condition in JOIN::attach_join_conditions().
+  */
+  if (cond) /* Because of GroupIndexSkipScanIterator */
+  {         /* there may be a select without a cond. */
+    if (join->primary_tables > 1)
+      cond->update_used_tables();  // Table number may have changed
+    if (join->plan_is_const() &&
+        join->query_block->master_query_expression() ==
+            thd->lex->unit)  // The outer-most query block
+      join->const_table_map |= RAND_TABLE_BIT;
+  }
+  /*
+    Extract conditions that depend on constant tables.
+    The const part of the query's WHERE clause can be checked immediately
+    and if it is not satisfied then the join has empty result
+  */
+  Item *const_cond = nullptr;
+  if (cond)
+    const_cond = make_cond_for_table(thd, cond, join->const_table_map,
+                                     table_map(0), true);
+
+  // Add conditions added by add_not_null_conds()
+  for (uint i = 0; i < join->const_tables; i++) {
+    if (and_conditions(&const_cond, join->best_ref[i]->condition()))
+      return true;
+  }
+  DBUG_EXECUTE("where",
+               print_where(thd, const_cond, "constants", QT_ORDINARY););
+  if (const_cond != nullptr &&
+      evaluate_during_optimization(const_cond, join->query_block)) {
+    const bool const_cond_result = const_cond->val_int() != 0;
+    if (thd->is_error()) return true;
+
+    Opt_trace_object trace_const_cond(trace);
+    trace_const_cond.add("condition_on_constant_tables", const_cond)
+        .add("condition_value", const_cond_result);
+    if (const_cond_result) {
+      /*
+        If all the tables referred by the condition are const tables and
+        if the condition is not expensive, we can remove the where condition
+        as it will always evaluate to "true".
+      */
+      if (join->plan_is_const() &&
+          !(cond->used_tables() & ~join->const_table_map) &&
+          !cond->is_expensive()) {
+        DBUG_PRINT("info", ("Found always true WHERE condition"));
+        join->where_cond = nullptr;
+      }
+    } else {
+      DBUG_PRINT("info", ("Found impossible WHERE condition"));
+      return true;
+    }
+  }
+
+  /*
+    Extract remaining conditions from WHERE clause and join conditions,
+    and attach them to the most appropriate table condition. This means that
+    a condition will be evaluated as soon as all fields it depends on are
+    available. For outer join conditions, the additional criterion is that
+    we must have determined whether outer-joined rows are available, or
+    have been NULL-extended, see JOIN::attach_join_conditions() for details.
+  */
+  {
+    Opt_trace_object trace_wrapper(trace);
+    Opt_trace_object trace_conditions(trace, "attaching_conditions_to_tables");
+    trace_conditions.add("original_condition", cond);
+    Opt_trace_array trace_attached_comp(trace,
+                                        "attached_conditions_computation");
+
+    for (uint i = join->const_tables; i < join->tables; i++) {
+      JOIN_TAB *const tab = join->best_ref[i];
+
+      if (!tab->position()) continue;
+      /*
+        first_inner is the X in queries like:
+        SELECT * FROM t1 LEFT OUTER JOIN (t2 JOIN t3) ON X
+      */
+      const plan_idx first_inner = tab->first_inner();
+      const table_map used_tables = tab->prefix_tables();
+      const table_map current_map = tab->added_tables();
+      Item *tmp = nullptr;
+
+      if (cond)
+        tmp = make_cond_for_table(thd, cond, used_tables, current_map, false);
+      /* Add conditions added by add_not_null_conds(). */
+      if (and_conditions(&tmp, tab->condition())) return true;
+
+      if (cond && !tmp && tab->range_scan()) {  // Outer join
+        assert(tab->type() == JT_RANGE || tab->type() == JT_INDEX_MERGE);
+        /*
+          Hack to handle the case where we only refer to a table
+          in the ON part of an OUTER JOIN. In this case we want the code
+          below to check if we should use 'quick' instead.
+        */
+        DBUG_PRINT("info", ("Item_func_true"));
+        tmp = new Item_func_true();  // Always true
+      }
+      if (tmp || !cond || tab->type() == JT_REF ||
+          tab->type() == JT_REF_OR_NULL || tab->type() == JT_EQ_REF ||
+          first_inner != NO_PLAN_IDX) {
+        DBUG_EXECUTE("where",
+                     print_where(thd, tmp, tab->table()->alias, QT_ORDINARY););
+        /*
+          If tab is an inner table of an outer join operation,
+          add a match guard to the pushed down predicate.
+          The guard will turn the predicate on only after
+          the first match for outer tables is encountered.
+        */
+        if (cond && tmp) {
+          /*
+            Because of GroupIndexSkipScanIterator there may be a select without
+            a cond, so neutralize the hack above.
+          */
+          if (!(tmp = add_found_match_trig_cond(join, first_inner, tmp,
+                                                NO_PLAN_IDX)))
+            return true;
+          tab->set_condition(tmp);
+        } else {
+          tab->set_condition(nullptr);
+        }
+
+        DBUG_EXECUTE("where",
+                     print_where(thd, tmp, tab->table()->alias, QT_ORDINARY););
+
+        if (tab->range_scan()) {
+          if (tab->needed_reg.is_clear_all() && tab->type() != JT_CONST) {
+            /*
+              We keep (for now) the QUICK AM calculated in
+              get_quick_record_count().
+            */
+          } else {
+            destroy(tab->range_scan());
+            tab->set_range_scan(nullptr);
+          }
+        }
+
+        if ((tab->type() == JT_ALL || tab->type() == JT_RANGE ||
+             tab->type() == JT_INDEX_MERGE || tab->type() == JT_INDEX_SCAN) &&
+            tab->use_quick != QS_RANGE) {
+          /*
+            We plan to scan (table/index/range scan).
+            Check again if we should use an index. We can use an index if:
+
+            1a) There is a condition that range optimizer can work on, and
+            1b) There are non-constant conditions on one or more keys, and
+            1c) Some of the non-constant fields may have been read
+                already. This may be the case if this is not the first
+                table in the join OR this is a subselect with
+                non-constant conditions referring to an outer table
+                (dependent subquery)
+                or,
+            2a) There are conditions only relying on constants
+            2b) This is the first non-constant table
+            2c) There is a limit of rows to read that is lower than
+                the fanout for this table, predicate filters included
+                (i.e., the estimated number of rows that will be
+                produced for this table per row combination of
+                previous tables)
+            2d) The query is NOT run with FOUND_ROWS() (because in that
+                case we have to scan through all rows to count them anyway)
+          */
+          enum {
+            DONT_RECHECK,
+            NOT_FIRST_TABLE,
+            LOW_LIMIT
+          } recheck_reason = DONT_RECHECK;
+
+          assert(tab->const_keys.is_subset(tab->keys()));
+
+          const join_type orig_join_type = tab->type();
+          const AccessPath *const orig_range_scan = tab->range_scan();
+
+          if (cond &&                              // 1a
+              (tab->keys() != tab->const_keys) &&  // 1b
+              (i > 0 ||                            // 1c
+               (join->query_block->master_query_expression()->item &&
+                cond->is_outer_reference())))
+            recheck_reason = NOT_FIRST_TABLE;
+          else if (!tab->const_keys.is_clear_all() &&  // 2a
+                   i == join->const_tables &&          // 2b
+                   (join->query_expression()->select_limit_cnt <
+                    (tab->position()->rows_fetched *
+                     tab->position()->filter_effect)) &&  // 2c
+                   !join->calc_found_rows)                // 2d
+            recheck_reason = LOW_LIMIT;
+
+          // Don't recheck if the storage engine does not support index access.
+          if ((tab->table()->file->ha_table_flags() & HA_NO_INDEX_ACCESS) != 0)
+            recheck_reason = DONT_RECHECK;
+
+          if (tab->position()->sj_strategy == SJ_OPT_LOOSE_SCAN) {
+            /*
+              Semijoin loose scan has settled for a certain index-based access
+              method with suitable characteristics, don't substitute it.
+            */
+            recheck_reason = DONT_RECHECK;
+          }
+
+          if (recheck_reason != DONT_RECHECK) {
+            Opt_trace_object trace_one_table(trace);
+            trace_one_table.add_utf8_table(tab->table_ref);
+            Opt_trace_object trace_table(trace, "rechecking_index_usage");
+            if (recheck_reason == NOT_FIRST_TABLE)
+              trace_table.add_alnum("recheck_reason", "not_first_table");
+            else
+              trace_table.add_alnum("recheck_reason", "low_limit")
+                  .add("limit", join->query_expression()->select_limit_cnt)
+                  .add("row_estimate", tab->position()->rows_fetched *
+                                           tab->position()->filter_effect);
+
+            /* Join with outer join condition */
+            Item *orig_cond = tab->condition();
+            tab->and_with_condition(tab->join_cond());
+
+            /*
+              We can't call sel->cond->fix_fields,
+              as it will break tab->join_cond() if it's AND condition
+              (fix_fields currently removes extra AND/OR levels).
+              Yet attributes of the just built condition are not needed.
+              Thus we call sel->cond->quick_fix_field for safety.
+            */
+            if (tab->condition() && !tab->condition()->fixed)
+              tab->condition()->quick_fix_field();
+
+            Key_map usable_keys = tab->keys();
+            enum_order interesting_order = ORDER_NOT_RELEVANT;
+
+            if (recheck_reason == LOW_LIMIT) {
+              int read_direction = 0;
+
+              /*
+                If the current plan is to use range, then check if the
+                already selected index provides the order dictated by the
+                ORDER BY clause.
+              */
+              if (tab->range_scan() &&
+                  used_index(tab->range_scan()) != MAX_KEY) {
+                const uint ref_key = used_index(tab->range_scan());
+                bool skip_quick;
+                read_direction = test_if_order_by_key(
+                    &join->order, tab->table(), ref_key, nullptr, &skip_quick);
+                if (skip_quick) read_direction = 0;
+                /*
+                  If the index provides order there is no need to recheck
+                  index usage; we already know from the former call to
+                  test_quick_select() that a range scan on the chosen
+                  index is cheapest. Note that previous calls to
+                  test_quick_select() did not take order direction
+                  (ASC/DESC) into account, so in case of DESC ordering
+                  we still need to recheck.
+                */
+                if (read_direction == 1 ||
+                    (read_direction == -1 &&
+                     reverse_sort_possible(tab->range_scan()) &&
+                     !make_reverse(get_used_key_parts(tab->range_scan()),
+                                   tab->range_scan()))) {
+                  recheck_reason = DONT_RECHECK;
+                }
+              }
+              // We do a cost based search for an ordering index here. Do this
+              // only if prefer_ordering_index switch is on or an index is
+              // forced for order by
+              if (recheck_reason != DONT_RECHECK &&
+                  (tab->table()->force_index_order ||
+                   thd->optimizer_switch_flag(
+                       OPTIMIZER_SWITCH_PREFER_ORDERING_INDEX))) {
+                int best_key = -1;
+                ha_rows select_limit =
+                    join->query_expression()->select_limit_cnt;
+
+                /* Use index specified in FORCE INDEX FOR ORDER BY, if any. */
+                if (tab->table()->force_index_order)
+                  usable_keys.intersect(tab->table()->keys_in_use_for_order_by);
+
+                // Do a cost based search on the indexes that give sort order.
+                test_if_cheaper_ordering(
+                    tab, &join->order, tab->table(), usable_keys, -1,
+                    select_limit, &best_key, &read_direction, &select_limit);
+                if (best_key < 0)
+                  recheck_reason = DONT_RECHECK;  // No usable keys
+                else {
+                  // Only usable_key is the best_key chosen
+                  usable_keys.clear_all();
+                  usable_keys.set_bit(best_key);
+                  interesting_order =
+                      (read_direction == -1 ? ORDER_DESC : ORDER_ASC);
+                }
+              }
+            }
+
+            bool search_if_impossible = recheck_reason != DONT_RECHECK;
+            if (search_if_impossible) {
+              if (tab->range_scan()) {
+                destroy(tab->range_scan());
+                tab->set_type(JT_ALL);
+              }
+              AccessPath *range_scan;
+              MEM_ROOT temp_mem_root(key_memory_test_quick_select_exec,
+                                     thd->variables.range_alloc_block_size);
+              search_if_impossible =
+                  test_quick_select(
+                      thd, thd->mem_root, &temp_mem_root, usable_keys,
+                      used_tables & ~tab->table_ref->map(), 0,
+                      join->calc_found_rows
+                          ? HA_POS_ERROR
+                          : join->query_expression()->select_limit_cnt,
+                      false,  // don't force quick range
+                      interesting_order, tab->table(),
+                      tab->skip_records_in_range(), tab->condition(),
+                      &tab->needed_reg, tab->table()->force_index,
+                      join->query_block, &range_scan) < 0;
+              tab->set_range_scan(range_scan);
+            }
+            tab->set_condition(orig_cond);
+            if (search_if_impossible) {
+              /*
+                Before reporting "Impossible WHERE" for the whole query
+                we have to check isn't it only "impossible ON" instead
+              */
+              if (!tab->join_cond())
+                return true;  // No ON, so it's really "impossible WHERE"
+              Opt_trace_object trace_without_on(trace, "without_ON_clause");
+              if (tab->range_scan()) {
+                destroy(tab->range_scan());
+                tab->set_type(JT_ALL);
+              }
+              AccessPath *range_scan;
+              MEM_ROOT temp_mem_root(key_memory_test_quick_select_exec,
+                                     thd->variables.range_alloc_block_size);
+              const bool impossible_where =
+                  test_quick_select(
+                      thd, thd->mem_root, &temp_mem_root, tab->keys(),
+                      used_tables & ~tab->table_ref->map(), 0,
+                      join->calc_found_rows
+                          ? HA_POS_ERROR
+                          : join->query_expression()->select_limit_cnt,
+                      false,  // don't force quick range
+                      ORDER_NOT_RELEVANT, tab->table(),
+                      tab->skip_records_in_range(), tab->condition(),
+                      &tab->needed_reg, tab->table()->force_index,
+                      join->query_block, &range_scan) < 0;
+              tab->set_range_scan(range_scan);
+              if (impossible_where) return true;  // Impossible WHERE
+            }
+
+            /*
+              Access method changed. This is after deciding join order
+              and access method for all other tables so the info
+              updated below will not have any effect on the execution
+              plan.
+            */
+            if (tab->range_scan())
+              tab->set_type(calc_join_type(tab->range_scan()));
+
+          }  // end of "if (recheck_reason != DONT_RECHECK)"
+
+          if (!tab->table()->quick_keys.is_subset(tab->checked_keys) ||
+              !tab->needed_reg.is_subset(tab->checked_keys)) {
+            tab->keys().merge(tab->table()->quick_keys);
+            tab->keys().merge(tab->needed_reg);
+
+            /*
+              The logic below for assigning tab->use_quick is strange.
+              It bases the decision of which access method to use
+              (dynamic range, range, scan) based on seemingly
+              unrelated information like the presence of another index
+              with too bad selectivity to be used.
+
+              Consider the following scenario:
+
+              The join optimizer has decided to use join order
+              (t1,t2), and 'tab' is currently t2. Further, assume that
+              there is a join condition between t1 and t2 using some
+              range operator (e.g. "t1.x < t2.y").
+
+              It has been decided that a table scan is best for t2.
+              make_join_query_block() then reran the range optimizer a few
+              lines up because there is an index 't2.good_idx'
+              covering the t2.y column. If 'good_idx' is the only
+              index in t2, the decision below will be to use dynamic
+              range. However, if t2 also has another index 't2.other'
+              which the range access method can be used on but
+              selectivity is bad (#rows estimate is high), then table
+              scan is chosen instead.
+
+              Thus, the choice of DYNAMIC RANGE vs SCAN depends on the
+              presence of an index that has so bad selectivity that it
+              will not be used anyway.
+            */
+            if (!tab->needed_reg.is_clear_all() &&
+                (tab->table()->quick_keys.is_clear_all() ||
+                 (tab->range_scan() &&
+                  (tab->range_scan()->num_output_rows() >= 100.0)))) {
+              tab->use_quick = QS_DYNAMIC_RANGE;
+              tab->set_type(JT_ALL);
+            } else
+              tab->use_quick = QS_RANGE;
+          }
+
+          if (tab->type() != orig_join_type ||
+              tab->range_scan() != orig_range_scan)  // Access method changed
+            tab->position()->filter_effect = COND_FILTER_STALE;
+        }
+      }
+
+      if (join->attach_join_conditions(i)) return true;
+    }
+    trace_attached_comp.end();
+
+    /*
+      In outer joins the loop above, in iteration for table #i, may push
+      conditions to a table before #i. Thus, the processing below has to be in
+      a separate loop:
+    */
+    Opt_trace_array trace_attached_summary(trace,
+                                           "attached_conditions_summary");
+    for (uint i = join->const_tables; i < join->tables; i++) {
+      JOIN_TAB *const tab = join->best_ref[i];
+      if (!tab->table()) continue;
+      Item *const tab_cond = tab->condition();
+      Opt_trace_object trace_one_table(trace);
+      trace_one_table.add_utf8_table(tab->table_ref).add("attached", tab_cond);
+      if (tab_cond && tab_cond->has_subquery())  // traverse only if needed
+      {
+        /*
+          Why we pass walk_subquery=false: imagine
+          WHERE t1.col IN (SELECT * FROM t2
+                             WHERE t2.col IN (SELECT * FROM t3)
+          and tab==t1. The grandchild subquery (SELECT * FROM t3) should not
+          be marked as "in condition of t1" but as "in condition of t2", for
+          correct calculation of the number of its executions.
+        */
+        std::pair<Query_block *, int> pair_object(join->query_block, i);
+        tab_cond->walk(&Item::inform_item_in_cond_of_tab, enum_walk::POSTFIX,
+                       pointer_cast<uchar *>(&pair_object));
+      }
+    }
+  }
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: test_if_skip_sort_order
+  It is not obvious to see that test_if_skip_sort_order() never changes the
+  plan if no_changes is true. So we double-check: creating an instance of this
+  class saves some important access-path-related information of the current
+  table; when the instance is destroyed, the latest access-path information is
+  compared with saved data.
+*/
+
+class Plan_change_watchdog {
+#ifndef NDEBUG
+ public:
+  /**
+    @param tab_arg     table whose access path is being determined
+    @param no_changes_arg whether a change to the access path is allowed
+  */
+  Plan_change_watchdog(const JOIN_TAB *tab_arg, const bool no_changes_arg) {
+    if (no_changes_arg) {
+      tab = tab_arg;
+      type = tab->type();
+      if ((quick = tab->range_scan())) quick_index = used_index(quick);
+      use_quick = tab->use_quick;
+      ref_key = tab->ref().key;
+      ref_key_parts = tab->ref().key_parts;
+      index = tab->index();
+    } else {
+      tab = nullptr;
+      type = JT_UNKNOWN;
+      quick = nullptr;
+      ref_key = ref_key_parts = index = 0;
+      use_quick = QS_NONE;
+    }
+  }
+  ~Plan_change_watchdog() {
+    if (tab == nullptr) return;
+    // changes are not allowed, we verify:
+    assert(tab->type() == type);
+    assert(tab->range_scan() == quick);
+    assert(quick == nullptr || used_index(tab->range_scan()) == quick_index);
+    assert(tab->use_quick == use_quick);
+    assert(tab->ref().key == ref_key);
+    assert(tab->ref().key_parts == ref_key_parts);
+    assert(tab->index() == index);
+  }
+
+ private:
+  const JOIN_TAB *tab;  ///< table, or NULL if changes are allowed
+  enum join_type type;  ///< copy of tab->type()
+  // "Range / index merge" info
+  const AccessPath *quick{nullptr};  ///< copy of tab->select->quick
+  uint quick_index{0};               ///< copy of tab->select->quick->index
+  enum quick_type use_quick;         ///< copy of tab->use_quick
+  // "ref access" info
+  int ref_key;         ///< copy of tab->ref().key
+  uint ref_key_parts;  /// copy of tab->ref().key_parts
+  // Other index-related info
+  uint index;  ///< copy of tab->index
+#else          // in non-debug build, empty class
+ public:
+  Plan_change_watchdog(const JOIN_TAB *, const bool) {}
+#endif
+};
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: can_switch_from_ref_to_range not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: can_switch_from_ref_to_range not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: get_quick_record_count
+              get_quick_record_count().
+            */
+          } else {
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_update.cc
+Function: Sql_cmd_update::update_single_table
+bool Sql_cmd_update::update_single_table(THD *thd) {
+  DBUG_TRACE;
+
+  myf error_flags = MYF(0); /**< Flag for fatal errors */
+  /*
+    Most recent handler error
+    =  1: Some non-handler error
+    =  0: Success
+    = -1: No more rows to process, or reached limit
+  */
+  int error = 0;
+
+  Query_block *const query_block = lex->query_block;
+  Query_expression *const unit = lex->unit;
+  Table_ref *const table_list = query_block->get_table_list();
+  Table_ref *const update_table_ref = table_list->updatable_base_table();
+  TABLE *const table = update_table_ref->table;
+
+  assert(table->pos_in_table_list == update_table_ref);
+
+  const bool transactional_table = table->file->has_transactions();
+
+  const bool has_update_triggers =
+      table->triggers && table->triggers->has_update_triggers();
+
+  const bool has_after_triggers =
+      has_update_triggers &&
+      table->triggers->has_triggers(TRG_EVENT_UPDATE, TRG_ACTION_AFTER);
+
+  Opt_trace_context *const trace = &thd->opt_trace;
+
+  if (unit->set_limit(thd, unit->global_parameters()))
+    return true; /* purecov: inspected */
+
+  ha_rows limit = unit->select_limit_cnt;
+  const bool using_limit = limit != HA_POS_ERROR;
+
+  if (limit == 0 && thd->lex->is_explain()) {
+    Modification_plan plan(thd, MT_UPDATE, table, "LIMIT is zero", true, 0);
+    bool err = explain_single_table_modification(thd, thd, &plan, query_block);
+    return err;
+  }
+
+  // Used to track whether there are no rows that need to be read
+  bool no_rows = limit == 0;
+
+  THD::killed_state killed_status = THD::NOT_KILLED;
+  assert(CountHiddenFields(query_block->fields) == 0);
+  COPY_INFO update(COPY_INFO::UPDATE_OPERATION, &query_block->fields,
+                   update_value_list);
+  if (update.add_function_default_columns(table, table->write_set)) return true;
+
+  const bool safe_update = thd->variables.option_bits & OPTION_SAFE_UPDATES;
+
+  assert(!(table->all_partitions_pruned_away || m_empty_query));
+
+  Item *conds = nullptr;
+  ORDER *order = query_block->order_list.first;
+  if (!no_rows && query_block->get_optimizable_conditions(thd, &conds, nullptr))
+    return true; /* purecov: inspected */
+
+  /*
+    See if we can substitute expressions with equivalent generated
+    columns in the WHERE and ORDER BY clauses of the UPDATE statement.
+    It is unclear if this is best to do before or after the other
+    substitutions performed by substitute_for_best_equal_field(). Do
+    it here for now, to keep it consistent with how multi-table
+    updates are optimized in JOIN::optimize().
+  */
+  if (conds || order)
+    static_cast<void>(substitute_gc(thd, query_block, conds, nullptr, order));
+
+  if (conds != nullptr) {
+    if (table_list->check_option) {
+      // See the explanation in multi-table UPDATE code path
+      // (Query_result_update::prepare).
+      table_list->check_option->walk(&Item::disable_constant_propagation,
+                                     enum_walk::POSTFIX, nullptr);
+    }
+    COND_EQUAL *cond_equal = nullptr;
+    Item::cond_result result;
+    if (optimize_cond(thd, &conds, &cond_equal,
+                      query_block->m_current_table_nest, &result))
+      return true;
+
+    if (result == Item::COND_FALSE) {
+      no_rows = true;  // Impossible WHERE
+      if (thd->lex->is_explain()) {
+        Modification_plan plan(thd, MT_UPDATE, table, "Impossible WHERE", true,
+                               0);
+        bool err =
+            explain_single_table_modification(thd, thd, &plan, query_block);
+        return err;
+      }
+    }
+    if (conds != nullptr) {
+      conds = substitute_for_best_equal_field(thd, conds, cond_equal, nullptr);
+      if (conds == nullptr) return true;
+
+      conds->update_used_tables();
+    }
+  }
+
+  /*
+    Also try a second time after locking, to prune when subqueries and
+    stored programs can be evaluated.
+  */
+  if (table->part_info && !no_rows) {
+    if (prune_partitions(thd, table, query_block, conds))
+      return true; /* purecov: inspected */
+    if (table->all_partitions_pruned_away) {
+      no_rows = true;
+
+      if (thd->lex->is_explain()) {
+        Modification_plan plan(thd, MT_UPDATE, table,
+                               "No matching rows after partition pruning", true,
+                               0);
+        bool err =
+            explain_single_table_modification(thd, thd, &plan, query_block);
+        return err;
+      }
+      my_ok(thd);
+      return false;
+    }
+  }
+  // Initialize the cost model that will be used for this table
+  table->init_cost_model(thd->cost_model());
+
+  /* Update the table->file->stats.records number */
+  table->file->info(HA_STATUS_VARIABLE | HA_STATUS_NO_LOCK);
+
+  table->mark_columns_needed_for_update(thd,
+                                        false /*mark_binlog_columns=false*/);
+
+  AccessPath *range_scan = nullptr;
+  join_type type = JT_UNKNOWN;
+
+  auto cleanup = create_scope_guard([&range_scan, table] {
+    destroy(range_scan);
+    table->set_keyread(false);
+    table->file->ha_index_or_rnd_end();
+    free_io_cache(table);
+    filesort_free_buffers(table, true);
+  });
+
+  if (conds &&
+      thd->optimizer_switch_flag(OPTIMIZER_SWITCH_ENGINE_CONDITION_PUSHDOWN)) {
+    table->file->cond_push(conds);
+  }
+
+  {  // Enter scope for optimizer trace wrapper
+    Opt_trace_object wrapper(&thd->opt_trace);
+    wrapper.add_utf8_table(update_table_ref);
+
+    if (!no_rows && conds != nullptr) {
+      Key_map keys_to_use(Key_map::ALL_BITS), needed_reg_dummy;
+      MEM_ROOT temp_mem_root(key_memory_test_quick_select_exec,
+                             thd->variables.range_alloc_block_size);
+      no_rows = test_quick_select(
+                    thd, thd->mem_root, &temp_mem_root, keys_to_use, 0, 0,
+                    limit, safe_update, ORDER_NOT_RELEVANT, table,
+                    /*skip_records_in_range=*/false, conds, &needed_reg_dummy,
+                    table->force_index, query_block, &range_scan) < 0;
+      if (thd->is_error()) return true;
+    }
+    if (no_rows) {
+      if (thd->lex->is_explain()) {
+        Modification_plan plan(thd, MT_UPDATE, table, "Impossible WHERE", true,
+                               0);
+        bool err =
+            explain_single_table_modification(thd, thd, &plan, query_block);
+        return err;
+      }
+
+      char buff[MYSQL_ERRMSG_SIZE];
+      snprintf(buff, sizeof(buff), ER_THD(thd, ER_UPDATE_INFO), 0L, 0L,
+               (long)thd->get_stmt_da()->current_statement_cond_count());
+      my_ok(thd, 0, 0, buff);
+
+      DBUG_PRINT("info", ("0 records updated"));
+      return false;
+    }
+  }  // Ends scope for optimizer trace wrapper
+
+  /* If running in safe sql mode, don't allow updates without keys */
+  if (table->quick_keys.is_clear_all()) {
+    thd->server_status |= SERVER_QUERY_NO_INDEX_USED;
+
+    /*
+      No safe update error will be returned if:
+      1) Statement is an EXPLAIN OR
+      2) LIMIT is present.
+
+      Append the first warning (if any) to the error message. Allows the user
+      to understand why index access couldn't be chosen.
+    */
+    if (!lex->is_explain() && safe_update && !using_limit) {
+      my_error(ER_UPDATE_WITHOUT_KEY_IN_SAFE_MODE, MYF(0),
+               thd->get_stmt_da()->get_first_condition_message());
+      return true;
+    }
+  }
+  if (query_block->has_ft_funcs() && init_ftfuncs(thd, query_block))
+    return true; /* purecov: inspected */
+
+  if (conds != nullptr) table->update_const_key_parts(conds);
+
+  order = simple_remove_const(order, conds);
+  bool need_sort;
+  bool reverse = false;
+  bool used_key_is_modified = false;
+  uint used_index;
+  {
+    ORDER_with_src order_src(order, ESC_ORDER_BY, /*const_optimized=*/true);
+    used_index = get_index_for_order(&order_src, table, limit, range_scan,
+                                     &need_sort, &reverse);
+    if (range_scan != nullptr) {
+      // May have been changed by get_index_for_order().
+      type = calc_join_type(range_scan);
+    }
+  }
+  if (need_sort) {  // Assign table scan index to check below for modified key
+                    // fields:
+    used_index = table->file->key_used_on_scan;
+  }
+  if (used_index != MAX_KEY) {  // Check if we are modifying a key that we are
+                                // used to search with:
+    used_key_is_modified = is_key_used(table, used_index, table->write_set);
+  } else if (range_scan) {
+    /*
+      select->range_scan != NULL and used_index == MAX_KEY happens for index
+      merge and should be handled in a different way.
+    */
+    used_key_is_modified = (!unique_key_range(range_scan) &&
+                            uses_index_on_fields(range_scan, table->write_set));
+  }
+
+  if (table->part_info)
+    used_key_is_modified |= table->part_info->num_partitions_used() > 1 &&
+                            partition_key_modified(table, table->write_set);
+
+  const bool using_filesort = order && need_sort;
+
+  table->mark_columns_per_binlog_row_image(thd);
+
+  if (prepare_partial_update(trace, query_block->fields, *update_value_list))
+    return true; /* purecov: inspected */
+
+  if (table->setup_partial_update()) return true; /* purecov: inspected */
+
+  ha_rows updated_rows = 0;
+  ha_rows found_rows = 0;
+
+  unique_ptr_destroy_only<Filesort> fsort;
+  unique_ptr_destroy_only<RowIterator> iterator;
+
+  {  // Start of scope for Modification_plan
+    ha_rows rows;
+    if (range_scan)
+      rows = range_scan->num_output_rows();
+    else if (!conds && !need_sort && limit != HA_POS_ERROR)
+      rows = limit;
+    else {
+      update_table_ref->fetch_number_of_rows();
+      rows = table->file->stats.records;
+    }
+    DEBUG_SYNC(thd, "before_single_update");
+    Modification_plan plan(thd, MT_UPDATE, table, type, range_scan, conds,
+                           used_index, limit,
+                           (!using_filesort && (used_key_is_modified || order)),
+                           using_filesort, used_key_is_modified, rows);
+    DEBUG_SYNC(thd, "planned_single_update");
+    if (thd->lex->is_explain()) {
+      bool err =
+          explain_single_table_modification(thd, thd, &plan, query_block);
+      return err;
+    }
+
+    if (thd->lex->is_ignore()) table->file->ha_extra(HA_EXTRA_IGNORE_DUP_KEY);
+
+    if (used_key_is_modified || order) {
+      /*
+        We can't update table directly;  We must first search after all
+        matching rows before updating the table!
+      */
+
+      /* note: We avoid sorting if we sort on the used index */
+      if (using_filesort) {
+        /*
+          Doing an ORDER BY;  Let filesort find and sort the rows we are going
+          to update
+          NOTE: filesort will call table->prepare_for_position()
+        */
+        JOIN join(thd, query_block);  // Only for holding examined_rows.
+        AccessPath *path = create_table_access_path(
+            thd, table, range_scan, /*table_ref=*/nullptr,
+            /*position=*/nullptr, /*count_examined_rows=*/true);
+
+        if (conds != nullptr) {
+          path = NewFilterAccessPath(thd, path, conds);
+        }
+
+        // Force filesort to sort by position.
+        fsort.reset(new (thd->mem_root) Filesort(
+            thd, {table}, /*keep_buffers=*/false, order, limit,
+            /*remove_duplicates=*/false,
+            /*force_sort_rowids=*/true, /*unwrap_rollup=*/false));
+        path = NewSortAccessPath(thd, path, fsort.get(), order,
+                                 /*count_examined_rows=*/false);
+        iterator = CreateIteratorFromAccessPath(
+            thd, path, &join, /*eligible_for_batch_mode=*/true);
+        // Prevent cleanup in JOIN::destroy() and in the cleanup condition
+        // guard, to avoid double-destroy of the SortingIterator.
+        table->sorting_iterator = nullptr;
+
+        if (iterator == nullptr || iterator->Init()) return true;
+        thd->inc_examined_row_count(join.examined_rows);
+
+        /*
+          Filesort has already found and selected the rows we want to update,
+          so we don't need the where clause
+        */
+        destroy(range_scan);
+        range_scan = nullptr;
+        conds = nullptr;
+      } else {
+        /*
+          We are doing a search on a key that is updated. In this case
+          we go through the matching rows, save a pointer to them and
+          update these in a separate loop based on the pointer. In the end,
+          we get a result file that looks exactly like what filesort uses
+          internally, which allows us to read from it
+          using SortFileIndirectIterator.
+
+          TODO: Find something less ugly.
+         */
+        Key_map covering_keys_for_cond;  // @todo - move this
+        if (used_index < MAX_KEY && covering_keys_for_cond.is_set(used_index))
+          table->set_keyread(true);
+
+        table->prepare_for_position();
+        table->file->try_semi_consistent_read(true);
+        auto end_semi_consistent_read = create_scope_guard(
+            [table] { table->file->try_semi_consistent_read(false); });
+
+        /*
+          When we get here, we have one of the following options:
+          A. used_index == MAX_KEY
+          This means we should use full table scan, and start it with
+          init_read_record call
+          B. used_index != MAX_KEY
+          B.1 quick select is used, start the scan with init_read_record
+          B.2 quick select is not used, this is full index scan (with LIMIT)
+          Full index scan must be started with init_read_record_idx
+        */
+
+        AccessPath *path;
+        if (used_index == MAX_KEY || range_scan) {
+          path = create_table_access_path(thd, table, range_scan,
+                                          /*table_ref=*/nullptr,
+                                          /*position=*/nullptr,
+                                          /*count_examined_rows=*/false);
+        } else {
+          empty_record(table);
+          path = NewIndexScanAccessPath(thd, table, used_index,
+                                        /*use_order=*/true, reverse,
+                                        /*count_examined_rows=*/false);
+        }
+
+        iterator = CreateIteratorFromAccessPath(
+            thd, path, /*join=*/nullptr, /*eligible_for_batch_mode=*/true);
+        // Prevent cleanup in JOIN::destroy() and in the cleanup condition
+        // guard, to avoid double-destroy of the SortingIterator.
+        table->sorting_iterator = nullptr;
+
+        if (iterator == nullptr || iterator->Init()) {
+          return true;
+        }
+
+        THD_STAGE_INFO(thd, stage_searching_rows_for_update);
+        ha_rows tmp_limit = limit;
+
+        IO_CACHE *tempfile =
+            (IO_CACHE *)my_malloc(key_memory_TABLE_sort_io_cache,
+                                  sizeof(IO_CACHE), MYF(MY_FAE | MY_ZEROFILL));
+
+        if (open_cached_file(tempfile, mysql_tmpdir, TEMP_PREFIX,
+                             DISK_BUFFER_SIZE, MYF(MY_WME))) {
+          my_free(tempfile);
+          return true;
+        }
+
+        while (!(error = iterator->Read()) && !thd->killed) {
+          assert(!thd->is_error());
+          thd->inc_examined_row_count(1);
+
+          if (conds != nullptr) {
+            const bool skip_record = conds->val_int() == 0;
+            if (thd->is_error()) {
+              error = 1;
+              /*
+                Don't try unlocking the row if skip_record reported an error
+                since in this case the transaction might have been rolled back
+                already.
+              */
+              break;
+            }
+            if (skip_record) {
+              table->file->unlock_row();
+              continue;
+            }
+          }
+          if (table->file->was_semi_consistent_read())
+            continue; /* repeat the read of the same row if it still exists */
+
+          table->file->position(table->record[0]);
+          if (my_b_write(tempfile, table->file->ref, table->file->ref_length)) {
+            error = 1; /* purecov: inspected */
+            break;     /* purecov: inspected */
+          }
+          if (!--limit && using_limit) {
+            error = -1;
+            break;
+          }
+        }
+
+        if (thd->killed && !error)  // Aborted
+          error = 1;                /* purecov: inspected */
+        limit = tmp_limit;
+        end_semi_consistent_read.rollback();
+        if (used_index < MAX_KEY && covering_keys_for_cond.is_set(used_index))
+          table->set_keyread(false);
+        table->file->ha_index_or_rnd_end();
+        iterator.reset();
+
+        // Change reader to use tempfile
+        if (reinit_io_cache(tempfile, READ_CACHE, 0L, false, false))
+          error = 1; /* purecov: inspected */
+
+        if (error >= 0) {
+          close_cached_file(tempfile);
+          my_free(tempfile);
+          return error > 0;
+        }
+
+        iterator = NewIterator<SortFileIndirectIterator>(
+            thd, thd->mem_root, Mem_root_array<TABLE *>{table}, tempfile,
+            /*ignore_not_found_rows=*/false, /*has_null_flags=*/false,
+            /*examined_rows=*/nullptr);
+        if (iterator->Init()) return true;
+
+        destroy(range_scan);
+        range_scan = nullptr;
+        conds = nullptr;
+      }
+    } else {
+      // No ORDER BY or updated key underway, so we can use a regular read.
+      iterator =
+          init_table_iterator(thd, table, range_scan,
+                              /*table_ref=*/nullptr, /*position=*/nullptr,
+                              /*ignore_not_found_rows=*/false,
+                              /*count_examined_rows=*/false);
+      if (iterator == nullptr) return true; /* purecov: inspected */
+    }
+
+    table->file->try_semi_consistent_read(true);
+    auto end_semi_consistent_read = create_scope_guard(
+        [table] { table->file->try_semi_consistent_read(false); });
+
+    /*
+      Generate an error (in TRADITIONAL mode) or warning
+      when trying to set a NOT NULL field to NULL.
+    */
+    thd->check_for_truncated_fields = CHECK_FIELD_WARN;
+    thd->num_truncated_fields = 0L;
+    THD_STAGE_INFO(thd, stage_updating);
+
+    bool will_batch;
+    /// read_removal is only used by NDB storage engine
+    bool read_removal = false;
+
+    if (has_after_triggers) {
+      /*
+        The table has AFTER UPDATE triggers that might access to subject
+        table and therefore might need update to be done immediately.
+        So we turn-off the batching.
+      */
+      (void)table->file->ha_extra(HA_EXTRA_UPDATE_CANNOT_BATCH);
+      will_batch = false;
+    } else {
+      // No after update triggers, attempt to start bulk update
+      will_batch = !table->file->start_bulk_update();
+    }
+    if ((table->file->ha_table_flags() & HA_READ_BEFORE_WRITE_REMOVAL) &&
+        !thd->lex->is_ignore() && !using_limit && !has_update_triggers &&
+        range_scan && ::used_index(range_scan) != MAX_KEY &&
+        check_constant_expressions(*update_value_list))
+      read_removal = table->check_read_removal(::used_index(range_scan));
+
+    // If the update is batched, we cannot do partial update, so turn it off.
+    if (will_batch) table->cleanup_partial_update(); /* purecov: inspected */
+
+    uint dup_key_found;
+
+    while (true) {
+      error = iterator->Read();
+      if (error || thd->killed) break;
+      thd->inc_examined_row_count(1);
+      if (conds != nullptr) {
+        const bool skip_record = conds->val_int() == 0;
+        if (thd->is_error()) {
+          error = 1;
+          break;
+        }
+        if (skip_record) {
+          table->file
+              ->unlock_row();  // Row failed condition check, release lock
+          thd->get_stmt_da()->inc_current_row_for_condition();
+          continue;
+        }
+      }
+      assert(!thd->is_error());
+
+      if (table->file->was_semi_consistent_read())
+        /*
+          Reviewer: iterator is reading from the to-be-updated table or
+          from a tmp file.
+          In the latter case, if the condition of this if() is true,
+          it is wrong to "continue"; indeed this will pick up the _next_ row of
+          tempfile; it will not re-read-with-lock the current row of tempfile,
+          as tempfile is not an InnoDB table and not doing semi consistent read.
+          If that happens, we're potentially skipping a row which was found
+          matching! OTOH, as the rowid was written to the tempfile, it means it
+          matched and thus we have already re-read it in the tempfile-write loop
+          above and thus locked it. So we shouldn't come here. How about adding
+          an assertion that if reading from tmp file we shouldn't come here?
+        */
+        continue; /* repeat the read of the same row if it still exists */
+
+      table->clear_partial_update_diffs();
+
+      store_record(table, record[1]);
+      bool is_row_changed = false;
+      if (fill_record_n_invoke_before_triggers(
+              thd, &update, query_block->fields, *update_value_list, table,
+              TRG_EVENT_UPDATE, 0, false, &is_row_changed)) {
+        error = 1;
+        break;
+      }
+      found_rows++;
+
+      if (is_row_changed) {
+        /*
+          Default function and default expression values are filled before
+          evaluating the view check option. Check option on view using table(s)
+          with default function and default expression breaks otherwise.
+
+          It is safe to not invoke CHECK OPTION for VIEW if records are same.
+          In this case the row is coming from the view and thus should satisfy
+          the CHECK OPTION.
+        */
+        int check_result = table_list->view_check_option(thd);
+        if (check_result != VIEW_CHECK_OK) {
+          if (check_result == VIEW_CHECK_SKIP)
+            continue;
+          else if (check_result == VIEW_CHECK_ERROR) {
+            error = 1;
+            break;
+          }
+        }
+
+        /*
+          Existing rows in table should normally satisfy CHECK constraints. So
+          it should be safe to check constraints only for rows that has really
+          changed (i.e. after compare_records()).
+
+          In future, once addition/enabling of CHECK constraints without their
+          validation is supported, we might encounter old rows which do not
+          satisfy CHECK constraints currently enabled. However, rejecting no-op
+          updates to such invalid pre-existing rows won't make them valid and is
+          probably going to be confusing for users. So it makes sense to stick
+          to current behavior.
+        */
+        if (invoke_table_check_constraints(thd, table)) {
+          if (thd->is_error()) {
+            error = 1;
+            break;
+          }
+          // continue when IGNORE clause is used.
+          continue;
+        }
+
+        if (will_batch) {
+          /*
+            Typically a batched handler can execute the batched jobs when:
+            1) When specifically told to do so
+            2) When it is not a good idea to batch anymore
+            3) When it is necessary to send batch for other reasons
+            (One such reason is when READ's must be performed)
+
+            1) is covered by exec_bulk_update calls.
+            2) and 3) is handled by the bulk_update_row method.
+
+            bulk_update_row can execute the updates including the one
+            defined in the bulk_update_row or not including the row
+            in the call. This is up to the handler implementation and can
+            vary from call to call.
+
+            The dup_key_found reports the number of duplicate keys found
+            in those updates actually executed. It only reports those if
+            the extra call with HA_EXTRA_IGNORE_DUP_KEY have been issued.
+            If this hasn't been issued it returns an error code and can
+            ignore this number. Thus any handler that implements batching
+            for UPDATE IGNORE must also handle this extra call properly.
+
+            If a duplicate key is found on the record included in this
+            call then it should be included in the count of dup_key_found
+            and error should be set to 0 (only if these errors are ignored).
+          */
+          error = table->file->ha_bulk_update_row(
+              table->record[1], table->record[0], &dup_key_found);
+          limit += dup_key_found;
+          updated_rows -= dup_key_found;
+        } else {
+          /* Non-batched update */
+          error =
+              table->file->ha_update_row(table->record[1], table->record[0]);
+        }
+        if (error == 0)
+          updated_rows++;
+        else if (error == HA_ERR_RECORD_IS_THE_SAME)
+          error = 0;
+        else {
+          if (table->file->is_fatal_error(error)) error_flags |= ME_FATALERROR;
+
+          table->file->print_error(error, error_flags);
+
+          // The error can have been downgraded to warning by IGNORE.
+          if (thd->is_error()) break;
+        }
+      }
+
+      if (!error && has_after_triggers &&
+          table->triggers->process_triggers(thd, TRG_EVENT_UPDATE,
+                                            TRG_ACTION_AFTER, true)) {
+        error = 1;
+        break;
+      }
+
+      if (!--limit && using_limit) {
+        /*
+          We have reached end-of-file in most common situations where no
+          batching has occurred and if batching was supposed to occur but
+          no updates were made and finally when the batch execution was
+          performed without error and without finding any duplicate keys.
+          If the batched updates were performed with errors we need to
+          check and if no error but duplicate key's found we need to
+          continue since those are not counted for in limit.
+        */
+        if (will_batch &&
+            ((error = table->file->exec_bulk_update(&dup_key_found)) ||
+             dup_key_found)) {
+          if (error) {
+            /*
+              ndbcluster is the only handler that returns an error at this
+              juncture
+            */
+            assert(table->file->ht->db_type == DB_TYPE_NDBCLUSTER);
+            if (table->file->is_fatal_error(error))
+              error_flags |= ME_FATALERROR;
+
+            table->file->print_error(error, error_flags);
+            error = 1;
+            break;
+          }
+          /* purecov: begin inspected */
+          /*
+            Either an error was found and we are ignoring errors or there were
+            duplicate keys found with HA_IGNORE_DUP_KEY enabled. In both cases
+            we need to correct the counters and continue the loop.
+          */
+
+          /*
+            Note that NDB disables batching when duplicate keys are to be
+            ignored. Any duplicate key found will result in an error returned
+            above.
+          */
+          assert(false);
+          limit = dup_key_found;  // limit is 0 when we get here so need to +
+          updated_rows -= dup_key_found;
+          /* purecov: end */
+        } else {
+          error = -1;  // Simulate end of file
+          break;
+        }
+      }
+
+      thd->get_stmt_da()->inc_current_row_for_condition();
+      assert(!thd->is_error());
+      if (thd->is_error()) {
+        error = 1;
+        break;
+      }
+    }
+    end_semi_consistent_read.rollback();
+
+    dup_key_found = 0;
+    /*
+      Caching the killed status to pass as the arg to query event constructor;
+      The cached value can not change whereas the killed status can
+      (externally) since this point and change of the latter won't affect
+      binlogging.
+      It's assumed that if an error was set in combination with an effective
+      killed status then the error is due to killing.
+    */
+    killed_status = thd->killed;  // get the status of the atomic
+    // simulated killing after the loop must be ineffective for binlogging
+    DBUG_EXECUTE_IF("simulate_kill_bug27571",
+                    { thd->killed = THD::KILL_QUERY; };);
+    if (killed_status != THD::NOT_KILLED) error = 1;
+
+    int loc_error;
+    if (error && will_batch &&
+        (loc_error = table->file->exec_bulk_update(&dup_key_found)))
+    /*
+      An error has occurred when a batched update was performed and returned
+      an error indication. It cannot be an allowed duplicate key error since
+      we require the batching handler to treat this as a normal behavior.
+
+      Otherwise we simply remove the number of duplicate keys records found
+      in the batched update.
+    */
+    {
+      /* purecov: begin inspected */
+      error_flags = MYF(0);
+      if (table->file->is_fatal_error(loc_error)) error_flags |= ME_FATALERROR;
+
+      table->file->print_error(loc_error, error_flags);
+      error = 1;
+      /* purecov: end */
+    } else
+      updated_rows -= dup_key_found;
+    if (will_batch) table->file->end_bulk_update();
+
+    if (read_removal) {
+      /* Only handler knows how many records really was written */
+      updated_rows = table->file->end_read_removal();
+      if (!records_are_comparable(table)) found_rows = updated_rows;
+    }
+
+  }  // End of scope for Modification_plan
+
+  if (!transactional_table && updated_rows > 0)
+    thd->get_transaction()->mark_modified_non_trans_table(
+        Transaction_ctx::STMT);
+
+  iterator.reset();
+
+  /*
+    error < 0 means really no error at all: we processed all rows until the
+    last one without error. error > 0 means an error (e.g. unique key
+    violation and no IGNORE or REPLACE). error == 0 is also an error (if
+    preparing the record or invoking before triggers fails). See
+    ha_autocommit_or_rollback(error>=0) and return error>=0 below.
+    Sometimes we want to binlog even if we updated no rows, in case user used
+    it to be sure master and slave are in same state.
+  */
+  if ((error < 0) ||
+      thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
+    if (mysql_bin_log.is_open()) {
+      int errcode = 0;
+      if (error < 0)
+        thd->clear_error();
+      else
+        errcode = query_error_code(thd, killed_status == THD::NOT_KILLED);
+
+      if (thd->binlog_query(THD::ROW_QUERY_TYPE, thd->query().str,
+                            thd->query().length, transactional_table, false,
+                            false, errcode)) {
+        error = 1;  // Rollback update
+      }
+    }
+  }
+  assert(transactional_table || updated_rows == 0 ||
+         thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT));
+
+  // If LAST_INSERT_ID(X) was used, report X
+  const ulonglong id = thd->arg_of_last_insert_id_function
+                           ? thd->first_successful_insert_id_in_prev_stmt
+                           : 0;
+
+  if (error < 0) {
+    char buff[MYSQL_ERRMSG_SIZE];
+    snprintf(buff, sizeof(buff), ER_THD(thd, ER_UPDATE_INFO), (long)found_rows,
+             (long)updated_rows,
+             (long)thd->get_stmt_da()->current_statement_cond_count());
+    my_ok(thd,
+          thd->get_protocol()->has_client_capability(CLIENT_FOUND_ROWS)
+              ? found_rows
+              : updated_rows,
+          id, buff);
+    DBUG_PRINT("info", ("%ld records updated", (long)updated_rows));
+  }
+  thd->check_for_truncated_fields = CHECK_FIELD_IGNORE;
+  thd->current_found_rows = found_rows;
+
+  assert(CountHiddenFields(*update_value_list) == 0);
+
+  // Following test is disabled, as we get RQG errors that are hard to debug
+  // assert((error >= 0) == thd->is_error());
+  return error >= 0 || thd->is_error();
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/range_optimizer/partition_pruning.cc
+Function: prune_partitions
+   prune_partitions() {
+     call create_partition_index_description();
+
+     call get_mm_tree(); // invoke the RangeAnalysisModule
+
+     // analyze the obtained interval list and get used partitions
+     call find_used_partitions();
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_delete.cc
+Function: Sql_cmd_delete::delete_from_single_table
+bool Sql_cmd_delete::delete_from_single_table(THD *thd) {
+  DBUG_TRACE;
+
+  myf error_flags = MYF(0); /**< Flag for fatal errors */
+  bool will_batch;
+  /*
+    Most recent handler error
+    =  1: Some non-handler error
+    =  0: Success
+    = -1: No more rows to process, or reached limit
+  */
+  int error = 0;
+  ha_rows deleted_rows = 0;
+  bool reverse = false;
+  /// read_removal is only used by NDB storage engine
+  bool read_removal = false;
+  bool need_sort = false;
+
+  uint usable_index = MAX_KEY;
+  Query_block *const query_block = lex->query_block;
+  Query_expression *const unit = query_block->master_query_expression();
+  ORDER *order = query_block->order_list.first;
+  Table_ref *const table_list = query_block->get_table_list();
+  THD::killed_state killed_status = THD::NOT_KILLED;
+  THD::enum_binlog_query_type query_type = THD::ROW_QUERY_TYPE;
+
+  const bool safe_update = thd->variables.option_bits & OPTION_SAFE_UPDATES;
+
+  Table_ref *const delete_table_ref = table_list->updatable_base_table();
+  TABLE *const table = delete_table_ref->table;
+
+  const bool transactional_table = table->file->has_transactions();
+
+  const bool has_delete_triggers =
+      table->triggers && table->triggers->has_delete_triggers();
+
+  const bool has_before_triggers =
+      has_delete_triggers &&
+      table->triggers->has_triggers(TRG_EVENT_DELETE, TRG_ACTION_BEFORE);
+  const bool has_after_triggers =
+      has_delete_triggers &&
+      table->triggers->has_triggers(TRG_EVENT_DELETE, TRG_ACTION_AFTER);
+  unit->set_limit(thd, query_block);
+
+  AccessPath *range_scan = nullptr;
+  join_type type = JT_UNKNOWN;
+
+  auto cleanup = create_scope_guard([&range_scan, table] {
+    destroy(range_scan);
+    table->set_keyread(false);
+    table->file->ha_index_or_rnd_end();
+    free_io_cache(table);
+    filesort_free_buffers(table, true);
+  });
+
+  ha_rows limit = unit->select_limit_cnt;
+  const bool using_limit = limit != HA_POS_ERROR;
+
+  if (limit == 0 && thd->lex->is_explain()) {
+    Modification_plan plan(thd, MT_DELETE, table, "LIMIT is zero", true, 0);
+    bool err = explain_single_table_modification(thd, thd, &plan, query_block);
+    return err;
+  }
+
+  assert(!(table->all_partitions_pruned_away || m_empty_query));
+
+  // Used to track whether there are no rows that need to be read
+  bool no_rows =
+      limit == 0 || is_empty_query() || table->all_partitions_pruned_away;
+
+  Item *conds = nullptr;
+  if (!no_rows && query_block->get_optimizable_conditions(thd, &conds, nullptr))
+    return true; /* purecov: inspected */
+
+  /*
+    See if we can substitute expressions with equivalent generated
+    columns in the WHERE and ORDER BY clauses of the DELETE statement.
+    It is unclear if this is best to do before or after the other
+    substitutions performed by substitute_for_best_equal_field(). Do
+    it here for now, to keep it consistent with how multi-table
+    deletes are optimized in JOIN::optimize().
+  */
+  if (conds || order)
+    static_cast<void>(substitute_gc(thd, query_block, conds, nullptr, order));
+
+  const bool const_cond = conds == nullptr || conds->const_item();
+  const bool const_cond_result = const_cond && (!conds || conds->val_int());
+  if (thd->is_error())  // Error during val_int()
+    return true;        /* purecov: inspected */
+  /*
+    We are passing HA_EXTRA_IGNORE_DUP_KEY flag here to recreate query with
+    IGNORE keyword within federated storage engine. If federated engine is
+    removed in the future, use of HA_EXTRA_IGNORE_DUP_KEY and
+    HA_EXTRA_NO_IGNORE_DUP_KEY flag should be removed from
+    delete_from_single_table(), DeleteRowsIterator::Init() and
+    handler::ha_reset().
+  */
+  if (lex->is_ignore()) table->file->ha_extra(HA_EXTRA_IGNORE_DUP_KEY);
+
+  /*
+    Test if the user wants to delete all rows and deletion doesn't have
+    any side-effects (because of triggers), so we can use optimized
+    handler::delete_all_rows() method.
+
+    We can use delete_all_rows() if and only if:
+    - There is no limit clause
+    - The condition is constant
+    - The row set is not empty
+    - We allow new functions (not using option --skip-new)
+    - If there is a condition, then it it produces a non-zero value
+    - If the current command is DELETE FROM with no where clause, then:
+      - We will not be binlogging this statement in row-based, and
+      - there should be no delete triggers associated with the table.
+  */
+  if (!using_limit && const_cond_result && !no_rows &&
+      !(specialflag & SPECIAL_NO_NEW_FUNC) &&
+      ((!thd->is_current_stmt_binlog_format_row() ||  // not ROW binlog-format
+        thd->is_current_stmt_binlog_disabled()) &&    // no binlog for this
+                                                      // command
+       !has_delete_triggers)) {
+    /* Update the table->file->stats.records number */
+    table->file->info(HA_STATUS_VARIABLE | HA_STATUS_NO_LOCK);
+    ha_rows const maybe_deleted = table->file->stats.records;
+
+    Modification_plan plan(thd, MT_DELETE, table, "Deleting all rows", false,
+                           maybe_deleted);
+    if (lex->is_explain()) {
+      bool err =
+          explain_single_table_modification(thd, thd, &plan, query_block);
+      return err;
+    }
+
+    /* Do not allow deletion of all records if safe_update is set. */
+    if (safe_update) {
+      my_error(ER_UPDATE_WITHOUT_KEY_IN_SAFE_MODE, MYF(0),
+               thd->get_stmt_da()->get_first_condition_message());
+      return true;
+    }
+
+    DBUG_PRINT("debug", ("Trying to use delete_all_rows()"));
+    if (!(error = table->file->ha_delete_all_rows())) {
+      /*
+        As delete_all_rows() was used, we have to log it in statement format.
+      */
+      query_type = THD::STMT_QUERY_TYPE;
+      error = -1;
+      deleted_rows = maybe_deleted;
+      goto cleanup;
+    }
+    if (error != HA_ERR_WRONG_COMMAND) {
+      if (table->file->is_fatal_error(error)) error_flags |= ME_FATALERROR;
+
+      table->file->print_error(error, error_flags);
+      goto cleanup;
+    }
+    /* Handler didn't support fast delete; Delete rows one by one */
+  }
+
+  if (conds != nullptr) {
+    COND_EQUAL *cond_equal = nullptr;
+    Item::cond_result result;
+
+    if (optimize_cond(thd, &conds, &cond_equal,
+                      query_block->m_current_table_nest, &result))
+      return true;
+    if (result == Item::COND_FALSE)  // Impossible where
+    {
+      no_rows = true;
+
+      if (lex->is_explain()) {
+        Modification_plan plan(thd, MT_DELETE, table, "Impossible WHERE", true,
+                               0);
+        bool err =
+            explain_single_table_modification(thd, thd, &plan, query_block);
+        return err;
+      }
+    }
+    if (conds) {
+      conds = substitute_for_best_equal_field(thd, conds, cond_equal, nullptr);
+      if (conds == nullptr) return true;
+
+      conds->update_used_tables();
+    }
+  }
+
+  /* Prune a second time to be able to prune on subqueries in WHERE clause. */
+  if (table->part_info && !no_rows) {
+    if (prune_partitions(thd, table, query_block, conds)) return true;
+    if (table->all_partitions_pruned_away) {
+      no_rows = true;
+      if (lex->is_explain()) {
+        Modification_plan plan(thd, MT_DELETE, table,
+                               "No matching rows after partition pruning", true,
+                               0);
+        bool err =
+            explain_single_table_modification(thd, thd, &plan, query_block);
+        return err;
+      }
+      my_ok(thd, 0);
+      return false;
+    }
+  }
+
+  // Initialize the cost model that will be used for this table
+  table->init_cost_model(thd->cost_model());
+
+  /* Update the table->file->stats.records number */
+  table->file->info(HA_STATUS_VARIABLE | HA_STATUS_NO_LOCK);
+
+  table->covering_keys.clear_all();
+
+  if (conds &&
+      thd->optimizer_switch_flag(OPTIMIZER_SWITCH_ENGINE_CONDITION_PUSHDOWN)) {
+    table->file->cond_push(conds);
+  }
+
+  {  // Enter scope for optimizer trace wrapper
+    Opt_trace_object wrapper(&thd->opt_trace);
+    wrapper.add_utf8_table(delete_table_ref);
+
+    if (!no_rows && conds != nullptr) {
+      Key_map keys_to_use(Key_map::ALL_BITS), needed_reg_dummy;
+      MEM_ROOT temp_mem_root(key_memory_test_quick_select_exec,
+                             thd->variables.range_alloc_block_size);
+      no_rows = test_quick_select(
+                    thd, thd->mem_root, &temp_mem_root, keys_to_use, 0, 0,
+                    limit, safe_update, ORDER_NOT_RELEVANT, table,
+                    /*skip_records_in_range=*/false, conds, &needed_reg_dummy,
+                    table->force_index, query_block, &range_scan) < 0;
+    }
+    if (thd->is_error())  // test_quick_select() has improper error propagation
+      return true;
+
+    if (no_rows) {
+      if (lex->is_explain()) {
+        Modification_plan plan(thd, MT_DELETE, table, "Impossible WHERE", true,
+                               0);
+        bool err =
+            explain_single_table_modification(thd, thd, &plan, query_block);
+        return err;
+      }
+
+      my_ok(thd, 0);
+      return false;  // Nothing to delete
+    }
+  }  // Ends scope for optimizer trace wrapper
+
+  /* If running in safe sql mode, don't allow updates without keys */
+  if (table->quick_keys.is_clear_all()) {
+    thd->server_status |= SERVER_QUERY_NO_INDEX_USED;
+
+    /*
+      Safe update error isn't returned if:
+      1) It is  an EXPLAIN statement OR
+      2) LIMIT is present.
+
+      Append the first warning (if any) to the error message. This allows the
+      user to understand why index access couldn't be chosen.
+    */
+    if (!thd->lex->is_explain() && safe_update && !using_limit) {
+      my_error(ER_UPDATE_WITHOUT_KEY_IN_SAFE_MODE, MYF(0),
+               thd->get_stmt_da()->get_first_condition_message());
+      return true;
+    }
+  }
+
+  if (order) {
+    if (conds != nullptr) table->update_const_key_parts(conds);
+    order = simple_remove_const(order, conds);
+    ORDER_with_src order_src(order, ESC_ORDER_BY, /*const_optimized=*/true);
+    usable_index = get_index_for_order(&order_src, table, limit, range_scan,
+                                       &need_sort, &reverse);
+    if (range_scan != nullptr) {
+      // May have been changed by get_index_for_order().
+      type = calc_join_type(range_scan);
+    }
+  }
+
+  // Reaching here only when table must be accessed
+  assert(!no_rows);
+
+  {
+    ha_rows rows;
+    if (range_scan)
+      rows = range_scan->num_output_rows();
+    else if (!conds && !need_sort && limit != HA_POS_ERROR)
+      rows = limit;
+    else {
+      delete_table_ref->fetch_number_of_rows();
+      rows = table->file->stats.records;
+    }
+    Modification_plan plan(thd, MT_DELETE, table, type, range_scan, conds,
+                           usable_index, limit, false, need_sort, false, rows);
+    DEBUG_SYNC(thd, "planned_single_delete");
+
+    if (lex->is_explain()) {
+      bool err =
+          explain_single_table_modification(thd, thd, &plan, query_block);
+      return err;
+    }
+
+    if (query_block->active_options() & OPTION_QUICK)
+      (void)table->file->ha_extra(HA_EXTRA_QUICK);
+
+    unique_ptr_destroy_only<Filesort> fsort;
+    JOIN join(thd, query_block);  // Only for holding examined_rows.
+    AccessPath *path;
+    if (usable_index == MAX_KEY || range_scan) {
+      path =
+          create_table_access_path(thd, table, range_scan,
+                                   /*table_ref=*/nullptr, /*position=*/nullptr,
+                                   /*count_examined_rows=*/true);
+    } else {
+      empty_record(table);
+      path = NewIndexScanAccessPath(thd, table, usable_index,
+                                    /*use_order=*/true, reverse,
+                                    /*count_examined_rows=*/false);
+    }
+
+    unique_ptr_destroy_only<RowIterator> iterator;
+    if (need_sort) {
+      assert(usable_index == MAX_KEY);
+
+      if (conds != nullptr) {
+        path = NewFilterAccessPath(thd, path, conds);
+      }
+
+      fsort.reset(new (thd->mem_root) Filesort(
+          thd, {table}, /*keep_buffers=*/false, order, HA_POS_ERROR,
+          /*remove_duplicates=*/false,
+          /*force_sort_rowids=*/true, /*unwrap_rollup=*/false));
+      path = NewSortAccessPath(thd, path, fsort.get(), order,
+                               /*count_examined_rows=*/false);
+      iterator = CreateIteratorFromAccessPath(thd, path, &join,
+                                              /*eligible_for_batch_mode=*/true);
+      // Prevent cleanup in JOIN::destroy() and in the cleanup condition guard,
+      // to avoid double-destroy of the SortingIterator.
+      table->sorting_iterator = nullptr;
+      if (iterator == nullptr || iterator->Init()) return true;
+      thd->inc_examined_row_count(join.examined_rows);
+
+      /*
+        Filesort has already found and selected the rows we want to delete,
+        so we don't need the where clause
+      */
+      conds = nullptr;
+    } else {
+      iterator = CreateIteratorFromAccessPath(thd, path, &join,
+                                              /*eligible_for_batch_mode=*/true);
+      // Prevent cleanup in JOIN::destroy() and in the cleanup condition guard,
+      // to avoid double-destroy of the SortingIterator.
+      table->sorting_iterator = nullptr;
+      if (iterator->Init()) return true;
+    }
+
+    if (query_block->has_ft_funcs() && init_ftfuncs(thd, query_block))
+      return true; /* purecov: inspected */
+
+    THD_STAGE_INFO(thd, stage_updating);
+
+    if (has_after_triggers) {
+      /*
+        The table has AFTER DELETE triggers that might access to subject table
+        and therefore might need delete to be done immediately. So we turn-off
+        the batching.
+      */
+      (void)table->file->ha_extra(HA_EXTRA_DELETE_CANNOT_BATCH);
+      will_batch = false;
+    } else {
+      // No after delete triggers, attempt to start bulk delete
+      will_batch = !table->file->start_bulk_delete();
+    }
+    table->mark_columns_needed_for_delete(thd);
+    if (thd->is_error()) return true;
+
+    if ((table->file->ha_table_flags() & HA_READ_BEFORE_WRITE_REMOVAL) &&
+        !using_limit && !has_delete_triggers && range_scan &&
+        used_index(range_scan) != MAX_KEY)
+      read_removal = table->check_read_removal(used_index(range_scan));
+
+    assert(limit > 0);
+
+    // The loop that reads rows and delete those that qualify
+
+    while (!(error = iterator->Read()) && !thd->killed) {
+      assert(!thd->is_error());
+      thd->inc_examined_row_count(1);
+
+      if (conds != nullptr) {
+        const bool skip_record = conds->val_int() == 0;
+        if (thd->is_error()) {
+          error = 1;
+          break;
+        }
+        if (skip_record) {
+          // Row failed condition check, release lock
+          table->file->unlock_row();
+          continue;
+        }
+      }
+
+      assert(!thd->is_error());
+
+      if (DeleteCurrentRowAndProcessTriggers(thd, table, has_before_triggers,
+                                             has_after_triggers,
+                                             &deleted_rows)) {
+        error = 1;
+        break;
+      }
+
+      if (!--limit && using_limit) {
+        error = -1;
+        break;
+      }
+    }
+
+    killed_status = thd->killed;
+    if (killed_status != THD::NOT_KILLED || thd->is_error())
+      error = 1;  // Aborted
+    int loc_error;
+    if (will_batch && (loc_error = table->file->end_bulk_delete())) {
+      /* purecov: begin inspected */
+      if (error != 1) {
+        if (table->file->is_fatal_error(loc_error))
+          error_flags |= ME_FATALERROR;
+
+        table->file->print_error(loc_error, error_flags);
+      }
+      error = 1;
+      /* purecov: end */
+    }
+    if (read_removal) {
+      /* Only handler knows how many records were really written */
+      deleted_rows = table->file->end_read_removal();
+    }
+    if (query_block->active_options() & OPTION_QUICK)
+      (void)table->file->ha_extra(HA_EXTRA_NORMAL);
+  }  // End of scope for Modification_plan
+
+cleanup:
+  assert(!lex->is_explain());
+
+  if (!transactional_table && deleted_rows > 0)
+    thd->get_transaction()->mark_modified_non_trans_table(
+        Transaction_ctx::STMT);
+
+  /* See similar binlogging code in sql_update.cc, for comments */
+  if ((error < 0) ||
+      thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT)) {
+    if (mysql_bin_log.is_open()) {
+      int errcode = 0;
+      if (error < 0)
+        thd->clear_error();
+      else
+        errcode = query_error_code(thd, killed_status == THD::NOT_KILLED);
+
+      /*
+        [binlog]: As we don't allow the use of 'handler:delete_all_rows()' when
+        binlog_format == ROW, if 'handler::delete_all_rows()' was called
+        we replicate statement-based; otherwise, 'ha_delete_row()' was used to
+        delete specific rows which we might log row-based.
+      */
+      int log_result =
+          thd->binlog_query(query_type, thd->query().str, thd->query().length,
+                            transactional_table, false, false, errcode);
+
+      if (log_result) {
+        error = 1;
+      }
+    }
+  }
+  assert(transactional_table || deleted_rows == 0 ||
+         thd->get_transaction()->cannot_safely_rollback(Transaction_ctx::STMT));
+  if (error < 0) {
+    my_ok(thd, deleted_rows);
+    DBUG_PRINT("info", ("%ld records deleted", (long)deleted_rows));
+  }
+  return error > 0;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/iterators/ref_row_iterators.cc
+Function: DynamicRangeIterator::DynamicRangeIterator not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/iterators/ref_row_iterators.cc
+Function: DynamicRangeIterator::DynamicRangeIterator not found.
+

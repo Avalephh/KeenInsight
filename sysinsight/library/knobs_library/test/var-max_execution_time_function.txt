@@ -1,0 +1,55 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: is_timer_applicable_to_statement
+static inline bool is_timer_applicable_to_statement(THD *thd) {
+  /*
+    The following conditions must be met:
+      - is SELECT statement.
+      - timer support is implemented and it is initialized.
+      - statement is not made by the slave threads.
+      - timer is not set for statement
+      - timer out value of is set
+      - SELECT statement is not from any stored programs.
+  */
+  return (thd->lex->sql_command == SQLCOM_SELECT &&
+          (have_statement_timeout == SHOW_OPTION_YES) && !thd->slave_thread &&
+          !thd->timer &&
+          (thd->lex->max_execution_time || thd->variables.max_execution_time) &&
+          !thd->sp_runtime_ctx);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: get_max_execution_time
+static inline ulong get_max_execution_time(THD *thd) {
+  return (thd->lex->max_execution_time ? thd->lex->max_execution_time
+                                       : thd->variables.max_execution_time);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_select.cc
+Function: set_statement_timer
+bool set_statement_timer(THD *thd) {
+  ulong max_execution_time = get_max_execution_time(thd);
+
+  /**
+    whether timer can be set for the statement or not should be checked before
+    calling set_statement_timer function.
+  */
+  assert(is_timer_applicable_to_statement(thd) == true);
+  assert(thd->timer == nullptr);
+
+  thd->timer = thd_timer_set(thd, thd->timer_cache, max_execution_time);
+  thd->timer_cache = nullptr;
+
+  if (thd->timer)
+    thd->status_var.max_execution_time_set++;
+  else
+    thd->status_var.max_execution_time_set_failed++;
+
+  return thd->timer;
+}
+
+

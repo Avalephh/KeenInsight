@@ -1,0 +1,32 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_error.cc
+Function: Diagnostics_area::push_warning
+void push_warning(THD *thd, Sql_condition::enum_severity_level severity,
+                  uint code, const char *message_text) {
+  DBUG_TRACE;
+  DBUG_PRINT("enter", ("code: %d, msg: %s", code, message_text));
+
+  /*
+    Calling push_warning/push_warning_printf with a level of
+    SL_ERROR *is* a bug.  Either use my_printf_error(),
+    my_error(), or SL_WARNING.
+  */
+  assert(severity != Sql_condition::SL_ERROR);
+
+  if (severity == Sql_condition::SL_ERROR) severity = Sql_condition::SL_WARNING;
+
+  (void)thd->raise_condition(code, nullptr, severity, message_text);
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_error.cc
+Function: Diagnostics_area::reserve_number_of_conditions
+void Diagnostics_area::reserve_number_of_conditions(THD *thd, uint count) {
+  while (m_conditions_list.elements() &&
+         (m_conditions_list.elements() + count) >
+             thd->variables.max_error_count)
+    m_conditions_list.remove(m_conditions_list.front());
+}
+
+

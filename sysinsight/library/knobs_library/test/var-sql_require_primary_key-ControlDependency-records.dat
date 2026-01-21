@@ -1,0 +1,90 @@
+Global Variable: System_variables.118
+Explicit Data Flow (17):
+  Instruction: %259 = load i8, i8* %sql_require_primary_key, align 8, !dbg !1256066 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8180:22 | Function: mysql_prepare_create_table
+  Instruction: %tobool315 = trunc i8 %259 to i1, !dbg !1256066 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8180:22 | Function: mysql_prepare_create_table
+  Instruction: br i1 %tobool315, label %if.then316, label %if.end318, !dbg !1256067 | Location: /root/LLVM/mysql-8.0.36/sql/sql_table.cc:8176:7 | Function: mysql_prepare_create_table
+  Instruction: %318 = load i8, i8* %sql_require_primary_key, align 8, !dbg !1255684 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3598:31 | Function: Query_log_event::write
+  Instruction: %tobool355 = trunc i8 %318 to i1, !dbg !1255684 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3598:31 | Function: Query_log_event::write
+  Instruction: %conv356 = zext i1 %tobool355 to i8, !dbg !1255682 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3598:16 | Function: Query_log_event::write
+  Instruction: store i8 %conv356, i8* %319, align 1, !dbg !1255686 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:3598:14 | Function: Query_log_event::write
+  Instruction: store i8 %frombool, i8* %sql_require_primary_key24, align 8, !dbg !1255317 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4729:50 | Function: Query_log_event::do_apply_event
+  Instruction: %sql_require_primary_key24 = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 118, !dbg !1255316 | Location: /root/LLVM/mysql-8.0.36/sql/log_event.cc:4729:26 | Function: Query_log_event::do_apply_event
+  Instruction: %sql_require_primary_key = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables, i32 0, i32 118, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/sdi_api.cc:98:22 | Function: dd::sdi::Import_target::load
+  Instruction: %5 = load i8, i8* %sql_require_primary_key, align 8, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/sdi_api.cc:98:22 | Function: dd::sdi::Import_target::load
+  Instruction: %tobool = trunc i8 %5 to i1, !dbg !1255310 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/sdi_api.cc:98:22 | Function: dd::sdi::Import_target::load
+  Instruction: br i1 %tobool, label %if.then9, label %if.end10, !dbg !1255311 | Location: /root/LLVM/mysql-8.0.36/sql/dd/impl/sdi_api.cc:97:7 | Function: dd::sdi::Import_target::load
+  Instruction: store i8 %frombool118, i8* %sql_require_primary_key, align 8, !dbg !1255509 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7074:46 | Function: handle_slave_sql
+  Instruction: %sql_require_primary_key = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables117, i32 0, i32 118, !dbg !1255508 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:7074:22 | Function: handle_slave_sql
+  Instruction: store i8 %frombool127, i8* %sql_require_primary_key, align 8, !dbg !1255434 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6040:44 | Function: handle_slave_worker
+  Instruction: %sql_require_primary_key = getelementptr inbounds %struct.System_variables, %struct.System_variables* %variables126, i32 0, i32 118, !dbg !1255433 | Location: /root/LLVM/mysql-8.0.36/sql/rpl_replica.cc:6040:20 | Function: handle_slave_worker
+
+Implicit Data Flow (0):
+
+----------------------------------------
+Explicit Control Flow:
+  Controlled Function: my_error
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array
+  Controlled Function: Mem_root_array
+  Controlled Function: Mem_root_array
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: check_duplicate_key
+  Controlled Function: AutoDebugTrace::~AutoDebugTrace
+  Controlled Function: check_promoted_index
+  Controlled Function: my_error
+  Controlled Function: void std::sort
+  Controlled Function: __assert_fail
+  Controlled Function: sql_calloc
+  Controlled Function: my_error
+  Controlled Function: prepare_preexisting_foreign_key
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: Mem_root_array_YY
+  Controlled Function: List_iterator
+  Controlled Function: List_iterator
+  Controlled Function: Foreign_key_spec* down_cast
+  Controlled Function: prepare_foreign_key
+  Controlled Function: handler::max_record_length
+  Controlled Function: is_timestamp_type
+  Controlled Function: handler::max_record_length
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: my_error
+  Controlled Function: dd::Object_table_definition_impl::fs_name_collation
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::remove_reference
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: operator new
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: operator delete
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::unique_ptr
+  Controlled Function: operator new
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: inline_mysql_file_rename
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: operator delete
+  Controlled Function: std::unique_ptr
+  Controlled Function: std::remove_reference
+  Controlled Function: std::__cxx11::basic_string
+  Controlled Function: std::__cxx11::basic_string
+
+Implicit Control Flow:
+
+----------------------------------------

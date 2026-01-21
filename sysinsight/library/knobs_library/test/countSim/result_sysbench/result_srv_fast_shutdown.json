@@ -1,0 +1,23 @@
+[
+    {
+        "knob_name": "srv_fast_shutdown",
+        "data_matched_functions": [
+            "Clone_persist_gtid::periodic_write",
+            "Fil_shard::space_flush",
+            "srv_purge_coordinator_thread"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "ibuf_merge_in_background",
+            "row_drop_tables_for_mysql_in_background",
+            "Clone_persist_gtid::flush_gtids",
+            "srv_thread_is_active",
+            "os_event_reset",
+            "srv_release_threads",
+            "trx_purge",
+            "os_event_set"
+        ],
+        "control_matched_count": 8,
+        "matched_count": 11
+    }
+]

@@ -1,0 +1,21 @@
+[
+    {
+        "knob_name": "pseudo_replica_mode",
+        "data_matched_functions": [
+            "THD::is_engine_ha_data_detached",
+            "MYSQL_BIN_LOG::write_transaction",
+            "trans_register_ha"
+        ],
+        "data_matched_count": 3,
+        "control_matched_functions": [
+            "ER_THD",
+            "gtid_set_performance_schema_values",
+            "Log_event::write",
+            "binlog::Context::monitoring_context",
+            "MYSQL_BIN_LOG::write_cache",
+            "binlog::monitoring::Transaction_compression::update"
+        ],
+        "control_matched_count": 6,
+        "matched_count": 9
+    }
+]

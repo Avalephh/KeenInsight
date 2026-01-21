@@ -1,0 +1,55 @@
+/*.json
+/*.txt
+/*.png
+
+# 忽略 init 文件夹下的所有文件
+/db_configurations/init/*
+!/db_configurations/init/dbtune.json
+
+# 忽略 task 文件夹下的所有文件，除了 dbtune.json
+/db_configurations/task/*
+!/db_configurations/task/dbtune.json
+
+# 忽略 task 文件夹下的所有文件，除了 dbtune.json
+/db_configurations/*
+!/db_configurations/dbtune.json
+
+# 忽略 old_output 文件夹
+log/
+logs/
+optimization_results/
+
+analysis_cache_count/
+analysis_cache_temp/
+analysis_cache/
+controlpath/
+
+
+# 忽略 old_output 文件夹
+old_output/
+reason_output/
+
+# 忽略 perf_data 文件夹 
+perf_data/
+
+# 忽略 garbage 文件夹
+garbage/
+
+# 忽略 default_perf_data 文件夹
+DBTuner/collectData/default_perf_data/*
+
+# 忽略所有 .out 结尾的文件
+*.out
+
+library/knobs_library/test/mysqld.bc
+reason_output/clean_reason_*
+perf*
+llambo/__pycache__/acquisition_function.cpython-38.pyc
+llambo/__pycache__/discriminative_sm.cpython-38.pyc
+llambo/__pycache__/extract_knob.cpython-38.pyc
+llambo/__pycache__/generative_sm.cpython-38.pyc
+llambo/__pycache__/llambo.cpython-38.pyc
+DBTuner/__pycache__/dbenv.cpython-38.pyc
+DBTuner/__pycache__/optimizer.cpython-38.pyc
+
+

@@ -1,0 +1,141 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc
+Function: Query_block::get_limit
+ha_rows Query_block::get_limit(const THD *thd) const {
+  /*
+    If m_use_select_limit is set in the query block, return the value
+    of the variable select_limit, unless an explicit limit is set.
+    This is used to implement SQL_SELECT_LIMIT for SELECT statements.
+  */
+  if (select_limit != nullptr)
+    return ha_rows{select_limit->val_uint()};
+  else if (m_use_select_limit)
+    return ha_rows{thd->variables.select_limit};
+  else
+    return ha_rows{HA_POS_ERROR};
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_lex.cc
+Function: Query_expression::set_limit
+bool Query_expression::set_limit(THD *thd, Query_block *provider) {
+  offset_limit_cnt = provider->get_offset(thd);
+  select_limit_cnt = provider->get_limit(thd);
+
+  if (select_limit_cnt + offset_limit_cnt >= select_limit_cnt)
+    select_limit_cnt += offset_limit_cnt;
+  else
+    select_limit_cnt = HA_POS_ERROR;
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sp.cc
+Function: sp_compile not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_call.cc
+Function: Sql_cmd_call::execute_inner
+bool Sql_cmd_call::execute_inner(THD *thd) {
+  // All required SPs should be in cache so no need to look into DB.
+
+  sp_head *sp = sp_setup_routine(thd, enum_sp_type::PROCEDURE, proc_name,
+                                 &thd->sp_proc_cache);
+  if (sp == nullptr) {
+    my_error(ER_SP_DOES_NOT_EXIST, MYF(0), "PROCEDURE", proc_name->m_qname.str);
+    return true;
+  }
+
+  // bits to be cleared in thd->server_status
+  uint bits_to_be_cleared = 0;
+  /*
+    Check that the stored procedure doesn't contain Dynamic SQL and doesn't
+    return result sets: such stored procedures can't be called from
+    a function or trigger.
+  */
+  if (thd->in_sub_stmt) {
+    const char *where =
+        (thd->in_sub_stmt & SUB_STMT_TRIGGER ? "trigger" : "function");
+    if (sp->is_not_allowed_in_function(where)) return true;
+  }
+
+  if (mysql_audit_notify(thd, AUDIT_EVENT(MYSQL_AUDIT_STORED_PROGRAM_EXECUTE),
+                         proc_name->m_db.str, proc_name->m_name.str, nullptr))
+    return true;
+
+  if (sp->m_flags & sp_head::MULTI_RESULTS) {
+    if (!thd->get_protocol()->has_client_capability(CLIENT_MULTI_RESULTS)) {
+      // Client does not support multiple result sets
+      my_error(ER_SP_BADSELECT, MYF(0), sp->m_qname.str);
+      return true;
+    }
+    /*
+      If SERVER_MORE_RESULTS_EXISTS is not set,
+      then remember that it should be cleared
+    */
+    bits_to_be_cleared = (~thd->server_status & SERVER_MORE_RESULTS_EXISTS);
+    thd->server_status |= SERVER_MORE_RESULTS_EXISTS;
+  }
+
+  ha_rows select_limit = thd->variables.select_limit;
+  thd->variables.select_limit = HA_POS_ERROR;
+
+  /*
+    Never write CALL statements into binlog:
+    - If the mode is non-prelocked, each statement will be logged separately.
+    - If the mode is prelocked, the invoking statement will care about writing
+      into binlog.
+    So just execute the statement.
+  */
+  bool result = sp->execute_procedure(thd, proc_args);
+
+  thd->variables.select_limit = select_limit;
+
+  thd->server_status &= ~bits_to_be_cleared;
+
+  if (result) {
+    assert(thd->is_error() || thd->killed);
+    return true;  // Substatement should already have sent error
+  }
+
+  my_ok(thd, max(thd->get_row_count_func(), 0LL));
+
+  return false;
+}
+
+

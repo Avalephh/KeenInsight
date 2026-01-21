@@ -1,0 +1,944 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: calculate_materialization_costs not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: calculate_materialization_costs not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: calculate_materialization_costs not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_optimizer.cc
+Function: calculate_materialization_costs not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::lateral_derived_cost
+double Optimize_table_order::lateral_derived_cost(
+    const JOIN_TAB *tab, const uint idx, const double prefix_rowcount,
+    const Cost_model_server *cost_model) {
+  assert(tab->table_ref->is_derived() &&
+         tab->table_ref->derived_query_expression()->m_lateral_deps);
+  if (prefix_rowcount == 0)  // no input rows: no materialization needed
+    return 0;
+  table_map deps = tab->table_ref->derived_query_expression()->m_lateral_deps;
+  POSITION *positions = got_final_plan ? join->best_positions : join->positions;
+  double derived_mat_cost = 0;
+  for (int j = idx; j >= (int)join->const_tables; j--) {
+    if (deps & join->best_ref[j]->table_ref->map()) {
+      // We found the last table in plan, on which 'tab' depends.
+      auto res = tab->table_ref->derived_query_expression()->query_result();
+      double inner_query_cost = res->estimated_cost;
+      double inner_query_rowcount = res->estimated_rowcount;
+      // copied and simplified from calculate_materialization_costs()
+      Cost_model_server::enum_tmptable_type tmp_table_type;
+      if (tab->table()->s->reclength * inner_query_rowcount <
+          thd->variables.max_heap_table_size)
+        tmp_table_type = Cost_model_server::MEMORY_TMPTABLE;
+      else
+        tmp_table_type = Cost_model_server::DISK_TMPTABLE;
+      double write_cost = cost_model->tmptable_readwrite_cost(
+          tmp_table_type, inner_query_rowcount, 0.0);
+      double mat_times = positions[j].prefix_rowcount;
+      double total_mat_cost = mat_times * (inner_query_cost + write_cost);
+      // average per read request:
+      derived_mat_cost = total_mat_cost / prefix_rowcount;
+      Opt_trace_context *const trace = &thd->opt_trace;
+      Opt_trace_object trace_lateral(trace);
+      Opt_trace_object trace_details(trace, "lateral_materialization");
+      trace_details.add("cost_for_one_run_of_inner_query", inner_query_cost)
+          .add("cost_for_writing_to_tmp_table", write_cost)
+          .add("count_of_runs", mat_times)
+          .add("total_cost", total_mat_cost)
+          .add("cost_per_read", derived_mat_cost);
+      break;
+    }
+  }
+  return derived_mat_cost;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_planner.cc
+Function: Optimize_table_order::semijoin_dupsweedout_access_paths
+void Optimize_table_order::semijoin_dupsweedout_access_paths(uint first_tab,
+                                                             uint last_tab,
+                                                             double *newcount,
+                                                             double *newcost) {
+  DBUG_TRACE;
+
+  const Cost_model_server *const cost_model = join->cost_model();
+  double cost, rowcount;
+  double inner_fanout = 1.0;
+  double outer_fanout = 1.0;
+  double max_outer_fanout = 1.0;
+  uint rowsize;  // Row size of the temporary table
+  if (first_tab == join->const_tables) {
+    cost = 0.0;
+    rowcount = 1.0;
+    rowsize = 0;
+  } else {
+    cost = join->positions[first_tab - 1].prefix_cost;
+    rowcount = join->positions[first_tab - 1].prefix_rowcount;
+    rowsize = 8;  // This is not true but we'll make it so
+  }
+  /**
+    Some times, some outer fanout is "absorbed" into the inner fanout.
+    In this case, we should make a better estimate for outer_fanout that
+    is used to calculate the output rowcount.
+    If we have inner table(s) before an outer table, there are
+    dependencies between these tables. The fanout for the outer table is
+    not a good estimate for the final number of rows from the weedout
+    execution, therefore we convert some of the inner fanout into an outer
+    fanout, limited to the number of possible rows in the outer table.
+  */
+  for (uint j = first_tab; j <= last_tab; j++) {
+    const POSITION *const p = join->positions + j;
+    cost += p->read_cost +
+            cost_model->row_evaluate_cost(rowcount * inner_fanout *
+                                          outer_fanout * p->rows_fetched);
+
+    if (p->table->emb_sj_nest)
+      inner_fanout *= p->rows_fetched * p->filter_effect;
+    else {
+      /*
+        max_outer_fanout is the cardinality of the cross product
+        of the outer tables.
+        @note: We do not consider dependencies between these tables here.
+      */
+      double total_records = p->table->table()->file->stats.records;
+      max_outer_fanout *= total_records * p->filter_effect;
+      if (inner_fanout > 1.0) {
+        // Absorb inner fanout into the outer fanout
+        outer_fanout *= inner_fanout * p->rows_fetched * p->filter_effect;
+        inner_fanout = 1;
+      } else
+        outer_fanout *= p->rows_fetched * p->filter_effect;
+      rowsize += p->table->table()->file->ref_length;
+    }
+  }
+
+  if (max_outer_fanout < outer_fanout) {
+    /*
+      The calculated fanout for the outer tables is bigger than
+      the cardinality of the cross product of the outer tables.
+      Adjust outer fanout to the max value, but also adjust
+      inner fanout so that inner_fanout * outer_fanout is still
+      the same (dups weedout runs a complete join internally).
+    */
+    if (max_outer_fanout > 0.0) inner_fanout *= outer_fanout / max_outer_fanout;
+    outer_fanout = max_outer_fanout;
+  }
+
+  /*
+    Add the cost of temptable use. The table will have outer_fanout rows,
+    and we will make
+    - rowcount * outer_fanout writes
+    - rowcount * inner_fanout * outer_fanout lookups.
+  */
+  Cost_model_server::enum_tmptable_type tmp_table_type;
+  if (outer_fanout * rowsize < thd->variables.max_heap_table_size)
+    tmp_table_type = Cost_model_server::MEMORY_TMPTABLE;
+  else
+    tmp_table_type = Cost_model_server::DISK_TMPTABLE;
+
+  cost += cost_model->tmptable_create_cost(tmp_table_type);
+  cost += cost_model->tmptable_readwrite_cost(
+      tmp_table_type, rowcount * outer_fanout,
+      rowcount * inner_fanout * outer_fanout);
+
+  *newcount = rowcount * outer_fanout;
+  *newcost = cost;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc
+Function: alloc_record_buffers
+static bool alloc_record_buffers(THD *thd, TABLE *table) {
+  TABLE_SHARE *share = table->s;
+  /*
+    Same as MI_UNIQUE_HASH_LENGTH,
+    allows to exclude "myisam.h" from include files.
+  */
+  const int TMP_TABLE_UNIQUE_HASH_LENGTH = 4;
+  uint alloc_length =
+      ALIGN_SIZE(share->reclength + TMP_TABLE_UNIQUE_HASH_LENGTH + 1);
+  share->rec_buff_length = alloc_length;
+  /*
+    Note that code in open_table_from_share() relies on the fact that
+    for optimizer-created temporary tables TABLE_SHARE::default_values
+    is allocated in a single chuck with TABLE::record[0] for the first
+    TABLE instance.
+  */
+  if (!(table->record[0] = (uchar *)share->mem_root.Alloc(
+            (alloc_length * 3 + share->null_bytes))))
+    return true;
+  table->record[1] = table->record[0] + alloc_length;
+  share->default_values = table->record[1] + alloc_length;
+  table->null_flags_saved = share->default_values + alloc_length;
+  if (share->null_bytes) {
+    table->null_flags = table->record[0];
+    memset(table->record[0], 255, share->null_bytes);  // Set null fields
+  }
+
+  if (thd->variables.tmp_table_size == ~(ulonglong)0)  // No limit
+    share->max_rows = ~(ha_rows)0;
+  else
+    share->max_rows = (ha_rows)(((share->db_type() == heap_hton)
+                                     ? min(thd->variables.tmp_table_size,
+                                           thd->variables.max_heap_table_size)
+                                     : thd->variables.tmp_table_size) /
+                                share->reclength);
+  share->max_rows =
+      std::max(share->max_rows, ha_rows(1));  // For dummy start options
+
+  return false;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/sql_tmp_table.cc
+Function: trace_tmp_table
+static void trace_tmp_table(Opt_trace_context *trace, const TABLE *table) {
+  TABLE_SHARE *s = table->s;
+  Opt_trace_object trace_tmp(trace, "tmp_table_info");
+  if (strlen(table->alias) != 0)
+    if (table->pos_in_table_list != nullptr &&
+        strlen(table->pos_in_table_list->table_name) > 0) {
+      trace_tmp.add_utf8_table(table->pos_in_table_list);
+    } else {
+      trace_tmp.add_alnum("table", table->alias);
+    }
+  else
+    trace_tmp.add_alnum("table", "intermediate_tmp_table");
+  QEP_TAB *tab = table->reginfo.qep_tab;
+  if (tab != nullptr && tab->join() != nullptr)
+    trace_tmp.add("in_plan_at_position", tab->idx());
+  trace_tmp.add("columns", s->fields)
+      .add("row_length", s->reclength)
+      .add("key_length", table->s->keys > 0 ? table->key_info->key_length : 0)
+      .add("unique_constraint", table->hash_field ? true : false)
+      .add("makes_grouped_rows", table->group != nullptr)
+      .add("cannot_insert_duplicates", s->is_distinct);
+
+  if (s->db_type() == innodb_hton) {
+    trace_tmp.add_alnum("location", "disk (InnoDB)");
+    if (s->db_create_options & HA_OPTION_PACK_RECORD)
+      trace_tmp.add_alnum("record_format", "packed");
+    else
+      trace_tmp.add_alnum("record_format", "fixed");
+  } else if (table->s->db_type() == temptable_hton) {
+    trace_tmp.add_alnum("location", "TempTable");
+  } else {
+    assert(s->db_type() == heap_hton);
+    trace_tmp.add_alnum("location", "memory (heap)")
+        .add("row_limit_estimate", s->max_rows);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_sum::ram_limitation
+ulonglong Item_sum::ram_limitation(THD *thd) {
+  ulonglong limitation =
+      min(thd->variables.tmp_table_size, thd->variables.max_heap_table_size);
+
+  DBUG_EXECUTE_IF("simulate_low_itemsum_ram_limitation", limitation = 32;);
+
+  return limitation;
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Aggregator_distinct::setup
+bool Aggregator_distinct::setup(THD *thd) {
+  endup_done = false;
+  /*
+    Setup can be called twice for ROLLUP items. This is a bug.
+    Please add assert(tree == 0) here when it's fixed.
+  */
+  if (tree || table || tmp_table_param) return false;
+
+  assert(thd->lex->current_query_block() == item_sum->aggr_query_block);
+
+  if (item_sum->setup(thd)) return true;
+  if (item_sum->sum_func() == Item_sum::COUNT_FUNC ||
+      item_sum->sum_func() == Item_sum::COUNT_DISTINCT_FUNC) {
+    mem_root_deque<Item *> list(thd->mem_root);
+    Query_block *query_block = item_sum->aggr_query_block;
+
+    if (!(tmp_table_param = new (thd->mem_root) Temp_table_param)) return true;
+
+    /**
+      Create a table with an unique key over all parameters.
+      If the list contains only const values, const_distinct
+      is set to CONST_NOT_NULL to avoid creation of temp table
+      and thereby counting as count(distinct of const values)
+      will always be 1. If any of these const values is null,
+      const_distinct is set to CONST_NULL to ensure aggregation
+      does not happen.
+     */
+    uint const_items = 0;
+    uint num_args = item_sum->argument_count();
+    assert(num_args);
+    for (uint i = 0; i < num_args; i++) {
+      Item *item = item_sum->get_arg(i);
+      list.push_back(item);
+      if (item->const_item()) {
+        const bool is_null = item->is_null();
+        if (thd->is_error()) return true;  // is_null can fail
+        if (is_null) {
+          const_distinct = CONST_NULL;
+          return false;
+        } else
+          const_items++;
+      }
+    }
+    if (num_args == const_items) {
+      const_distinct = CONST_NOT_NULL;
+      return false;
+    }
+    count_field_types(query_block, tmp_table_param, list, false, false);
+    tmp_table_param->force_copy_fields = item_sum->has_force_copy_fields();
+    assert(table == nullptr);
+    /*
+      Make create_tmp_table() convert BIT columns to BIGINT.
+      This is needed because BIT fields store parts of their data in table's
+      null bits, and we don't have methods to compare two table records, which
+      is needed by Unique which is used when HEAP table is used.
+    */
+    for (Item *item : list) {
+      if (item->type() == Item::FIELD_ITEM &&
+          ((Item_field *)item)->field->type() == FIELD_TYPE_BIT)
+        item->marker = Item::MARKER_BIT;
+      assert(!item->hidden);
+    }
+    if (!(table = create_tmp_table(thd, tmp_table_param, list, nullptr, true,
+                                   false, query_block->active_options(),
+                                   HA_POS_ERROR, "")))
+      return true;
+    table->file->ha_extra(HA_EXTRA_NO_ROWS);  // Don't update rows
+    table->no_rows = true;
+    if (table->hash_field) table->file->ha_index_init(0, false);
+
+    if ((table->s->db_type() == temptable_hton ||
+         table->s->db_type() == heap_hton) &&
+        (table->s->blob_fields == 0)) {
+      /*
+        No blobs:
+        set up a compare function and its arguments to use with Unique.
+      */
+      qsort2_cmp compare_key;
+      void *cmp_arg;
+      Field **field = table->field;
+      Field **field_end = field + table->s->fields;
+      bool all_binary = true;
+
+      for (tree_key_length = 0; field < field_end; ++field) {
+        Field *f = *field;
+        enum enum_field_types type = f->type();
+        tree_key_length += f->pack_length();
+        if ((type == MYSQL_TYPE_VARCHAR) ||
+            (!f->binary() &&
+             (type == MYSQL_TYPE_STRING || type == MYSQL_TYPE_VAR_STRING))) {
+          all_binary = false;
+          break;
+        }
+      }
+      if (all_binary) {
+        cmp_arg = (void *)&tree_key_length;
+        compare_key = simple_raw_key_cmp;
+      } else {
+        if (table->s->fields == 1) {
+          /*
+            If we have only one field, which is the most common use of
+            count(distinct), it is much faster to use a simpler key
+            compare method that can take advantage of not having to worry
+            about other fields.
+          */
+          compare_key = simple_str_key_cmp;
+          cmp_arg = (void *)table->field[0];
+          /* tree_key_length has been set already */
+        } else {
+          uint32 *length;
+          compare_key = composite_key_cmp;
+          cmp_arg = (void *)this;
+          field_lengths =
+              (uint32 *)thd->alloc(table->s->fields * sizeof(uint32));
+          for (tree_key_length = 0, length = field_lengths,
+              field = table->field;
+               field < field_end; ++field, ++length) {
+            *length = (*field)->pack_length();
+            tree_key_length += *length;
+          }
+        }
+      }
+      assert(tree == nullptr);
+      tree = new (thd->mem_root) Unique(compare_key, cmp_arg, tree_key_length,
+                                        item_sum->ram_limitation(thd));
+      /*
+        The only time tree_key_length could be 0 is if someone does
+        count(distinct) on a char(0) field - stupid thing to do,
+        but this has to be handled - otherwise someone can crash
+        the server with a DoS attack
+      */
+      if (!tree) return true;
+    }
+    return false;
+  } else {
+    List<Create_field> field_list;
+    Create_field field_def; /* field definition */
+    Item *arg;
+    DBUG_TRACE;
+    /* It's legal to call setup() more than once when in a subquery */
+    if (tree) return false;
+
+    /*
+      Virtual table and the tree are created anew on each re-execution of
+      PS/SP. Hence all further allocations are performed in the runtime
+      mem_root.
+    */
+    if (field_list.push_back(&field_def)) return true;
+
+    item_sum->set_nullable(true);
+    item_sum->null_value = true;
+    item_sum->allow_group_via_temp_table = false;
+
+    assert(item_sum->get_arg(0)->fixed);
+
+    arg = item_sum->get_arg(0);
+    if (arg->const_item()) {
+      if (arg->update_null_value()) return true;
+      if (arg->null_value) {
+        const_distinct = CONST_NULL;
+        return false;
+      }
+    }
+
+    enum enum_field_types field_type =
+        calc_tmp_field_type(arg->data_type(), arg->result_type());
+
+    field_def.init_for_tmp_table(
+        field_type, arg->max_length,
+        field_type == MYSQL_TYPE_NEWDECIMAL
+            ? min<unsigned int>(arg->decimals, DECIMAL_MAX_SCALE)
+            : arg->decimals,
+        arg->is_nullable(), arg->unsigned_flag, 0);
+
+    if (!(table = create_tmp_table_from_fields(thd, field_list))) return true;
+
+    /* XXX: check that the case of CHAR(0) works OK */
+    tree_key_length = table->s->reclength - table->s->null_bytes;
+
+    /*
+      Unique handles all unique elements in a tree until they can't fit
+      in.  Then the tree is dumped to the temporary file. We can use
+      simple_raw_key_cmp because the table contains numbers only; decimals
+      are converted to binary representation as well.
+    */
+    tree = new (thd->mem_root)
+        Unique(simple_raw_key_cmp, &tree_key_length, tree_key_length,
+               item_sum->ram_limitation(thd));
+
+    return tree == nullptr;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/item_sum.cc
+Function: Item_func_group_concat::setup
+bool Aggregator_distinct::setup(THD *thd) {
+  endup_done = false;
+  /*
+    Setup can be called twice for ROLLUP items. This is a bug.
+    Please add assert(tree == 0) here when it's fixed.
+  */
+  if (tree || table || tmp_table_param) return false;
+
+  assert(thd->lex->current_query_block() == item_sum->aggr_query_block);
+
+  if (item_sum->setup(thd)) return true;
+  if (item_sum->sum_func() == Item_sum::COUNT_FUNC ||
+      item_sum->sum_func() == Item_sum::COUNT_DISTINCT_FUNC) {
+    mem_root_deque<Item *> list(thd->mem_root);
+    Query_block *query_block = item_sum->aggr_query_block;
+
+    if (!(tmp_table_param = new (thd->mem_root) Temp_table_param)) return true;
+
+    /**
+      Create a table with an unique key over all parameters.
+      If the list contains only const values, const_distinct
+      is set to CONST_NOT_NULL to avoid creation of temp table
+      and thereby counting as count(distinct of const values)
+      will always be 1. If any of these const values is null,
+      const_distinct is set to CONST_NULL to ensure aggregation
+      does not happen.
+     */
+    uint const_items = 0;
+    uint num_args = item_sum->argument_count();
+    assert(num_args);
+    for (uint i = 0; i < num_args; i++) {
+      Item *item = item_sum->get_arg(i);
+      list.push_back(item);
+      if (item->const_item()) {
+        const bool is_null = item->is_null();
+        if (thd->is_error()) return true;  // is_null can fail
+        if (is_null) {
+          const_distinct = CONST_NULL;
+          return false;
+        } else
+          const_items++;
+      }
+    }
+    if (num_args == const_items) {
+      const_distinct = CONST_NOT_NULL;
+      return false;
+    }
+    count_field_types(query_block, tmp_table_param, list, false, false);
+    tmp_table_param->force_copy_fields = item_sum->has_force_copy_fields();
+    assert(table == nullptr);
+    /*
+      Make create_tmp_table() convert BIT columns to BIGINT.
+      This is needed because BIT fields store parts of their data in table's
+      null bits, and we don't have methods to compare two table records, which
+      is needed by Unique which is used when HEAP table is used.
+    */
+    for (Item *item : list) {
+      if (item->type() == Item::FIELD_ITEM &&
+          ((Item_field *)item)->field->type() == FIELD_TYPE_BIT)
+        item->marker = Item::MARKER_BIT;
+      assert(!item->hidden);
+    }
+    if (!(table = create_tmp_table(thd, tmp_table_param, list, nullptr, true,
+                                   false, query_block->active_options(),
+                                   HA_POS_ERROR, "")))
+      return true;
+    table->file->ha_extra(HA_EXTRA_NO_ROWS);  // Don't update rows
+    table->no_rows = true;
+    if (table->hash_field) table->file->ha_index_init(0, false);
+
+    if ((table->s->db_type() == temptable_hton ||
+         table->s->db_type() == heap_hton) &&
+        (table->s->blob_fields == 0)) {
+      /*
+        No blobs:
+        set up a compare function and its arguments to use with Unique.
+      */
+      qsort2_cmp compare_key;
+      void *cmp_arg;
+      Field **field = table->field;
+      Field **field_end = field + table->s->fields;
+      bool all_binary = true;
+
+      for (tree_key_length = 0; field < field_end; ++field) {
+        Field *f = *field;
+        enum enum_field_types type = f->type();
+        tree_key_length += f->pack_length();
+        if ((type == MYSQL_TYPE_VARCHAR) ||
+            (!f->binary() &&
+             (type == MYSQL_TYPE_STRING || type == MYSQL_TYPE_VAR_STRING))) {
+          all_binary = false;
+          break;
+        }
+      }
+      if (all_binary) {
+        cmp_arg = (void *)&tree_key_length;
+        compare_key = simple_raw_key_cmp;
+      } else {
+        if (table->s->fields == 1) {
+          /*
+            If we have only one field, which is the most common use of
+            count(distinct), it is much faster to use a simpler key
+            compare method that can take advantage of not having to worry
+            about other fields.
+          */
+          compare_key = simple_str_key_cmp;
+          cmp_arg = (void *)table->field[0];
+          /* tree_key_length has been set already */
+        } else {
+          uint32 *length;
+          compare_key = composite_key_cmp;
+          cmp_arg = (void *)this;
+          field_lengths =
+              (uint32 *)thd->alloc(table->s->fields * sizeof(uint32));
+          for (tree_key_length = 0, length = field_lengths,
+              field = table->field;
+               field < field_end; ++field, ++length) {
+            *length = (*field)->pack_length();
+            tree_key_length += *length;
+          }
+        }
+      }
+      assert(tree == nullptr);
+      tree = new (thd->mem_root) Unique(compare_key, cmp_arg, tree_key_length,
+                                        item_sum->ram_limitation(thd));
+      /*
+        The only time tree_key_length could be 0 is if someone does
+        count(distinct) on a char(0) field - stupid thing to do,
+        but this has to be handled - otherwise someone can crash
+        the server with a DoS attack
+      */
+      if (!tree) return true;
+    }
+    return false;
+  } else {
+    List<Create_field> field_list;
+    Create_field field_def; /* field definition */
+    Item *arg;
+    DBUG_TRACE;
+    /* It's legal to call setup() more than once when in a subquery */
+    if (tree) return false;
+
+    /*
+      Virtual table and the tree are created anew on each re-execution of
+      PS/SP. Hence all further allocations are performed in the runtime
+      mem_root.
+    */
+    if (field_list.push_back(&field_def)) return true;
+
+    item_sum->set_nullable(true);
+    item_sum->null_value = true;
+    item_sum->allow_group_via_temp_table = false;
+
+    assert(item_sum->get_arg(0)->fixed);
+
+    arg = item_sum->get_arg(0);
+    if (arg->const_item()) {
+      if (arg->update_null_value()) return true;
+      if (arg->null_value) {
+        const_distinct = CONST_NULL;
+        return false;
+      }
+    }
+
+    enum enum_field_types field_type =
+        calc_tmp_field_type(arg->data_type(), arg->result_type());
+
+    field_def.init_for_tmp_table(
+        field_type, arg->max_length,
+        field_type == MYSQL_TYPE_NEWDECIMAL
+            ? min<unsigned int>(arg->decimals, DECIMAL_MAX_SCALE)
+            : arg->decimals,
+        arg->is_nullable(), arg->unsigned_flag, 0);
+
+    if (!(table = create_tmp_table_from_fields(thd, field_list))) return true;
+
+    /* XXX: check that the case of CHAR(0) works OK */
+    tree_key_length = table->s->reclength - table->s->null_bytes;
+
+    /*
+      Unique handles all unique elements in a tree until they can't fit
+      in.  Then the tree is dumped to the temporary file. We can use
+      simple_raw_key_cmp because the table contains numbers only; decimals
+      are converted to binary representation as well.
+    */
+    tree = new (thd->mem_root)
+        Unique(simple_raw_key_cmp, &tree_key_length, tree_key_length,
+               item_sum->ram_limitation(thd));
+
+    return tree == nullptr;
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/join_optimizer/cost_model.cc
+Function: AddCost
+void AddCost(THD *thd, const ContainedSubquery &subquery, double num_rows,
+             FilterCost *cost) {
+  switch (subquery.strategy) {
+    case ContainedSubquery::Strategy::kMaterializable: {
+      // We can't ask the handler for costs at this stage, since that
+      // requires an actual TABLE, and we don't want to be creating
+      // them every time we're evaluating a cost-> Thus, instead,
+      // we ask the cost model for an estimate. Longer-term, these two
+      // estimates should really be guaranteed to be the same somehow.
+      Cost_model_server::enum_tmptable_type tmp_table_type;
+      if (subquery.row_width * num_rows < thd->variables.max_heap_table_size) {
+        tmp_table_type = Cost_model_server::MEMORY_TMPTABLE;
+      } else {
+        tmp_table_type = Cost_model_server::DISK_TMPTABLE;
+      }
+      cost->cost_if_materialized += thd->cost_model()->tmptable_readwrite_cost(
+          tmp_table_type, /*write_rows=*/0,
+          /*read_rows=*/num_rows);
+      cost->cost_to_materialize +=
+          subquery.path->cost +
+          kMaterializeOneRowCost * subquery.path->num_output_rows();
+
+      cost->cost_if_not_materialized += num_rows * subquery.path->cost;
+    } break;
+
+    case ContainedSubquery::Strategy::kNonMaterializable:
+      cost->cost_if_not_materialized += num_rows * subquery.path->cost;
+      cost->cost_if_materialized += num_rows * subquery.path->cost;
+      break;
+
+    case ContainedSubquery::Strategy::kIndependentSingleRow:
+      cost->cost_if_materialized += subquery.path->cost;
+      cost->cost_if_not_materialized += subquery.path->cost;
+      cost->init_cost_if_not_materialized += subquery.path->cost;
+      break;
+
+    default:
+      assert(false);
+  }
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/heap/ha_heap.cc
+Function: heap_prepare_hp_create_info not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/heap/ha_heap.cc
+Function: heap_prepare_hp_create_info not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/heap/ha_heap.cc
+Function: heap_prepare_hp_create_info not found.
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/heap/hp_create.cc
+Function: heap_create
+int heap_create(const char *name, HP_CREATE_INFO *create_info, HP_SHARE **res,
+                bool *created_new_share) {
+  uint i, j, key_segs, max_length, length;
+  HP_SHARE *share = nullptr;
+  HA_KEYSEG *keyseg;
+  HP_KEYDEF *keydef = create_info->keydef;
+  uint reclength = create_info->reclength;
+  uint keys = create_info->keys;
+  ulong min_records = create_info->min_records;
+  ulong max_records = create_info->max_records;
+  DBUG_TRACE;
+
+  if (!create_info->single_instance) {
+    mysql_mutex_lock(&THR_LOCK_heap);
+    share = hp_find_named_heap(name);
+    if (share && share->open_count == 0) {
+      hp_free(share);
+      share = nullptr;
+    }
+  }
+  *created_new_share = (share == nullptr);
+
+  if (!share) {
+    HP_KEYDEF *keyinfo;
+    DBUG_PRINT("info", ("Initializing new table"));
+
+    /*
+      We have to store sometimes uchar* del_link in records,
+      so the record length should be at least sizeof(uchar*)
+    */
+    reclength = std::max(reclength, uint(sizeof(uchar *)));
+
+    for (i = key_segs = max_length = 0, keyinfo = keydef; i < keys;
+         i++, keyinfo++) {
+      new (&keyinfo->block) HP_BLOCK();
+      new (&keyinfo->rb_tree) TREE();
+      for (j = length = 0; j < keyinfo->keysegs; j++) {
+        length += keyinfo->seg[j].length;
+        if (keyinfo->seg[j].null_bit) {
+          length++;
+          if (!(keyinfo->flag & HA_NULL_ARE_EQUAL))
+            keyinfo->flag |= HA_NULL_PART_KEY;
+          if (keyinfo->algorithm == HA_KEY_ALG_BTREE)
+            keyinfo->rb_tree.size_of_element++;
+        }
+        switch (keyinfo->seg[j].type) {
+          case HA_KEYTYPE_SHORT_INT:
+          case HA_KEYTYPE_LONG_INT:
+          case HA_KEYTYPE_FLOAT:
+          case HA_KEYTYPE_DOUBLE:
+          case HA_KEYTYPE_USHORT_INT:
+          case HA_KEYTYPE_ULONG_INT:
+          case HA_KEYTYPE_LONGLONG:
+          case HA_KEYTYPE_ULONGLONG:
+          case HA_KEYTYPE_INT24:
+          case HA_KEYTYPE_UINT24:
+          case HA_KEYTYPE_INT8:
+            keyinfo->seg[j].flag |= HA_SWAP_KEY;
+            break;
+          case HA_KEYTYPE_VARBINARY1:
+            /* Case-insensitiveness is handled in coll->hash_sort */
+            keyinfo->seg[j].type = HA_KEYTYPE_VARTEXT1;
+            [[fallthrough]];
+          case HA_KEYTYPE_VARTEXT1:
+            keyinfo->flag |= HA_VAR_LENGTH_KEY;
+            /*
+              For BTREE algorithm, key length, greater than or equal
+              to 255, is packed on 3 bytes.
+            */
+            if (keyinfo->algorithm == HA_KEY_ALG_BTREE)
+              length += size_to_store_key_length(keyinfo->seg[j].length);
+            else
+              length += 2;
+            /* Save number of bytes used to store length */
+            keyinfo->seg[j].bit_start = 1;
+            break;
+          case HA_KEYTYPE_VARBINARY2:
+            /* Case-insensitiveness is handled in coll->hash_sort */
+            [[fallthrough]];
+          case HA_KEYTYPE_VARTEXT2:
+            keyinfo->flag |= HA_VAR_LENGTH_KEY;
+            /*
+              For BTREE algorithm, key length, greater than or equal
+              to 255, is packed on 3 bytes.
+            */
+            if (keyinfo->algorithm == HA_KEY_ALG_BTREE)
+              length += size_to_store_key_length(keyinfo->seg[j].length);
+            else
+              length += 2;
+            /* Save number of bytes used to store length */
+            keyinfo->seg[j].bit_start = 2;
+            /*
+              Make future comparison simpler by only having to check for
+              one type
+            */
+            keyinfo->seg[j].type = HA_KEYTYPE_VARTEXT1;
+            break;
+          default:
+            break;
+        }
+      }
+      keyinfo->length = length;
+      length +=
+          keyinfo->rb_tree.size_of_element +
+          ((keyinfo->algorithm == HA_KEY_ALG_BTREE) ? sizeof(uchar *) : 0);
+      if (length > max_length) max_length = length;
+      key_segs += keyinfo->keysegs;
+      if (keyinfo->algorithm == HA_KEY_ALG_BTREE) {
+        key_segs++; /* additional HA_KEYTYPE_END segment */
+        if (keyinfo->flag & HA_VAR_LENGTH_KEY)
+          keyinfo->get_key_length = hp_rb_var_key_length;
+        else if (keyinfo->flag & HA_NULL_PART_KEY)
+          keyinfo->get_key_length = hp_rb_null_key_length;
+        else
+          keyinfo->get_key_length = hp_rb_key_length;
+      }
+    }
+    if (!(share = (HP_SHARE *)my_malloc(hp_key_memory_HP_SHARE,
+                                        (uint)sizeof(HP_SHARE) +
+                                            keys * sizeof(HP_KEYDEF) +
+                                            key_segs * sizeof(HA_KEYSEG),
+                                        MYF(MY_ZEROFILL))))
+      goto err;
+    share->keydef = (HP_KEYDEF *)(share + 1);
+    share->key_stat_version = 1;
+    keyseg = (HA_KEYSEG *)(share->keydef + keys);
+    init_block(&share->block, reclength + 1, min_records, max_records);
+    /* Fix keys */
+    for (i = 0; i < keys; ++i) share->keydef[i] = std::move(keydef[i]);
+    for (i = 0, keyinfo = share->keydef; i < keys; i++, keyinfo++) {
+      keyinfo->seg = keyseg;
+      memcpy(keyseg, keydef[i].seg,
+             (size_t)(sizeof(keyseg[0]) * keydef[i].keysegs));
+      keyseg += keydef[i].keysegs;
+
+      if (keydef[i].algorithm == HA_KEY_ALG_BTREE) {
+        /* additional HA_KEYTYPE_END keyseg */
+        keyseg->type = HA_KEYTYPE_END;
+        keyseg->length = sizeof(uchar *);
+        keyseg->flag = 0;
+        keyseg->null_bit = 0;
+        keyseg++;
+
+        init_tree(&keyinfo->rb_tree, 0, sizeof(uchar *), keys_compare, true,
+                  nullptr, nullptr);
+        keyinfo->delete_key = hp_rb_delete_key;
+        keyinfo->write_key = hp_rb_write_key;
+      } else {
+        init_block(&keyinfo->block, sizeof(HASH_INFO), min_records,
+                   max_records);
+        keyinfo->delete_key = hp_delete_key;
+        keyinfo->write_key = hp_write_key;
+        keyinfo->hash_buckets = 0;
+      }
+      if ((keyinfo->flag & HA_AUTO_KEY) && create_info->with_auto_increment)
+        share->auto_key = i + 1;
+    }
+    share->min_records = min_records;
+    share->max_records = max_records;
+    share->max_table_size = create_info->max_table_size;
+    share->data_length = share->index_length = 0;
+    share->reclength = reclength;
+    share->blength = 1;
+    share->keys = keys;
+    share->max_key_length = max_length;
+    share->changed = 0;
+    share->auto_key = create_info->auto_key;
+    share->auto_key_type = create_info->auto_key_type;
+    share->auto_increment = create_info->auto_increment;
+    share->create_time = (long)time((time_t *)nullptr);
+    /* Must be allocated separately for rename to work */
+    if (!(share->name = my_strdup(hp_key_memory_HP_SHARE, name, MYF(0)))) {
+      my_free(share);
+      goto err;
+    }
+    if (!create_info->single_instance) {
+      /*
+        Do not initialize THR_LOCK object for internal temporary tables.
+        It is not needed for such tables. Calling thr_lock_init() can
+        cause scalability issues since it acquires global lock.
+      */
+      thr_lock_init(&share->lock);
+      share->open_list.data = (void *)share;
+      heap_share_list = list_add(heap_share_list, &share->open_list);
+    }
+    share->delete_on_close = create_info->delete_on_close;
+  }
+  if (!create_info->single_instance) {
+    if (create_info->pin_share) ++share->open_count;
+    mysql_mutex_unlock(&THR_LOCK_heap);
+  }
+
+  *res = share;
+  return 0;
+
+err:
+  if (!create_info->single_instance) mysql_mutex_unlock(&THR_LOCK_heap);
+  return 1;
+} /* heap_create */
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/heap/hp_write.cc
+Function: next_free_record_pos
+static uchar *next_free_record_pos(HP_SHARE *info) {
+  int block_pos;
+  uchar *pos;
+  size_t length;
+  DBUG_TRACE;
+
+  if (info->del_link) {
+    pos = info->del_link;
+    info->del_link = *((uchar **)pos);
+    info->deleted--;
+    DBUG_PRINT("exit", ("Used old position: %p", pos));
+    return pos;
+  }
+  if (!(block_pos = (info->records % info->block.records_in_block))) {
+    if ((info->records > info->max_records && info->max_records) ||
+        (info->data_length + info->index_length >= info->max_table_size)) {
+      set_my_errno(HA_ERR_RECORD_FILE_FULL);
+      return nullptr;
+    }
+    if (hp_get_new_block(&info->block, &length)) return nullptr;
+    info->data_length += length;
+  }
+  DBUG_PRINT("exit", ("Used new position: %p",
+                      ((uchar *)info->block.level_info[0].last_blocks +
+                       block_pos * info->block.recbuffer)));
+  return (uchar *)info->block.level_info[0].last_blocks +
+         block_pos * info->block.recbuffer;
+}
+
+

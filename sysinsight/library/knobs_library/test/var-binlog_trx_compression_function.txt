@@ -1,0 +1,114 @@
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/binlog.cc
+Function: Binlog_cache_compressor::shall_compress
+  [[NODISCARD]] bool shall_compress() {
+    DBUG_TRACE;
+    // no compression enabled (ctype == NONE at this point)
+    if (!m_thd.variables.binlog_trx_compression) {
+      DBUG_PRINT("info", ("fallback to uncompressed: "
+                          "binlog_transaction_compression disabled"));
+      return false;
+    }
+    // do not compress if there are incident events
+    DBUG_EXECUTE_IF("binlog_compression_inject_incident",
+                    m_cache.set_incident(););
+    if (m_cache.has_incident()) {
+      DBUG_PRINT("info", ("fallback to uncompressed: has incident"));
+      return false;
+    }
+    // do not compress if there are non-transactional changes
+    if (m_thd.get_transaction()->has_modified_non_trans_table(
+            Transaction_ctx::STMT) ||
+        m_thd.get_transaction()->has_modified_non_trans_table(
+            Transaction_ctx::SESSION)) {
+      DBUG_PRINT("info",
+                 ("fallback to uncompressed: has modified trans table"));
+      return false;
+    }
+    // do not compress if has SBR
+    if (m_cache.may_have_sbr_stmts()) {
+      DBUG_PRINT("info", ("fallback to uncompressed: may have SBR events"));
+      return false;
+    }
+    // nothing can stop us now!
+    return true;
+  }
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/sql/rpl_applier_reader.cc
+Function: Rpl_applier_reader::debug_print_next_event_positions
+void Rpl_applier_reader::debug_print_next_event_positions() {
+  DBUG_PRINT(
+      "info",
+      ("assertion skip %u file pos %llu event relay log pos %llu file %s\n",
+       m_rli->slave_skip_counter, m_relaylog_file_reader.position(),
+       m_rli->get_event_relay_log_pos(), m_rli->get_event_relay_log_name()));
+
+  /* This is an assertion which sometimes fails, let's try to track it */
+  DBUG_PRINT("info", ("m_relaylog_file_reader->position() %llu "
+                      "m_rli->event_relay_log_pos=%llu",
+                      m_relaylog_file_reader.position(),
+                      m_rli->get_event_relay_log_pos()));
+
+  assert(m_relaylog_file_reader.position() >= BIN_LOG_HEADER_SIZE);
+  assert(m_relaylog_file_reader.position() ==
+             m_rli->get_event_relay_log_pos() ||
+         (m_rli->is_parallel_exec() ||
+          // TODO: double check that this is safe:
+          (m_rli->info_thd != nullptr &&
+           m_rli->info_thd->variables.binlog_trx_compression)));
+
+  DBUG_PRINT(
+      "info",
+      ("next_event group source %s %lu group relay %s %lu event %s %lu\n",
+       m_rli->get_group_master_log_name(),
+       (ulong)m_rli->get_group_master_log_pos(),
+       m_rli->get_group_relay_log_name(),
+       (ulong)m_rli->get_group_relay_log_pos(),
+       m_rli->get_event_relay_log_name(),
+       (ulong)m_rli->get_event_relay_log_pos()));
+
+  DBUG_PRINT("info",
+             ("m_rli->relay_log.get_binlog_end_pos()= %llu", m_log_end_pos));
+  DBUG_PRINT("info",
+             ("active_log= %s", m_reading_active_log ? "true" : "false"));
+}
+
+
+-------------------------------------------------------------------------------------------
+File: /root/LLVM/mysql-8.0.36/storage/ndb/plugin/ha_ndbcluster_binlog.cc
+Function: Ndb_binlog_thread::fix_per_epoch_trans_settings
+void Ndb_binlog_thread::fix_per_epoch_trans_settings(THD *thd) {
+  // No effect for self logging engine
+  // thd->variables.binlog_row_format
+
+  // With HTON_NO_BINLOG_ROW_OPT handlerton flag setting has no effect
+  // thd->variables.binlog_row_image
+
+  // Compression settings should take effect next binlog transaction
+  thd->variables.binlog_trx_compression = opt_ndb_log_trx_compression;
+  thd->variables.binlog_trx_compression_type = 0;  // zstd
+  thd->variables.binlog_trx_compression_level_zstd =
+      opt_ndb_log_trx_compression_level_zstd;
+
+  // Without HA_BLOB_PARTIAL_UPDATE setting has no effect
+  // thd->variables.binlog_row_value_options & PARTIAL_JSON
+
+  // Controls writing Rows_query_log events with the query to binlog, disable
+  // since query is not known for changes received from NDB
+  thd->variables.binlog_rows_query_log_events = false;
+
+  // No effect unless statement-based binary logging
+  // thd->variables.binlog_direct_non_trans_update
+
+  // Setup writeset extraction based on --ndb-log-transaction-dependency
+  thd->variables.transaction_write_set_extraction =
+      opt_ndb_log_trans_dependency ? HASH_ALGORITHM_XXHASH64
+                                   : HASH_ALGORITHM_OFF;
+
+  // Charset setting
+  thd->variables.character_set_client = &my_charset_latin1;
+}
+
+
