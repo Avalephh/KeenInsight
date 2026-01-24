@@ -6,7 +6,7 @@
 3. 从 pgaudit 日志中精确提取这段时间的 SQL
 4. 恢复数据库到备份状态
 5. 调用 replay API 进行回放
-6. 对比原始和回放的 CPU/内存曲线
+6. 对比原始和回放的 QPS 曲线
 
 每次测试的所有文件都保存在独立目录中，并支持添加测试描述。
 """
@@ -16,10 +16,8 @@ import sys
 import time
 import json
 import yaml
-import psutil
 import requests
 import subprocess
-import threading
 import re
 import shutil
 import matplotlib.pyplot as plt
@@ -28,6 +26,22 @@ from datetime import datetime, timedelta
 # 禁用代理，确保直接连接到本地服务
 os.environ['NO_PROXY'] = 'localhost,127.0.0.1'
 os.environ['no_proxy'] = 'localhost,127.0.0.1'
+
+# Homebrew bin path (macOS)
+HOMEBREW_BIN = '/opt/homebrew/bin'
+
+def find_command(name):
+    """Find a command in PATH or known locations."""
+    # Try PATH first
+    result = shutil.which(name)
+    if result:
+        return result
+    # Try homebrew
+    homebrew_path = os.path.join(HOMEBREW_BIN, name)
+    if os.path.isfile(homebrew_path):
+        return homebrew_path
+    # Not found
+    return name  # Return the name and let subprocess fail with a clearer error
 
 class ReplayCompareRunner:
     def __init__(self, config_path="tools/config.yaml", output_dir=None, description=""):
@@ -44,20 +58,11 @@ class ReplayCompareRunner:
         
         # 原始数据和回放数据
         self.original_stats = {
-            'time': [],
-            'cpu': [],
-            'memory': []
+            'time': []
         }
         self.replay_stats = {
-            'time': [],
-            'cpu': [],
-            'memory': []
+            'time': []
         }
-        
-        self.running = False
-        self.last_cpu_times = {}
-        self.last_sample_time = None
-        self._main_process = None
         
         # API 配置
         self.api_base = self.config.get('api', {}).get('base_url', 'http://localhost:8080')
@@ -109,160 +114,6 @@ class ReplayCompareRunner:
         with open(self.config_path, 'r') as f:
             self.config = yaml.safe_load(f)
 
-    def find_pg_main_process(self):
-        """自动查找 PostgreSQL 主进程"""
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    if proc.info['name'] in ['postgres', 'postgresql']:
-                        cmdline = proc.info['cmdline'] or []
-                        if any('-D' in arg for arg in cmdline):
-                            return proc.info['pid']
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-            
-            postgres_procs = []
-            for proc in psutil.process_iter(['pid', 'name', 'create_time']):
-                try:
-                    if proc.info['name'] in ['postgres', 'postgresql']:
-                        postgres_procs.append(proc.info)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-            
-            if postgres_procs:
-                oldest_proc = min(postgres_procs, key=lambda x: x['create_time'])
-                return oldest_proc['pid']
-                
-        except Exception as e:
-            print(f"Error finding PostgreSQL process: {e}")
-        
-        return None
-
-    def get_pg_process(self):
-        """获取 PostgreSQL 主进程"""
-        if self._main_process:
-            try:
-                self._main_process.memory_info()
-                return self._main_process
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                self._main_process = None
-
-        print("Searching for PostgreSQL main process...")
-        pid = self.find_pg_main_process()
-
-        if pid:
-            print(f"Found PostgreSQL main process with PID: {pid}")
-            try:
-                p = psutil.Process(pid)
-                self._main_process = p
-                return p
-            except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-                print(f"Error accessing process: {e}")
-                return None
-        else:
-            print("Error: Could not find PostgreSQL main process.")
-            return None
-
-    def get_all_pg_processes(self):
-        """获取 PostgreSQL 主进程及其所有子进程"""
-        main_process = self.get_pg_process()
-        if not main_process:
-            return []
-        
-        processes = [main_process]
-        try:
-            children = main_process.children(recursive=True)
-            processes.extend(children)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
-        
-        return processes
-
-    def get_process_cpu_times(self, process):
-        """获取进程的 CPU 时间"""
-        try:
-            times = process.cpu_times()
-            return times.user + times.system
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            return None
-
-    def calculate_cpu_percent(self, processes, elapsed_time):
-        """计算 CPU 使用率"""
-        if elapsed_time <= 0:
-            return 0.0
-        
-        total_cpu_percent = 0.0
-        current_cpu_times = {}
-        
-        for p in processes:
-            try:
-                pid = p.pid
-                cpu_time = self.get_process_cpu_times(p)
-                if cpu_time is None:
-                    continue
-                
-                current_cpu_times[pid] = cpu_time
-                
-                if pid in self.last_cpu_times:
-                    cpu_delta = cpu_time - self.last_cpu_times[pid]
-                    cpu_percent = (cpu_delta / elapsed_time) * 100
-                    total_cpu_percent += cpu_percent
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-        
-        self.last_cpu_times = current_cpu_times
-        return total_cpu_percent
-
-    def monitor_resources(self, stats_dict):
-        """监控资源使用"""
-        print(f"Starting resource monitoring...")
-        
-        cpu_count = psutil.cpu_count()
-        print(f"System has {cpu_count} CPU cores")
-        
-        self.last_sample_time = time.time()
-        start_time = self.last_sample_time
-        self.last_cpu_times = {}
-        
-        time.sleep(0.5)
-        
-        sample_interval = 0.5
-        sample_count = 0
-        
-        while self.running:
-            try:
-                current_time = time.time()
-                elapsed = current_time - self.last_sample_time
-                
-                current_processes = self.get_all_pg_processes()
-                total_cpu = self.calculate_cpu_percent(current_processes, elapsed)
-                
-                total_memory = 0.0
-                for p in current_processes:
-                    try:
-                        mem_info = p.memory_info()
-                        total_memory += mem_info.rss / 1024 / 1024
-                    except (psutil.NoSuchProcess, psutil.AccessDenied):
-                        continue
-                
-                relative_time = current_time - start_time
-                
-                stats_dict['time'].append(relative_time)
-                stats_dict['cpu'].append(total_cpu)
-                stats_dict['memory'].append(total_memory)
-                
-                self.last_sample_time = current_time
-                sample_count += 1
-                
-                if sample_count % 10 == 0:
-                    print(f"Sample {sample_count}: {len(current_processes)} processes, CPU: {total_cpu:.2f}%, Memory: {total_memory:.2f}MB")
-                
-                time.sleep(sample_interval)
-            except Exception as e:
-                print(f"Monitor error: {e}")
-                import traceback
-                traceback.print_exc()
-                break
     
     # ==================== 数据库备份恢复功能 ====================
     
@@ -289,7 +140,7 @@ class ReplayCompareRunner:
         # -c: 在恢复前先清理（DROP）已存在的对象
         # --if-exists: DROP 时加上 IF EXISTS
         cmd = [
-            "pg_dump",
+            find_command("pg_dump"),
             "-h", db_conf['host'],
             "-p", str(db_conf['port']),
             "-U", db_conf['user'],
@@ -343,7 +194,7 @@ class ReplayCompareRunner:
         
         # 使用 psql 恢复
         cmd = [
-            "psql",
+            find_command("psql"),
             "-h", db_conf['host'],
             "-p", str(db_conf['port']),
             "-U", db_conf['user'],
@@ -399,7 +250,7 @@ class ReplayCompareRunner:
         
         # 构建 pg_dump 命令，只备份指定的表
         cmd = [
-            "pg_dump",
+            find_command("pg_dump"),
             "-h", db_conf['host'],
             "-p", str(db_conf['port']),
             "-U", db_conf['user'],
@@ -532,23 +383,6 @@ class ReplayCompareRunner:
         解析审计日志文件，提取每条 SQL 的关键信息
         返回: 列表，每个元素包含 session_id, vxid, operation, sql_key, sql_preview
         """
-        # 通用正则表达式，提取 session, vxid 和 AUDIT 内容
-        # 格式: session=xxx xid=xxx vxid=xxx LOG:  AUDIT: SESSION,num,num,TYPE,OP,,,SQL,...
-        pattern_main = re.compile(
-            r'session=(\S+)\s+xid=(\d+)\s+vxid=(\S+)\s+LOG:\s+AUDIT:\s+\w+,\d+,\d+,(\w+),(\w+),.*?,(.+)$'
-        )
-        
-        # 备用格式 vxid=... tx=...
-        pattern_vxid_tx = re.compile(
-            r'session=(\S+)\s+vxid=(\S+)\s+tx=(\d+)\s+LOG:\s+AUDIT:\s+\w+,\d+,\d+,(\w+),(\w+),.*?,(.+)$'
-        )
-        
-        # 备用格式 只有 tx=...
-        pattern_tx_only = re.compile(
-            r'session=(\S+)\s+tx=(\d+)\s+LOG:\s+AUDIT:\s+\w+,\d+,\d+,(\w+),(\w+),.*?,(.+)$'
-        )
-        
-        # CSV-like format observed: user,db,timestamp,sqlstate,session_id,vxid,query_id/txid? LOG: AUDIT: ...
         # Example: test,test,1768995830.784,00000,6970bbec.c0c0,28/296,-5454431914034686354 LOG:  AUDIT: ...
         pattern_csv = re.compile(
             r'^[^,]+,[^,]+,(\d+\.\d+),[^,]+,([^,]+),([^,]+),[^ ]+ LOG:\s+AUDIT:\s+\w+,\d+,\d+,(\w+),(\w+),.*?,(.+)$'
@@ -567,7 +401,7 @@ class ReplayCompareRunner:
                     if not line or 'AUDIT:' not in line:
                         continue
                     
-                    session_id = None
+                    session_id = None 
                     vxid = None
                     sql_type = None
                     operation = None
@@ -588,9 +422,7 @@ class ReplayCompareRunner:
                         sql_type = match.group(4)
                         operation = match.group(5)
                         sql_part = match.group(6)
-                    else:
-                        # 尝试标准格式
-                        
+                    
                         # 尝试匹配时间戳
                         time_match = time_pattern.search(line)
                         if time_match:
@@ -603,37 +435,7 @@ class ReplayCompareRunner:
                                     timestamp = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S')
                             except:
                                 pass
-                        
-                        # 尝试匹配主格式 (xid vxid)
-                        match = pattern_main.search(line)
-                        if match:
-                            session_id = match.group(1)
-                            # xid = match.group(2)
-                            vxid = match.group(3)
-                            sql_type = match.group(4)
-                            operation = match.group(5)
-                            sql_part = match.group(6)
-                        else:
-                            # 尝试 vxid tx 格式
-                            match = pattern_vxid_tx.search(line)
-                            if match:
-                                session_id = match.group(1)
-                                vxid = match.group(2)
-                                # tx = match.group(3)
-                                sql_type = match.group(4)
-                                operation = match.group(5)
-                                sql_part = match.group(6)
-                            else:
-                                # 尝试只有 tx 格式
-                                match = pattern_tx_only.search(line)
-                                if match:
-                                    session_id = match.group(1)
-                                    tx = match.group(2)
-                                    vxid = f"tx/{tx}"  # 生成虚拟 vxid
-                                    sql_type = match.group(3)
-                                    operation = match.group(4)
-                                    sql_part = match.group(5)
-                    
+
                     if not match:
                         parse_errors += 1
                         if parse_errors <= 3:
@@ -752,8 +554,8 @@ class ReplayCompareRunner:
                 replay_vxid_groups[vxid] = []
             replay_vxid_groups[vxid].append(stmt)
         
-        print(f"  Original transactions (by vxid): {len(original_vxid_groups)}")
-        print(f"  Replay transactions (by vxid): {len(replay_vxid_groups)}")
+        print(f"  Original transactions: {len(original_vxid_groups)}")
+        print(f"  Replay transactions: {len(replay_vxid_groups)}")
         
         # 统计事务大小分布
         def get_size_distribution(groups):
@@ -1044,7 +846,7 @@ class ReplayCompareRunner:
         sb_conf = self.config['sysbench']
         
         cmd = [
-            "sysbench",
+            find_command("sysbench"),
             f"tools/sysbench_lua/fluctuating_oltp.lua",
             f"--db-driver=pgsql",
             f"--pgsql-host={db_conf['host']}",
@@ -1078,37 +880,8 @@ class ReplayCompareRunner:
         print("Running Original Benchmark (Sysbench)")
         print("="*60 + "\n")
         
-        main_process = self.get_pg_process()
-        if not main_process:
-            print("PostgreSQL main process not found, exiting.")
-            return False
-        
-        # 重置统计
-        self.original_stats = {
-            'time': [],
-            'cpu': [],
-            'memory': []
-        }
-        self.last_cpu_times = {}
-        
-        # 启动监控线程
-        self.running = True
-        monitor_thread = threading.Thread(
-            target=self.monitor_resources, 
-            args=(self.original_stats,)
-        )
-        monitor_thread.start()
-        
         # 运行 sysbench
         self.run_sysbench()
-        
-        # 停止监控
-        self.running = False
-        monitor_thread.join()
-        
-        # 保存原始数据
-        original_stats_file = self.save_stats(self.original_stats, "original_stats.json")
-        self.test_result['files']['original_stats'] = original_stats_file
         
         # 保存时间范围信息
         time_info = {
@@ -1123,14 +896,9 @@ class ReplayCompareRunner:
         self.test_result['files']['test_time'] = time_info_file
         
         # 更新测试结果
-        if self.original_stats.get('time'):
-            self.test_result['original'] = {
-                'duration': max(self.original_stats['time']),
-                'cpu_max': max(self.original_stats['cpu']),
-                'cpu_avg': sum(self.original_stats['cpu']) / len(self.original_stats['cpu']),
-                'memory_max': max(self.original_stats['memory']),
-                'memory_avg': sum(self.original_stats['memory']) / len(self.original_stats['memory'])
-            }
+        self.test_result['original'] = {
+            'duration': (self.test_end_time - self.test_start_time).total_seconds()
+        }
         
         return True
     
@@ -1142,45 +910,18 @@ class ReplayCompareRunner:
         
         self.test_result['task_id'] = task_id
         
-        main_process = self.get_pg_process()
-        if not main_process:
-            print("PostgreSQL main process not found, exiting.")
-            return False
-        
-        # 重置回放统计
-        self.replay_stats = {
-            'time': [],
-            'cpu': [],
-            'memory': []
-        }
-        self.last_cpu_times = {}
-        
-        # 启动监控线程
-        self.running = True
-        monitor_thread = threading.Thread(
-            target=self.monitor_resources, 
-            args=(self.replay_stats,)
-        )
-        monitor_thread.start()
-        
         # 记录回放开始时间
         self.replay_start_time = datetime.now() - timedelta(seconds=1)
         
         # 启动回放
         if not self.start_replay(task_id, speed_factor):
-            self.running = False
-            monitor_thread.join()
             return False
         
         # 等待回放完成
-        self.wait_for_replay_complete(task_id)
+        self.wait_for_replay_complete(task_id, timeout=self.config['sysbench']['time']*1.5)
         
         # 记录回放结束时间
         self.replay_end_time = datetime.now() + timedelta(seconds=1)
-        
-        # 停止监控
-        self.running = False
-        monitor_thread.join()
         
         # 打印回放报告
         report = self.get_replay_report(task_id)
@@ -1237,19 +978,10 @@ class ReplayCompareRunner:
                 json.dump(report, f, indent=2)
             self.test_result['files']['replay_report'] = report_file
         
-        # 保存回放数据
-        replay_stats_file = self.save_stats(self.replay_stats, "replay_stats.json")
-        self.test_result['files']['replay_stats'] = replay_stats_file
-        
         # 更新测试结果
-        if self.replay_stats.get('time'):
-            self.test_result['replay'] = {
-                'duration': max(self.replay_stats['time']),
-                'cpu_max': max(self.replay_stats['cpu']),
-                'cpu_avg': sum(self.replay_stats['cpu']) / len(self.replay_stats['cpu']),
-                'memory_max': max(self.replay_stats['memory']),
-                'memory_avg': sum(self.replay_stats['memory']) / len(self.replay_stats['memory'])
-            }
+        self.test_result['replay'] = {
+            'duration': (self.replay_end_time - self.replay_start_time).total_seconds()
+        }
         
         return True
     
@@ -1257,67 +989,15 @@ class ReplayCompareRunner:
     
     def plot_comparison(self):
         """绘制对比图"""
-        if not self.original_stats.get('time') and not self.replay_stats.get('time'):
-            print("No data to plot.")
-            return
-        
-        cpu_count = psutil.cpu_count()
         
         plt.style.use('seaborn-v0_8-whitegrid')
-        fig, axes = plt.subplots(3, 1, figsize=(14, 15))
+        fig, ax = plt.subplots(1, 1, figsize=(14, 8))
         
         # 添加标题（包含描述）
-        title = 'Database Replay Comparison Test'
+        title = 'Database Replay QPS Comparison'
         if self.description:
             title += f'\n{self.description}'
         fig.suptitle(title, fontsize=14, fontweight='bold')
-        
-        # CPU 对比图
-        ax1 = axes[0]
-        
-        has_original = bool(self.original_stats.get('time'))
-        has_replay = bool(self.replay_stats.get('time'))
-        
-        if has_original:
-            ax1.plot(self.original_stats['time'], self.original_stats['cpu'], 
-                    'b-', linewidth=1.2, label='Original (Sysbench)', alpha=0.8)
-            ax1.fill_between(self.original_stats['time'], self.original_stats['cpu'], 
-                           alpha=0.2, color='blue')
-        
-        if has_replay:
-            ax1.plot(self.replay_stats['time'], self.replay_stats['cpu'], 
-                    'r-', linewidth=1.2, label='Replay', alpha=0.8)
-            ax1.fill_between(self.replay_stats['time'], self.replay_stats['cpu'], 
-                           alpha=0.2, color='red')
-        
-        ax1.set_title('CPU Usage Comparison', fontsize=12)
-        ax1.set_ylabel(f'CPU % (max theoretical={cpu_count*100}%)')
-        ax1.legend(loc='upper right')
-        ax1.grid(True, alpha=0.3)
-        
-        # 内存对比图
-        ax2 = axes[1]
-        
-        if has_original:
-            ax2.plot(self.original_stats['time'], self.original_stats['memory'], 
-                    'b-', linewidth=1.2, label='Original (Sysbench)', alpha=0.8)
-            ax2.fill_between(self.original_stats['time'], self.original_stats['memory'], 
-                           alpha=0.2, color='blue')
-        
-        if has_replay:
-            ax2.plot(self.replay_stats['time'], self.replay_stats['memory'], 
-                    'r-', linewidth=1.2, label='Replay', alpha=0.8)
-            ax2.fill_between(self.replay_stats['time'], self.replay_stats['memory'], 
-                           alpha=0.2, color='red')
-        
-        ax2.set_title('Memory Usage Comparison', fontsize=12)
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Memory (MB)')
-        ax2.legend(loc='upper right')
-        ax2.grid(True, alpha=0.3)
-        
-        # QPS Comparison Graph
-        ax3 = axes[2]
         
         def get_qps_data(log_file):
             if not log_file or not os.path.exists(log_file):
@@ -1364,7 +1044,8 @@ class ReplayCompareRunner:
         orig_log = self.test_result.get('files', {}).get('audit_log')
         replay_log = self.test_result.get('files', {}).get('replay_audit_log')
         
-        has_orig_qps = False
+        has_data = False
+        
         if orig_log:
             t_orig, qps_orig = get_qps_data(orig_log)
             if t_orig:
@@ -1376,14 +1057,12 @@ class ReplayCompareRunner:
                         start_idx = max(0, i - window_size // 2)
                         end_idx = min(len(qps_orig), i + window_size // 2 + 1)
                         qps_smooth.append(sum(qps_orig[start_idx:end_idx]) / (end_idx - start_idx))
-                    ax3.plot(t_orig, qps_smooth, 'b-', linewidth=1.5, label='Original QPS (Smoothed)', alpha=0.9)
-                    ax3.plot(t_orig, qps_orig, 'b.', markersize=2, alpha=0.2) # 原始点
+                    ax.plot(t_orig, qps_smooth, 'b-', linewidth=1.5, label='Original QPS (Smoothed)', alpha=0.9)
+                    ax.plot(t_orig, qps_orig, 'b.', markersize=2, alpha=0.2) # 原始点
                 else:
-                    ax3.plot(t_orig, qps_orig, 'b-', linewidth=1.5, label='Original QPS', alpha=0.9)
+                    ax.plot(t_orig, qps_orig, 'b-', linewidth=1.5, label='Original QPS', alpha=0.9)
                 
-                avg_orig_qps = sum(qps_orig) / len(qps_orig) if qps_orig else 0
-                ax3.axhline(y=avg_orig_qps, color='b', linestyle=':', alpha=0.5, label=f'Avg Original: {avg_orig_qps:.1f}')
-                has_orig_qps = True
+                has_data = True
 
         if replay_log:
             t_replay, qps_replay = get_qps_data(replay_log)
@@ -1396,20 +1075,23 @@ class ReplayCompareRunner:
                         start_idx = max(0, i - window_size // 2)
                         end_idx = min(len(qps_replay), i + window_size // 2 + 1)
                         qps_smooth.append(sum(qps_replay[start_idx:end_idx]) / (end_idx - start_idx))
-                    ax3.plot(t_replay, qps_smooth, 'r-', linewidth=1.5, label='Replay QPS (Smoothed)', alpha=0.9)
-                    ax3.plot(t_replay, qps_replay, 'r.', markersize=2, alpha=0.2) # 原始点
+                    ax.plot(t_replay, qps_smooth, 'r-', linewidth=1.5, label='Replay QPS (Smoothed)', alpha=0.9)
+                    ax.plot(t_replay, qps_replay, 'r.', markersize=2, alpha=0.2) # 原始点
                 else:
-                    ax3.plot(t_replay, qps_replay, 'r-', linewidth=1.5, label='Replay QPS', alpha=0.9)
-                    
-                avg_replay_qps = sum(qps_replay) / len(qps_replay) if qps_replay else 0
-                ax3.axhline(y=avg_replay_qps, color='r', linestyle=':', alpha=0.5, label=f'Avg Replay: {avg_replay_qps:.1f}')
+                    ax.plot(t_replay, qps_replay, 'r-', linewidth=1.5, label='Replay QPS', alpha=0.9)
                 
-        ax3.set_title('QPS Comparison (Queries Per Second)', fontsize=12)
-        ax3.set_xlabel('Time (s)')
-        ax3.set_ylabel('QPS')
-        ax3.legend(loc='upper right')
-        ax3.grid(True, alpha=0.3)
+                has_data = True
         
+        if not has_data:
+            print("No QPS data to plot.")
+            plt.close(fig)
+            return
+        
+        ax.set_title('QPS Comparison (Queries Per Second)', fontsize=12)
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('QPS')
+        ax.legend(loc='upper right')
+        ax.grid(True, alpha=0.3)
         plt.tight_layout()
         
         output_file = self.get_output_path("comparison.png")
@@ -1423,20 +1105,16 @@ class ReplayCompareRunner:
     def print_statistics(self):
         """打印统计信息"""
         print("\n" + "="*60)
-        print("STATISTICS COMPARISON")
+        print("STATISTICS")
         print("="*60)
         
-        if self.original_stats.get('time'):
+        if self.test_result.get('original'):
             print("\n[Original (Sysbench)]")
-            print(f"  Duration: {max(self.original_stats['time']):.2f}s")
-            print(f"  CPU: min={min(self.original_stats['cpu']):.2f}%, max={max(self.original_stats['cpu']):.2f}%, avg={sum(self.original_stats['cpu'])/len(self.original_stats['cpu']):.2f}%")
-            print(f"  Memory: min={min(self.original_stats['memory']):.2f}MB, max={max(self.original_stats['memory']):.2f}MB")
+            print(f"  Duration: {self.test_result['original'].get('duration', 0):.2f}s")
         
-        if self.replay_stats.get('time'):
+        if self.test_result.get('replay'):
             print("\n[Replay]")
-            print(f"  Duration: {max(self.replay_stats['time']):.2f}s")
-            print(f"  CPU: min={min(self.replay_stats['cpu']):.2f}%, max={max(self.replay_stats['cpu']):.2f}%, avg={sum(self.replay_stats['cpu'])/len(self.replay_stats['cpu']):.2f}%")
-            print(f"  Memory: min={min(self.replay_stats['memory']):.2f}MB, max={max(self.replay_stats['memory']):.2f}MB")
+            print(f"  Duration: {self.test_result['replay'].get('duration', 0):.2f}s")
         
         print("="*60)
     
@@ -1479,18 +1157,12 @@ class ReplayCompareRunner:
             if self.test_result.get('original'):
                 f.write("## Original Benchmark Results\n\n")
                 orig = self.test_result['original']
-                f.write(f"- Duration: {orig.get('duration', 0):.2f}s\n")
-                f.write(f"- CPU Max: {orig.get('cpu_max', 0):.2f}%\n")
-                f.write(f"- CPU Avg: {orig.get('cpu_avg', 0):.2f}%\n")
-                f.write(f"- Memory Max: {orig.get('memory_max', 0):.2f}MB\n\n")
+                f.write(f"- Duration: {orig.get('duration', 0):.2f}s\n\n")
             
             if self.test_result.get('replay'):
                 f.write("## Replay Results\n\n")
                 replay = self.test_result['replay']
-                f.write(f"- Duration: {replay.get('duration', 0):.2f}s\n")
-                f.write(f"- CPU Max: {replay.get('cpu_max', 0):.2f}%\n")
-                f.write(f"- CPU Avg: {replay.get('cpu_avg', 0):.2f}%\n")
-                f.write(f"- Memory Max: {replay.get('memory_max', 0):.2f}MB\n\n")
+                f.write(f"- Duration: {replay.get('duration', 0):.2f}s\n\n")
             
             if self.test_result.get('divergence'):
                 f.write("## Divergence Statistics\n\n")
@@ -1601,7 +1273,9 @@ class ReplayCompareRunner:
         time.sleep(5)
         
         # 7. 运行回放测试
-        self.run_replay_benchmark(task_id, speed_factor)
+        if not self.run_replay_benchmark(task_id, speed_factor):
+            print("Replay failed to start, exiting...")
+            return
         
         # 8. 提取回放期间的审计日志并验证一致性
         if hasattr(self, 'replay_start_time') and hasattr(self, 'replay_end_time'):
@@ -1694,7 +1368,9 @@ def main():
             runner.restore_database(args.backup_file)
             time.sleep(3)
         
-        runner.run_replay_benchmark(args.task_id, args.speed)
+        if not runner.run_replay_benchmark(args.task_id, args.speed):
+            print("Replay failed to start, exiting...")
+            return
         runner.plot_comparison()
         runner.save_test_summary()
         
