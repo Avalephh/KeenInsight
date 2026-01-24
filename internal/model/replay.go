@@ -43,11 +43,11 @@ type TrafficBaseline struct {
 	DBName        string `json:"db_name" gorm:"type:varchar(64)"`
 	UserName      string `json:"user_name" gorm:"type:varchar(64)"`
 	TxID          string `json:"tx_id" gorm:"type:varchar(64)"` // 对应 thesis 的 tx_id (Stores PG vxid)
-	// 辅助字段
-	OriginTime time.Time `json:"origin_time" gorm:"-"`
-	SQLType    string    `json:"sql_type" gorm:"-"`
-	Operation  string    `json:"operation" gorm:"-"`
-	SeqInTx    int       `json:"seq_in_tx" gorm:"-"`
+	// 这些字段对回放至关重要，必须持久化
+	OriginTime time.Time `json:"origin_time" gorm:"column:origin_time"`
+	SQLType    string    `json:"sql_type" gorm:"column:sql_type;type:varchar(32)"`
+	Operation  string    `json:"operation" gorm:"column:operation;type:varchar(32)"`
+	SeqInTx    int       `json:"seq_in_tx" gorm:"column:seq_in_tx"`
 }
 
 func (TrafficBaseline) TableName() string {

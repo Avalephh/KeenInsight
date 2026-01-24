@@ -45,6 +45,7 @@ type RunRequest struct {
 	SpeedFactor float64 `json:"speed_factor" example:"1.0"` // 回放速度因子，1.0表示原速，0表示快速模式
 	MaxWorkers  int     `json:"max_workers" example:"100"`  // 最大并发会话数
 	FastMode    bool    `json:"fast_mode" example:"false"`  // 快速模式：忽略时间戳
+	TargetDB    string  `json:"target_db" example:"test"`   // 目标数据库名（默认使用任务中的db_name或流量基线中的db_name）
 }
 
 // RunResponse 定义运行阶段的响应
@@ -174,6 +175,7 @@ func (h *ReplayHandler) Run(c *gin.Context) {
 		req.SpeedFactor, _ = strconv.ParseFloat(c.DefaultQuery("speed_factor", "1.0"), 64)
 		req.MaxWorkers, _ = strconv.Atoi(c.DefaultQuery("max_workers", "0"))
 		req.FastMode = c.DefaultQuery("fast_mode", "false") == "true"
+		req.TargetDB = c.DefaultQuery("target_db", "")
 	} else if err := c.ShouldBindJSON(&req); err != nil {
 		response.Error(c, response.CodeError, "invalid request: "+err.Error())
 		return
@@ -193,6 +195,7 @@ func (h *ReplayHandler) Run(c *gin.Context) {
 		SpeedFactor: req.SpeedFactor,
 		MaxWorkers:  req.MaxWorkers,
 		FastMode:    req.FastMode,
+		TargetDB:    req.TargetDB,
 	}
 
 	if err := h.service.StartReplay(req.TaskID, opts); err != nil {

@@ -90,7 +90,7 @@ func (s *ReplayService) Prepare(req *PrepareRequest) (*PrepareResult, error) {
 		return nil, fmt.Errorf("failed to save log file: %w", err)
 	}
 
-	// 2. 创建任务记录 (Use TaskInfo)
+	// 3. 创建任务记录
 	task := &model.TaskInfo{
 		TaskID:      strTaskID,
 		Status:      model.TaskStatusPreparing,
@@ -306,7 +306,16 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 	}
 
 	if config.Database == "" {
-		config.Database = "postgres" // default
+		// 尝试从流量基线中获取数据库名
+		for _, stmt := range statements {
+			if stmt.DBName != "" {
+				config.Database = stmt.DBName
+				break
+			}
+		}
+		if config.Database == "" {
+			config.Database = "postgres" // 最后的默认值
+		}
 	}
 
 	if config.SpeedFactor < 0 {

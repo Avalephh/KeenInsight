@@ -9,10 +9,3 @@ logger:
   max_size: 100
   max_age: 30
   max_backups: 10
-
-database:
-  driver: mysql
-  source: "root:password@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
-  max_idle_conns: 10
-  max_open_conns: 100
-

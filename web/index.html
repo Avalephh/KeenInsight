@@ -1,600 +1,34 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RUC Database Replay Tool</title>
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --bg-primary: #f8f9fa;
-            --bg-secondary: #ffffff;
-            --bg-card: #ffffff;
-            --bg-hover: #e9ecef;
-            --text-primary: #212529;
-            --text-secondary: #6c757d;
-            --accent-blue: #0d6efd;
-            --accent-green: #198754;
-            --accent-red: #dc3545;
-            --accent-yellow: #ffc107;
-            --accent-purple: #6f42c1;
-            --border-color: #dee2e6;
-            --gradient-start: #667eea;
-            --gradient-end: #764ba2;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
-        
-        /* 导航栏 */
-        .navbar-custom {
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            padding: 1rem 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .navbar-brand i {
-            font-size: 1.75rem;
-        }
-        
-        .nav-link-custom {
-            color: rgba(255,255,255,0.85) !important;
-            font-weight: 500;
-            padding: 0.5rem 1rem !important;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        }
-        
-        .nav-link-custom:hover, .nav-link-custom.active {
-            color: #fff !important;
-            background: rgba(255,255,255,0.15);
-        }
-        
-        .status-indicator {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: rgba(255,255,255,0.1);
-            border-radius: 20px;
-            font-size: 0.875rem;
-        }
-        
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--accent-green);
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* 主容器 */
-        .main-container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        
-        /* 卡片样式 */
-        .card-custom {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            overflow: hidden;
-            margin-bottom: 1.5rem;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        
-        .card-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
-        }
-        
-        .card-header-custom {
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .card-header-custom i {
-            font-size: 1.25rem;
-        }
-        
-        .card-header-custom h5 {
-            font-weight: 600;
-            margin: 0;
-        }
-        
-        .card-body-custom {
-            padding: 1.5rem;
-        }
-        
-        /* 页面标题 */
-        .page-header {
-            margin-bottom: 2rem;
-        }
-        
-        .page-title {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-        
-        .page-subtitle {
-            color: var(--text-secondary);
-            font-size: 1rem;
-        }
-        
-        /* 步骤指示器 */
-        .steps-container {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 2rem;
-            gap: 1rem;
-        }
-        
-        .step-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 30px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .step-item:hover {
-            background: var(--bg-hover);
-        }
-        
-        .step-item.active {
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            border-color: transparent;
-        }
-        
-        .step-number {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-        
-        .step-item.active .step-number {
-            background: rgba(255,255,255,0.3);
-        }
-        
-        .step-item.completed .step-number {
-            background: var(--accent-green);
-        }
-        
-        /* 表单样式 */
-        .form-label-custom {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
-        
-        .form-control-custom {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            color: var(--text-primary);
-            padding: 0.75rem 1rem;
-            transition: all 0.2s ease;
-        }
-        
-        .form-control-custom:focus {
-            background: var(--bg-secondary);
-            border-color: var(--accent-blue);
-            color: var(--text-primary);
-            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
-        }
-        
-        .form-control-custom::placeholder {
-            color: var(--text-secondary);
-        }
-        
-        /* 文件上传区域 */
-        .upload-zone {
-            border: 2px dashed var(--border-color);
-            border-radius: 16px;
-            padding: 3rem 2rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            background: var(--bg-secondary);
-        }
-        
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: var(--accent-blue);
-            background: rgba(88, 166, 255, 0.05);
-        }
-        
-        .upload-zone i {
-            font-size: 3rem;
-            color: var(--accent-blue);
-            margin-bottom: 1rem;
-        }
-        
-        .upload-zone h6 {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-        
-        .upload-zone p {
-            color: var(--text-secondary);
-            margin-bottom: 1.5rem;
-        }
-        
-        .file-info {
-            background: var(--bg-hover);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-top: 1rem;
-            display: none;
-        }
-        
-        .file-info.show {
-            display: block;
-        }
-        
-        /* 按钮样式 */
-        .btn-custom {
-            padding: 0.75rem 1.5rem;
-            border-radius: 10px;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            border: none;
-        }
-        
-        .btn-primary-custom {
-            background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
-            color: #fff;
-        }
-        
-        .btn-primary-custom:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            color: #fff;
-        }
-        
-        .btn-outline-custom {
-            background: transparent;
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-        }
-        
-        .btn-outline-custom:hover {
-            background: var(--bg-hover);
-            border-color: var(--accent-blue);
-            color: var(--text-primary);
-        }
-        
-        .btn-success-custom {
-            background: var(--accent-green);
-            color: #fff;
-        }
-        
-        .btn-success-custom:hover {
-            background: #2ea043;
-            color: #fff;
-        }
-        
-        .btn-danger-custom {
-            background: var(--accent-red);
-            color: #fff;
-        }
-        
-        /* 统计卡片 */
-        .stat-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.2s ease;
-        }
-        
-        .stat-card:hover {
-            background: var(--bg-hover);
-        }
-        
-        .stat-value {
-            font-size: 2rem;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-        
-        .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
-        }
-        
-        .stat-value.blue { color: var(--accent-blue); }
-        .stat-value.green { color: var(--accent-green); }
-        .stat-value.red { color: var(--accent-red); }
-        .stat-value.yellow { color: var(--accent-yellow); }
-        .stat-value.purple { color: var(--accent-purple); }
-        
-        /* 进度条 */
-        .progress-custom {
-            height: 12px;
-            background: var(--bg-secondary);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-        
-        .progress-bar-custom {
-            background: linear-gradient(90deg, var(--accent-green), var(--accent-blue));
-            border-radius: 6px;
-            transition: width 0.3s ease;
-        }
-        
-        /* 表格样式 */
-        .table-custom {
-            color: var(--text-primary);
-        }
-        
-        .table-custom thead th {
-            background: var(--bg-secondary);
-            border-color: var(--border-color);
-            color: var(--text-secondary);
-            font-weight: 600;
-            font-size: 0.875rem;
-            padding: 1rem;
-        }
-        
-        .table-custom tbody td {
-            border-color: var(--border-color);
-            padding: 1rem;
-            vertical-align: middle;
-        }
-        
-        .table-custom tbody tr:hover {
-            background: var(--bg-hover);
-        }
-        
-        /* SQL 显示 */
-        .sql-code {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 0.75rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-            max-height: 100px;
-            overflow-y: auto;
-        }
-        
-        /* 徽章 */
-        .badge-custom {
-            padding: 0.35rem 0.75rem;
-            border-radius: 6px;
-            font-weight: 500;
-            font-size: 0.75rem;
-        }
-        
-        .badge-read { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
-        .badge-write { background: rgba(210, 153, 34, 0.2); color: var(--accent-yellow); }
-        .badge-misc { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
-        .badge-ddl { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
-        .badge-success { background: rgba(63, 185, 80, 0.2); color: var(--accent-green); }
-        .badge-failed { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
-        .badge-running { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
-        .badge-ready { background: rgba(163, 113, 247, 0.2); color: var(--accent-purple); }
-        
-        /* 图表容器 */
-        .chart-container {
-            position: relative;
-            height: 280px;
-            background: var(--bg-secondary);
-            border-radius: 12px;
-            padding: 1rem;
-        }
-        
-        /* 分割视图 */
-        .split-view {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-        }
-        
-        @media (max-width: 992px) {
-            .split-view {
-                grid-template-columns: 1fr;
-            }
-        }
-        
-        /* 回放报告 */
-        .report-section {
-            margin-bottom: 2rem;
-        }
-        
-        .report-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .divergence-item {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        .divergence-type {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-        
-        .divergence-detail {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-        
-        /* 错误列表 */
-        .error-item {
-            background: rgba(248, 81, 73, 0.1);
-            border: 1px solid rgba(248, 81, 73, 0.3);
-            border-radius: 10px;
-            padding: 1rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        .error-message {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            color: var(--accent-red);
-        }
-        
-        /* 隐藏区域 */
-        .section-hidden {
-            display: none;
-        }
-        
-        /* 加载动画 */
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 0.8s linear infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        /* 滚动条 */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: var(--bg-secondary);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--border-color);
-            border-radius: 4px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--text-secondary);
-        }
-        
-        /* 回放控制面板 */
-        .replay-controls {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            margin-bottom: 1.5rem;
-        }
-        
-        .control-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .control-label {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-        }
-        
-        /* Toast 通知 */
-        .toast-container {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 9999;
-        }
-        
-        .toast-custom {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            animation: slideIn 0.3s ease;
-        }
-        
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        .toast-success { border-left: 4px solid var(--accent-green); }
-        .toast-error { border-left: 4px solid var(--accent-red); }
-        .toast-info { border-left: 4px solid var(--accent-blue); }
-    </style>
+    <!-- Custom CSS -->
+    <link href="/web/css/style.css" rel="stylesheet">
 </head>
+
 <body>
     <!-- 导航栏 -->
     <nav class="navbar navbar-expand-lg navbar-custom">
         <div class="container-fluid px-4">
-            <a class="navbar-brand text-white" href="#">
+            <a class="navbar-brand" href="#">
                 <i class="bi bi-database-fill-gear"></i>
                 Database Replay
             </a>
             <div class="d-flex align-items-center gap-3">
-                <ul class="navbar-nav me-3">
+                <ul class="navbar-nav me-3 d-flex flex-row">
                     <li class="nav-item">
                         <a class="nav-link nav-link-custom active" href="#" data-page="prepare">
                             <i class="bi bi-upload"></i> 准备
@@ -613,108 +47,113 @@
                 </ul>
                 <div class="status-indicator">
                     <span class="status-dot" id="serverStatus"></span>
-                    <span id="serverStatusText">API 服务正常</span>
+                    <span id="serverStatusText">检查服务中...</span>
                 </div>
             </div>
         </div>
     </nav>
 
     <!-- Toast 容器 -->
-    <div class="toast-container" id="toastContainer"></div>
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1100" id="toastContainer"></div>
 
     <!-- 主容器 -->
     <div class="main-container">
-        
+
         <!-- ========== 准备阶段页面 ========== -->
-        <div id="preparePage" class="page-section">
+        <div id="preparePage" class="page-section fade-in">
             <div class="page-header">
-                <h1 class="page-title">
-                    <i class="bi bi-cloud-arrow-up-fill" style="color: var(--accent-blue);"></i>
-                    准备阶段
-                </h1>
-                <p class="page-subtitle">上传 PgAudit 审计日志文件，配置目标数据库连接信息</p>
+                <h1 class="page-title">准备阶段</h1>
+                <p class="page-subtitle">上传 PgAudit 审计日志文件，配置目标数据库连接信息以开始回放任务。</p>
             </div>
 
-            <div class="row">
-                <div class="col-lg-5">
-                    <div class="card-custom">
+            <div class="row g-4">
+                <div class="col-lg-4">
+                    <div class="card-custom h-100">
                         <div class="card-header-custom">
-                            <i class="bi bi-gear" style="color: var(--accent-purple);"></i>
+                            <i class="bi bi-gear-fill"></i>
                             <h5>数据库配置</h5>
                         </div>
                         <div class="card-body-custom">
                             <form id="prepareForm">
                                 <div class="mb-3">
                                     <label class="form-label-custom">主机地址</label>
-                                    <input type="text" class="form-control form-control-custom" id="dbHost" value="127.0.0.1" required>
+                                    <input type="text" class="form-control form-control-custom" id="dbHost"
+                                        value="127.0.0.1" required>
                                 </div>
                                 <div class="row">
                                     <div class="col-6 mb-3">
                                         <label class="form-label-custom">端口号</label>
-                                        <input type="number" class="form-control form-control-custom" id="dbPort" value="5432" required>
+                                        <input type="number" class="form-control form-control-custom" id="dbPort"
+                                            value="5432" required>
                                     </div>
                                     <div class="col-6 mb-3">
                                         <label class="form-label-custom">数据库名</label>
-                                        <input type="text" class="form-control form-control-custom" id="dbName" value="test" required>
+                                        <input type="text" class="form-control form-control-custom" id="dbName"
+                                            value="test" required>
                                     </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label-custom">用户名</label>
-                                    <input type="text" class="form-control form-control-custom" id="dbUser" value="test" required>
+                                    <input type="text" class="form-control form-control-custom" id="dbUser" value="test"
+                                        required>
                                 </div>
                                 <div class="mb-4">
                                     <label class="form-label-custom">密码</label>
-                                    <input type="password" class="form-control form-control-custom" id="dbPass" value="test1234" required>
+                                    <input type="password" class="form-control form-control-custom" id="dbPass"
+                                        value="test1234" required>
                                 </div>
                             </form>
                         </div>
                     </div>
                 </div>
-                
-                <div class="col-lg-7">
-                    <div class="card-custom">
+
+                <div class="col-lg-8">
+                    <div class="card-custom h-100 d-flex flex-column">
                         <div class="card-header-custom">
-                            <i class="bi bi-file-earmark-code" style="color: var(--accent-green);"></i>
+                            <i class="bi bi-file-earmark-code-fill"></i>
                             <h5>审计日志文件</h5>
                         </div>
-                        <div class="card-body-custom">
-                            <div class="upload-zone" id="uploadZone">
-                                <i class="bi bi-cloud-arrow-up"></i>
+                        <div class="card-body-custom flex-grow-1 d-flex flex-column">
+                            <div class="upload-zone flex-grow-1 d-flex flex-column justify-content-center"
+                                id="uploadZone">
+                                <i class="bi bi-cloud-arrow-up-fill"></i>
                                 <h6>拖拽文件到此处或点击选择</h6>
                                 <p>支持 .log、.txt 格式的 PgAudit 日志文件</p>
-                                <button type="button" class="btn btn-custom btn-outline-custom" onclick="document.getElementById('logFile').click()">
+                                <button type="button" class="btn btn-custom btn-outline-custom mx-auto"
+                                    onclick="document.getElementById('logFile').click()">
                                     <i class="bi bi-folder2-open"></i> 浏览文件
                                 </button>
                                 <input type="file" id="logFile" accept=".log,.txt" hidden>
                             </div>
                             <div class="file-info" id="fileInfo">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <i class="bi bi-file-earmark-text" style="color: var(--accent-blue);"></i>
-                                        <span id="fileName" class="ms-2">filename.log</span>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-file-earmark-text-fill text-primary fs-5 me-2"></i>
+                                        <span id="fileName" class="fw-medium">filename.log</span>
                                     </div>
                                     <span class="badge-custom badge-success" id="fileSize">0 MB</span>
                                 </div>
                             </div>
+
+                            <button type="button" class="btn btn-custom btn-primary-custom w-100 py-3 mt-4"
+                                id="prepareBtn" onclick="submitPrepare()">
+                                <i class="bi bi-rocket-takeoff"></i> 开始解析
+                            </button>
                         </div>
                     </div>
-                    
-                    <button type="button" class="btn btn-custom btn-primary-custom w-100 py-3" id="prepareBtn" onclick="submitPrepare()">
-                        <i class="bi bi-rocket-takeoff"></i> 开始解析
-                    </button>
                 </div>
             </div>
 
             <!-- 任务结果 -->
-            <div id="prepareResult" class="section-hidden mt-4">
+            <div id="prepareResult" class="hidden mt-4">
                 <div class="card-custom">
                     <div class="card-header-custom">
-                        <i class="bi bi-check-circle" style="color: var(--accent-green);"></i>
+                        <i class="bi bi-check-circle-fill text-success"></i>
                         <h5>解析完成</h5>
                         <span class="badge-custom badge-success ms-auto" id="taskStatus">Ready</span>
                     </div>
                     <div class="card-body-custom">
-                        <div class="row g-3">
+                        <div class="row g-4">
                             <div class="col-md-3">
                                 <div class="stat-card">
                                     <div class="stat-value blue" id="taskIdShort">-</div>
@@ -740,17 +179,21 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <!-- 统计图表 -->
-                        <div class="split-view mt-4">
-                            <div class="chart-container">
-                                <canvas id="typeChart"></canvas>
+                        <div class="row mt-4 g-4">
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <canvas id="typeChart"></canvas>
+                                </div>
                             </div>
-                            <div class="chart-container">
-                                <canvas id="operationChart"></canvas>
+                            <div class="col-md-6">
+                                <div class="chart-container">
+                                    <canvas id="operationChart"></canvas>
+                                </div>
                             </div>
                         </div>
-                        
+
                         <div class="d-flex gap-3 mt-4">
                             <button class="btn btn-custom btn-outline-custom flex-fill" onclick="showStatements()">
                                 <i class="bi bi-code-square"></i> 查看 SQL
@@ -765,49 +208,49 @@
         </div>
 
         <!-- ========== 回放页面 ========== -->
-        <div id="replayPage" class="page-section section-hidden">
+        <div id="replayPage" class="page-section hidden">
             <div class="page-header">
-                <h1 class="page-title">
-                    <i class="bi bi-play-circle-fill" style="color: var(--accent-green);"></i>
-                    流量回放
-                </h1>
-                <p class="page-subtitle">将捕获的 SQL 语句按照原始时序重放到目标数据库</p>
+                <h1 class="page-title">流量回放</h1>
+                <p class="page-subtitle">将捕获的 SQL 语句按照原始时序重放到目标数据库，并实时监控进度。</p>
             </div>
 
             <!-- 回放控制面板 -->
             <div class="card-custom">
                 <div class="card-header-custom">
-                    <i class="bi bi-sliders" style="color: var(--accent-blue);"></i>
+                    <i class="bi bi-sliders text-primary"></i>
                     <h5>回放控制</h5>
                 </div>
                 <div class="card-body-custom">
-                    <div class="replay-controls">
-                        <div class="control-group">
-                            <span class="control-label">任务ID:</span>
-                            <span id="replayTaskId" class="badge-custom badge-ready">未选择</span>
+                    <div class="d-flex flex-wrap gap-4 align-items-center mb-4">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary">任务ID:</span>
+                            <span id="replayTaskId" class="badge-custom badge-ready font-monospace fs-6">未选择</span>
                         </div>
-                        <div class="control-group">
-                            <span class="control-label">速度因子:</span>
-                            <select class="form-control form-control-custom" id="speedFactor" style="width: 120px;">
-                                <option value="0">快速模式</option>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary">速度因子:</span>
+                            <select class="form-select form-control-custom" id="speedFactor" style="width: 140px;">
+                                <option value="0">🚀 快速模式</option>
                                 <option value="0.5">0.5x</option>
                                 <option value="1" selected>1x (原速)</option>
                                 <option value="2">2x</option>
                                 <option value="5">5x</option>
                             </select>
                         </div>
-                        <div class="control-group">
-                            <span class="control-label">最大并发:</span>
-                            <input type="number" class="form-control form-control-custom" id="maxWorkers" value="100" style="width: 100px;">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-secondary">最大并发:</span>
+                            <input type="number" class="form-control form-control-custom" id="maxWorkers" value="100"
+                                style="width: 100px;">
                         </div>
                     </div>
-                    
+
                     <div class="d-flex gap-3">
-                        <button class="btn btn-custom btn-success-custom flex-fill" id="startReplayBtn" onclick="startReplay()">
-                            <i class="bi bi-play-fill"></i> 开始回放
+                        <button class="btn btn-custom btn-success-custom flex-fill py-3" id="startReplayBtn"
+                            onclick="startReplay()">
+                            <i class="bi bi-play-fill fs-5"></i> 开始回放
                         </button>
-                        <button class="btn btn-custom btn-danger-custom" id="stopReplayBtn" onclick="stopReplay()" disabled>
-                            <i class="bi bi-stop-fill"></i> 停止
+                        <button class="btn btn-custom btn-danger-custom py-3 px-5" id="stopReplayBtn"
+                            onclick="stopReplay()" disabled>
+                            <i class="bi bi-stop-fill fs-5"></i> 停止
                         </button>
                     </div>
                 </div>
@@ -816,56 +259,58 @@
             <!-- 回放进度 -->
             <div class="card-custom" id="progressCard">
                 <div class="card-header-custom">
-                    <i class="bi bi-activity" style="color: var(--accent-yellow);"></i>
+                    <i class="bi bi-activity text-warning"></i>
                     <h5>回放进度</h5>
                     <span class="badge-custom badge-running ms-auto" id="replayStatus">等待开始</span>
                 </div>
                 <div class="card-body-custom">
                     <div class="row g-3 mb-4">
                         <div class="col-md-2">
-                            <div class="stat-card">
-                                <div class="stat-value blue" id="totalStmts">0</div>
+                            <div class="stat-card p-3">
+                                <div class="stat-value blue fs-3" id="totalStmts" data-value="0">0</div>
                                 <div class="stat-label">总语句数</div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="stat-card">
-                                <div class="stat-value green" id="executedStmts">0</div>
+                            <div class="stat-card p-3">
+                                <div class="stat-value green fs-3" id="executedStmts" data-value="0">0</div>
                                 <div class="stat-label">已执行</div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="stat-card">
-                                <div class="stat-value green" id="successStmts">0</div>
+                            <div class="stat-card p-3">
+                                <div class="stat-value green fs-3" id="successStmts" data-value="0">0</div>
                                 <div class="stat-label">成功</div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="stat-card">
-                                <div class="stat-value red" id="failedStmts">0</div>
+                            <div class="stat-card p-3">
+                                <div class="stat-value red fs-3" id="failedStmts" data-value="0">0</div>
                                 <div class="stat-label">失败</div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="stat-card">
-                                <div class="stat-value yellow" id="divergenceStmts">0</div>
+                            <div class="stat-card p-3">
+                                <div class="stat-value yellow fs-3" id="divergenceStmts">0</div>
                                 <div class="stat-label">差异</div>
                             </div>
                         </div>
                         <div class="col-md-2">
-                            <div class="stat-card">
-                                <div class="stat-value purple" id="progressPercent">0%</div>
+                            <div class="stat-card p-3">
+                                <div class="stat-value purple fs-3" id="progressPercent">0%</div>
                                 <div class="stat-label">完成率</div>
                             </div>
                         </div>
                     </div>
-                    
-                    <div class="progress-custom">
-                        <div class="progress-bar progress-bar-custom" id="progressBar" style="width: 0%"></div>
+
+                    <div class="progress"
+                        style="height: 12px; background-color: var(--bg-primary); border-radius: 6px;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" id="progressBar"
+                            style="width: 0%"></div>
                     </div>
-                    
+
                     <div class="mt-3 text-center">
-                        <small class="text-muted">
+                        <small class="text-secondary font-monospace">
                             <i class="bi bi-clock"></i> 已运行: <span id="elapsedTime">00:00:00</span>
                         </small>
                     </div>
@@ -874,19 +319,16 @@
         </div>
 
         <!-- ========== 报告页面 ========== -->
-        <div id="reportPage" class="page-section section-hidden">
+        <div id="reportPage" class="page-section hidden">
             <div class="page-header">
-                <h1 class="page-title">
-                    <i class="bi bi-file-earmark-bar-graph-fill" style="color: var(--accent-purple);"></i>
-                    回放报告
-                </h1>
-                <p class="page-subtitle">查看回放执行结果、差异统计和错误详情</p>
+                <h1 class="page-title">回放报告</h1>
+                <p class="page-subtitle">详细分析回放执行结果、性能指标对比以及数据一致性差异。</p>
             </div>
 
             <!-- 报告统计表格 -->
             <div class="card-custom">
                 <div class="card-header-custom">
-                    <i class="bi bi-table" style="color: var(--accent-blue);"></i>
+                    <i class="bi bi-table text-primary"></i>
                     <h5>统计对比</h5>
                     <button class="btn btn-sm btn-custom btn-outline-custom ms-auto" onclick="loadReport()">
                         <i class="bi bi-arrow-clockwise"></i> 刷新
@@ -894,20 +336,23 @@
                 </div>
                 <div class="card-body-custom">
                     <div class="table-responsive">
-                        <table class="table table-custom table-hover">
-                            <thead>
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
                                 <tr>
-                                    <th>Metric</th>
-                                    <th>Original</th>
-                                    <th>Replay</th>
+                                    <th class="py-3 ps-4 text-secondary text-uppercase text-xs"
+                                        style="letter-spacing: 0.05em;">Metric</th>
+                                    <th class="py-3 text-secondary text-uppercase text-xs"
+                                        style="letter-spacing: 0.05em;">Original</th>
+                                    <th class="py-3 text-secondary text-uppercase text-xs"
+                                        style="letter-spacing: 0.05em;">Replay</th>
                                 </tr>
                             </thead>
-                            <tbody id="reportStatsBody">
+                            <tbody id="reportStatsBody" class="font-monospace">
                                 <!-- JS填充 -->
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <div class="mt-4 row g-3">
                         <div class="col-md-4">
                             <div class="stat-card">
@@ -934,7 +379,7 @@
             <!-- 差异统计 -->
             <div class="card-custom">
                 <div class="card-header-custom">
-                    <i class="bi bi-exclamation-triangle" style="color: var(--accent-yellow);"></i>
+                    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
                     <h5>差异统计</h5>
                     <button class="btn btn-sm btn-custom btn-outline-custom ms-auto" onclick="showDivergences()">
                         <i class="bi bi-list-ul"></i> 查看所有差异
@@ -967,10 +412,12 @@
                             </div>
                         </div>
                     </div>
-                    
-                    <h6 class="mb-3"><i class="bi bi-list-ul"></i> 差异详情 (前 10 条)</h6>
-                    <div id="divergenceList">
-                        <p class="text-muted">暂无差异记录</p>
+
+                    <h6 class="mb-3 fw-bold text-secondary text-uppercase text-xs d-flex align-items-center gap-2">
+                        <i class="bi bi-list-ul"></i> 差异详情 (Top 10)
+                    </h6>
+                    <div id="divergenceList" class="d-flex flex-column gap-2">
+                        <p class="text-secondary text-center">暂无差异记录</p>
                     </div>
                 </div>
             </div>
@@ -978,12 +425,12 @@
             <!-- 错误列表 -->
             <div class="card-custom">
                 <div class="card-header-custom">
-                    <i class="bi bi-bug" style="color: var(--accent-red);"></i>
+                    <i class="bi bi-bug-fill text-danger"></i>
                     <h5>错误详情</h5>
                 </div>
                 <div class="card-body-custom">
-                    <div id="errorList">
-                        <p class="text-muted">暂无错误记录</p>
+                    <div id="errorList" class="d-flex flex-column gap-2">
+                        <p class="text-secondary text-center">暂无错误记录</p>
                     </div>
                 </div>
             </div>
@@ -994,42 +441,60 @@
     <!-- SQL 语句模态框 -->
     <div class="modal fade" id="statementsModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content" style="background: var(--bg-card); color: var(--text-primary);">
-                <div class="modal-header" style="border-color: var(--border-color);">
-                    <h5 class="modal-title"><i class="bi bi-code-square"></i> SQL 语句列表</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold font-heading"><i class="bi bi-code-square text-primary"></i> SQL 语句列表
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3 d-flex gap-2">
-                        <button class="btn btn-sm btn-custom btn-outline-custom" onclick="loadStatements(0)">首页</button>
-                        <button class="btn btn-sm btn-custom btn-outline-custom" onclick="loadStatements(currentStmtPage - 1)">上一页</button>
-                        <span class="align-self-center px-3" id="stmtPageInfo">第 1 页</span>
-                        <button class="btn btn-sm btn-custom btn-outline-custom" onclick="loadStatements(currentStmtPage + 1)">下一页</button>
+                <div class="modal-body px-4 py-3 bg-light">
+                    <div class="mb-3 d-flex gap-2 justify-content-center align-items-center bg-white p-2 rounded shadow-sm mx-auto"
+                        style="width: fit-content;">
+                        <button class="btn btn-sm btn-custom btn-outline-custom border-0"
+                            onclick="loadStatements(0)">首页</button>
+                        <button class="btn btn-sm btn-custom btn-outline-custom border-0"
+                            onclick="loadStatements(state.currentStmtPage - 1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span class="px-3 fw-medium text-secondary" id="stmtPageInfo">第 1 页</span>
+                        <button class="btn btn-sm btn-custom btn-outline-custom border-0"
+                            onclick="loadStatements(state.currentStmtPage + 1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
                     </div>
-                    <div id="statementsList" style="max-height: 60vh; overflow-y: auto;">
+                    <div id="statementsList" style="min-height: 300px;">
                         <!-- SQL 列表 -->
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- 差异详情模态框 -->
     <div class="modal fade" id="divergencesModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content" style="background: var(--bg-card); color: var(--text-primary);">
-                <div class="modal-header" style="border-color: var(--border-color);">
-                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> 差异详情列表</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+                <div class="modal-header border-bottom px-4 py-3">
+                    <h5 class="modal-title fw-bold font-heading"><i
+                            class="bi bi-exclamation-triangle-fill text-warning"></i> 差异详情列表</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-body">
-                    <div class="mb-3 d-flex gap-2">
-                        <button class="btn btn-sm btn-custom btn-outline-custom" onclick="loadDivergences(0)">首页</button>
-                        <button class="btn btn-sm btn-custom btn-outline-custom" onclick="loadDivergences(currentDivPage - 1)">上一页</button>
-                        <span class="align-self-center px-3" id="divPageInfo">第 1 页</span>
-                        <button class="btn btn-sm btn-custom btn-outline-custom" onclick="loadDivergences(currentDivPage + 1)">下一页</button>
+                <div class="modal-body px-4 py-3 bg-light">
+                    <div class="mb-3 d-flex gap-2 justify-content-center align-items-center bg-white p-2 rounded shadow-sm mx-auto"
+                        style="width: fit-content;">
+                        <button class="btn btn-sm btn-custom btn-outline-custom border-0"
+                            onclick="loadDivergences(0)">首页</button>
+                        <button class="btn btn-sm btn-custom btn-outline-custom border-0"
+                            onclick="loadDivergences(state.currentDivPage - 1)">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span class="px-3 fw-medium text-secondary" id="divPageInfo">第 1 页</span>
+                        <button class="btn btn-sm btn-custom btn-outline-custom border-0"
+                            onclick="loadDivergences(state.currentDivPage + 1)">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
                     </div>
-                    <div id="divergencesListFull" style="max-height: 60vh; overflow-y: auto;">
+                    <div id="divergencesListFull" style="min-height: 300px;">
                         <!-- 差异列表 -->
                     </div>
                 </div>
@@ -1037,700 +502,10 @@
         </div>
     </div>
 
+    <!-- Bootstrap Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        // ========== 全局变量 ==========
-        let currentTaskId = null;
-        let currentStmtPage = 0;
-        let currentDivPage = 0;
-        let typeChart = null;
-        let operationChart = null;
-        let progressInterval = null;
-        let replayStartTime = null;
-        
-        // ========== 页面切换 ==========
-        document.querySelectorAll('[data-page]').forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const page = e.target.closest('[data-page]').dataset.page;
-                showPage(page);
-            });
-        });
-        
-        function showPage(page) {
-            // 隐藏所有页面
-            document.querySelectorAll('.page-section').forEach(el => {
-                el.classList.add('section-hidden');
-            });
-            // 显示目标页面
-            document.getElementById(page + 'Page').classList.remove('section-hidden');
-            // 更新导航
-            document.querySelectorAll('[data-page]').forEach(link => {
-                link.classList.remove('active');
-                if (link.dataset.page === page) {
-                    link.classList.add('active');
-                }
-            });
-            
-            // 页面特定逻辑
-            if (page === 'report' && currentTaskId) {
-                loadReport();
-            }
-        }
-        
-        // ========== Toast 通知 ==========
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast-custom toast-${type}`;
-            toast.innerHTML = `
-                <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'error' ? 'x-circle' : 'info-circle'}"></i>
-                <span>${message}</span>
-            `;
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.remove();
-            }, 3000);
-        }
-        
-        // ========== 文件上传 ==========
-        const uploadZone = document.getElementById('uploadZone');
-        const fileInput = document.getElementById('logFile');
-        
-        uploadZone.addEventListener('click', () => fileInput.click());
-        
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            });
-        });
-        
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, () => uploadZone.classList.add('dragover'));
-        });
-        
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, () => uploadZone.classList.remove('dragover'));
-        });
-        
-        uploadZone.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                updateFileInfo(files[0]);
-            }
-        });
-        
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files[0]) {
-                updateFileInfo(e.target.files[0]);
-            }
-        });
-        
-        function updateFileInfo(file) {
-            document.getElementById('fileName').textContent = file.name;
-            document.getElementById('fileSize').textContent = formatFileSize(file.size);
-            document.getElementById('fileInfo').classList.add('show');
-        }
-        
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 B';
-            const k = 1024;
-            const sizes = ['B', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-        
-        // ========== 准备阶段 ==========
-        async function submitPrepare() {
-            const btn = document.getElementById('prepareBtn');
-            const file = document.getElementById('logFile').files[0];
-            
-            if (!file) {
-                showToast('请选择日志文件', 'error');
-                return;
-            }
-            
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading-spinner me-2"></span> 解析中...';
-            
-            const formData = new FormData();
-            formData.append('db_host', document.getElementById('dbHost').value);
-            formData.append('db_port', document.getElementById('dbPort').value);
-            formData.append('db_user', document.getElementById('dbUser').value);
-            formData.append('db_pass', document.getElementById('dbPass').value);
-            formData.append('db_name', document.getElementById('dbName').value);
-            formData.append('log_file', file);
-            
-            try {
-                const response = await fetch('/api/v1/replay/prepare', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (result.code === 0) {
-                    currentTaskId = result.data.task_id;
-                    showPrepareResult(result.data);
-                    showToast('日志解析完成！', 'success');
-                } else {
-                    showToast('解析失败: ' + result.msg, 'error');
-                }
-            } catch (error) {
-                showToast('网络错误: ' + error.message, 'error');
-            } finally {
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-rocket-takeoff"></i> 开始解析';
-            }
-        }
-        
-        function showPrepareResult(data) {
-            document.getElementById('prepareResult').classList.remove('section-hidden');
-            document.getElementById('taskIdShort').textContent = data.task_id.substring(0, 8);
-            document.getElementById('stmtCount').textContent = formatNumber(data.total_statements);
-            document.getElementById('txCount').textContent = formatNumber(data.total_transactions);
-            document.getElementById('sessionCount').textContent = data.statistics?.session_count || '-';
-            document.getElementById('taskStatus').textContent = data.status;
-            
-            // 绘制图表
-            if (data.statistics) {
-                drawCharts(data.statistics);
-            }
-        }
-        
-        function drawCharts(stats) {
-            // SQL 类型分布
-            const typeCtx = document.getElementById('typeChart').getContext('2d');
-            if (typeChart) typeChart.destroy();
-            
-            const typeData = stats.by_type || {};
-            typeChart = new Chart(typeCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(typeData),
-                    datasets: [{
-                        data: Object.values(typeData),
-                        backgroundColor: ['#3fb950', '#d29922', '#58a6ff', '#f85149', '#a371f7']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'right',
-                            labels: { color: '#8b949e' }
-                        },
-                        title: {
-                            display: true,
-                            text: 'SQL 类型分布',
-                            color: '#e6edf3'
-                        }
-                    }
-                }
-            });
-            
-            // 操作类型分布
-            const opCtx = document.getElementById('operationChart').getContext('2d');
-            if (operationChart) operationChart.destroy();
-            
-            const opData = stats.by_operation || {};
-            operationChart = new Chart(opCtx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(opData),
-                    datasets: [{
-                        data: Object.values(opData),
-                        backgroundColor: '#667eea'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        title: {
-                            display: true,
-                            text: '操作类型分布',
-                            color: '#e6edf3'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: { color: '#8b949e' },
-                            grid: { color: '#30363d' }
-                        },
-                        y: {
-                            ticks: { color: '#8b949e' },
-                            grid: { color: '#30363d' }
-                        }
-                    }
-                }
-            });
-        }
-        
-        function formatNumber(num) {
-            if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-            return num.toString();
-        }
-        
-        // ========== SQL 语句查看 ==========
-        function showStatements() {
-            const modal = new bootstrap.Modal(document.getElementById('statementsModal'));
-            loadStatements(0);
-            modal.show();
-        }
-        
-        async function loadStatements(page) {
-            if (page < 0) return;
-            
-            try {
-                const response = await fetch(`/api/v1/replay/statements?task_id=${currentTaskId}&offset=${page * 50}&limit=50`);
-                const result = await response.json();
-                
-                if (result.code === 0) {
-                    currentStmtPage = page;
-                    document.getElementById('stmtPageInfo').textContent = `第 ${page + 1} 页`;
-                    displayStatements(result.data.statements);
-                }
-            } catch (error) {
-                console.error('Load statements error:', error);
-            }
-        }
-        
-        function displayStatements(statements) {
-            const container = document.getElementById('statementsList');
-            container.innerHTML = '';
-            
-            statements.forEach(stmt => {
-                const div = document.createElement('div');
-                div.className = 'mb-3 p-3';
-                div.style.cssText = 'background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px;';
-                div.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <small style="color: var(--text-secondary);">
-                            ID: ${stmt.id} | TX: ${stmt.tx_id} | ${stmt.timestamp}
-                        </small>
-                        <span class="badge-custom badge-${stmt.sql_type.toLowerCase()}">${stmt.sql_type}</span>
-                    </div>
-                    <div class="sql-code">${escapeHtml(stmt.sql)}</div>
-                    <div class="mt-2">
-                        <small style="color: var(--text-secondary);">
-                            操作: <span style="color: var(--accent-blue);">${stmt.operation}</span> | 
-                            影响行数: <span style="color: var(--accent-green);">${stmt.rows_affected}</span> | 
-                            状态: <span style="color: ${stmt.state === '00000' ? 'var(--accent-green)' : 'var(--accent-red)'};">${stmt.state}</span>
-                        </small>
-                    </div>
-                `;
-                container.appendChild(div);
-            });
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        // ========== 回放控制 ==========
-        function goToReplay() {
-            if (!currentTaskId) {
-                showToast('请先解析日志文件', 'error');
-                return;
-            }
-            document.getElementById('replayTaskId').textContent = currentTaskId.substring(0, 8);
-            showPage('replay');
-        }
-        
-        async function startReplay() {
-            if (!currentTaskId) {
-                showToast('请先选择任务', 'error');
-                return;
-            }
-            
-            const speedFactor = document.getElementById('speedFactor').value;
-            const maxWorkers = document.getElementById('maxWorkers').value;
-            
-            const btn = document.getElementById('startReplayBtn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="loading-spinner me-2"></span> 启动中...';
-            
-            try {
-                const params = new URLSearchParams({
-                    task_id: currentTaskId,
-                    speed_factor: speedFactor,
-                    max_workers: maxWorkers
-                });
-                
-                const response = await fetch(`/api/v1/replay/run?${params}`, {
-                    method: 'POST'
-                });
-                
-                const result = await response.json();
-                
-                if (result.code === 0) {
-                    showToast('回放已启动！', 'success');
-                    document.getElementById('stopReplayBtn').disabled = false;
-                    document.getElementById('replayStatus').textContent = '运行中';
-                    document.getElementById('replayStatus').className = 'badge-custom badge-running ms-auto';
-                    replayStartTime = Date.now();
-                    startProgressPolling();
-                } else {
-                    showToast('启动失败: ' + result.msg, 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-play-fill"></i> 开始回放';
-                }
-            } catch (error) {
-                showToast('网络错误: ' + error.message, 'error');
-                btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-play-fill"></i> 开始回放';
-            }
-        }
-        
-        async function stopReplay() {
-            try {
-                const response = await fetch(`/api/v1/replay/stop?task_id=${currentTaskId}`, {
-                    method: 'POST'
-                });
-                
-                const result = await response.json();
-                
-                if (result.code === 0) {
-                    showToast('回放已停止', 'info');
-                    stopProgressPolling();
-                    resetReplayUI();
-                } else {
-                    showToast('停止失败: ' + result.msg, 'error');
-                }
-            } catch (error) {
-                showToast('网络错误: ' + error.message, 'error');
-            }
-        }
-        
-        function startProgressPolling() {
-            progressInterval = setInterval(updateProgress, 1000);
-            updateElapsedTime();
-        }
-        
-        function stopProgressPolling() {
-            if (progressInterval) {
-                clearInterval(progressInterval);
-                progressInterval = null;
-            }
-        }
-        
-        async function updateProgress() {
-            try {
-                const response = await fetch(`/api/v1/replay/progress?task_id=${currentTaskId}`);
-                const result = await response.json();
-                
-                if (result.code === 0) {
-                    const data = result.data;
-                    
-                    document.getElementById('totalStmts').textContent = formatNumber(data.total_statements || 0);
-                    document.getElementById('executedStmts').textContent = formatNumber(data.executed_statements || 0);
-                    document.getElementById('successStmts').textContent = formatNumber(data.success_count || 0);
-                    document.getElementById('failedStmts').textContent = formatNumber(data.failure_count || 0);
-                    
-                    const percentage = data.percentage || 0;
-                    document.getElementById('progressPercent').textContent = percentage.toFixed(1) + '%';
-                    document.getElementById('progressBar').style.width = percentage + '%';
-                    
-                    if (!data.running && data.executed_statements > 0) {
-                        // 回放完成
-                        stopProgressPolling();
-                        document.getElementById('replayStatus').textContent = '已完成';
-                        document.getElementById('replayStatus').className = 'badge-custom badge-success ms-auto';
-                        showToast('回放完成！', 'success');
-                        resetReplayUI();
-                    }
-                }
-            } catch (error) {
-                console.error('Progress update error:', error);
-            }
-        }
-        
-        function updateElapsedTime() {
-            const interval = setInterval(() => {
-                if (!progressInterval) {
-                    clearInterval(interval);
-                    return;
-                }
-                const elapsed = Math.floor((Date.now() - replayStartTime) / 1000);
-                const hours = Math.floor(elapsed / 3600);
-                const minutes = Math.floor((elapsed % 3600) / 60);
-                const seconds = elapsed % 60;
-                document.getElementById('elapsedTime').textContent = 
-                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }, 1000);
-        }
-        
-        function resetReplayUI() {
-            const btn = document.getElementById('startReplayBtn');
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-play-fill"></i> 开始回放';
-            document.getElementById('stopReplayBtn').disabled = true;
-        }
-        
-        // ========== 报告页面 ==========
-        async function loadReport() {
-            if (!currentTaskId) {
-                showToast('请先选择任务', 'error');
-                return;
-            }
-            
-            try {
-                // 并行获取报告和任务详情（为了获取原始统计）
-                const [reportRes, taskRes] = await Promise.all([
-                    fetch(`/api/v1/replay/report?task_id=${currentTaskId}`),
-                    fetch(`/api/v1/replay/task?task_id=${currentTaskId}`)
-                ]);
-                
-                const reportResult = await reportRes.json();
-                const taskResult = await taskRes.json();
-                
-                if (reportResult.code === 0 && taskResult.code === 0) {
-                    displayReport(reportResult.data, taskResult.data);
-                } else {
-                    showToast('加载报告失败: ' + (reportResult.msg || taskResult.msg), 'error');
-                }
-            } catch (error) {
-                showToast('网络错误: ' + error.message, 'error');
-            }
-        }
-        
-        function displayReport(report, taskData) {
-            const stats = taskData.statistics || {};
-            const origStmts = taskData.task.total_statements || 0;
-            const origTx = taskData.task.total_tx || 0;
-            const origSession = stats.session_count || 0;
-            const origSingleTx = stats.single_stmt_tx || 0;
-            const origMultiTx = stats.multi_stmt_tx || 0;
-
-            const repStmts = report.executed_stmts || 0;
-            const repTx = report.total_tx || 0; // 实际上回放的事务数应该等于原始事务数（除非被过滤）
-            // 注意：report 中的 session_count 是回放时的实际 session 数
-            const repSession = report.session_count || 0;
-            const repSingleTx = report.single_stmt_tx || 0;
-            const repMultiTx = report.multi_stmt_tx || 0;
-
-            // 填充表格
-            const tbody = document.getElementById('reportStatsBody');
-            tbody.innerHTML = `
-                <tr>
-                    <td>Statements</td>
-                    <td>${formatNumber(origStmts)}</td>
-                    <td>${formatNumber(repStmts)}</td>
-                </tr>
-                <tr>
-                    <td>Sessions</td>
-                    <td>${origSession}</td>
-                    <td>${repSession}</td>
-                </tr>
-                <tr>
-                    <td>Transactions</td>
-                    <td>${formatNumber(origTx)}</td>
-                    <td>${formatNumber(repTx)}</td>
-                </tr>
-                <tr>
-                    <td>Single-stmt TX</td>
-                    <td>${formatNumber(origSingleTx)}</td>
-                    <td>${formatNumber(repSingleTx)}</td>
-                </tr>
-                <tr>
-                    <td>Multi-stmt TX</td>
-                    <td>${formatNumber(origMultiTx)}</td>
-                    <td>${formatNumber(repMultiTx)}</td>
-                </tr>
-            `;
-
-            // 计算比率
-            const stmtRatio = origStmts > 0 ? (repStmts / origStmts).toFixed(4) : '-';
-            const txRatio = origTx > 0 ? (repTx / origTx).toFixed(4) : '-';
-            
-            // 事务分布相似度计算 (简单算法：1 - (差异/总数))
-            // 这里使用单语句和多语句事务的差异来计算
-            let similarity = 0;
-            if (origTx > 0) {
-                const singleDiff = Math.abs(origSingleTx - repSingleTx);
-                const multiDiff = Math.abs(origMultiTx - repMultiTx);
-                const totalDiff = singleDiff + multiDiff;
-                similarity = (1 - (totalDiff / (origTx * 2))) * 100; // *2 是因为差异是双向的，这里做一个归一化
-                // 或者更简单的：match rate
-                // similarity = (1 - (totalDiff / origTx)) * 100; // 这可能变为负数如果回放多很多
-                
-                // 另一种算法：Min(Orig, Rep) / Max(Orig, Rep) 对每项求平均
-                // const sSim = Math.min(origSingleTx, repSingleTx) / Math.max(origSingleTx, repSingleTx) || 1;
-                // const mSim = Math.min(origMultiTx, repMultiTx) / Math.max(origMultiTx, repMultiTx) || 1;
-                // similarity = ((sSim + mSim) / 2) * 100;
-                
-                // 采用用户示例中的高相似度算法，可能是基于分布比例的
-                // 此处简化为：(1 - abs(ratio_orig - ratio_rep)) ? No.
-                
-                // 使用简单的 count match:
-                const matchCount = Math.min(origSingleTx, repSingleTx) + Math.min(origMultiTx, repMultiTx);
-                similarity = (matchCount / origTx) * 100;
-            }
-            
-            document.getElementById('stmtRatio').textContent = stmtRatio;
-            document.getElementById('txRatio').textContent = txRatio;
-            document.getElementById('txSim').textContent = similarity.toFixed(2) + '%';
-
-            // 差异统计
-            document.getElementById('reportDivergence').textContent = formatNumber(report.divergence_count || 0);
-            document.getElementById('reportRowsDiff').textContent = formatNumber(report.rows_affected_diff || 0);
-            document.getElementById('reportErrorDiff').textContent = formatNumber(report.error_state_diff || 0);
-            document.getElementById('reportDivergenceRate').textContent = (report.divergence_rate || 0).toFixed(4) + '%';
-            
-            // 差异列表 (前 10 条)
-            const divList = document.getElementById('divergenceList');
-            if (report.divergences && report.divergences.length > 0) {
-                divList.innerHTML = '';
-                report.divergences.slice(0, 10).forEach(div => {
-                    const item = document.createElement('div');
-                    item.className = 'divergence-item';
-                    item.innerHTML = renderDivergenceItem(div);
-                    divList.appendChild(item);
-                });
-            } else {
-                divList.innerHTML = '<p class="text-muted">暂无差异记录</p>';
-            }
-            
-            // 错误列表
-            const errList = document.getElementById('errorList');
-            if (report.errors && report.errors.length > 0) {
-                errList.innerHTML = '';
-                report.errors.slice(0, 10).forEach(err => {
-                    const item = document.createElement('div');
-                    item.className = 'error-item';
-                    item.innerHTML = `
-                        <div class="error-message">${escapeHtml(err.error || 'Unknown error')}</div>
-                        ${err.sql ? `<div class="sql-code mt-2" style="font-size: 0.75rem;">${escapeHtml(err.sql.substring(0, 200))}...</div>` : ''}
-                    `;
-                    errList.appendChild(item);
-                });
-            } else {
-                errList.innerHTML = '<p class="text-muted">暂无错误记录</p>';
-            }
-        }
-
-        function renderDivergenceItem(div) {
-            return `
-                <div class="divergence-type d-flex justify-content-between align-items-center">
-                    <span class="badge-custom ${div.divergence_type === 'rows_affected' ? 'badge-write' : 'badge-failed'}">
-                        ${div.divergence_type === 'rows_affected' ? '影响行数差异' : '错误状态差异'}
-                    </span>
-                    <small class="text-muted" style="font-size: 0.75rem;">
-                        TxID: ${div.tx_id} | VxID: ${div.vxid}
-                    </small>
-                </div>
-                <div class="divergence-detail mt-2">
-                    ${div.divergence_type === 'rows_affected' 
-                        ? `<div class="d-flex justify-content-between"><span>原始: ${div.original_rows_affected} 行</span> <span>回放: ${div.replay_rows_affected} 行</span></div>`
-                        : `<div class="d-flex justify-content-between"><span>原始: ${div.original_state}</span> <span>回放: ${div.replay_state}</span></div>`
-                    }
-                    ${div.replay_error ? `<div class="mt-1 text-danger small">${escapeHtml(div.replay_error)}</div>` : ''}
-                </div>
-                <div class="sql-code mt-2" style="font-size: 0.75rem;">${escapeHtml(div.sql.substring(0, 100))}${div.sql.length > 100 ? '...' : ''}</div>
-            `;
-        }
-
-        // ========== 差异查看 ==========
-        function showDivergences() {
-            const modal = new bootstrap.Modal(document.getElementById('divergencesModal'));
-            loadDivergences(0);
-            modal.show();
-        }
-
-        async function loadDivergences(page) {
-            if (page < 0) return;
-            
-            try {
-                const response = await fetch(`/api/v1/replay/divergences?task_id=${currentTaskId}&offset=${page * 50}&limit=50`);
-                const result = await response.json();
-                
-                if (result.code === 0) {
-                    currentDivPage = page;
-                    document.getElementById('divPageInfo').textContent = `第 ${page + 1} 页`;
-                    displayDivergencesFull(result.data.divergences);
-                }
-            } catch (error) {
-                console.error('Load divergences error:', error);
-            }
-        }
-
-        function displayDivergencesFull(divergences) {
-            const container = document.getElementById('divergencesListFull');
-            container.innerHTML = '';
-            
-            if (!divergences || divergences.length === 0) {
-                container.innerHTML = '<p class="text-center text-muted my-4">暂无数据</p>';
-                return;
-            }
-
-            divergences.forEach(div => {
-                const divEl = document.createElement('div');
-                divEl.className = 'divergence-item mb-3';
-                divEl.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="badge-custom ${div.divergence_type === 'rows_affected' ? 'badge-write' : 'badge-failed'}">
-                            ${div.divergence_type === 'rows_affected' ? '影响行数差异' : '错误状态差异'}
-                        </span>
-                        <small class="text-muted">
-                            ID: ${div.id} | Session: ${div.session_id} | VxID: ${div.vxid}
-                        </small>
-                    </div>
-                    <div class="sql-code mb-2">${escapeHtml(div.sql)}</div>
-                    <div class="row g-2 text-sm">
-                        <div class="col-6">
-                            <div class="p-2 border rounded bg-light">
-                                <strong>原始执行:</strong><br>
-                                ${div.divergence_type === 'rows_affected' 
-                                    ? `Rows: ${div.original_rows_affected}` 
-                                    : `State: ${div.original_state}`}
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="p-2 border rounded bg-light">
-                                <strong>回放执行:</strong><br>
-                                ${div.divergence_type === 'rows_affected' 
-                                    ? `Rows: ${div.replay_rows_affected}` 
-                                    : `State: ${div.replay_state}`}
-                                ${div.replay_error ? `<br><span class="text-danger">${escapeHtml(div.replay_error)}</span>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(divEl);
-            });
-        }
-        
-        // ========== 服务器状态检查 ==========
-        async function checkServerStatus() {
-            try {
-                const response = await fetch('/health');
-                if (response.ok) {
-                    document.getElementById('serverStatus').style.background = 'var(--accent-green)';
-                    document.getElementById('serverStatusText').textContent = 'API 服务正常';
-                } else {
-                    throw new Error('Server error');
-                }
-            } catch (error) {
-                document.getElementById('serverStatus').style.background = 'var(--accent-red)';
-                document.getElementById('serverStatusText').textContent = 'API 服务离线';
-            }
-        }
-        
-        // ========== 初始化 ==========
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('RUC Database Replay Tool - Frontend Loaded');
-            checkServerStatus();
-            setInterval(checkServerStatus, 30000);
-        });
-    </script>
+    <!-- App Logic -->
+    <script src="/web/js/app.js"></script>
 </body>
+
 </html>
