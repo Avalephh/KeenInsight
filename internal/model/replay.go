@@ -34,20 +34,17 @@ func (TaskInfo) TableName() string {
 
 // TrafficBaseline 流量基线数据表 (t_traffic_baseline)
 type TrafficBaseline struct {
-	ID            int64  `json:"id" gorm:"primaryKey;autoIncrement"`
-	TaskID        string `json:"task_id" gorm:"index:idx_task_sql;type:char(36)"`
-	SQLID         string `json:"sql_id" gorm:"index:idx_task_sql;type:varchar(64)"`
-	ExecTimestamp int64  `json:"exec_timestamp" gorm:"type:bigint"` // 原始执行时间戳 (ms)
-	SessionID     string `json:"session_id" gorm:"type:varchar(64)"`
-	SQLText       string `json:"sql_text" gorm:"type:text"`
-	DBName        string `json:"db_name" gorm:"type:varchar(64)"`
-	UserName      string `json:"user_name" gorm:"type:varchar(64)"`
-	TxID          string `json:"tx_id" gorm:"type:varchar(64)"` // 对应 thesis 的 tx_id (Stores PG vxid)
-	// 这些字段对回放至关重要，必须持久化
-	OriginTime time.Time `json:"origin_time" gorm:"column:origin_time"`
-	SQLType    string    `json:"sql_type" gorm:"column:sql_type;type:varchar(32)"`
-	Operation  string    `json:"operation" gorm:"column:operation;type:varchar(32)"`
-	SeqInTx    int       `json:"seq_in_tx" gorm:"column:seq_in_tx"`
+	ID        int64  `json:"id" gorm:"primaryKey;autoIncrement"`
+	TaskID    string `json:"task_id" gorm:"index:idx_task_sql;type:char(36)"`
+	Timestamp int64  `json:"timestamp" gorm:"type:bigint"`
+	SessionID string `json:"session_id" gorm:"type:varchar(64)"`
+	SQLText   string `json:"sql_text" gorm:"type:text"`
+	DBName    string `json:"db_name" gorm:"type:varchar(64)"`
+	UserName  string `json:"user_name" gorm:"type:varchar(64)"`
+	TxID      string `json:"tx_id" gorm:"type:varchar(64)"`
+	SQLType   string `json:"sql_type" gorm:"column:sql_type;type:varchar(32)"`
+	Operation string `json:"operation" gorm:"column:operation;type:varchar(32)"`
+	SeqInTx   int    `json:"seq_in_tx" gorm:"column:seq_in_tx"`
 }
 
 func (TrafficBaseline) TableName() string {

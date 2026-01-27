@@ -9,17 +9,17 @@ import (
 
 func TestReplayer_GroupByTxID(t *testing.T) {
 	// 创建测试语句，同一个 TxID 的语句应该在同一个事务中
-	baseTime := time.Now()
+	baseTime := time.Now().UnixMilli()
 	statements := []*model.TrafficBaseline{
 		// 事务1: TxID=100
-		{ID: 1, SessionID: "session1", TxID: "100", Operation: "BEGIN", SQLText: "BEGIN", OriginTime: baseTime},
-		{ID: 2, SessionID: "session1", TxID: "100", Operation: "INSERT", SQLText: "INSERT INTO t1 VALUES (1)", OriginTime: baseTime.Add(100 * time.Millisecond)},
-		{ID: 3, SessionID: "session1", TxID: "100", Operation: "INSERT", SQLText: "INSERT INTO t1 VALUES (2)", OriginTime: baseTime.Add(200 * time.Millisecond)},
-		{ID: 4, SessionID: "session1", TxID: "100", Operation: "COMMIT", SQLText: "COMMIT", OriginTime: baseTime.Add(300 * time.Millisecond)},
+		{ID: 1, SessionID: "session1", TxID: "100", Operation: "BEGIN", SQLText: "BEGIN", Timestamp: baseTime},
+		{ID: 2, SessionID: "session1", TxID: "100", Operation: "INSERT", SQLText: "INSERT INTO t1 VALUES (1)", Timestamp: baseTime + 100},
+		{ID: 3, SessionID: "session1", TxID: "100", Operation: "INSERT", SQLText: "INSERT INTO t1 VALUES (2)", Timestamp: baseTime + 200},
+		{ID: 4, SessionID: "session1", TxID: "100", Operation: "COMMIT", SQLText: "COMMIT", Timestamp: baseTime + 300},
 		// 事务2: TxID=101
-		{ID: 5, SessionID: "session1", TxID: "101", Operation: "BEGIN", SQLText: "BEGIN", OriginTime: baseTime.Add(400 * time.Millisecond)},
-		{ID: 6, SessionID: "session1", TxID: "101", Operation: "UPDATE", SQLText: "UPDATE t1 SET v=1 WHERE id=1", OriginTime: baseTime.Add(500 * time.Millisecond)},
-		{ID: 7, SessionID: "session1", TxID: "101", Operation: "COMMIT", SQLText: "COMMIT", OriginTime: baseTime.Add(600 * time.Millisecond)},
+		{ID: 5, SessionID: "session1", TxID: "101", Operation: "BEGIN", SQLText: "BEGIN", Timestamp: baseTime + 400},
+		{ID: 6, SessionID: "session1", TxID: "101", Operation: "UPDATE", SQLText: "UPDATE t1 SET v=1 WHERE id=1", Timestamp: baseTime + 500},
+		{ID: 7, SessionID: "session1", TxID: "101", Operation: "COMMIT", SQLText: "COMMIT", Timestamp: baseTime + 600},
 	}
 
 	config := ReplayConfig{
@@ -47,7 +47,7 @@ func TestReplayer_GroupByTxID(t *testing.T) {
 
 	// 验证语句按时间排序
 	for i := 1; i < len(sessionStmts); i++ {
-		if sessionStmts[i].OriginTime.Before(sessionStmts[i-1].OriginTime) {
+		if sessionStmts[i].Timestamp < sessionStmts[i-1].Timestamp {
 			t.Error("Statements not sorted by timestamp")
 		}
 	}
@@ -61,15 +61,15 @@ func TestReplayer_GroupByTxID(t *testing.T) {
 
 func TestReplayer_TxIDTransactionBoundary(t *testing.T) {
 	// 测试不同 TxID 应该创建新事务
-	baseTime := time.Now()
+	baseTime := time.Now().UnixMilli()
 	statements := []*model.TrafficBaseline{
-		{ID: 1, SessionID: "session1", TxID: "100", Operation: "BEGIN", SQLText: "BEGIN", OriginTime: baseTime},
-		{ID: 2, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 1", OriginTime: baseTime.Add(100 * time.Millisecond)},
-		{ID: 3, SessionID: "session1", TxID: "100", Operation: "COMMIT", SQLText: "COMMIT", OriginTime: baseTime.Add(200 * time.Millisecond)},
+		{ID: 1, SessionID: "session1", TxID: "100", Operation: "BEGIN", SQLText: "BEGIN", Timestamp: baseTime},
+		{ID: 2, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 1", Timestamp: baseTime + 100},
+		{ID: 3, SessionID: "session1", TxID: "100", Operation: "COMMIT", SQLText: "COMMIT", Timestamp: baseTime + 200},
 		// 不同的 TxID，应该是新事务
-		{ID: 4, SessionID: "session1", TxID: "101", Operation: "BEGIN", SQLText: "BEGIN", OriginTime: baseTime.Add(300 * time.Millisecond)},
-		{ID: 5, SessionID: "session1", TxID: "101", Operation: "SELECT", SQLText: "SELECT 2", OriginTime: baseTime.Add(400 * time.Millisecond)},
-		{ID: 6, SessionID: "session1", TxID: "101", Operation: "COMMIT", SQLText: "COMMIT", OriginTime: baseTime.Add(500 * time.Millisecond)},
+		{ID: 4, SessionID: "session1", TxID: "101", Operation: "BEGIN", SQLText: "BEGIN", Timestamp: baseTime + 300},
+		{ID: 5, SessionID: "session1", TxID: "101", Operation: "SELECT", SQLText: "SELECT 2", Timestamp: baseTime + 400},
+		{ID: 6, SessionID: "session1", TxID: "101", Operation: "COMMIT", SQLText: "COMMIT", Timestamp: baseTime + 600},
 	}
 
 	config := ReplayConfig{
@@ -107,7 +107,7 @@ func TestReplayer_TxIDTransactionBoundary(t *testing.T) {
 func TestReplayer_StartStop(t *testing.T) {
 	// 测试回放器的启动和停止功能
 	statements := []*model.TrafficBaseline{
-		{ID: 1, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 1", OriginTime: time.Now()},
+		{ID: 1, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 1", Timestamp: time.Now().UnixMilli()},
 	}
 
 	config := ReplayConfig{
@@ -145,8 +145,8 @@ func TestReplayer_StartStop(t *testing.T) {
 
 func TestReplayer_GenerateReport(t *testing.T) {
 	statements := []*model.TrafficBaseline{
-		{ID: 1, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 1", OriginTime: time.Now()},
-		{ID: 2, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 2", OriginTime: time.Now()},
+		{ID: 1, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 1", Timestamp: time.Now().UnixMilli()},
+		{ID: 2, SessionID: "session1", TxID: "100", Operation: "SELECT", SQLText: "SELECT 2", Timestamp: time.Now().UnixMilli()},
 	}
 
 	config := ReplayConfig{

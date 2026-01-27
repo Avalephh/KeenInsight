@@ -17,7 +17,6 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 		expectedTxID string
 		expectedType string
 		expectedOp   string
-		expectedQID  string
 	}{
 		{
 			name:         "INSERT with new CSV prefix (QID=0)",
@@ -28,7 +27,6 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 			expectedTxID: "4/12532",
 			expectedType: "WRITE",
 			expectedOp:   "INSERT",
-			expectedQID:  "", // Should use hash
 		},
 		{
 			name:         "SELECT with new CSV prefix and valid QID",
@@ -39,7 +37,6 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 			expectedTxID: "4/690",
 			expectedType: "READ",
 			expectedOp:   "SELECT",
-			expectedQID:  "123456789",
 		},
 		{
 			name:         "BEGIN transaction",
@@ -50,7 +47,6 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 			expectedTxID: "4/12534",
 			expectedType: "MISC",
 			expectedOp:   "BEGIN",
-			expectedQID:  "", // Hash
 		},
 		{
 			name:         "COMMIT transaction",
@@ -61,7 +57,6 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 			expectedTxID: "4/12534",
 			expectedType: "MISC",
 			expectedOp:   "COMMIT",
-			expectedQID:  "", // Hash
 		},
 		{
 			name:        "Non-audit line",
@@ -116,16 +111,6 @@ func TestPgAuditParser_ParseLine(t *testing.T) {
 				t.Errorf("SQL mismatch:\nexpected: %s\ngot:      %s", tc.expectedSQL, stmt.SQLText)
 			}
 
-			if tc.expectedQID != "" {
-				if stmt.SQLID != tc.expectedQID {
-					t.Errorf("SQLID mismatch(should be QID): expected %s, got %s", tc.expectedQID, stmt.SQLID)
-				}
-			} else {
-				// We expect a hash
-				if stmt.SQLID == "" || stmt.SQLID == "0" {
-					t.Errorf("SQLID should be a hash, got empty or 0")
-				}
-			}
 		})
 	}
 }
@@ -187,11 +172,6 @@ test,test,1765626377.000,00000,693d5208.8383,5/200,77777 LOG:  AUDIT: SESSION,28
 		t.Errorf("Transaction 5/200 statement count mismatch: expected 1, got %d", tx2.StmtCount)
 	}
 
-	// Check QID extraction for specific statements
-	// Note: Units are in order of parsing
-	if result.Units[1].SQLID != "55555" {
-		t.Errorf("Expected SQLID 55555, got %s", result.Units[1].SQLID)
-	}
 }
 
 func TestPgAuditParser_TransactionGroupingByTxID(t *testing.T) {

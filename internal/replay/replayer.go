@@ -109,14 +109,14 @@ func NewReplayer(config ReplayConfig, statements []*model.TrafficBaseline) *Repl
 	r.groupBySession()
 
 	if len(statements) > 0 {
-		r.originalStartTime = statements[0].OriginTime
-		r.originalEndTime = statements[0].OriginTime
+		r.originalStartTime = time.UnixMilli(statements[0].Timestamp)
+		r.originalEndTime = time.UnixMilli(statements[0].Timestamp)
 		for _, stmt := range statements {
-			if stmt.OriginTime.Before(r.originalStartTime) {
-				r.originalStartTime = stmt.OriginTime
+			if time.UnixMilli(stmt.Timestamp).Before(r.originalStartTime) {
+				r.originalStartTime = time.UnixMilli(stmt.Timestamp)
 			}
-			if stmt.OriginTime.After(r.originalEndTime) {
-				r.originalEndTime = stmt.OriginTime
+			if time.UnixMilli(stmt.Timestamp).After(r.originalEndTime) {
+				r.originalEndTime = time.UnixMilli(stmt.Timestamp)
 			}
 		}
 	}
@@ -154,8 +154,8 @@ func (r *Replayer) groupBySession() {
 
 		for _, stmt := range stmts {
 			txGroups[stmt.TxID] = append(txGroups[stmt.TxID], stmt)
-			if firstTime, exists := txFirstTime[stmt.TxID]; !exists || stmt.OriginTime.Before(firstTime) {
-				txFirstTime[stmt.TxID] = stmt.OriginTime
+			if firstTime, exists := txFirstTime[stmt.TxID]; !exists || time.UnixMilli(stmt.Timestamp).Before(firstTime) {
+				txFirstTime[stmt.TxID] = time.UnixMilli(stmt.Timestamp)
 			}
 		}
 
@@ -276,7 +276,7 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxLifetime(24 * time.Hour)
 
 	if err := db.Ping(); err != nil {
 		if logger.Log != nil {
@@ -307,15 +307,14 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 		}
 
 		if !r.config.FastMode {
-			r.waitForTimestamp(stmt.OriginTime) // Temporal Alignment Algorithm (Thesis 4.2.2)
+			r.waitForTimestamp(time.UnixMilli(stmt.Timestamp))
 		}
 
-		// 事务管理逻辑 (Thesis 4.1.2 Replay-Base -> Replay Engine Transaction Management)
 		needNewTx := false
 
 		if stmt.TxID != currentTxID && stmt.TxID != "" {
 			if currentTx != nil {
-				currentTx.Commit() // 隐式提交
+				currentTx.Commit()
 				currentTx = nil
 			}
 
@@ -334,7 +333,6 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 			needNewTx = true
 		}
 
-		// 自动开始新事务 (除非显式 TCL)
 		if needNewTx && stmt.Operation != "BEGIN" && stmt.Operation != "COMMIT" && stmt.Operation != "ROLLBACK" {
 			currentTx, _ = db.Begin()
 		}
@@ -344,9 +342,9 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 		}
 
 		var execErr error
-		var rowsAffected int64 = 0
-		var result sql.Result
-		startTime := time.Now()
+		// var rowsAffected int64 = 0
+		// var result sql.Result
+		// startTime := time.Now()
 
 		switch strings.ToUpper(stmt.Operation) {
 		case "BEGIN":
@@ -373,27 +371,27 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 			}
 
 			if currentTx != nil {
-				result, execErr = currentTx.Exec(stmt.SQLText)
+				_, execErr = currentTx.Exec(stmt.SQLText)
 			} else {
-				result, execErr = db.Exec(stmt.SQLText)
+				_, execErr = db.Exec(stmt.SQLText)
 			}
 
-			if result != nil && execErr == nil {
-				rowsAffected, _ = result.RowsAffected()
-			}
+			// if result != nil && execErr == nil {
+			// 	rowsAffected, _ = result.RowsAffected()
+			// }
 		}
 
-		duration := time.Since(startTime).Seconds() * 1000 // ms
+		// duration := time.Since(startTime).Seconds() * 1000 // ms
 
 		atomic.AddInt64(&r.stats.ExecutedStatements, 1)
 
 		// 结果校验与差异检测 (Thesis 4.3.1)
-		replayState, divergenceType, hasDivergence := r.checkDivergence(stmt, execErr, rowsAffected)
+		// replayState, divergenceType, hasDivergence := r.checkDivergence(stmt, execErr, rowsAffected)
 
-		if hasDivergence {
-			atomic.AddInt64(&r.stats.DivergenceCount, 1)
-			r.recordDivergence(stmt, sessionID, divergenceType, rowsAffected, replayState, "", duration)
-		}
+		// if hasDivergence {
+		// 	atomic.AddInt64(&r.stats.DivergenceCount, 1)
+		// 	r.recordDivergence(stmt, sessionID, divergenceType, rowsAffected, replayState, "", duration)
+		// }
 
 		if execErr != nil {
 			atomic.AddInt64(&r.stats.FailureCount, 1)
@@ -420,7 +418,6 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 	}
 }
 
-// waitForTimestamp 时序对齐算法 (Thesis 4.2.2 Eq 4.7)
 func (r *Replayer) waitForTimestamp(originalTimestamp time.Time) {
 	originalOffset := originalTimestamp.Sub(r.originalStartTime)
 	if originalOffset < 0 || originalOffset > 24*time.Hour {
@@ -537,8 +534,8 @@ func (r *Replayer) recordDivergence(stmt *model.TrafficBaseline, sessionID, dive
 
 	if len(r.stats.Divergences) < 1000 {
 		r.stats.Divergences = append(r.stats.Divergences, model.ReplayDetail{
-			TaskID:         stmt.TaskID,
-			SQLID:          stmt.SQLID,
+			TaskID: stmt.TaskID,
+			// SQLID:          stmt.SQLID,
 			RowsAffected:   replayRowsAffected,
 			ExecDuration:   duration,
 			DivergenceType: divergenceType,

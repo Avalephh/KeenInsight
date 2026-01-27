@@ -135,7 +135,7 @@ func (r *ReplayRepository) BatchCreateStatements(statements []*model.TrafficBase
 // GetStatementsByTask 获取任务的所有SQL语句
 func (r *ReplayRepository) GetStatementsByTask(taskID string) ([]*model.TrafficBaseline, error) {
 	var statements []*model.TrafficBaseline
-	err := r.db.Where("task_id = ?", taskID).Order("exec_timestamp").Find(&statements).Error
+	err := r.db.Where("task_id = ?", taskID).Order("timestamp").Find(&statements).Error
 	return statements, err
 }
 
@@ -143,7 +143,7 @@ func (r *ReplayRepository) GetStatementsByTask(taskID string) ([]*model.TrafficB
 func (r *ReplayRepository) GetStatementsByTaskPaginated(taskID string, offset, limit int) ([]*model.TrafficBaseline, error) {
 	var statements []*model.TrafficBaseline
 	err := r.db.Where("task_id = ?", taskID).
-		Order("exec_timestamp").
+		Order("timestamp").
 		Offset(offset).
 		Limit(limit).
 		Find(&statements).Error
@@ -153,7 +153,7 @@ func (r *ReplayRepository) GetStatementsByTaskPaginated(taskID string, offset, l
 // GetStatementsByTx 获取事务的所有SQL语句
 func (r *ReplayRepository) GetStatementsByTx(taskID string, txID string) ([]*model.TrafficBaseline, error) {
 	var statements []*model.TrafficBaseline
-	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).Order("exec_timestamp").Find(&statements).Error
+	err := r.db.Where("task_id = ? AND tx_id = ?", taskID, txID).Order("timestamp").Find(&statements).Error
 	return statements, err
 }
 

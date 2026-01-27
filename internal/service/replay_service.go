@@ -278,6 +278,7 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 	s.mu.RUnlock()
 
 	// 获取所有 SQL 语句
+	// TODO: 优化，不要一次性加载所有 SQL 语句
 	statements, err := s.repo.GetStatementsByTask(taskID)
 	if err != nil {
 		return fmt.Errorf("failed to get statements: %w", err)
@@ -296,15 +297,16 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 	// 创建回放配置
 	config := replay.ReplayConfig{
 		Host:        task.DstIP,
-		Port:        task.DstPort, // int
+		Port:        task.DstPort,
 		User:        task.DstUser,
 		Password:    task.DstPass,
-		Database:    opts.TargetDB, // Pass via Options
+		Database:    opts.TargetDB,
 		SpeedFactor: opts.SpeedFactor,
 		MaxWorkers:  opts.MaxWorkers,
 		FastMode:    opts.FastMode,
 	}
 
+	// TODO: 这里需要优化
 	if config.Database == "" {
 		// 尝试从流量基线中获取数据库名
 		for _, stmt := range statements {
@@ -314,7 +316,7 @@ func (s *ReplayService) StartReplay(taskID string, opts *ReplayOptions) error {
 			}
 		}
 		if config.Database == "" {
-			config.Database = "postgres" // 最后的默认值
+			config.Database = "postgres"
 		}
 	}
 

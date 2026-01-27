@@ -61,9 +61,6 @@ postgres,mydb,1732100000.300,00000,sess1,3/100,0 LOG:  AUDIT: SESSION,4,1,MISC,C
 	if insertUnit.Operation != "INSERT" {
 		t.Errorf("Unit 1 op mismatch: %s", insertUnit.Operation)
 	}
-	if insertUnit.SQLID != "1001" {
-		t.Errorf("Unit 1 SQLID mismatch: expected '1001', got '%s'", insertUnit.SQLID)
-	}
 	expectedSQL := "INSERT INTO t1 VALUES (10)"
 	if insertUnit.SQLText != expectedSQL {
 		t.Errorf("Unit 1 SQLText mismatch: expected '%s', got '%s'", expectedSQL, insertUnit.SQLText)
@@ -73,9 +70,6 @@ postgres,mydb,1732100000.300,00000,sess1,3/100,0 LOG:  AUDIT: SESSION,4,1,MISC,C
 	selectUnit := result.Units[2]
 	if selectUnit.Operation != "SELECT" {
 		t.Errorf("Unit 2 op mismatch: %s", selectUnit.Operation)
-	}
-	if selectUnit.SQLID != "1002" {
-		t.Errorf("Unit 2 SQLID mismatch: expected '1002', got '%s'", selectUnit.SQLID)
 	}
 }
 
