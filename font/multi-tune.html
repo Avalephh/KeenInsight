@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>KeenInsight | 备库调优</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f4f6f9;
+      color: #333;
+    }
+
+    header {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      padding: 22px 32px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    header p {
+      margin-top: 6px;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    main {
+      padding: 26px 34px;
+    }
+
+    .section {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+
+    .section h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-left: 4px solid #667eea;
+      padding-left: 10px;
+    }
+
+    .round-selector {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .round-selector label {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+    }
+
+    .round-selector select {
+      padding: 8px 16px;
+      font-size: 14px;
+      border: 2px solid #667eea;
+      border-radius: 6px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+
+    .round-selector select:hover {
+      border-color: #764ba2;
+      background: #f8fafc;
+    }
+
+    .round-selector select:focus {
+      border-color: #764ba2;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .performance-card {
+      background: #f0f4f8;
+      border-radius: 12px;
+      padding: 24px;
+      color: #333;
+      margin-bottom: 24px;
+      border: 1px solid #e0e6ed;
+    }
+
+    .performance-title {
+      font-size: 16px;
+      opacity: 0.9;
+      margin-bottom: 20px;
+    }
+
+    .performance-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .metric-box {
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid #e0e6ed;
+    }
+
+    .metric-label {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .metric-change {
+      font-size: 12px;
+      margin-top: 4px;
+      opacity: 0.9;
+    }
+
+    .metric-change.positive {
+      color: #a0f0a0;
+    }
+
+    .metric-change.negative {
+      color: #ffb3b3;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    th {
+      background: #f5f7fb;
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .operation-box {
+      font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 16px 20px;
+      border-radius: 8px;
+      border: 1px solid #d0d7de;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: #24292f;
+      font-weight: 400;
+      line-height: 1.7;
+      letter-spacing: 0.3px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .operation-box::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .operation-box::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .operation-box::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+    }
+
+    .operation-box::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    /* 调优操作表格样式 - 与handling.html一致 */
+    #tuning-operations {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-top: 16px;
+      font-feature-settings: "kern" 1, "liga" 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    #tuning-operations th {
+      background: linear-gradient(135deg, #1e3c72 0%, #2c5282 100%);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 20px 24px;
+      text-align: left;
+      border: none;
+      font-family: 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      line-height: 1.4;
+    }
+
+    #tuning-operations th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+
+    #tuning-operations th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+
+    #tuning-operations td {
+      padding: 18px 24px;
+      font-size: 15px;
+      border-bottom: 1px solid #e8eaed;
+      background: #ffffff;
+      color: #2c3e50;
+      font-family: 'Inter', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      transition: background-color 0.2s ease;
+      line-height: 1.6;
+      letter-spacing: 0.2px;
+    }
+
+    #tuning-operations tr:hover td {
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    }
+
+    #tuning-operations tr:last-child td {
+      border-bottom: none;
+    }
+
+    #tuning-operations tr:last-child td:first-child {
+      border-radius: 0 0 0 8px;
+    }
+
+    #tuning-operations tr:last-child td:last-child {
+      border-radius: 0 0 8px 0;
+    }
+
+    /* 根因类型列样式 */
+    #tuning-operations td:first-child {
+      font-weight: 650;
+      color: #1e3c72;
+      font-size: 16px;
+      font-family: 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      letter-spacing: 0.3px;
+    }
+
+    .tag {
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #fff;
+      display: inline-block;
+      font-weight: 500;
+    }
+
+    .success { background: #5cb85c; }
+    .warning { background: #f0ad4e; }
+    .danger { background: #d9534f; }
+    .info { background: #5bc0de; }
+
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      justify-content: flex-end;
+    }
+
+    button {
+      padding: 10px 24px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #5568d3, #653a8b);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: #667eea;
+      border: 2px solid #667eea;
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+      border-color: #764ba2;
+      color: #764ba2;
+    }
+
+    .comparison-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      margin: 20px 0;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+
+    .chart-bar {
+      flex: 0 0 auto;
+      min-width: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .bar-container {
+      width: 100%;
+      height: 200px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .bar {
+      width: 24px;
+      background: linear-gradient(to top, #667eea, #764ba2);
+      border-radius: 4px 4px 0 0;
+      transition: all 0.5s ease;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 4px;
+      color: #fff;
+      font-weight: bold;
+      font-size: 10px;
+    }
+
+    .bar-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #333;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    .improvement-badge {
+      display: inline-block;
+      background: #5cb85c;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 8px;
+    }
+
+    .explanation-content-multi {
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: #34495e;
+      font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      overflow-y: auto;
+      max-height: 200px;
+      padding-right: 8px;
+    }
+
+    .explanation-content-multi::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .explanation-content-multi::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .explanation-content-multi::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 3px;
+    }
+
+    .explanation-content-multi::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>KeenInsight · 备库调优</h1>
+  <p>多轮迭代调优与性能优化跟踪</p>
+</header>
+
+<main>
+
+  <!-- 调优进度（性能对比图） -->
+  <div class="section">
+    <h2>调优进度</h2>
+    
+    <!-- 进度条 -->
+    <div style="margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <span style="font-size: 14px; color: #666; font-weight: 500;">当前进度</span>
+        <span id="progress-text" style="font-size: 16px; font-weight: 600; color: #667eea;">0/30</span>
+      </div>
+      <div style="width: 100%; height: 24px; background: #e8eaed; border-radius: 12px; overflow: hidden; position: relative;">
+        <div id="progress-bar" style="height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 12px; transition: width 0.3s ease; width: 0%;"></div>
+      </div>
+    </div>
+    
+    <div class="comparison-chart" id="comparison-chart">
+      <!-- 初始状态：只显示第0轮（初始状态），其他30个空柱状图由JavaScript动态生成 -->
+    </div>
+  </div>
+
+  <!-- 调优轮次选择与操作详情 -->
+  <div class="section">
+    <div class="round-selector">
+      <label for="round-select">选择调优轮次：</label>
+      <select id="round-select" onchange="loadRoundData()">
+        <option value="0" selected>第 0 轮调优</option>
+      </select>
+    </div>
+
+    <!-- 性能提升概览 -->
+    <div class="performance-card" style="margin-top: 20px;">
+      <div class="performance-title">第 <span id="current-round">0</span> 轮性能提升</div>
+      <div class="performance-metrics">
+        <div class="metric-box">
+          <div class="metric-label">执行时间</div>
+          <div class="metric-value" id="exec-time">-</div>
+          <div class="metric-change positive" id="exec-time-change" style="display: none;"></div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">针对根因</div>
+          <div class="metric-value" id="root-causes" style="font-size: 14px; line-height: 1.6; white-space: normal;">
+            -
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e6ed;">
+        <div class="metric-label">解释</div>
+        <div id="explanation" class="explanation-content-multi" style="margin-top: 8px;">
+          -
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; margin-bottom: 14px;">
+      <h2 style="margin: 0; font-size: 18px; border-left: 4px solid #667eea; padding-left: 10px;">调优操作详情</h2>
+      <button class="btn-primary" onclick="deployTuning()">部署当前调优方案</button>
+    </div>
+    
+    <table id="tuning-operations" style="margin-top: 0;">
+      <thead>
+        <tr>
+          <th>根因类型</th>
+          <th>调优操作</th>
+        </tr>
+      </thead>
+      <tbody id="tuning-operations-tbody">
+        <!-- 初始为空，由JavaScript加载 -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="action-buttons">
+    <button class="btn-secondary" onclick="goBack()">返回上一页</button>
+  </div>
+
+</main>
+
+<script>
+  // 不同轮次的数据
+  const roundData = {
+    1: {
+      execTime: '2.25s',
+      execTimeChange: '↓ 34.8% vs 初始',
+      rootCauses: ['索引选择', '查询计划调优'],
+      explanation: '本轮调优通过为常用查询列创建单列索引，提升索引选择效率，并更新表统计信息使查询优化器能够选择更优的执行计划，从而显著降低查询执行时间。',
+      operations: [
+        {
+          rootCause: '索引选择',
+          operation: 'CREATE INDEX idx_orders_orderdate ON orders(orderdate);\nCREATE INDEX idx_orders_totalprice ON orders(totalprice);'
+        },
+        {
+          rootCause: '查询计划调优',
+          operation: 'ANALYZE orders;\nANALYZE customer;'
+        }
+      ]
+    },
+    2: {
+      execTime: '1.45s',
+      execTimeChange: '↓ 58.0% vs 初始',
+      rootCauses: ['参数调优', '查询计划调优'],
+      explanation: '本轮调优通过调整内存相关参数（work_mem、effective_cache_size、shared_buffers），提升查询执行时使用的内存资源，并通过优化器提示强制使用更高效的Hash Join连接方式，进一步提升性能。',
+      operations: [
+        {
+          rootCause: '参数调优',
+          operation: 'SET work_mem = \'24MB\';\nSET effective_cache_size = \'6GB\';\nSET shared_buffers = \'1.5GB\';'
+        },
+        {
+          rootCause: '查询计划调优',
+          operation: '/*+ HashJoin(orders customer) */\n-- 强制使用 Hash Join'
+        }
+      ]
+    },
+    3: {
+      execTime: '0.95s',
+      execTimeChange: '↓ 72.5% vs 初始',
+      rootCauses: ['索引选择', '参数调优', '查询计划调优', '查询改写'],
+      explanation: '本轮调优通过创建复合索引优化索引选择，调整内存参数提升查询性能，更新统计信息优化查询计划，重写查询语句避免不必要的回表操作，多方面协同提升查询执行效率。',
+      operations: [
+        {
+          rootCause: '索引选择',
+          operation: 'CREATE INDEX idx_orders_composite \nON orders(orderdate, totalprice, custkey);'
+        },
+        {
+          rootCause: '参数调优',
+          operation: 'SET work_mem = \'32MB\';\nSET effective_cache_size = \'8GB\';\nSET shared_buffers = \'2GB\';'
+        },
+        {
+          rootCause: '查询计划调优',
+          operation: 'ANALYZE orders;\nANALYZE customer;\n-- 更新统计信息以优化查询计划'
+        },
+        {
+          rootCause: '查询改写',
+          operation: '-- 使用覆盖索引避免回表\nSELECT o.orderkey, o.orderdate, \n       o.totalprice, c.name\nFROM orders o\nJOIN customer c USING (custkey)\nWHERE o.orderdate >= \'2023-01-01\'\n  AND o.totalprice > 10000\nORDER BY o.totalprice DESC\nLIMIT 100;'
+        }
+      ]
+    },
+    4: {
+      execTime: '0.75s',
+      execTimeChange: '↓ 78.3% vs 初始',
+      rootCauses: ['索引选择', '参数调优'],
+      explanation: '本轮调优通过创建覆盖索引完全避免回表操作，并启用并行查询功能，利用多核CPU资源加速查询执行，进一步压缩查询响应时间。',
+      operations: [
+        {
+          rootCause: '索引选择',
+          operation: '-- 使用覆盖索引，完全避免回表\nCREATE INDEX idx_orders_covering \nON orders(orderdate, totalprice) \nINCLUDE (orderkey, custkey);'
+        },
+        {
+          rootCause: '参数调优',
+          operation: 'SET max_parallel_workers_per_gather = 4;\nSET parallel_tuple_cost = 0.05;'
+        }
+      ]
+    }
+  };
+
+  // 加载轮次数据（从本地数据或服务器数据）
+  function loadRoundData() {
+    const select = document.getElementById('round-select');
+    if (!select) return;
+    
+    const round = parseInt(select.value);
+    
+    // 如果是第0轮，加载初始状态数据
+    if (round === 0) {
+      loadRound0Data();
+      return;
+    }
+    
+    // 尝试从服务器数据加载
+    if (window.serverRoundData && window.serverRoundData.rounds) {
+      const roundData = window.serverRoundData.rounds.find(r => r.round === round);
+      if (roundData) {
+        loadRoundDataFromServer(roundData);
+        return;
+      }
+    }
+    
+    // 如果没有找到数据，显示空状态
+    const currentRoundEl = document.getElementById('current-round');
+    if (currentRoundEl) {
+      currentRoundEl.textContent = round;
+    }
+    
+    const execTimeEl = document.getElementById('exec-time');
+    const rootCausesEl = document.getElementById('root-causes');
+    const explanationEl = document.getElementById('explanation');
+    const tbody = document.querySelector('#tuning-operations-tbody');
+    
+    if (execTimeEl) execTimeEl.textContent = '-';
+    if (rootCausesEl) rootCausesEl.innerHTML = '-';
+    if (explanationEl) explanationEl.textContent = '-';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="2" style="text-align: center; color: #999;">暂无数据</td></tr>';
+  }
+
+  // 部署调优方案
+  function deployTuning() {
+    const round = document.getElementById('round-select').value;
+    if (confirm(`确认要部署第 ${round} 轮调优方案吗？\n\n系统将应用所有调优操作并重启相关服务。`)) {
+      alert(`正在部署第 ${round} 轮调优方案...\n\n这是一个模拟功能。实际应用中，系统将：\n1. 执行所有调优操作\n2. 验证配置正确性\n3. 重启相关服务\n4. 监控性能变化`);
+    }
+  }
+
+  // 返回上一页
+  function goBack() {
+    window.history.back();
+  }
+
+  // 从URL参数获取queryId
+  function getQueryIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('queryId') || '1';
+  }
+
+  // 从后端获取调优进度数据
+  async function fetchTuningProgress() {
+    const queryId = getQueryIdFromUrl();
+    try {
+      const response = await fetch(`/api/multi-tune-progress/${queryId}`);
+      if (!response.ok) {
+        throw new Error('获取调优进度失败');
+      }
+      const data = await response.json();
+      updateProgress(data);
+      return data;
+    } catch (error) {
+      console.error('获取调优进度错误:', error);
+      return null;
+    }
+  }
+
+  // 更新进度条和图表
+  function updateProgress(data) {
+    const currentRound = data.current_round || 0;
+    const totalRounds = data.total_rounds || 30;
+    const rounds = data.rounds || [];
+    
+    // 保存服务器数据供 loadRoundData 使用
+    window.serverRoundData = data;
+    
+    // 更新进度条
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressPercent = (currentRound / totalRounds) * 100;
+    
+    if (progressBar) {
+      progressBar.style.width = progressPercent + '%';
+    }
+    if (progressText) {
+      progressText.textContent = `${currentRound}/${totalRounds}`;
+    }
+    
+    // 更新图表
+    updateComparisonChart(rounds, data.initial_time);
+    
+    // 更新轮次选择器
+    updateRoundSelector(rounds);
+    
+    // 如果有当前轮次数据，加载它
+    if (rounds.length > 0) {
+      const latestRound = rounds[rounds.length - 1];
+      loadRoundDataFromServer(latestRound);
+      
+      // 更新选择器到最新轮次
+      const select = document.getElementById('round-select');
+      if (select) {
+        select.value = latestRound.round.toString();
+      }
+    }
+  }
+
+  // 更新对比图表
+  function updateComparisonChart(rounds, initialTime) {
+    const chartContainer = document.getElementById('comparison-chart');
+    if (!chartContainer || !initialTime || initialTime <= 0) return;
+    
+    // 清空现有内容
+    chartContainer.innerHTML = '';
+    
+    // 添加初始状态（第0轮）
+    const initialBar = createChartBar('0', initialTime, initialTime, 0, true);
+    chartContainer.appendChild(initialBar);
+    
+    // 更新已完成的轮次
+    rounds.forEach((round) => {
+      const roundNum = round.round || 0;
+      const execTime = round.exec_time || round.execTime || 0;
+      if (execTime > 0 && roundNum > 0) {
+        const bar = createChartBar(`${roundNum}`, execTime, initialTime, 0, false);
+        chartContainer.appendChild(bar);
+      }
+    });
+    
+    // 添加剩余的空柱状图（总共30个）
+    const completedRounds = rounds.length;
+    for (let i = completedRounds + 1; i <= 30; i++) {
+      const emptyBar = createEmptyChartBar(`${i}`);
+      chartContainer.appendChild(emptyBar);
+    }
+  }
+
+  // 创建图表柱（不显示百分比和绿色）
+  function createChartBar(label, value, maxValue, improvement, isInitial) {
+    const barContainer = document.createElement('div');
+    barContainer.className = 'chart-bar';
+    
+    const heightPercent = maxValue > 0 ? Math.max(5, (value / maxValue * 100)) : 100; // 最小高度5%以便可见
+    // 统一使用紫色渐变，不显示绿色
+    const barColor = 'linear-gradient(to top, #667eea, #764ba2)';
+    
+    barContainer.innerHTML = `
+      <div class="bar-container">
+        <div class="bar" style="height: ${heightPercent}%; background: ${barColor};" data-value="${value}" title="${value.toFixed(2)}s">${value.toFixed(1)}s</div>
+      </div>
+      <div class="bar-label">
+        ${label}
+      </div>
+    `;
+    
+    return barContainer;
+  }
+
+  // 更新轮次选择器
+  function updateRoundSelector(rounds) {
+    const select = document.getElementById('round-select');
+    if (!select) return;
+    
+    // 保存当前选中的值
+    const currentValue = select.value;
+    
+    // 清空现有选项
+    select.innerHTML = '';
+    
+    // 添加第0轮
+    const option0 = document.createElement('option');
+    option0.value = '0';
+    option0.textContent = '第 0 轮调优';
+    if (currentValue === '0' || rounds.length === 0) {
+      option0.selected = true;
+    }
+    select.appendChild(option0);
+    
+    // 添加各轮次选项
+    rounds.forEach((round) => {
+      const roundNum = round.round || 0;
+      if (roundNum > 0) {
+        const option = document.createElement('option');
+        option.value = roundNum.toString();
+        option.textContent = `第 ${roundNum} 轮调优`;
+        if (currentValue === roundNum.toString() || (currentValue === '' && roundNum === rounds.length)) {
+          option.selected = true;
+        }
+        select.appendChild(option);
+      }
+    });
+  }
+
+  // 从服务器数据加载轮次
+  function loadRoundDataFromServer(roundData) {
+    if (!roundData) return;
+    
+    // 更新当前轮次
+    const currentRoundEl = document.getElementById('current-round');
+    if (currentRoundEl) {
+      currentRoundEl.textContent = roundData.round || 1;
+    }
+    
+    // 更新性能指标
+    const execTimeEl = document.getElementById('exec-time');
+    const execTimeChangeEl = document.getElementById('exec-time-change');
+    if (execTimeEl && roundData.exec_time !== undefined) {
+      execTimeEl.textContent = roundData.exec_time.toFixed(2) + 's';
+    }
+    if (execTimeChangeEl && roundData.improvement_ratio !== undefined) {
+      const improvement = (roundData.improvement_ratio * 100).toFixed(1);
+      execTimeChangeEl.textContent = `↓ ${improvement}% vs 初始`;
+      execTimeChangeEl.className = 'metric-change positive';
+    }
+    
+    // 更新根因列表
+    const rootCausesEl = document.getElementById('root-causes');
+    if (rootCausesEl && roundData.root_causes) {
+      const rootCausesHtml = roundData.root_causes.map(cause => `• ${cause}`).join('<br>');
+      rootCausesEl.innerHTML = rootCausesHtml;
+    }
+    
+    // 更新解释（从调优结果中的explanation获取，不从之前的explanation拿）
+    const explanationEl = document.getElementById('explanation');
+    if (explanationEl) {
+      // 优先使用当前轮次的explanation，如果没有则显示默认值
+      if (roundData.explanation) {
+        explanationEl.textContent = roundData.explanation;
+      } else {
+        explanationEl.textContent = '-';
+      }
+    }
+    
+    // 更新调优操作表格
+    const tbody = document.querySelector('#tuning-operations-tbody');
+    if (tbody) {
+      tbody.innerHTML = '';
+      if (roundData.operations && roundData.operations.length > 0) {
+        roundData.operations.forEach(op => {
+          const row = document.createElement('tr');
+          const operationText = (op.operation || op.action || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
+          row.innerHTML = `
+            <td>${op.rootCause || op.type || ''}</td>
+            <td><div class="operation-box">${operationText}</div></td>
+          `;
+          tbody.appendChild(row);
+        });
+      } else {
+        // 如果没有操作，显示空状态
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="2" style="text-align: center; color: #999; padding: 20px;">暂无调优操作</td>';
+        tbody.appendChild(row);
+      }
+    }
+  }
+
+  // 启动多轮调优
+  async function startMultiTune() {
+    const queryId = getQueryIdFromUrl();
+    try {
+      const response = await fetch(`/api/multi-tune/${queryId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          total_rounds: 30
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.message && errorData.message.includes('已在运行中')) {
+          // 任务已在运行，继续监控进度
+          console.log('多轮调优任务已在运行中');
+        } else {
+          throw new Error(errorData.error || '启动多轮调优失败');
+        }
+      } else {
+        const data = await response.json();
+        console.log('多轮调优任务已启动:', data);
+      }
+    } catch (error) {
+      console.error('启动多轮调优错误:', error);
+    }
+  }
+
+  // 初始化图表：显示初始状态和第0轮，以及30个空柱状图
+  function initializeChart(initialTime) {
+    const chartContainer = document.getElementById('comparison-chart');
+    if (!chartContainer) return;
+    
+    chartContainer.innerHTML = '';
+    
+    // 添加初始状态（第0轮）
+    if (initialTime && initialTime > 0) {
+      const initialBar = createChartBar('0', initialTime, initialTime, 0, true);
+      chartContainer.appendChild(initialBar);
+    }
+    
+    // 添加30个空柱状图
+    for (let i = 1; i <= 30; i++) {
+      const emptyBar = createEmptyChartBar(`${i}`);
+      chartContainer.appendChild(emptyBar);
+    }
+  }
+
+  // 创建空柱状图
+  function createEmptyChartBar(label) {
+    const barContainer = document.createElement('div');
+    barContainer.className = 'chart-bar';
+    
+    barContainer.innerHTML = `
+      <div class="bar-container">
+        <div class="bar" style="height: 5%; background: #e8eaed; color: #999;" data-value="0" title="未开始">-</div>
+      </div>
+      <div class="bar-label">${label}</div>
+    `;
+    
+    return barContainer;
+  }
+
+  // 加载第0轮数据（从已存储的诊断结果和调优结果获取，不重新调用API）
+  async function loadRound0Data() {
+    const queryId = getQueryIdFromUrl();
+    try {
+      // 从进度API获取初始时间
+      const progressResponse = await fetch(`/api/multi-tune-progress/${queryId}`);
+      let initialTime = null;
+      if (progressResponse.ok) {
+        const progressData = await progressResponse.json();
+        initialTime = progressData.initial_time;
+      }
+      
+      // 尝试从已存储的诊断结果获取（不重新诊断）
+      let diagnosisData = null;
+      try {
+        const storedDiagnosisResponse = await fetch(`/api/diagnosis-result/${queryId}`);
+        if (storedDiagnosisResponse.ok) {
+          diagnosisData = await storedDiagnosisResponse.json();
+          // 如果从诊断结果中获取到执行时间，使用它
+          if (diagnosisData.query_info && diagnosisData.query_info.execution_time) {
+            initialTime = diagnosisData.query_info.execution_time;
+          }
+        }
+      } catch (e) {
+        console.warn('无法获取已存储的诊断结果:', e);
+      }
+      
+      // 尝试从已存储的调优结果获取
+      let tuningSuggestions = [];
+      try {
+        const tuneResponse = await fetch(`/api/tuning-result/${queryId}`);
+        if (tuneResponse.ok) {
+          const tuneData = await tuneResponse.json();
+          tuningSuggestions = tuneData.tuning_suggestions || [];
+          // 如果诊断数据不存在，从调优结果中提取根因
+          if (!diagnosisData && tuneData.root_causes) {
+            diagnosisData = {
+              root_causes: tuneData.root_causes || [],
+              explanation: '初始状态（从调优结果获取）',
+              query_info: {
+                execution_time: initialTime || 0
+              }
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('无法获取调优结果:', e);
+      }
+      
+      // 如果还是没有数据，使用默认值
+      if (!diagnosisData) {
+        diagnosisData = {
+          root_causes: [],
+          explanation: '初始状态',
+          query_info: {
+            execution_time: initialTime || 0
+          }
+        };
+      }
+      
+      // 映射根因到中文
+      const rootCauseMap = {
+        "missing indexes": "索引选择",
+        "inappropriate query knobs": "参数调优",
+        "suboptimal plan optimizer": "查询计划调优",
+        "poorly written queries": "查询改写",
+      };
+      const rootCauses = (diagnosisData.root_causes || []).map(rc => {
+        const rcKey = rc.toLowerCase().replace(/\s+/g, '_');
+        return rootCauseMap[rc] || rootCauseMap[rcKey] || rc;
+      });
+      
+      // 构建第0轮数据（第0轮不使用诊断结果的explanation，使用空字符串）
+      const round0Data = {
+        round: 0,
+        exec_time: initialTime || diagnosisData.query_info?.execution_time || 0,
+        old_time: initialTime || diagnosisData.query_info?.execution_time || 0,
+        improvement_ratio: 0,
+        root_causes: rootCauses,
+        explanation: '', // 第0轮不使用诊断结果的explanation
+        operations: tuningSuggestions.map(s => ({
+          rootCause: s.type || s.rootCause,
+          operation: s.action || s.operation
+        }))
+      };
+      
+      // 更新选择器
+      const select = document.getElementById('round-select');
+      if (select) {
+        select.innerHTML = '<option value="0" selected>第 0 轮调优</option>';
+      }
+      
+      // 加载第0轮数据
+      loadRoundDataFromServer(round0Data);
+      
+      // 更新图表初始状态
+      if (round0Data.exec_time > 0) {
+        initializeChart(round0Data.exec_time);
+      } else {
+        // 如果没有执行时间，初始化空图表
+        initializeChart(0);
+      }
+    } catch (error) {
+      console.error('加载第0轮数据错误:', error);
+      // 如果加载失败，至少初始化空图表
+      initializeChart(0);
+    }
+  }
+
+  // 页面加载时初始化
+  document.addEventListener('DOMContentLoaded', function() {
+    const queryId = getQueryIdFromUrl();
+    
+    // 先加载第0轮数据（初始状态）
+    loadRound0Data();
+    
+    // 启动多轮调优任务
+    startMultiTune();
+    
+    // 从后端获取调优进度
+    fetchTuningProgress();
+    
+    // 定时刷新进度（每5秒）
+    setInterval(fetchTuningProgress, 5000);
+  });
+</script>
+
+</body>
+</html>
+

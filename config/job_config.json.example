@@ -1,0 +1,115 @@
+{
+  "DATABASE_TYPE": "postgres",
+  "DATABASE_CONFIG": {
+    "user": "postgres",
+    "password": "postgres",
+    "host": "localhost",
+    "port": 5432,
+    "dbname": "job",
+    "workload_type": "OLAP",
+    "postgres_path": "/usr/lib/postgresql/14/bin",
+    "postgres_data": "/usr/lib/postgresql/14/data",
+    "log_path": "/usr/lib/postgresql/14/log",
+    "db_type": "postgres",
+    "query_timeout": 30
+  },
+  "KNOB_CONFIG": {
+    "query_knobs": {
+      "enable_async_append": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_bitmapscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_gathermerge": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_hashagg": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_hashjoin": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_incremental_sort": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_indexonlyscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_indexscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_material": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_memoize": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_mergejoin": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_nestloop": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_parallel_append": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_parallel_hash": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_partition_pruning": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_partitionwise_aggregate": {"type": "boolean", "min": 0, "max": 1, "default": 0},
+      "enable_partitionwise_join": {"type": "boolean", "min": 0, "max": 1, "default": 0},
+      "enable_seqscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_sort": {"type": "boolean", "min": 0, "max": 1, "default": 1}
+    },
+    "system_knobs": {
+      "constraint_exclusion": {"type": "enum", "min": null, "max": null, "default": "partition"},
+      "cpu_index_tuple_cost": {"type": "float", "min": 0.0, "max": 10, "default": 0.005},
+      "cpu_operator_cost": {"type": "float", "min": 0.0, "max": 1, "default": 0.0025},
+      "cpu_tuple_cost": {"type": "float", "min": 0.0, "max": 10, "default": 0.01},
+      "cursor_tuple_fraction": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.1},
+      "default_statistics_target": {"type": "integer", "min": 1, "max": 5000, "default": 100},
+      "effective_cache_size": {"type": "integer", "min": 1, "max": 2147483647, "default": 524288},
+      "from_collapse_limit": {"type": "integer", "min": 1, "max": 24, "default": 8},
+      "geqo": {"type": "boolean", "min": 0, "max": 1, "default": 0},
+      "hash_mem_multiplier": {"type": "float", "min": 1.0, "max": 1000.0, "default": 2.0},
+      "jit": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "jit_above_cost": {"type": "float", "min": -1.0, "max": 500000, "default": 100000.0},
+      "jit_expressions": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "jit_inline_above_cost": {"type": "float", "min": -1.0, "max": 5000000, "default": 500000.0},
+      "jit_optimize_above_cost": {"type": "float", "min": -1.0, "max": 5000000, "default": 500000.0},
+      "jit_tuple_deforming": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "join_collapse_limit": {"type": "integer", "min": 1, "max": 24, "default": 8},
+      "max_parallel_workers": {"type": "integer", "min": 0, "max": 1024, "default": 8},
+      "max_parallel_workers_per_gather": {"type": "integer", "min": 0, "max": 1024, "default": 2},
+      "min_parallel_index_scan_size": {"type": "integer", "min": 0, "max": 715827882, "default": 64},
+      "min_parallel_table_scan_size": {"type": "integer", "min": 0, "max": 715827882, "default": 1024},
+      "parallel_setup_cost": {"type": "float", "min": 0.0, "max": 50000.0, "default": 1000.0},
+      "parallel_tuple_cost": {"type": "float", "min": 0.0, "max": 10, "default": 0.1},
+      "plan_cache_mode": {"type": "enum", "min": null, "max": null, "default": "auto"},
+      "random_page_cost": {"type": "float", "min": 0.0, "max": 100, "default": 4.0},
+      "seq_page_cost": {"type": "float", "min": 0.0, "max": 100, "default": 1.0},
+      "work_mem": {"type": "integer", "min": 64, "max": 2147483647, "default": 4096}
+    }
+  },
+  "API_SETTINGS": {
+    "openai": {
+      "api_key": "",
+      "base_url": "",
+      "model": "gpt-4.1"
+    },
+    "anthropic": {
+      "api_key": "",
+      "base_url": "",
+      "model": "claude-3-5-sonnet-20241022"
+    }
+  },
+  "PLANNER_CONFIG": {
+    "device": "cpu",
+    "model_path": "/root/DREAM/src/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen eta0.07/best_model.pt",
+    "train_data_path": "/root/DREAM/src/agent/plan/slow_sql_data_gen.csv",
+    "opt_threshold": 0.5,
+    "num_classes": 4
+  },
+  "MEMORY_MANAGER_CONFIG": {
+    "db_path": "/root/DREAM/src/memory_results_job",
+    "archive_size": 20,
+    "finetune_threshold": 220,
+    "finetune_epochs": 50,
+    "finetune_batch_size": 8,
+    "finetune_device": "cpu",
+    "model_output_dir": "/root/DREAM/src/agent/plan/model_res",
+    "bce_weight": 0.7,
+    "contrastive_weight": 0.3,
+    "lambda_neg": 1.0,
+    "enable_finetune": true,
+    "retrieval_mode": "dynamic",
+    "enable_save_samples": true,
+    "samples_save_path": "/root/DREAM/src/agent/memory/experience/retriever_samples.jsonl",
+    "retriever_model_path": "/root/DREAM/src/agent/memory/model/soft_q_retriever.pt",
+    "bert_model_path": "/root/DREAM/src/agent/plan/RCRank/bert-base-uncased"
+  },
+  "AGENT_CONFIG": {
+    "no_improvement_threshold": 3,
+    "epsilon": 0.1,
+    "fix_timeout": 600,
+    "diagnostic_agent_model": "gpt-4.1",
+    "fix_agent_model": "gpt-4.1",
+    "root_cause_llm_model": "gpt-4.1",
+    "action_server_config": "/root/DREAM/src/agent/action/action_server_config.yaml"
+  }
+}
+

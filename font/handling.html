@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>KeenInsight | 异常处理模块</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f4f6f9;
+      color: #333;
+    }
+
+    header {
+      background: linear-gradient(135deg, #8e2de2, #4a00e0);
+      color: #fff;
+      padding: 22px 32px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    header p {
+      margin-top: 6px;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    main {
+      padding: 26px 34px;
+    }
+
+    .section {
+      background: #fff;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+
+    .section h2 {
+      margin-top: 0;
+      font-size: 18px;
+      border-left: 4px solid #4a00e0;
+      padding-left: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 14px;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+      text-align: left;
+    }
+
+    th {
+      background: #f5f7fb;
+    }
+
+    /* 调优建议表格样式 */
+    .tuning-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      margin-top: 16px;
+      font-feature-settings: "kern" 1, "liga" 1;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .tuning-table th {
+      background: linear-gradient(135deg, #1e3c72 0%, #2c5282 100%);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 15px;
+      padding: 20px 24px;
+      text-align: left;
+      border: none;
+      font-family: 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      line-height: 1.4;
+    }
+
+    .tuning-table th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+
+    .tuning-table th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+
+    .tuning-table td {
+      padding: 18px 24px;
+      font-size: 15px;
+      border-bottom: 1px solid #e8eaed;
+      background: #ffffff;
+      color: #2c3e50;
+      font-family: 'Inter', 'SF Pro Text', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      transition: background-color 0.2s ease;
+      line-height: 1.6;
+      letter-spacing: 0.2px;
+    }
+
+    .tuning-table tr:hover td {
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+    }
+
+    .tuning-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .tuning-table tr:last-child td:first-child {
+      border-radius: 0 0 0 8px;
+    }
+
+    .tuning-table tr:last-child td:last-child {
+      border-radius: 0 0 8px 0;
+    }
+
+    /* 根因类型列样式 */
+    .tuning-table td:first-child {
+      font-weight: 650;
+      color: #1e3c72;
+      font-size: 16px;
+      font-family: 'Inter', 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      letter-spacing: 0.3px;
+    }
+
+    /* 调优建议代码样式 */
+    .tuning-action-code {
+      font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 16px 20px;
+      border-radius: 8px;
+      border: 1px solid #d0d7de;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      color: #24292f;
+      font-weight: 400;
+      line-height: 1.7;
+      letter-spacing: 0.3px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .tuning-action-code::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .tuning-action-code::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .tuning-action-code::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+    }
+
+    .tuning-action-code::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .tag {
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #fff;
+      display: inline-block;
+    }
+
+    .danger { background: #d9534f; }
+    .warning { background: #f0ad4e; }
+    .normal { background: #5cb85c; }
+    .success { background: #5cb85c; }
+
+    button {
+      padding: 6px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #4a00e0;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    button:hover {
+      background: #3a00b3;
+    }
+
+    .summary {
+      font-size: 15px;
+      line-height: 1.6;
+      background: #f8fafc;
+      padding: 14px;
+      border-radius: 8px;
+    }
+
+    .query-info {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 15px;
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 18px 22px;
+      border-radius: 10px;
+      border: 1px solid #d0d7de;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 300px;
+      overflow-y: auto;
+      line-height: 1.8;
+      color: #24292f;
+      font-weight: 400;
+    }
+
+    .query-info::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .query-info::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .query-info::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+    }
+
+    .query-info::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .plan-info {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Source Code Pro', 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      padding: 18px 22px;
+      border-radius: 10px;
+      border: 1px solid #d0d7de;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.04);
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      max-height: 300px;
+      overflow-y: auto;
+      line-height: 1.7;
+      color: #24292f;
+      font-weight: 400;
+    }
+
+    .plan-info::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .plan-info::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .plan-info::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+    }
+
+    .plan-info::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .info-row {
+      display: flex;
+      flex-direction: row;
+      gap: 24px;
+      margin-bottom: 24px;
+    }
+
+    .info-row .section {
+      flex: 1;
+      margin-bottom: 0;
+    }
+
+    .info-row .section h2 {
+      margin-top: 0;
+      font-size: 18px;
+      font-weight: 700;
+      border-left: 4px solid #1e3c72;
+      padding-left: 14px;
+      color: #1e3c72;
+      font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      letter-spacing: 0.3px;
+      margin-bottom: 20px;
+    }
+
+    .diagnosis-container {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 28px;
+      margin-top: 20px;
+      align-items: stretch;
+    }
+
+    .diagnosis-left {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border-radius: 12px;
+      border: 1px solid #e0e4e8;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .diagnosis-right {
+      background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+      border-radius: 12px;
+      border: 1px solid #e0e4e8;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .diagnosis-explanation {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .explanation-content {
+      flex: 1;
+      margin-top: 12px;
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .explanation-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .explanation-content::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 3px;
+    }
+
+    .explanation-content::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 3px;
+    }
+
+    .explanation-content::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .diagnosis-left table {
+      margin: 0;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+
+    .diagnosis-left th,
+    .diagnosis-left td {
+      padding: 10px 16px;
+      border-bottom: 1px solid #e8eaed;
+      text-align: left;
+    }
+
+    .diagnosis-left th {
+      background: linear-gradient(135deg, #1e3c72 0%, #2c5282 100%);
+      color: #fff;
+      font-weight: 600;
+      font-size: 14px;
+      border-bottom: none;
+      position: sticky;
+      top: 0;
+      height: 48px;
+      vertical-align: middle;
+    }
+
+    .diagnosis-left td {
+      background: #fff;
+      color: #2c3e50;
+      font-size: 14px;
+    }
+
+    .diagnosis-left tr:hover td {
+      background: #f8fafc;
+    }
+
+    .diagnosis-left tr:last-child td {
+      border-bottom: none;
+    }
+
+    .diagnosis-explanation {
+      font-size: 15px;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      line-height: 1.8;
+      margin: 0;
+      padding: 0;
+      color: #34495e;
+    }
+
+    .explanation-title {
+      font-weight: 600;
+      color: #fff;
+      margin: 0;
+      font-size: 14px;
+      border: none;
+      padding: 0;
+      letter-spacing: 0;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      background: linear-gradient(135deg, #1e3c72 0%, #2c5282 100%);
+      padding: 0 16px;
+      border-radius: 6px 6px 0 0;
+    }
+
+    .expected-effect {
+      background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 20px 0;
+    }
+
+    .expected-effect-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 12px;
+    }
+
+    .time-comparison {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .time-item {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .time-label {
+      font-size: 14px;
+      color: #888;
+      margin: 0;
+    }
+
+    .time-value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #4a00e0;
+      margin: 0;
+    }
+
+    .time-arrow {
+      font-size: 24px;
+      color: #4a00e0;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .button-group button {
+      flex: 1;
+    }
+
+    .btn-detail {
+      background: #fff;
+      color: #4a00e0;
+      border: 1px solid #4a00e0;
+    }
+
+    .btn-detail:hover {
+      background: #f8fafc;
+      border-color: #3a00b3;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background: #fff;
+      color: #4a00e0;
+      border: 2px solid #4a00e0;
+      padding: 10px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.3s ease;
+    }
+
+    .btn-secondary:hover {
+      background: #f8fafc;
+      border-color: #3a00b3;
+      color: #3a00b3;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>KeenInsight · 异常处理模块</h1>
+  <p>基于异常诊断结果的参数调优与系统恢复建议</p>
+</header>
+
+<main>
+
+  <!-- 异常SQL和执行计划 -->
+  <div class="info-row">
+    <!-- 异常SQL -->
+    <div class="section">
+      <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">异常SQL</h2>
+      <div class="query-info">select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty, avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*) as count_order from lineitem where l_shipdate &lt;= date '1998-12-01' - interval '80' day group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus;</div>
+    </div>
+
+    <!-- 执行计划 -->
+    <div class="section">
+      <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">执行计划</h2>
+      <div class="plan-info">[
+  [
+    {
+      "Plan": {
+        "Node Type": "Aggregate",
+        "Strategy": "Sorted",
+        "Partial Mode": "Finalize",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 2302668.46,
+        "Total Cost": 2302670.42,
+        "Plan Rows": 6,
+        "Plan Width": 236,
+        "Group Key": [
+          "l_returnflag",
+          "l_linestatus"
+        ],
+        "Plans": [
+          {
+            "Node Type": "Gather Merge",
+            "Parent Relationship": "Outer",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 2302668.46,
+            "Total Cost": 2302669.86,
+            "Plan Rows": 12,
+            "Plan Width": 236,
+            "Workers Planned": 2,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 2301668.44,
+                "Total Cost": 2301668.45,
+                "Plan Rows": 6,
+                "Plan Width": 236,
+                "Sort Key": [
+                  "l_returnflag",
+                  "l_linestatus"
+                ],
+                "Plans": [
+                  {
+                    "Node Type": "Aggregate",
+                    "Strategy": "Hashed",
+                    "Partial Mode": "Partial",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Startup Cost": 2301668.22,
+                    "Total Cost": 2301668.36,
+                    "Plan Rows": 6,
+                    "Plan Width": 236,
+                    "Group Key": [
+                      "l_returnflag",
+                      "l_linestatus"
+                    ],
+                    "Planned Partitions": 0,
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Parent Relationship": "Outer",
+                        "Parallel Aware": true,
+                        "Async Capable": false,
+                        "Relation Name": "lineitem",
+                        "Alias": "lineitem",
+                        "Startup Cost": 0.0,
+                        "Total Cost": 1436969.35,
+                        "Plan Rows": 24705682,
+                        "Plan Width": 25,
+                        "Filter": "(l_shipdate <= '1998-09-12 00:00:00'::timestamp without time zone)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "JIT": {
+        "Functions": 9,
+        "Options": {
+          "Inlining": true,
+          "Optimization": true,
+          "Expressions": true,
+          "Deforming": true
+        }
+      }
+    }
+  ]
+]</div>
+    </div>
+  </div>
+
+  <!-- 异常回顾 -->
+  <div class="section">
+    <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">异常回顾</h2>
+
+    <div class="diagnosis-container">
+      <!-- 左侧：异常类型和置信度 -->
+      <div class="diagnosis-left">
+        <table><tr><th>异常类型</th><th>置信度</th></tr>
+                <tr>
+                  <td>索引选择</td>
+                  <td><span class="tag warning">0.75</span></td>
+                </tr>
+
+                <tr>
+                  <td>参数调优</td>
+                  <td><span class="tag warning">0.65</span></td>
+                </tr>
+
+                <tr>
+                  <td>查询计划调优</td>
+                  <td><span class="tag normal">0.15</span></td>
+                </tr>
+
+                <tr>
+                  <td>查询改写</td>
+                  <td><span class="tag normal">0.10</span></td>
+                </tr>
+</table>
+      </div>
+
+      <!-- 右侧：统一解释说明 -->
+      <div class="diagnosis-right">
+        <div class="diagnosis-explanation">
+          <div class="explanation-title">解释说明</div>
+          <div id="explanation-text-handling" class="explanation-content">根据查询信息和执行计划，当前SQL主要在大型lineitem表上根据l_shipdate进行筛选，执行计划显示采用了顺序扫描（Seq Scan），且CPU使用率极高（91.9%-99.9%），而I/O读写非常低，进一步说明系统的大部分资源消耗在CPU计算上而非磁盘I/O。这表明对于where条件中的l_shipdate缺乏有效索引，导致全表扫描成为主要瓶颈。'missing indexes'的置信度最高，为0.72，直接反映了上述症结。'inappropriate query knobs'置信度为0.18，虽然存在排序与并行聚合的合理利用，但无法明显改善性能，暂未发现参数配置失当。'suboptimal plan optimizer'和'poorly written queries'由于没有复杂join或不合理表达式，仅维持低置信度（分别为0.10、0.05）。总之，首要根因是缺失索引，优化应优先考虑对此字段添加索引以减少顺序扫描。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 调优建议 -->
+  <div class="section">
+    <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">调优建议</h2>
+
+    <table class="tuning-table">
+      <tr>
+        <th>根因类型</th>
+        <th>调优建议</th>
+      </tr>
+      <tr>
+        <td>索引选择</td>
+        <td>
+          <div class="tuning-action-code">CREATE INDEX IF NOT EXISTS lineitem_l_shipdate_idx ON lineitem (l_shipdate);</div>
+        </td>
+      </tr>
+
+      <tr>
+        <td>参数调优</td>
+        <td>
+          <div class="tuning-action-code">SET work_mem = 1048576;
+SET hash_mem_multiplier = 4;</div>
+        </td>
+      </tr>
+</table>
+  </div>
+
+  <!-- 预期调优效果 -->
+  <div class="section">
+    <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">预期调优效果</h2>
+    
+    <div class="expected-effect">
+      <div class="time-comparison">
+        <div class="time-item">
+          <div class="time-label">调优前执行时间</div>
+          <div class="time-value" id="expected-old-time">23.97 秒</div>
+        </div>
+        <div class="time-arrow">→</div>
+        <div class="time-item">
+          <div class="time-label">调优后执行时间</div>
+          <div class="time-value">10.10 秒</div>
+        </div>
+      </div>
+      <div class="button-group">
+        <button class="btn-detail" onclick="viewDetail()">详细解析</button>
+        <button onclick="apply()">确认并执行调优</button>
+        <button class="btn-detail" onclick="goToMultiTune()">备库调优</button>
+      </div>
+    </div>
+  </div>
+
+    <!-- 实际调优效果 -->
+    <div class="section" id="actual-effect" style="display: none; margin-top: 20px;">
+      <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">实际调优效果</h2>
+      
+      <div class="expected-effect">
+        <div class="time-comparison">
+          <div class="time-item">
+            <div class="time-label">调优前执行时间</div>
+            <div class="time-value" id="actual-old-time">-</div>
+          </div>
+          <div class="time-arrow">→</div>
+          <div class="time-item">
+            <div class="time-label">调优后执行时间</div>
+            <div class="time-value" id="actual-new-time">-</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <!-- 操作按钮 -->
+  <div class="action-buttons">
+    <button class="btn-secondary" onclick="goBack()">返回上一页</button>
+  </div>
+
+</main>
+
+<script>
+  // 从URL参数获取queryId
+  function getQueryIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('queryId') || '1';
+  }
+
+  // 页面加载时，如果有queryId参数，可以加载对应的数据
+  document.addEventListener('DOMContentLoaded', function() {
+    const queryId = getQueryIdFromUrl();
+    // 这里可以调用API加载对应的调优建议数据
+    // 目前数据已经在HTML中生成，所以不需要额外加载
+  });
+
+  async function apply() {
+    const queryId = getQueryIdFromUrl();
+    const btn = event.target;
+    const originalText = btn.textContent;
+    
+    // 禁用按钮并显示加载状态
+    btn.disabled = true;
+    btn.textContent = '执行中...';
+    
+    try {
+      const response = await fetch(`/api/execute-tune/${queryId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('执行调优失败');
+      }
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      // 显示实际调优效果部分
+      const actualEffectSection = document.getElementById('actual-effect');
+      if (actualEffectSection) {
+        actualEffectSection.style.display = 'block';
+      }
+      
+      // 更新实际调优效果
+      const actualOldTimeElement = document.getElementById('actual-old-time');
+      const actualNewTimeElement = document.getElementById('actual-new-time');
+      
+      if (actualOldTimeElement && data.old_time !== undefined) {
+        actualOldTimeElement.textContent = formatExecutionTime(data.old_time);
+      }
+      
+      if (actualNewTimeElement && data.new_time !== undefined) {
+        actualNewTimeElement.textContent = formatExecutionTime(data.new_time);
+      }
+      
+      // 显示完成提示
+      const improvementText = data.improvement_ratio > 0 
+        ? `性能提升 ${(data.improvement_ratio * 100).toFixed(2)}%`
+        : data.improvement_ratio < 0
+        ? `性能下降 ${Math.abs(data.improvement_ratio * 100).toFixed(2)}%`
+        : '性能无变化';
+      showNotification(`调优执行完成！执行时间从 ${formatExecutionTime(data.old_time)} 优化到 ${formatExecutionTime(data.new_time)}。${improvementText}`, 'success');
+      
+    } catch (error) {
+      console.error('执行调优错误:', error);
+      showNotification('执行调优失败: ' + error.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+
+  function formatExecutionTime(seconds) {
+    if (seconds < 1) {
+      return (seconds * 1000).toFixed(2) + ' 毫秒';
+    }
+    return seconds.toFixed(2) + ' 秒';
+  }
+
+  function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 16px 24px;
+      background: ${type === 'success' ? '#5cb85c' : type === 'error' ? '#d9534f' : '#5bc0de'};
+      color: white;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      font-size: 14px;
+      font-weight: 500;
+      animation: slideIn 0.3s ease;
+    `;
+    notification.textContent = message;
+    
+    if (!document.getElementById('notification-styles')) {
+      const style = document.createElement('style');
+      style.id = 'notification-styles';
+      style.textContent = `
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      notification.style.animation = 'slideIn 0.3s ease reverse';
+      setTimeout(() => {
+        if (document.body.contains(notification)) {
+          document.body.removeChild(notification);
+        }
+      }, 300);
+    }, 3000);
+  }
+
+  function viewDetail() {
+    // 跳转到详细解析页面（这里使用新窗口打开，实际可以根据需要修改）
+    window.open('detail.html', '_blank');
+    // 或者使用 window.location.href = 'detail.html'; 在当前窗口跳转
+  }
+
+  function goToMultiTune() {
+    // 跳转到备库调优页面，传递queryId
+    const queryId = getQueryIdFromUrl();
+    window.location.href = 'multi-tune.html?queryId=' + queryId;
+  }
+
+  function goBack() {
+    // 返回到诊断页面
+    window.location.href = 'diagnosis.html';
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,24 @@
+services:
+  - name: Postgres
+    server_type: stdio
+    params:
+      command: npx
+      args:
+        - -y
+        - "@modelcontextprotocol/server-postgres"
+        - "postgresql://postgres:postgres@localhost:5432/postgres"
+      cwd: .
+
+  - name: Math
+    server_type: stdio
+    params:
+      command: python
+      args:
+        - math_server.py
+      cwd: .
+
+  - name: Weather
+    server_type: sse
+    params:
+      url: "http://localhost:8000/sse"
+      cwd: . 

@@ -1,0 +1,68 @@
+{"name": "SORT_UNION_TRANSPOSE_MATCH_NULL_FETCH", "conditions": "UNION ALL with ORDER BY (no OFFSET)", "transformations": "Push ORDER BY to each SELECT in UNION ALL, keep original ORDER BY after UNION"}
+{"name": "PROJECT_CORRELATE_TRANSPOSE", "conditions": "Projection over correlated subquery (no window functions)", "transformations": "Push projections down to inner/outer queries, adjust correlation conditions"}
+{"name": "FILTER_MERGE", "conditions": "Nested queries with WHERE clauses on same data", "transformations": "Merge WHERE conditions using AND"}
+{"name": "JOIN_ADD_REDUNDANT_SEMI_JOIN", "conditions": "INNER JOIN between tables X and Y", "transformations": "Add semi-join filter using EXISTS or IN subquery to pre-filter X"}
+{"name": "AGGREGATE_EXPAND_DISTINCT_AGGREGATES", "conditions": "DISTINCT aggregates (COUNT, SUM, MIN, MAX) on same column", "transformations": "Remove DISTINCT, use GROUP BY; split if different columns"}
+{"name": "AGGREGATE_UNION_TRANSPOSE", "conditions": "Aggregate after UNION ALL", "transformations": "Push aggregates to each UNION branch, combine with final aggregate"}
+{"name": "JOIN_CONDITION_PUSH", "conditions": "WHERE conditions on single table in JOIN", "transformations": "Move conditions to ON clause or subquery"}
+{"name": "SORT_REMOVE_CONSTANT_KEYS", "conditions": "ORDER BY with constant expressions (no LIMIT/OFFSET)", "transformations": "Remove constant expressions from ORDER BY"}
+{"name": "AGGREGATE_JOIN_REMOVE", "conditions": "GROUP BY after LEFT/RIGHT JOIN, unused columns from join side", "transformations": "Remove unnecessary JOIN, adjust SELECT and GROUP BY"}
+{"name": "AGGREGATE_PROJECT_MERGE", "conditions": "Simple GROUP BY with direct column aggregates", "transformations": "Merge projection with aggregation, remove redundant SELECT layers"}
+{"name": "PROJECT_WINDOW_TRANSPOSE", "conditions": "Window functions with unused columns", "transformations": "Create subquery with only required columns, apply window functions"}
+{"name": "FILTER_VALUES_MERGE", "conditions": "WHERE clause on VALUES clause", "transformations": "Apply filters directly to VALUES tuples"}
+{"name": "FILTER_SET_OP_TRANSPOSE", "conditions": "WHERE clause after UNION/INTERSECT/EXCEPT", "transformations": "Push WHERE conditions to each input query"}
+{"name": "JOIN_PROJECT_BOTH_TRANSPOSE_INCLUDE_OUTER", "conditions": "Projections on both sides of JOIN", "transformations": "Move projections above JOIN, combine into single SELECT"}
+{"name": "AGGREGATE_MERGE", "conditions": "Nested GROUP BY with compatible aggregates", "transformations": "Combine GROUP BY operations, merge compatible aggregates"}
+{"name": "AGGREGATE_UNION_AGGREGATE_FIRST", "conditions": "UNION ALL with GROUP BY (no aggregates)", "transformations": "Remove GROUP BY from branches, apply single GROUP BY after UNION"}
+{"name": "SORT_UNION_TRANSPOSE", "conditions": "UNION ALL with ORDER BY and LIMIT", "transformations": "Push ORDER BY and LIMIT to each SELECT, add final ORDER BY and LIMIT"}
+{"name": "AGGREGATE_JOIN_JOIN_REMOVE", "conditions": "Redundant LEFT JOIN in nested JOIN", "transformations": "Remove redundant JOIN, adjust JOIN conditions"}
+{"name": "PROJECT_SUB_QUERY_TO_CORRELATE", "conditions": "Scalar subqueries in SELECT", "transformations": "Convert to LEFT JOIN with aggregate functions"}
+{"name": "AGGREGATE_REDUCE_FUNCTIONS", "conditions": "Complex aggregate functions (AVG, STDDEV, etc.)", "transformations": "Replace with basic aggregates (SUM, COUNT, etc.)"}
+{"name": "AGGREGATE_VALUES", "conditions": "Aggregates on empty dataset", "transformations": "Replace with literal values (0 for COUNT/SUM, NULL for MIN/MAX)"}
+{"name": "AGGREGATE_REMOVE", "conditions": "GROUP BY on all SELECT columns without aggregates", "transformations": "Remove GROUP BY, use DISTINCT if needed"}
+{"name": "SEMI_JOIN_JOIN_TRANSPOSE", "conditions": "Semi-join after JOIN operation", "transformations": "Move semi-join to subquery, adjust JOIN structure"}
+{"name": "FILTER_SUB_QUERY_TO_CORRELATE", "conditions": "Subqueries in WHERE clause", "transformations": "Convert to JOIN operations"}
+{"name": "PROJECT_VALUES_MERGE", "conditions": "SELECT over VALUES clause", "transformations": "Apply SELECT expressions directly to VALUES tuples"}
+{"name": "UNION_REMOVE", "conditions": "UNION ALL with single dataset", "transformations": "Remove redundant UNION ALL"}
+{"name": "PROJECT_TO_LOGICAL_PROJECT_AND_WINDOW", "conditions": "Window functions with other expressions", "transformations": "Separate window functions into outer query, non-window expressions in subquery"}
+{"name": "FILTER_INTO_JOIN", "conditions": "WHERE conditions on JOIN results", "transformations": "Move conditions to ON clause or subqueries"}
+{"name": "SEMI_JOIN_PROJECT_TRANSPOSE", "conditions": "Semi-join after projection", "transformations": "Move semi-join to base table, apply projection after"}
+{"name": "UNION_TO_DISTINCT", "conditions": "UNION (implicit DISTINCT)", "transformations": "Replace with UNION ALL + DISTINCT"}
+{"name": "UNION_PULL_UP_CONSTANTS", "conditions": "UNION with identical constants", "transformations": "Extract constants to outer SELECT"}
+{"name": "JOIN_SUB_QUERY_TO_CORRELATE", "conditions": "Subqueries in JOIN conditions", "transformations": "Convert to JOIN with aggregate functions"}
+{"name": "SORT_REMOVE", "conditions": "ORDER BY on pre-sorted data (no LIMIT/OFFSET)", "transformations": "Remove redundant ORDER BY"}
+{"name": "SORT_JOIN_TRANSPOSE", "conditions": "ORDER BY on single table in OUTER JOIN", "transformations": "Move ORDER BY to subquery before JOIN"}
+{"name": "JOIN_LEFT_UNION_TRANSPOSE", "conditions": "JOIN with UNION ALL on left side", "transformations": "Apply JOIN to each UNION branch, combine with UNION ALL"}
+{"name": "PROJECT_JOIN_REMOVE", "conditions": "SELECT only from one side of JOIN with unique keys", "transformations": "Remove unnecessary JOIN, select directly from required table"}
+{"name": "AGGREGATE_ANY_PULL_UP_CONSTANTS", "conditions": "GROUP BY with constant columns", "transformations": "Remove constants from GROUP BY, add to SELECT"}
+{"name": "FILTER_TABLE_FUNCTION_TRANSPOSE", "conditions": "WHERE clause after table function", "transformations": "Move conditions to input of table function"}
+{"name": "FILTER_PROJECT_TRANSPOSE", "conditions": "WHERE clause after SELECT transformations (no window functions)", "transformations": "Move WHERE conditions before transformations"}
+{"name": "JOIN_PUSH_EXPRESSIONS", "conditions": "JOIN conditions with expressions", "transformations": "Create computed columns in subqueries, simplify JOIN conditions"}
+{"name": "AGGREGATE_JOIN_TRANSPOSE_EXTENDED", "conditions": "JOIN followed by GROUP BY with unique join keys", "transformations": "Push aggregates to each side of JOIN"}
+{"name": "AGGREGATE_CASE_TO_FILTER", "conditions": "Aggregates with CASE expressions", "transformations": "Replace CASE with FILTER clause"}
+{"name": "AGGREGATE_UNION_AGGREGATE_SECOND", "conditions": "UNION ALL with GROUP BY on right side", "transformations": "Move GROUP BY after UNION ALL"}
+{"name": "PROJECT_REMOVE", "conditions": "Redundant projection layers", "transformations": "Remove unnecessary SELECT layers"}
+{"name": "JOIN_REDUCE_EXPRESSIONS", "conditions": "JOIN conditions with constant expressions", "transformations": "Simplify constant expressions in JOIN conditions"}
+{"name": "PROJECT_REDUCE_EXPRESSIONS", "conditions": "SELECT with constant expressions", "transformations": "Evaluate constants, remove redundant casts"}
+{"name": "WINDOW_REDUCE_EXPRESSIONS", "conditions": "Window functions with constant expressions", "transformations": "Simplify expressions in window functions"}
+{"name": "FILTER_REDUCE_EXPRESSIONS", "conditions": "WHERE clause with constant conditions", "transformations": "Remove always-true conditions, replace always-false with empty result"}
+{"name": "PROJECT_FILTER_TRANSPOSE", "conditions": "SELECT followed by WHERE (no window functions)", "transformations": "Move WHERE conditions before SELECT transformations"}
+{"name": "PROJECT_JOIN_JOIN_REMOVE", "conditions": "Nested JOINs with unused columns", "transformations": "Remove redundant JOIN, adjust JOIN conditions"}
+{"name": "JOIN_EXTRACT_FILTER", "conditions": "INNER JOIN with specific conditions", "transformations": "Convert to Cartesian join with WHERE filter"}
+{"name": "PROJECT_AGGREGATE_MERGE", "conditions": "SELECT with GROUP BY aggregates", "transformations": "Merge projection with aggregation, optimize aggregate functions"}
+{"name": "JOIN_PUSH_TRANSITIVE_PREDICATES", "conditions": "JOIN with inferable conditions", "transformations": "Add inferred conditions to JOIN inputs"}
+{"name": "FILTER_EXPAND_IS_NOT_DISTINCT_FROM", "conditions": "IS NOT DISTINCT FROM in WHERE", "transformations": "Replace with CASE expression handling NULLs"}
+{"name": "JOIN_RIGHT_UNION_TRANSPOSE", "conditions": "JOIN with UNION ALL on right side", "transformations": "Apply JOIN to each UNION branch, combine with UNION ALL"}
+{"name": "PROJECT_MERGE", "conditions": "Consecutive SELECT operations", "transformations": "Merge compatible SELECT operations"}
+{"name": "SORT_PROJECT_TRANSPOSE", "conditions": "ORDER BY after SELECT with monotonic transformations", "transformations": "Move ORDER BY before SELECT transformations"}
+{"name": "PROJECT_SET_OP_TRANSPOSE", "conditions": "SELECT over set operations (UNION/INTERSECT/EXCEPT)", "transformations": "Push non-window expressions to input queries"}
+{"name": "JOIN_TO_CORRELATE", "conditions": "INNER/LEFT JOIN with guaranteed matches", "transformations": "Convert to EXISTS or correlated subquery"}
+{"name": "PROJECT_JOIN_TRANSPOSE", "conditions": "SELECT over JOIN (no window functions)", "transformations": "Push SELECT to each side of JOIN"}
+{"name": "FILTER_CORRELATE", "conditions": "WHERE conditions on correlated subqueries", "transformations": "Push conditions to appropriate query level"}
+{"name": "SEMI_JOIN_FILTER_TRANSPOSE", "conditions": "Semi-join followed by WHERE", "transformations": "Move WHERE conditions before semi-join"}
+{"name": "JOIN_DERIVE_IS_NOT_NULL_FILTER_RULE", "conditions": "INNER JOIN with non-nullable join columns", "transformations": "Add IS NOT NULL filters to JOIN inputs"}
+{"name": "INTERSECT_TO_DISTINCT", "conditions": "INTERSECT operation", "transformations": "Convert to GROUP BY with COUNT and filtering"}
+{"name": "FILTER_AGGREGATE_TRANSPOSE", "conditions": "WHERE/HAVING after GROUP BY", "transformations": "Move grouping column conditions to WHERE, keep aggregate conditions in HAVING"}
+{"name": "JOIN_PROJECT_RIGHT_TRANSPOSE_INCLUDE_OUTER", "conditions": "SELECT on right side of JOIN", "transformations": "Move SELECT above JOIN"}
+{"name": "JOIN_PROJECT_LEFT_TRANSPOSE_INCLUDE_OUTER", "conditions": "SELECT on left side of JOIN", "transformations": "Move SELECT above JOIN, adjust JOIN conditions"}
+{"name": "AGGREGATE_FILTER_TRANSPOSE", "conditions": "GROUP BY after WHERE with non-unique columns", "transformations": "Combine GROUP BY columns, use HAVING for pre-filtering"}

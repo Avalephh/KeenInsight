@@ -1,0 +1,27 @@
+services:
+  - name: diagnose_tools
+    server_type: stdio
+    params:
+      command: python
+      args:
+        - diagnose_tools.py
+      cwd: .
+
+  - name: server-sequential-thinking
+    server_type: stdio
+    params:
+      command: npx
+      args:
+        - -y
+        - "@modelcontextprotocol/server-sequential-thinking"
+      cwd: .
+
+  - name: Postgres
+    server_type: stdio
+    params:
+      command: npx
+      args:
+        - -y
+        - "@modelcontextprotocol/server-postgres"
+        - "postgresql://postgres:postgres@localhost:5432/postgres"
+      cwd: .

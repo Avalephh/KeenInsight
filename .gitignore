@@ -1,0 +1,51 @@
+# Ignore Python bytecode cache directories
+__pycache__/
+**/__pycache__/
+diagnostic_results/**
+# Ignore pytest cache directory
+.pytest_cache/
+src/agent/plan/model_res/**
+dream/agent/plan/model_res/**
+config/base_config.py
+config/base_config.json
+config/base_config.yaml
+config/tidb_config.json
+config/tidb_config.py
+src/agent/plan/RCRank/bert-base-uncased/**
+dream/agent/plan/RCRank/bert-base-uncased/**
+dream/agent/plan/RCRank/pretrain
+dream/agent/plan/RCRank/data/**
+src/memory_results*
+dream/memory_results*
+test_sql_gen/data/**
+test_sql_gen/logs/**
+test_sql_gen/rubbish/**
+test_sql_gen/slow_queries/**
+logs/**
+src/agent/plan/slow_sql_data_gen.csv
+dream/agent/plan/slow_sql_data_gen.csv
+config/ablation_experiments_config.json
+src/ablation_main.py
+dream/ablation_main.py
+src/agent/ablation_db_agent.py
+dream/agent/ablation_db_agent.py
+ablation.md
+src/agent/memory/experience/**
+dream/agent/memory/experience/**
+src/agent/memory/model/**
+dream/agent/memory/model/**
+config/job_config.json
+config/tpch_config.json
+config/tpcds_config.json
+config/tpch_tidb_config.json
+dream.egg-info
+# test_sql_gen/data/hint/**
+# test_sql_gen/data/hint_normal/**
+# test_sql_gen/data/hint+index/**
+# test_sql_gen/data/hint+knob/**
+# test_sql_gen/data/hint+query/**
+# test_sql_gen/data/hint+query+index/**
+# test_sql_gen/data/index/**
+# test_sql_gen/data/index_normal/**
+# test_sql_gen/data/index+knob/**
+# test_sql_gen/data/knob/**

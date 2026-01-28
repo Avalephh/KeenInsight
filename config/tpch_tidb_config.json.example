@@ -1,0 +1,99 @@
+{
+  "DATABASE_TYPE": "tidb",
+  "TiDB_CONFIG": {
+    "user": "root",
+    "password": "",
+    "host": "localhost",
+    "port": 4000,
+    "dbname": "tpch10g",
+    "workload_type": "OLAP",
+    "db_type": "tidb",
+    "query_timeout": 300,
+    "ssl_mode": "DISABLED"
+  },
+  "KNOB_CONFIG": {
+    "query_knobs": {
+      "tidb_enable_index_merge": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_outer_join_reorder": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_inl_join_inner_multi_pattern": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_opt_projection_push_down": {"type": "boolean", "min": 0, "max": 1, "default": 0},
+      "tidb_opt_enable_hash_join": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_allow_batch_cop": {"type": "integer", "min": 0, "max": 1, "default": 1},
+      "tidb_allow_mpp": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_broadcast_join_threshold_count": {"type": "integer", "min": 0, "max": 2147483647, "default": 10240},
+      "tidb_broadcast_join_threshold_size": {"type": "integer", "min": 0, "max": 2147483647, "default": 104857600}
+    },
+    "system_knobs": {
+      "tidb_distsql_scan_concurrency": {"type": "integer", "min": 1, "max": 256, "default": 15},
+      "tidb_enable_extended_stats": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_non_prepared_plan_cache": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_prepared_plan_cache": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_point_get_cache": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_pseudo_for_outdated_stats": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_enable_vectorized_expression": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_executor_concurrency": {"type": "integer", "min": 1, "max": 256, "default": 5},
+      "tidb_index_join_batch_size": {"type": "integer", "min": 1, "max": 2147483647, "default": 25000},
+      "tidb_index_join_double_read_penalty_cost_rate": {"type": "integer", "min": 0, "max": 2147483647, "default": 0},
+      "tidb_index_lookup_size": {"type": "integer", "min": 1, "max": 2147483647, "default": 20000},
+      "tidb_index_serial_scan_concurrency": {"type": "integer", "min": 1, "max": 256, "default": 1},
+      "tidb_opt_correlation_exp_factor": {"type": "integer", "min": 0, "max": 2147483647, "default": 1},
+      "tidb_opt_desc_factor": {"type": "float", "min": 0.0, "max": 2147483647.0, "default": 1.0},
+      "tidb_opt_disk_factor": {"type": "float", "min": 0.0, "max": 2147483647.0, "default": 1.0},
+      "tidb_opt_enable_correlation_adjustment": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_opt_enable_late_materialization": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "tidb_opt_join_reorder_threshold": {"type": "integer", "min": 0, "max": 50, "default": 0},
+      "tidb_opt_scan_factor": {"type": "float", "min": 0.0, "max": 2147483647.0, "default": 1.5},
+      "tidb_opt_seek_factor": {"type": "float", "min": 0.0, "max": 2147483647.0, "default": 20.0},
+      "tidb_store_batch_size": {"type": "integer", "min": 1, "max": 2147483647, "default": 4},
+      "tiflash_fine_grained_shuffle_batch_size": {"type": "integer", "min": 1, "max": 2147483647, "default": 8192},
+      "tiflash_fine_grained_shuffle_stream_count": {"type": "integer", "min": 0, "max": 2147483647, "default": 0}
+    }
+  },
+  "API_SETTINGS": {
+    "openai": {
+      "api_key": "",
+      "base_url": "",
+      "model": ""
+    },
+    "anthropic": {
+      "api_key": "",
+      "base_url": "",
+      "model": ""
+    }
+  },
+  "PLANNER_CONFIG": {
+    "device": "cpu",
+    "model_path": "/root/DREAM/src/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen old_knob eta0.07/best_model.pt",
+    "train_data_path": "/root/DREAM/src/agent/plan/slow_sql_data_gen.csv",
+    "opt_threshold": 0.5,
+    "num_classes": 4
+  },
+  "MEMORY_MANAGER_CONFIG": {
+    "db_path": "/root/DREAM/src/memory_results_tpch_tidb",
+    "archive_size": 20,
+    "finetune_threshold": 220,
+    "finetune_epochs": 10,
+    "finetune_batch_size": 8,
+    "finetune_device": "cpu",
+    "model_output_dir": "/root/DREAM/src/agent/plan/model_res",
+    "bce_weight": 0.7,
+    "contrastive_weight": 0.3,
+    "lambda_neg": 1.0,
+    "enable_finetune": true,
+    "retrieval_mode": "static",
+    "enable_save_samples": false,
+    "samples_save_path": "/root/DREAM/src/agent/memory/experience/retriever_samples_tpch_tidb.jsonl",
+    "retriever_model_path": "/root/DREAM/src/agent/memory/model/soft_q_retriever_tpch_tidb.pt",
+    "bert_model_path": "/root/DREAM/src/agent/plan/RCRank/bert-base-uncased"
+  },
+  "AGENT_CONFIG": {
+    "no_improvement_threshold": 3,
+    "epsilon": 0.1,
+    "fix_timeout": 600,
+    "diagnostic_agent_model": "gpt-4.1",
+    "fix_agent_model": "gpt-4.1",
+    "root_cause_llm_model": "gpt-4.1",
+    "action_server_config": "/root/DREAM/src/agent/action/action_server_config.yaml"
+  }
+}
+

@@ -1,0 +1,115 @@
+{
+  "1": {
+    "query_id": "1",
+    "root_causes": [
+      "missing indexes",
+      "inappropriate query knobs"
+    ],
+    "confidence": {
+      "missing indexes": 0.75,
+      "inappropriate query knobs": 0.65,
+      "suboptimal plan optimizer": 0.15,
+      "poorly written queries": 0.1
+    },
+    "explanation": "从当前执行计划来看，lineitem表的访问方式为大规模顺序扫描（Seq Scan），且有明显的筛选条件l_shipdate <= '1998-09-12'。但plan未显示有适用的索引，加之顺序读取了约5998万行，实际仅返回少量元组，说明缺少高效索引。因此，'missing indexes'置信度最高。同时，CPU资源占用极高（接近100%），而IO指标极低，表明当前查询主要受限于CPU计算，通常指示查询并行参数、工作内存等相关knob设置可能不合理，从而导致并发利用低或单次聚合计算压力大，因此'inappropriate query knobs'也具有高置信度。另一方面，聚合和表达式并未显示异常冗余或复杂，查询结构相对标准，'poorly written queries'置信度因此较低。'suboptimal plan optimizer'置信度也偏低，因为执行计划没有显示明显的错误选择或严重估算失准。综上，推断主要根因是索引缺失和查询参数配置不合理，分别给予较高置信度。",
+    "query_info": {
+      "query": "select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty, avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*) as count_order from lineitem where l_shipdate <= date '1998-12-01' - interval '80' day group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus;",
+      "execution_time": 23.96550750732422,
+      "plan_json": "[[{\"Plan\": {\"Node Type\": \"Aggregate\", \"Strategy\": \"Sorted\", \"Partial Mode\": \"Finalize\", \"Parallel Aware\": false, \"Async Capable\": false, \"Startup Cost\": 2302668.46, \"Total Cost\": 2302670.42, \"Plan Rows\": 6, \"Plan Width\": 236, \"Group Key\": [\"l_returnflag\", \"l_linestatus\"], \"Plans\": [{\"Node Type\": \"Gather Merge\", \"Parent Relationship\": \"Outer\", \"Parallel Aware\": false, \"Async Capable\": false, \"Startup Cost\": 2302668.46, \"Total Cost\": 2302669.86, \"Plan Rows\": 12, \"Plan Width\": 236, \"Workers Planned\": 2, \"Plans\": [{\"Node Type\": \"Sort\", \"Parent Relationship\": \"Outer\", \"Parallel Aware\": false, \"Async Capable\": false, \"Startup Cost\": 2301668.44, \"Total Cost\": 2301668.45, \"Plan Rows\": 6, \"Plan Width\": 236, \"Sort Key\": [\"l_returnflag\", \"l_linestatus\"], \"Plans\": [{\"Node Type\": \"Aggregate\", \"Strategy\": \"Hashed\", \"Partial Mode\": \"Partial\", \"Parent Relationship\": \"Outer\", \"Parallel Aware\": false, \"Async Capable\": false, \"Startup Cost\": 2301668.22, \"Total Cost\": 2301668.36, \"Plan Rows\": 6, \"Plan Width\": 236, \"Group Key\": [\"l_returnflag\", \"l_linestatus\"], \"Planned Partitions\": 0, \"Plans\": [{\"Node Type\": \"Seq Scan\", \"Parent Relationship\": \"Outer\", \"Parallel Aware\": true, \"Async Capable\": false, \"Relation Name\": \"lineitem\", \"Alias\": \"lineitem\", \"Startup Cost\": 0.0, \"Total Cost\": 1436969.35, \"Plan Rows\": 24705682, \"Plan Width\": 25, \"Filter\": \"(l_shipdate <= '1998-09-12 00:00:00'::timestamp without time zone)\"}]}]}]}]}, \"JIT\": {\"Functions\": 9, \"Options\": {\"Inlining\": true, \"Optimization\": true, \"Expressions\": true, \"Deforming\": true}}}]]",
+      "internal_metrics": [
+        59988804,
+        114000,
+        1012558,
+        1363,
+        0,
+        59986052,
+        3,
+        0,
+        111984,
+        1012558,
+        1,
+        0,
+        23.96550750732422
+      ],
+      "external_metrics": [
+        [
+          91.9,
+          99.16250000000001,
+          99.9,
+          99.9,
+          99.95,
+          99.275,
+          99.9,
+          99.9,
+          95.9
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0546875,
+          0.005859375000000002,
+          0.45898437499999994,
+          0.08862304687499996,
+          0.30859375,
+          0.0498046875,
+          2.060546875,
+          0.6513671875000004,
+          0.0
+        ],
+        [
+          4.296958923339844,
+          4.311779022216797,
+          4.311779022216797,
+          4.311779022216797,
+          4.311779022216797,
+          4.311779022216797,
+          4.311779022216797,
+          4.311779022216797,
+          4.311779022216797
+        ],
+        [
+          0.08731460571289062,
+          0.3597679138183594,
+          0.5805931091308594,
+          0.7638931274414062,
+          0.9375801086425781,
+          1.1006584167480469,
+          1.2399101257324219,
+          1.3666648864746094,
+          1.4558601379394531
+        ],
+        [
+          0.002197265625,
+          0.0004999637603759766,
+          0.00030422210693359375,
+          0.0015945434570312504,
+          0.00030422210693359375,
+          0.0005078315734863281,
+          0.0006327629089355469,
+          0.001533746719360351,
+          0.0007886886596679688
+        ],
+        [
+          0.002197265625,
+          0.0004999637603759766,
+          0.00030422210693359375,
+          0.0015945434570312504,
+          0.00030422210693359375,
+          0.0005078315734863281,
+          0.0006327629089355469,
+          0.001533746719360351,
+          0.0007886886596679688
+        ]
+      ]
+    }
+  }
+}

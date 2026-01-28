@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dream"
+version = "0.1.0"
+description = "DREAM: An Anomaly-Aware Approach for Multi-Component Tuning in DBMSs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "DREAM Team"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+]
+dependencies = [
+    "torch>=1.9.0",
+    "transformers>=4.11.0",
+    "numpy>=1.24.0",
+    "pandas>=2.0.0",
+    "scikit-learn>=0.24.2",
+    "scipy>=1.7.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+    "psycopg>=3.0.0",
+    "pymysql>=1.0.2",
+    "plumbum>=1.8.0",
+    "jpype1>=1.4.0",
+    "sqlparse>=0.4.0",
+    "openai>=1.0.0",
+    "anthropic>=0.8.0",
+    "langchain-anthropic>=0.1.0",
+    "langchain-deepseek>=0.0.1",
+    "langgraph>=0.0.10",
+    "langchain-mcp-adapters",
+    "openai-agents",
+    "mcp>=0.1.0",
+    "smithery>=0.1.0",
+    "nest-asyncio>=1.5.0",
+    "python-dotenv>=0.21.0",
+    "pyyaml>=6.0.0",
+    "tqdm>=4.64.0",
+    "psutil>=5.8.0",
+    "smac>=2.0.0",
+    "ConfigSpace>=0.7.0",
+    "httpx>=0.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.2.5",
+    "black>=21.9b0",
+    "flake8>=3.9.0",
+]
+
+[project.scripts]
+dream = "dream.main:main"
+
+[tool.setuptools]
+packages = {find = {}}
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = [
+    "agent/plan/model_res/**/*",
+    "agent/plan/slow_sql_data_gen.csv",
+    "agent/memory/experience/**/*",
+    "agent/memory/model/**/*",
+    "agent/action/**/*.jsonl",
+    "agent/action/**/*.txt",
+    "agent/action/**/*.yaml",
+    "agent/action/libs/**/*",
+    "agent/plan/RCRank/**/*",
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py310']
+
+[tool.isort]
+profile = "black"
