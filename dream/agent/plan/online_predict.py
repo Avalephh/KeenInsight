@@ -27,6 +27,17 @@ from RCRank.utils.plan_encoding import PlanEncoder
 from transformers import BertModel, BertTokenizer
 
 
+def resolve_bert_path(current_dir: str) -> str:
+    """Resolve local BERT path or fallback to HuggingFace model id."""
+    env_path = os.getenv("BERT_MODEL_PATH")
+    if env_path and os.path.isdir(env_path):
+        return env_path
+    local_path = os.path.join(current_dir, "RCRank", "bert-base-uncased")
+    if os.path.isdir(local_path):
+        return local_path
+    return "bert-base-uncased"
+
+
 class RCRankPredictor:
     def __init__(self, config):
         self.device = config.get("device", "cpu")
@@ -36,7 +47,7 @@ class RCRankPredictor:
 
         # Get the absolute path to bert-base-uncased
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        bert_path = os.path.join(current_dir, "RCRank/bert-base-uncased")
+        bert_path = resolve_bert_path(current_dir)
 
         self.tokenizer = BertTokenizer.from_pretrained(bert_path)
         self.opt_threshold = config.get("opt_threshold", 0.5)

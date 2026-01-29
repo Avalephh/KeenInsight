@@ -2,14 +2,10 @@ import asyncio
 import logging
 import os
 import re
-import sys
 import time
-from pathlib import Path
-
 from agents import Agent, Runner
-
-from dream.agent.action import diagnose_tools
 from dream.agent.action.action_manager import ActionManager
+from dream.agent.action.action_utils import base_information_collect, parse_query_rewrite
 from dream.agent.prompt import (
     build_simple_diagnosis_prompt,
     get_diagnostic_agent_instructions,
@@ -19,10 +15,8 @@ from dream.database.tidb_env import TiDB
 from dream.utils.types import QueryInfo
 
 logger = logging.getLogger(__name__)
-
 logger.setLevel(logging.INFO)
 logger.propagate = True
-
 
 class SimpleDBAgent:
     def __init__(self, configs=None):
@@ -33,13 +27,10 @@ class SimpleDBAgent:
         if db_type.lower() == "postgres":
             db_config = configs.get("DATABASE_CONFIG")
             self.db = PostgresDB(db_config)
-            logger.info("Using PostgreSQL database")
         elif db_type.lower() == "tidb":
             db_config = configs.get("TiDB_CONFIG")
             self.db = TiDB(db_config)
-            logger.info("Using TiDB database")
 
-        # Initialize diagnostic agent for LLM-based diagnosis
         self.diagnostic_model = self.agent_config.get("diagnostic_agent_model")
         self.api_settings = self.configs.get("API_SETTINGS")
 
@@ -54,11 +45,10 @@ class SimpleDBAgent:
             instructions=get_diagnostic_agent_instructions(),
         )
 
-        # Initialize action manager for validation and execution
         self.action_manager = ActionManager(
-            memory_manager=None,  # No memory manager needed for simple version
+            memory_manager=None,
             db=self.db,
-            planner=None,  # No planner needed for simple version
+            planner=None,
             configs=configs,
         )
 
@@ -109,23 +99,6 @@ class SimpleDBAgent:
 
         return explanation, fix_action, is_rewrite
 
-    def parse_query_rewrite(self, fix_action):
-        lines = fix_action.strip().splitlines()
-        sql_start = None
-
-        for idx, line in enumerate(lines):
-            l = line.lstrip().upper()
-            if l.startswith("WITH") or l.startswith("SELECT") or l.startswith("INSERT") or l.startswith("UPDATE") or l.startswith("DELETE"):
-                sql_start = idx
-                break
-
-        if sql_start is not None:
-            fix_part = "\n".join([line for line in lines[:sql_start] if line.strip()])
-            sql_part = "\n".join(lines[sql_start:]).strip()
-            return fix_part, sql_part
-        else:
-            return fix_action.strip(), ""
-
     def extract_fix_action(self, action_result):
         explanation, fix_action, is_rewrite = self.parse_action_result(action_result)
         print("diagnosis output:")
@@ -133,7 +106,7 @@ class SimpleDBAgent:
         print("fix_action:", fix_action)
         print("is_rewrite:", is_rewrite)
         if is_rewrite == "yes":
-            fix_action, rewrite_sql = self.parse_query_rewrite(fix_action)
+            fix_action, rewrite_sql = parse_query_rewrite(fix_action)
             return fix_action, rewrite_sql
         else:
             return fix_action, ""
@@ -164,7 +137,7 @@ class SimpleDBAgent:
         """Simple LLM-based diagnosis without root cause prediction"""
         # Collect base information
         database_config = self.configs.get("DATABASE_CONFIG")
-        base_info = diagnose_tools.base_information_collect(query_info, database_config)
+        base_info = base_information_collect(query_info, database_config)
 
         # Build simple diagnosis prompt
         prompt = build_simple_diagnosis_prompt(query_info, base_info)

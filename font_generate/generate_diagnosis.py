@@ -16,6 +16,7 @@ from dream.utils.types import QueryInfo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def format_query_preview(query: str, max_length: int = 100) -> str:
@@ -192,7 +193,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
     logger.info("Generating diagnosis.html...")
     
     # Load template
-    template_path = os.path.join(os.path.dirname(__file__), 'font', 'diagnosis.html')
+    template_path = BASE_DIR / "font" / "diagnosis.html"
     with open(template_path, 'r', encoding='utf-8') as f:
         template = f.read()
     
@@ -274,7 +275,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
         
         sql_item_html = f"""
     <!-- SQL {query_id} -->
-    <div class="sql-item">
+    <div class="sql-item" data-query-id="{query_id}">
       <div class="sql-header" onclick="toggleSqlDetails('sql{query_id}')">
         <div class="sql-summary">
           <div class="sql-number">SQL #{query_id}</div>
@@ -392,7 +393,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
     updated_template = re.sub(pattern, replacement, template, flags=re.DOTALL)
     
     # Save the updated template
-    output_path = os.path.join(os.path.dirname(__file__), 'font', 'diagnosis.html')
+    output_path = BASE_DIR / "results" / "diagnosis.html"
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(updated_template)
     
@@ -411,7 +412,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     
     # Try to get execution_time from diagnosis result first (most accurate)
     execution_time = None
-    diagnosis_storage_file = os.path.join(os.path.dirname(__file__), 'diagnosis_results.json')
+    diagnosis_storage_file = BASE_DIR / "results" / "diagnosis_results.json"
     if os.path.exists(diagnosis_storage_file):
         try:
             with open(diagnosis_storage_file, 'r', encoding='utf-8') as f:
@@ -434,11 +435,20 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
         logger.error(f"execution_time not found for query {query_id}, using default 0.0")
         execution_time = 0.0
     
-    # Read diagnosis.html to extract content
-    diagnosis_path = os.path.join(os.path.dirname(__file__), 'font', 'diagnosis.html')
-    if not os.path.exists(diagnosis_path):
-        logger.error(f"diagnosis.html not found at {diagnosis_path}")
-        return
+    # Read diagnosis.html to extract content (generate if missing)
+    diagnosis_path = BASE_DIR / "results" / "diagnosis.html"
+    if not diagnosis_path.exists():
+        try:
+            from template_renderer import load_json, render_diagnosis_page
+            template_path = BASE_DIR / "font" / "diagnosis.html"
+            template = template_path.read_text(encoding="utf-8")
+            diagnosis_results = load_json(diagnosis_storage_file)
+            rendered = render_diagnosis_page(template, slow_query_data, diagnosis_results)
+            diagnosis_path.write_text(rendered, encoding="utf-8")
+            logger.info(f"Generated diagnosis.html at {diagnosis_path}")
+        except Exception as e:
+            logger.error(f"diagnosis.html not found at {diagnosis_path} and failed to generate: {e}")
+            return
     
     with open(diagnosis_path, 'r', encoding='utf-8') as f:
         diagnosis_html = f.read()
@@ -580,7 +590,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     tuning_suggestions = parse_tuning_actions(fix_action, rewrite_sql, root_causes)
     
     # Load handling.html template
-    template_path = os.path.join(os.path.dirname(__file__), 'font', 'handling.html')
+    template_path = BASE_DIR / "font" / "handling.html"
     with open(template_path, 'r', encoding='utf-8') as f:
         template = f.read()
     
@@ -675,61 +685,26 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     # This is the baseline time before tuning, we don't modify the expected result (10.10秒)
     time_str = format_execution_time(execution_time)
     logger.info(f"Setting baseline execution time to {time_str} for query {query_id} in expected effect section")
-    
-    # Update the "调优前执行时间" in the expected effect section using the ID
-    # Use a very specific pattern that only matches the expected-old-time div
-    # Pattern needs to handle whitespace and newlines in the HTML
-    # First try: exact match with id attribute
-    pattern1 = r'(<div\s+class="time-value"\s+id="expected-old-time">)([^<]*?)(</div>)'
-    replacement1 = r'\1' + time_str + r'\3'
-    
-    # Count matches before replacement
-    matches_before = len(re.findall(pattern1, template, re.DOTALL))
-    logger.info(f"Found {matches_before} matches for expected-old-time pattern (pattern1)")
-    
-    # Perform replacement with DOTALL flag to handle newlines
-    new_template = re.sub(pattern1, replacement1, template, flags=re.DOTALL)
-    
-    # Verify the replacement worked correctly
-    if f'id="expected-old-time">{time_str}</div>' in new_template or f'id="expected-old-time">\n{time_str}</div>' in new_template:
-        template = new_template
-        logger.info(f"Successfully updated expected-old-time to {time_str} using pattern1")
+
+    # Prefer placeholder replacement when using templates
+    if "{{ expected_old_time }}" in template:
+        template = template.replace("{{ expected_old_time }}", time_str)
+        logger.info("Successfully updated expected-old-time using template placeholder")
     else:
-        logger.warning(f"Pattern1 did not match, trying pattern2")
-        # Fallback: match with more flexible whitespace handling
-        pattern2 = r'(<div[^>]*class="time-value"[^>]*id="expected-old-time"[^>]*>)([^<]*?)(</div>)'
-        replacement2 = r'\1' + time_str + r'\3'
-        new_template = re.sub(pattern2, replacement2, template, flags=re.DOTALL)
-        
-        if f'id="expected-old-time">{time_str}</div>' in new_template or f'id="expected-old-time">\n{time_str}</div>' in new_template:
+        # Fallback to DOM pattern replacement for older templates
+        pattern = r'(<div\s+class="time-value"\s+id="expected-old-time">)([^<]*?)(</div>)'
+        new_template = re.sub(pattern, r'\1' + time_str + r'\3', template, flags=re.DOTALL)
+        if new_template != template:
             template = new_template
-            logger.info(f"Successfully updated expected-old-time to {time_str} using pattern2")
+            logger.info("Successfully updated expected-old-time using id selector")
         else:
-            logger.warning(f"Pattern2 did not match, trying pattern3 (fallback with context)")
-            # Final fallback: match within the expected effect section with context
-            pattern3 = r'(<h2[^>]*>预期调优效果</h2>.*?<div\s+class="time-label">调优前执行时间</div>\s*<div\s+class="time-value"\s+id="expected-old-time">)([^<]*?)(</div>)'
-            replacement3 = r'\1' + time_str + r'\3'
-            new_template = re.sub(pattern3, replacement3, template, flags=re.DOTALL)
-            
-            if f'id="expected-old-time">{time_str}</div>' in new_template or f'id="expected-old-time">\n{time_str}</div>' in new_template:
-                template = new_template
-                logger.info(f"Successfully updated expected-old-time to {time_str} using pattern3")
-            else:
-                logger.error(f"Failed to update expected-old-time with all patterns! time_str={time_str}")
-                # Last resort: try direct string replacement
-                old_pattern = r'id="expected-old-time">[^<]*?</div>'
-                new_pattern = f'id="expected-old-time">{time_str}</div>'
-                if old_pattern in template or re.search(old_pattern, template):
-                    template = re.sub(old_pattern, new_pattern, template, flags=re.DOTALL)
-                    logger.info(f"Updated expected-old-time using direct string replacement")
-                else:
-                    logger.error(f"Could not find expected-old-time in template at all!")
+            logger.error(f"Failed to update expected-old-time. time_str={time_str}")
     
     # Don't modify 调优后执行时间 - it should stay as 10.10 秒 in the template
     # The template already has the correct value, so we don't need to modify it
     
     # Save
-    output_path = os.path.join(os.path.dirname(__file__), 'font', 'handling.html')
+    output_path = BASE_DIR / "results" / "handling.html"
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(template)
     
@@ -853,15 +828,15 @@ async def main():
     # Load config
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
     if config_path is None:
-        config_path = os.path.join(os.path.dirname(__file__), 'config', 'tpch_config.json')
-        if not os.path.exists(config_path):
-            config_path = os.path.join(os.path.dirname(__file__), 'config', 'tpch_config.json.example')
+        config_path = BASE_DIR / "config" / "tpch_config.json"
+        if not config_path.exists():
+            config_path = BASE_DIR / "config" / "tpch_config.json.example"
     
     with open(config_path, 'r', encoding='utf-8') as f:
         configs = json.load(f)
     
     # Load slow query data
-    json_path = os.path.join(os.path.dirname(__file__), 'slow_query_list.json')
+    json_path = BASE_DIR / "results" / "slow_query_list.json"
     with open(json_path, 'r', encoding='utf-8') as f:
         slow_query_data = json.load(f)
     

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import nest_asyncio
-from flask import Flask, jsonify, render_template_string, request, send_from_directory
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 # Apply nest_asyncio to handle nested event loops
@@ -23,16 +23,57 @@ nest_asyncio.apply()
 # Import DREAM components
 from dream.agent.db_agent import DBAgent
 from dream.utils.types import QueryInfo
+from template_renderer import (
+    load_json,
+    render_diagnosis_page,
+    render_handling_page,
+)
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+def _setup_logging():
+    level = os.getenv("LOG_LEVEL", "INFO").upper()
+    use_color = os.getenv("LOG_COLOR", "1") not in {"0", "false", "False"}
+
+    root_logger = logging.getLogger()
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+
+    if use_color:
+        try:
+            from colorlog import ColoredFormatter  # type: ignore
+
+            handler = logging.StreamHandler()
+            formatter = ColoredFormatter(
+                "%(log_color)s%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                log_colors={
+                    "DEBUG": "cyan",
+                    "INFO": "green",
+                    "WARNING": "yellow",
+                    "ERROR": "red",
+                    "CRITICAL": "red,bg_white",
+                },
+            )
+            handler.setFormatter(formatter)
+            root_logger.addHandler(handler)
+            root_logger.setLevel(level)
+            return
+        except Exception:
+            pass
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
+
+_setup_logging()
 logger = logging.getLogger(__name__)
 
-# Get absolute path to font directory
-FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'font')
+# Base paths
+BASE_DIR = Path(__file__).resolve().parent
+FONT_DIR = BASE_DIR / "font"
+RESULTS_DIR = BASE_DIR / "results"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 # Don't use static_folder to avoid conflicts with our custom routes
 app = Flask(__name__)
 # Configure CORS to allow all origins for remote access
@@ -47,10 +88,10 @@ MULTI_TUNE_TASKS: Dict[str, threading.Thread] = {}
 MULTI_TUNE_TASK_LOCK = threading.Lock()
 
 # Storage file paths
-DIAGNOSIS_STORAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'diagnosis_results.json')
-TUNING_STORAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tuning_results.json')
-MULTI_TUNE_LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'multi_tune_progress.log')
-MULTI_TUNE_STORAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'multi_tune_results.json')
+DIAGNOSIS_STORAGE_FILE = str(RESULTS_DIR / "diagnosis_results.json")
+TUNING_STORAGE_FILE = str(RESULTS_DIR / "tuning_results.json")
+MULTI_TUNE_LOG_FILE = str(RESULTS_DIR / "multi_tune_progress.log")
+MULTI_TUNE_STORAGE_FILE = str(RESULTS_DIR / "multi_tune_results.json")
 
 
 def load_config(config_path: str = None):
@@ -74,7 +115,7 @@ def load_config(config_path: str = None):
 def load_slow_query_list():
     """Load slow query list from JSON file"""
     global SLOW_QUERY_DATA
-    json_path = os.path.join(os.path.dirname(__file__), 'slow_query_list.json')
+    json_path = str(RESULTS_DIR / "slow_query_list.json")
     if os.path.exists(json_path):
         with open(json_path, 'r', encoding='utf-8') as f:
             SLOW_QUERY_DATA = json.load(f)
@@ -194,23 +235,7 @@ def after_request(response):
 def index():
     """Redirect to diagnosis page"""
     try:
-        diagnosis_path = os.path.join(FONT_DIR, 'diagnosis.html')
-        logger.info(f"Serving diagnosis.html from {diagnosis_path}")
-        if not os.path.exists(diagnosis_path):
-            logger.error(f"diagnosis.html not found at {diagnosis_path}")
-            return f"Error: diagnosis.html not found at {diagnosis_path}", 404
-        if not os.access(diagnosis_path, os.R_OK):
-            logger.error(f"diagnosis.html is not readable at {diagnosis_path}")
-            return f"Error: diagnosis.html is not readable at {diagnosis_path}", 403
-        with open(diagnosis_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            response = app.response_class(
-                response=content,
-                status=200,
-                mimetype='text/html'
-            )
-            logger.info(f"Successfully served diagnosis.html, size: {len(content)} bytes")
-            return response
+        return diagnosis_page()
     except PermissionError as e:
         logger.error(f"Permission denied reading diagnosis.html: {e}")
         return f"Error: Permission denied - {str(e)}", 403
@@ -223,15 +248,16 @@ def index():
 def diagnosis_page():
     """Serve diagnosis page"""
     try:
-        diagnosis_path = os.path.join(FONT_DIR, 'diagnosis.html')
-        with open(diagnosis_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            response = app.response_class(
-                response=content,
-                status=200,
-                mimetype='text/html'
-            )
-            return response
+        if SLOW_QUERY_DATA is None:
+            load_slow_query_list()
+        template_path = FONT_DIR / "diagnosis.html"
+        if not template_path.exists():
+            return f"Error: diagnosis.html not found at {template_path}", 404
+        template = template_path.read_text(encoding="utf-8")
+        diagnosis_results = load_json(Path(DIAGNOSIS_STORAGE_FILE))
+        content = render_diagnosis_page(template, SLOW_QUERY_DATA or {}, diagnosis_results)
+        response = app.response_class(response=content, status=200, mimetype="text/html")
+        return response
     except Exception as e:
         logger.error(f"Error reading diagnosis.html: {e}")
         return f"Error: {str(e)}", 500
@@ -241,15 +267,34 @@ def diagnosis_page():
 def handling_page():
     """Serve handling page"""
     try:
-        handling_path = os.path.join(FONT_DIR, 'handling.html')
-        with open(handling_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            response = app.response_class(
-                response=content,
-                status=200,
-                mimetype='text/html'
-            )
-            return response
+        if SLOW_QUERY_DATA is None:
+            load_slow_query_list()
+        query_id = request.args.get("queryId")
+        if not query_id:
+            query_id = next(iter(SLOW_QUERY_DATA.keys()), "1")
+        template_path = FONT_DIR / "handling.html"
+        if not template_path.exists():
+            return f"Error: handling.html not found at {template_path}", 404
+        template = template_path.read_text(encoding="utf-8")
+        diagnosis_results = load_json(Path(DIAGNOSIS_STORAGE_FILE))
+        tuning_results = load_json(Path(TUNING_STORAGE_FILE))
+        from font_generate.generate_diagnosis import parse_tuning_actions
+        tuning_result = tuning_results.get(query_id, {})
+        tuning_suggestions = parse_tuning_actions(
+            tuning_result.get("fix_action", ""),
+            tuning_result.get("rewrite_sql", ""),
+            tuning_result.get("root_causes", []),
+        )
+        content = render_handling_page(
+            template,
+            query_id,
+            SLOW_QUERY_DATA or {},
+            diagnosis_results,
+            tuning_results,
+            tuning_suggestions,
+        )
+        response = app.response_class(response=content, status=200, mimetype="text/html")
+        return response
     except Exception as e:
         logger.error(f"Error reading handling.html: {e}")
         return f"Error: {str(e)}", 500
@@ -259,15 +304,12 @@ def handling_page():
 def multi_tune_page():
     """Serve multi-tune page"""
     try:
-        multi_tune_path = os.path.join(FONT_DIR, 'multi-tune.html')
-        with open(multi_tune_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            response = app.response_class(
-                response=content,
-                status=200,
-                mimetype='text/html'
-            )
-            return response
+        multi_tune_path = FONT_DIR / "multi-tune.html"
+        if not multi_tune_path.exists():
+            return f"Error: multi-tune.html not found at {multi_tune_path}", 404
+        content = multi_tune_path.read_text(encoding="utf-8")
+        response = app.response_class(response=content, status=200, mimetype="text/html")
+        return response
     except Exception as e:
         logger.error(f"Error reading multi-tune.html: {e}")
         return f"Error: {str(e)}", 500
@@ -282,14 +324,35 @@ def get_slow_queries():
     return jsonify(SLOW_QUERY_DATA)
 
 
+_ASYNC_LOOP = None
+_ASYNC_LOOP_THREAD = None
+_ASYNC_LOOP_LOCK = threading.Lock()
+
+
+def _ensure_background_loop():
+    global _ASYNC_LOOP, _ASYNC_LOOP_THREAD
+    with _ASYNC_LOOP_LOCK:
+        if _ASYNC_LOOP and _ASYNC_LOOP.is_running():
+            return _ASYNC_LOOP
+
+        _ASYNC_LOOP = asyncio.new_event_loop()
+
+        def _run_loop(loop: asyncio.AbstractEventLoop):
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+
+        _ASYNC_LOOP_THREAD = threading.Thread(
+            target=_run_loop, args=(_ASYNC_LOOP,), daemon=True
+        )
+        _ASYNC_LOOP_THREAD.start()
+        return _ASYNC_LOOP
+
+
 def run_async(coro):
-    """Helper to run async functions in Flask"""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Helper to run async functions in Flask with a persistent loop."""
+    loop = _ensure_background_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result()
 
 
 @app.route('/api/diagnose/<query_id>', methods=['POST'])
@@ -531,9 +594,10 @@ def tune_query(query_id: str):
             if not DREAM_AGENT.action_manager.agent:
                 await DREAM_AGENT.action_manager.initialize()
             
-            from dream.agent.action import diagnose_tools
+            from dream.agent.action.action_space import action_space_collect
+            from dream.agent.action.action_utils import base_information_collect
             database_config = DREAM_AGENT.action_manager.configs.get("DATABASE_CONFIG")
-            base_info = diagnose_tools.base_information_collect(query_info, database_config)
+            base_info = base_information_collect(query_info, database_config)
             
             # Retrieve cases
             if DREAM_AGENT.action_manager.enable_retrieval:
@@ -544,7 +608,15 @@ def tune_query(query_id: str):
                 positives = []
                 negatives = []
             
-            action_space = await DREAM_AGENT.action_manager.action_space_collect(root_causes, query_info)
+            action_space = await action_space_collect(
+                root_causes,
+                query_info,
+                enable_action_define=DREAM_AGENT.action_manager.enable_action_define,
+                enable_action_pruning=DREAM_AGENT.action_manager.enable_action_pruning,
+                configs=DREAM_AGENT.action_manager.configs,
+                db=DREAM_AGENT.action_manager.db,
+                memory_manager=DREAM_AGENT.action_manager.memory_manager,
+            )
             action_result = await DREAM_AGENT.action_manager.action_generate(
                 root_causes, base_info, action_space, "exploit", positives, negatives
             )
@@ -566,7 +638,7 @@ def tune_query(query_id: str):
             tuning_suggestions = parse_tuning_actions(fix_action, rewrite_sql, root_causes)
             
             # Generate handling.html using saved diagnosis result if available
-            from generate_diagnosis import generate_handling_html
+            from font_generate.generate_diagnosis import generate_handling_html
             await generate_handling_html(DREAM_AGENT, query_id, SLOW_QUERY_DATA, fix_action, rewrite_sql, root_causes, state_confidence)
             
             return {
@@ -633,8 +705,15 @@ def execute_tune(query_id: str):
             
             # Execute tuning actions directly using evaluate_action
             # This will execute fix_action in the database and test the query execution time
-            evaluation_result = await DREAM_AGENT.action_manager.evaluate_action(
-                fix_action, rewrite_sql, query_info
+            from dream.agent.action.action_evaluation import evaluate_action
+            evaluation_result = await evaluate_action(
+                fix_action,
+                rewrite_sql,
+                query_info,
+                db=DREAM_AGENT.action_manager.db,
+                fix_timeout=DREAM_AGENT.action_manager.fix_timeout,
+                sql_timeout=DREAM_AGENT.action_manager.sql_timeout,
+                fix_agent=DREAM_AGENT.action_manager.fixAgent,
             )
             
             old_time = query_info.execution_time
@@ -661,7 +740,7 @@ def execute_tune(query_id: str):
 
 def parse_tuning_actions(fix_action: str, rewrite_sql: str, root_causes: List[str]) -> List[Dict]:
     """Parse tuning actions into structured format based on root causes"""
-    from generate_diagnosis import parse_tuning_actions as parse_tuning_actions_impl
+    from font_generate.generate_diagnosis import parse_tuning_actions as parse_tuning_actions_impl
     return parse_tuning_actions_impl(fix_action, rewrite_sql, root_causes)
 
 
@@ -779,6 +858,7 @@ def run_multi_tune_background(query_id: str, total_rounds: int = 30):
                     current_exec_time = initial_time
                     
                     # Run multiple rounds
+                    step_timeout = float(os.getenv("MULTI_TUNE_STEP_TIMEOUT", "600"))
                     for round_num in range(start_round, total_rounds + 1):
                         try:
                             logger.info(f"Starting round {round_num}/{total_rounds} for query {query_id}")
@@ -805,22 +885,29 @@ def run_multi_tune_background(query_id: str, total_rounds: int = 30):
                                 "component_attempts": {},
                             }
                             
+                            logger.info(f"Predicting root cause for query {query_id}, round {round_num}")
                             predicted_root, updated_state, explanation = await DREAM_AGENT.planner.predict(
                                 query_info, state, DREAM_AGENT.memory_manager
                             )
                             
                             root_causes = predicted_root if isinstance(predicted_root, list) else [predicted_root]
                             
-                            # Generate tuning actions and execute
-                            evaluation_result = await DREAM_AGENT.action_manager.step(
-                                query_info, root_causes, mode="exploit"
+                            # Generate tuning actions and execute (no MCP)
+                            logger.info(f"Generating tuning actions for query {query_id}, round {round_num}")
+                            evaluation_result = await asyncio.wait_for(
+                                DREAM_AGENT.action_manager.step(query_info, root_causes, mode="exploit"),
+                                timeout=step_timeout,
                             )
-                            
-                            # Extract tuning suggestions
+
                             fix_action = evaluation_result.get('fix_action', '')
                             rewrite_sql = evaluation_result.get('rewrite_sql', '')
                             
                             tuning_suggestions = parse_tuning_actions(fix_action, rewrite_sql, root_causes)
+                            evaluation_explanation = (
+                                evaluation_result.get('explanation')
+                                or evaluation_result.get('diagnosis_explanation')
+                                or ''
+                            )
                             
                             # Get new execution time
                             new_time = evaluation_result.get('new_time', query_info.execution_time)
@@ -846,7 +933,9 @@ def run_multi_tune_background(query_id: str, total_rounds: int = 30):
                                 'old_time': old_time,
                                 'improvement_ratio': improvement_ratio,
                                 'root_causes': root_causes_chinese,
-                                'explanation': explanation if isinstance(explanation, str) else str(explanation) if explanation else '暂无解释说明',
+                                'explanation': evaluation_explanation if isinstance(evaluation_explanation, str) and evaluation_explanation else (
+                                    explanation if isinstance(explanation, str) else str(explanation) if explanation else '暂无解释说明'
+                                ),
                                 'operations': [
                                     {
                                         'rootCause': suggestion['type'],
@@ -866,6 +955,24 @@ def run_multi_tune_background(query_id: str, total_rounds: int = 30):
                             # Small delay between rounds
                             await asyncio.sleep(1)
                             
+                        except asyncio.TimeoutError:
+                            logger.error(
+                                f"Timeout in round {round_num} for query {query_id} after {step_timeout}s"
+                            )
+                            round_result = {
+                                'round': round_num,
+                                'exec_time': current_exec_time,
+                                'old_time': current_exec_time,
+                                'improvement_ratio': 0.0,
+                                'root_causes': [],
+                                'explanation': f'本轮调优超时（>{step_timeout}s），已跳过。',
+                                'operations': [],
+                                'fix_action': '',
+                                'rewrite_sql': ''
+                            }
+                            save_multi_tune_result(query_id, round_num, round_result)
+                            await asyncio.sleep(1)
+                            continue
                         except Exception as e:
                             logger.error(f"Error in round {round_num} for query {query_id}: {e}", exc_info=True)
                             # Continue to next round even if this one failed
@@ -1055,7 +1162,7 @@ def get_tuning_result(query_id: str):
         result = load_tuning_result(query_id)
         if result:
             # Parse tuning suggestions for frontend
-            from generate_diagnosis import parse_tuning_actions
+            from font_generate.generate_diagnosis import parse_tuning_actions
             tuning_suggestions = parse_tuning_actions(
                 result.get('fix_action', ''),
                 result.get('rewrite_sql', ''),
@@ -1071,21 +1178,29 @@ def get_tuning_result(query_id: str):
 
 
 if __name__ == '__main__':
+    import sys
+    from flask.cli import main as flask_main
+
     # Load configuration and data
     load_config()
     load_slow_query_list()
-    
+
     # Add error handler for 403
     @app.errorhandler(403)
     def forbidden(error):
         logger.error(f"403 Forbidden: {request.url}")
         return jsonify({'error': 'Forbidden', 'message': str(error)}), 403
-    
+
     # Add error handler for 404
     @app.errorhandler(404)
     def not_found(error):
         logger.error(f"404 Not Found: {request.url}")
         return jsonify({'error': 'Not Found', 'message': str(error)}), 404
-    
-    # Run Flask app
-    app.run(host='0.0.0.0', port=5000, debug=True, threaded=True)
+
+    # Run via Flask CLI (same style as `flask run`)
+    os.environ.setdefault("FLASK_APP", "web_server:app")
+    os.environ.setdefault("FLASK_RUN_HOST", "0.0.0.0")
+    os.environ.setdefault("FLASK_RUN_PORT", "5000")
+    os.environ.setdefault("FLASK_ENV", "development")
+    sys.argv = ["flask", "run"]
+    flask_main()

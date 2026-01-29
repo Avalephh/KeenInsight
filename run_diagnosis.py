@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sys
+from pathlib import Path
 
 import sys
 import os
@@ -16,8 +17,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dream.agent.db_agent import DBAgent
-from generate_diagnosis import generate_diagnosis_html, generate_handling_html
-from generate_multi_tune import generate_multi_tune_html
+from font_generate.generate_diagnosis import generate_diagnosis_html, generate_handling_html
+from font_generate.generate_multi_tune import generate_multi_tune_html
 
 logging.basicConfig(
     level=logging.INFO,
@@ -31,16 +32,17 @@ async def main():
     # Load config
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
     if config_path is None:
-        config_path = os.path.join(os.path.dirname(__file__), 'config', 'tpch_config.json')
-        if not os.path.exists(config_path):
-            config_path = os.path.join(os.path.dirname(__file__), 'config', 'tpch_config.json.example')
+        base_dir = Path(__file__).resolve().parent
+        config_path = base_dir / "config" / "tpch_config.json"
+        if not config_path.exists():
+            config_path = base_dir / "config" / "tpch_config.json.example"
     
     logger.info(f"Using config: {config_path}")
     with open(config_path, 'r', encoding='utf-8') as f:
         configs = json.load(f)
     
     # Load slow query data
-    json_path = os.path.join(os.path.dirname(__file__), 'slow_query_list.json')
+    json_path = Path(__file__).resolve().parent / "results" / "slow_query_list.json"
     logger.info(f"Loading slow queries from: {json_path}")
     with open(json_path, 'r', encoding='utf-8') as f:
         slow_query_data = json.load(f)
@@ -60,9 +62,9 @@ async def main():
             try:
                 await generate_handling_html(agent, query_id, slow_query_data)
                 # Save with query_id in filename for multiple queries
-                handling_path = os.path.join(os.path.dirname(__file__), 'font', f'handling_{query_id}.html')
-                default_handling = os.path.join(os.path.dirname(__file__), 'font', 'handling.html')
-                if os.path.exists(default_handling):
+                handling_path = Path(__file__).resolve().parent / "results" / f"handling_{query_id}.html"
+                default_handling = Path(__file__).resolve().parent / "results" / "handling.html"
+                if default_handling.exists():
                     import shutil
                     shutil.copy(default_handling, handling_path)
             except Exception as e:

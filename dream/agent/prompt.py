@@ -88,7 +88,7 @@ def build_action_prompt(root_cause, base_info, action_space, mode, positives, ne
     - The fix action should be safe and should not drop or delete data unless explicitly required by the root cause.
 
     ## Output Format
-    You must output ONLY in the following format, with explanation and fix action:
+    You must output ONLY in the following format, with explanation in Chinese and fix action:
 
     Explanation:
     <concise technical reason why the root cause is causing the slowdown now>
@@ -210,9 +210,7 @@ def build_root_cause_diagnosis_prompt(query_info, root_causes, state_confidence,
     - You MUST output ALL allowed labels WITH a confidence in [0,1]: missing indexes, inappropriate query knobs, suboptimal plan optimizer, poorly written queries
     - You MUST also output a separate array `predicted_root_causes` listing the final predicted root cause labels (derived from confidence and considering historical priors above).
     - `predicted_root_causes` MUST be exactly the set of labels with confidence > 0.5. Labels with confidence ≤ 0.5 MUST NOT appear in `predicted_root_causes`.
-    - You MUST provide a detailed explanation of the diagnosis results in **Chinese (简体中文)**, explaining why each root cause has its assigned confidence level based on the query information, execution plan, and metrics.
-    - The explanation MUST be written in Chinese (简体中文) and should be clear, technical, and comprehensive. **DO NOT use English or any other language. Only Chinese is allowed for the explanation field.**
-    - You MUST output strict JSON only in the format below. No extra text, no explanation outside the JSON.
+    - You MUST output strict JSON only in the format below. No extra text, no explanation.
 
     ## Output JSON Example
     {{
@@ -222,8 +220,7 @@ def build_root_cause_diagnosis_prompt(query_info, root_causes, state_confidence,
         {{"label": "inappropriate query knobs", "confidence": 0.18}},
         {{"label": "suboptimal plan optimizer", "confidence": 0.10}},
         {{"label": "poorly written queries", "confidence": 0.05}}
-      ],
-      "explanation": "根据执行计划分析，该查询在lineitem表上进行了大规模顺序扫描，过滤条件为l_shipdate。执行计划显示扫描了24,705,682行，但仅获取了1,363个元组，这表明缺少索引。高CPU使用率（91.9-99.9%）结合中等I/O表明查询是CPU密集型，很可能是由于全表扫描导致的。'missing indexes'的置信度为0.72，反映了执行计划中的明确证据。其他根因的置信度较低，因为当前指标对它们的支持较少。"
+      ]
     }}"""
 
 
@@ -281,7 +278,7 @@ def build_action_space_prompt(root_causes, db, knob_config, current_knob_values,
 
     # SQL readability/rewrite related
     if "poorly written queries" in root_causes:
-        from .action.diagnose_tools import SQLRuleMatcher
+        from dream.agent.action.rule_matcher import SQLRuleMatcher
 
         matcher = SQLRuleMatcher()
         rule_descriptions = matcher.get_rule_descriptions(query_info.query)

@@ -543,105 +543,14 @@
     <!-- 异常SQL -->
     <div class="section">
       <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">异常SQL</h2>
-      <div class="query-info">select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price, sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty, avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*) as count_order from lineitem where l_shipdate &lt;= date '1998-12-01' - interval '80' day group by l_returnflag, l_linestatus order by l_returnflag, l_linestatus;</div>
+      <div class="query-info">{{ query }}</div>
     </div>
 
     <!-- 执行计划 -->
     <div class="section">
       <h2 style="margin-top: 0; font-size: 18px; font-weight: 700; border-left: 4px solid #1e3c72; padding-left: 14px; color: #1e3c72; font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif; letter-spacing: 0.3px; margin-bottom: 20px;">执行计划</h2>
-      <div class="plan-info">[
-  [
-    {
-      "Plan": {
-        "Node Type": "Aggregate",
-        "Strategy": "Sorted",
-        "Partial Mode": "Finalize",
-        "Parallel Aware": false,
-        "Async Capable": false,
-        "Startup Cost": 2302668.46,
-        "Total Cost": 2302670.42,
-        "Plan Rows": 6,
-        "Plan Width": 236,
-        "Group Key": [
-          "l_returnflag",
-          "l_linestatus"
-        ],
-        "Plans": [
-          {
-            "Node Type": "Gather Merge",
-            "Parent Relationship": "Outer",
-            "Parallel Aware": false,
-            "Async Capable": false,
-            "Startup Cost": 2302668.46,
-            "Total Cost": 2302669.86,
-            "Plan Rows": 12,
-            "Plan Width": 236,
-            "Workers Planned": 2,
-            "Plans": [
-              {
-                "Node Type": "Sort",
-                "Parent Relationship": "Outer",
-                "Parallel Aware": false,
-                "Async Capable": false,
-                "Startup Cost": 2301668.44,
-                "Total Cost": 2301668.45,
-                "Plan Rows": 6,
-                "Plan Width": 236,
-                "Sort Key": [
-                  "l_returnflag",
-                  "l_linestatus"
-                ],
-                "Plans": [
-                  {
-                    "Node Type": "Aggregate",
-                    "Strategy": "Hashed",
-                    "Partial Mode": "Partial",
-                    "Parent Relationship": "Outer",
-                    "Parallel Aware": false,
-                    "Async Capable": false,
-                    "Startup Cost": 2301668.22,
-                    "Total Cost": 2301668.36,
-                    "Plan Rows": 6,
-                    "Plan Width": 236,
-                    "Group Key": [
-                      "l_returnflag",
-                      "l_linestatus"
-                    ],
-                    "Planned Partitions": 0,
-                    "Plans": [
-                      {
-                        "Node Type": "Seq Scan",
-                        "Parent Relationship": "Outer",
-                        "Parallel Aware": true,
-                        "Async Capable": false,
-                        "Relation Name": "lineitem",
-                        "Alias": "lineitem",
-                        "Startup Cost": 0.0,
-                        "Total Cost": 1436969.35,
-                        "Plan Rows": 24705682,
-                        "Plan Width": 25,
-                        "Filter": "(l_shipdate <= '1998-09-12 00:00:00'::timestamp without time zone)"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "JIT": {
-        "Functions": 9,
-        "Options": {
-          "Inlining": true,
-          "Optimization": true,
-          "Expressions": true,
-          "Deforming": true
-        }
-      }
-    }
-  ]
-]</div>
+      <div class="plan-info">{{ plan_json }}</div>
+    
     </div>
   </div>
 
@@ -652,26 +561,8 @@
     <div class="diagnosis-container">
       <!-- 左侧：异常类型和置信度 -->
       <div class="diagnosis-left">
-        <table><tr><th>异常类型</th><th>置信度</th></tr>
-                <tr>
-                  <td>索引选择</td>
-                  <td><span class="tag warning">0.75</span></td>
-                </tr>
-
-                <tr>
-                  <td>参数调优</td>
-                  <td><span class="tag warning">0.65</span></td>
-                </tr>
-
-                <tr>
-                  <td>查询计划调优</td>
-                  <td><span class="tag normal">0.15</span></td>
-                </tr>
-
-                <tr>
-                  <td>查询改写</td>
-                  <td><span class="tag normal">0.10</span></td>
-                </tr>
+        <table>
+{{ diagnosis_table_html }}
 </table>
       </div>
 
@@ -679,7 +570,7 @@
       <div class="diagnosis-right">
         <div class="diagnosis-explanation">
           <div class="explanation-title">解释说明</div>
-          <div id="explanation-text-handling" class="explanation-content">根据查询信息和执行计划，当前SQL主要在大型lineitem表上根据l_shipdate进行筛选，执行计划显示采用了顺序扫描（Seq Scan），且CPU使用率极高（91.9%-99.9%），而I/O读写非常低，进一步说明系统的大部分资源消耗在CPU计算上而非磁盘I/O。这表明对于where条件中的l_shipdate缺乏有效索引，导致全表扫描成为主要瓶颈。'missing indexes'的置信度最高，为0.72，直接反映了上述症结。'inappropriate query knobs'置信度为0.18，虽然存在排序与并行聚合的合理利用，但无法明显改善性能，暂未发现参数配置失当。'suboptimal plan optimizer'和'poorly written queries'由于没有复杂join或不合理表达式，仅维持低置信度（分别为0.10、0.05）。总之，首要根因是缺失索引，优化应优先考虑对此字段添加索引以减少顺序扫描。</div>
+          <div id="explanation-text-handling" class="explanation-content">{{ explanation }}</div>
         </div>
       </div>
     </div>
@@ -694,20 +585,7 @@
         <th>根因类型</th>
         <th>调优建议</th>
       </tr>
-      <tr>
-        <td>索引选择</td>
-        <td>
-          <div class="tuning-action-code">CREATE INDEX IF NOT EXISTS lineitem_l_shipdate_idx ON lineitem (l_shipdate);</div>
-        </td>
-      </tr>
-
-      <tr>
-        <td>参数调优</td>
-        <td>
-          <div class="tuning-action-code">SET work_mem = 1048576;
-SET hash_mem_multiplier = 4;</div>
-        </td>
-      </tr>
+{{ tuning_rows_html }}
 </table>
   </div>
 
@@ -719,7 +597,7 @@ SET hash_mem_multiplier = 4;</div>
       <div class="time-comparison">
         <div class="time-item">
           <div class="time-label">调优前执行时间</div>
-          <div class="time-value" id="expected-old-time">23.97 秒</div>
+          <div class="time-value" id="expected-old-time">{{ expected_old_time }}</div>
         </div>
         <div class="time-arrow">→</div>
         <div class="time-item">
@@ -898,9 +776,20 @@ SET hash_mem_multiplier = 4;</div>
     // 或者使用 window.location.href = 'detail.html'; 在当前窗口跳转
   }
 
-  function goToMultiTune() {
-    // 跳转到备库调优页面，传递queryId
+  async function goToMultiTune() {
+    // 启动多轮调优任务，再跳转到备库调优页面
     const queryId = getQueryIdFromUrl();
+    try {
+      await fetch(`/api/multi-tune/${queryId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ total_rounds: 30 })
+      });
+    } catch (error) {
+      console.warn('启动多轮调优失败，将继续跳转:', error);
+    }
     window.location.href = 'multi-tune.html?queryId=' + queryId;
   }
 

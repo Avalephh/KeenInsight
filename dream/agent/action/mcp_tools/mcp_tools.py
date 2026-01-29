@@ -1,7 +1,7 @@
-import json
 import os
 import re
 import sys
+from pathlib import Path
 
 # from dataclasses import dataclass
 from collections import defaultdict
@@ -22,382 +22,15 @@ from sqlparse.tokens import DML
 from sqlparse.tokens import Comparison as TComparison
 from sqlparse.tokens import Keyword, Literal, Name, Whitespace, Wildcard
 
+# Add project root directory to Python path
+sys.path.append(str(Path(__file__).resolve().parents[4]))
+
 import jpype as jp
+
+from dream.database.pg_env import PostgresDB
 
 # Initialize FastMCP server
 mcp = FastMCP("db_diagnosis")
-
-# Lazy import to avoid issues when MCP server runs as separate process
-def _get_postgres_db():
-    """Lazy import helper to avoid module import issues in MCP server processes"""
-    from dream.database.pg_env import PostgresDB
-    return PostgresDB
-
-
-class SQLRuleMatcher:
-    def __init__(self):
-        # Use relative path based on current module directory
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        self.rules_file = os.path.join(current_dir, "calcite_rewrite_rules_abbreviated.jsonl")
-        self.rules = self._load_rules()
-
-    def _load_rules(self):
-        rules = []
-        with open(self.rules_file, "r", encoding="utf-8") as f:
-            for line in f:
-                if line.strip():
-                    rule = json.loads(line.strip())
-                    rules.append(rule)
-        return rules
-
-    def _has_union_all(self, sql):
-        return bool(re.search(r"\bUNION\s+ALL\b", sql, re.IGNORECASE))
-
-    def _has_order_by(self, sql):
-        return bool(re.search(r"\bORDER\s+BY\b", sql, re.IGNORECASE))
-
-    def _has_window_functions(self, sql):
-        return bool(re.search(r"\bOVER\s*\(", sql, re.IGNORECASE))
-
-    def _has_distinct_aggregates(self, sql):
-        return bool(re.search(r"\b(COUNT|SUM|MIN|MAX|AVG)\s*\(\s*DISTINCT\b", sql, re.IGNORECASE))
-
-    def _has_subqueries(self, sql):
-        return bool(re.search(r"\(\s*SELECT\b", sql, re.IGNORECASE))
-
-    def _has_joins(self, sql):
-        return bool(re.search(r"\b(INNER|LEFT|RIGHT|FULL)\s+JOIN\b", sql, re.IGNORECASE))
-
-    def _has_where_clauses(self, sql):
-        return bool(re.search(r"\bWHERE\b", sql, re.IGNORECASE))
-
-    def _has_group_by(self, sql):
-        return bool(re.search(r"\bGROUP\s+BY\b", sql, re.IGNORECASE))
-
-    def _has_constant_expressions(self, sql):
-        order_by_match = re.search(
-            r"\bORDER\s+BY\b(.+?)(?:\bLIMIT\b|\bOFFSET\b|$)",
-            sql,
-            re.IGNORECASE | re.DOTALL,
-        )
-        if order_by_match:
-            order_clause = order_by_match.group(1)
-            return bool(re.search(r"\b\d+\b|\'[^\']*\'", order_clause))
-        return False
-
-    def _has_redundant_projections(self, sql):
-        select_count = len(re.findall(r"\bSELECT\b", sql, re.IGNORECASE))
-        return select_count > 1
-
-    def match_rules(self, sql):
-        applicable_rules = []
-
-        if self._has_union_all(sql) and self._has_order_by(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["SORT_UNION_TRANSPOSE", "UNION"]))
-
-        if self._has_subqueries(sql) and self._has_where_clauses(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["FILTER_MERGE", "FILTER_SUB_QUERY"]))
-
-        if self._has_joins(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["JOIN"]))
-
-        if self._has_joins(sql) and self._has_where_clauses(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["JOIN_CONDITION_PUSH"]))
-
-        if self._has_distinct_aggregates(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["AGGREGATE_EXPAND_DISTINCT"]))
-
-        if self._has_window_functions(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["PROJECT_WINDOW_TRANSPOSE", "WINDOW"]))
-
-        if self._has_redundant_projections(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["PROJECT_REMOVE", "PROJECT_MERGE"]))
-
-        if self._has_constant_expressions(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["SORT_REMOVE_CONSTANT", "REDUCE_EXPRESSIONS"]))
-
-        if self._has_group_by(sql):
-            applicable_rules.extend(self._get_rules_by_pattern(["AGGREGATE"]))
-
-        seen = set()
-        unique_rules = []
-        for rule in applicable_rules:
-            if rule["name"] not in seen:
-                seen.add(rule["name"])
-                unique_rules.append(rule)
-
-        return unique_rules
-
-    def _get_rules_by_pattern(self, patterns):
-        matched_rules = []
-        for rule in self.rules:
-            rule_name = rule["name"].upper()
-            for pattern in patterns:
-                if pattern.upper() in rule_name:
-                    matched_rules.append(rule)
-                    break
-        return matched_rules
-
-    def get_rule_descriptions(self, sql):
-        applicable_rules = self.match_rules(sql)
-
-        if not applicable_rules:
-            return "    - No specific rewrite rules identified for this query structure."
-
-        descriptions = []
-        for rule in applicable_rules:
-            descriptions.append(f'    - "{rule["name"]}": {rule["conditions"]} → {rule["transformations"]}')
-
-        return "\n".join(descriptions)
-
-    def get_rule_info(self, rule_name):
-        """
-        Get rule information based on rule name
-        """
-        for rule in self.rules:
-            if rule["name"] == rule_name:
-                return rule
-        return None
-
-    def _rule_used_in_rewrite(self, rule, original_query, rewritten_query):
-        """
-        Check if rule is used in rewrite, based on specific Calcite rule patterns
-        """
-        rule_name = rule["name"]
-
-        # Exact matching based on specific rule names
-        if "SORT_UNION_TRANSPOSE" in rule_name:
-            # Check if ORDER BY is pushed into UNION
-            return self._check_union_order_by_push(original_query, rewritten_query)
-
-        elif "PROJECT_CORRELATE_TRANSPOSE" in rule_name:
-            # Check correlated subquery projection pushdown
-            return self._check_correlated_subquery_projection(original_query, rewritten_query)
-
-        elif "FILTER_MERGE" in rule_name:
-            # Check WHERE condition merge
-            return self._check_where_merge(original_query, rewritten_query)
-
-        elif "JOIN_ADD_REDUNDANT_SEMI_JOIN" in rule_name:
-            # Check semi-join addition
-            return self._check_semi_join_addition(original_query, rewritten_query)
-
-        elif "AGGREGATE_EXPAND_DISTINCT_AGGREGATES" in rule_name:
-            # Check DISTINCT aggregate expansion
-            return self._check_distinct_aggregate_expansion(original_query, rewritten_query)
-
-        elif "AGGREGATE_UNION_TRANSPOSE" in rule_name:
-            # Check aggregate pushdown to UNION
-            return self._check_aggregate_union_transpose(original_query, rewritten_query)
-
-        elif "JOIN_CONDITION_PUSH" in rule_name:
-            # Check JOIN condition pushdown
-            return self._check_join_condition_push(original_query, rewritten_query)
-
-        elif "SORT_REMOVE_CONSTANT_KEYS" in rule_name:
-            # Check ORDER BY constant key removal
-            return self._check_order_by_constant_removal(original_query, rewritten_query)
-
-        elif "AGGREGATE_JOIN_REMOVE" in rule_name:
-            # Check unnecessary JOIN removal
-            return self._check_unnecessary_join_removal(original_query, rewritten_query)
-
-        elif "PROJECT_WINDOW_TRANSPOSE" in rule_name:
-            # Check window function projection transpose
-            return self._check_window_projection_transpose(original_query, rewritten_query)
-
-        elif "FILTER_VALUES_MERGE" in rule_name:
-            # Check VALUES clause filter merge
-            return self._check_values_filter_merge(original_query, rewritten_query)
-
-        elif "FILTER_SUB_QUERY_TO_CORRELATE" in rule_name:
-            # Check subquery to correlated subquery conversion
-            return self._check_subquery_to_correlate(original_query, rewritten_query)
-
-        elif "UNION_REMOVE" in rule_name:
-            # Check redundant UNION removal
-            return self._check_redundant_union_removal(original_query, rewritten_query)
-
-        elif "UNION_TO_DISTINCT" in rule_name:
-            # Check UNION to DISTINCT conversion
-            return self._check_union_to_distinct(original_query, rewritten_query)
-
-        elif "SORT_REMOVE" in rule_name:
-            # Check redundant ORDER BY removal
-            return self._check_redundant_sort_removal(original_query, rewritten_query)
-
-        elif "PROJECT_REMOVE" in rule_name:
-            # Check redundant projection removal
-            return self._check_redundant_projection_removal(original_query, rewritten_query)
-
-        elif "JOIN_TO_CORRELATE" in rule_name:
-            # Check JOIN to correlated subquery conversion
-            return self._check_join_to_correlate(original_query, rewritten_query)
-
-        elif "INTERSECT_TO_DISTINCT" in rule_name:
-            # Check INTERSECT to DISTINCT conversion
-            return self._check_intersect_to_distinct(original_query, rewritten_query)
-
-        return False
-
-    def _check_union_order_by_push(self, original_query, rewritten_query):
-        """Check if ORDER BY is pushed into UNION"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        if "union" in original_lower and "union" in rewritten_lower:
-            # Check if ORDER BY moved from after UNION to inside UNION
-            original_order_by_count = original_lower.count("order by")
-            rewritten_order_by_count = rewritten_lower.count("order by")
-            return original_order_by_count != rewritten_order_by_count
-        return False
-
-    def _check_correlated_subquery_projection(self, original_query, rewritten_query):
-        """Check correlated subquery projection pushdown"""
-        # Check if projection is extracted from correlated subquery
-        return "select" in original_query.lower() and "select" in rewritten_query.lower() and "exists" in original_query.lower() or "in " in original_query.lower()
-
-    def _check_where_merge(self, original_query, rewritten_query):
-        """Check WHERE condition merge"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check change in WHERE clause count
-        original_where_count = original_lower.count("where")
-        rewritten_where_count = rewritten_lower.count("where")
-        return original_where_count > rewritten_where_count
-
-    def _check_semi_join_addition(self, original_query, rewritten_query):
-        """Check semi-join addition"""
-        rewritten_lower = rewritten_query.lower()
-        # Check if EXISTS or IN subquery is added
-        return "exists" in rewritten_lower or " in " in rewritten_lower
-
-    def _check_distinct_aggregate_expansion(self, original_query, rewritten_query):
-        """Check DISTINCT aggregate expansion"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if DISTINCT is removed and GROUP BY is added
-        return "distinct" in original_lower and "distinct" not in rewritten_lower and "group by" in rewritten_lower
-
-    def _check_aggregate_union_transpose(self, original_query, rewritten_query):
-        """Check aggregate pushdown to UNION"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if aggregate functions moved from after UNION to inside UNION
-        agg_functions = ["count", "sum", "avg", "min", "max"]
-        original_agg_count = sum(original_lower.count(func) for func in agg_functions)
-        rewritten_agg_count = sum(rewritten_lower.count(func) for func in agg_functions)
-        return rewritten_agg_count > original_agg_count
-
-    def _check_join_condition_push(self, original_query, rewritten_query):
-        """Check JOIN condition pushdown"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if WHERE condition is moved to ON clause
-        return "where" in original_lower and "on " in rewritten_lower
-
-    def _check_order_by_constant_removal(self, original_query, rewritten_query):
-        """Check ORDER BY constant key removal"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if ORDER BY clause is simplified
-        if "order by" in original_lower and "order by" in rewritten_lower:
-            # Simple heuristic: if ORDER BY clause is shorter, constants may have been removed
-            original_order_by = original_query[original_query.lower().find("order by") :]
-            rewritten_order_by = rewritten_query[rewritten_query.lower().find("order by") :]
-            return len(rewritten_order_by) < len(original_order_by)
-        return False
-
-    def _check_unnecessary_join_removal(self, original_query, rewritten_query):
-        """Check unnecessary JOIN removal"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if JOIN count is reduced
-        original_join_count = original_lower.count("join")
-        rewritten_join_count = rewritten_lower.count("join")
-        return rewritten_join_count < original_join_count
-
-    def _check_window_projection_transpose(self, original_query, rewritten_query):
-        """Check window function projection transpose"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if window function is separated into subquery
-        return "over(" in original_lower and "over(" in rewritten_lower and "select" in original_lower and "select" in rewritten_lower
-
-    def _check_values_filter_merge(self, original_query, rewritten_query):
-        """Check VALUES clause filter merge"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if VALUES clause is simplified
-        return "values" in original_lower and "values" in rewritten_lower
-
-    def _check_subquery_to_correlate(self, original_query, rewritten_query):
-        """Check subquery to correlated subquery conversion"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if subquery is converted to JOIN
-        return "select" in original_lower and "join" in rewritten_lower
-
-    def _check_redundant_union_removal(self, original_query, rewritten_query):
-        """Check redundant UNION removal"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if UNION is removed
-        original_union_count = original_lower.count("union")
-        rewritten_union_count = rewritten_lower.count("union")
-        return rewritten_union_count < original_union_count
-
-    def _check_union_to_distinct(self, original_query, rewritten_query):
-        """Check UNION to DISTINCT conversion"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if UNION is converted to DISTINCT
-        return "union" in original_lower and "distinct" in rewritten_lower and "union" not in rewritten_lower
-
-    def _check_redundant_sort_removal(self, original_query, rewritten_query):
-        """Check redundant ORDER BY removal"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if ORDER BY is removed
-        return "order by" in original_lower and "order by" not in rewritten_lower
-
-    def _check_redundant_projection_removal(self, original_query, rewritten_query):
-        """Check redundant projection removal"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if SELECT clause is simplified
-        original_select_count = original_lower.count("select")
-        rewritten_select_count = rewritten_lower.count("select")
-        return rewritten_select_count < original_select_count
-
-    def _check_join_to_correlate(self, original_query, rewritten_query):
-        """Check JOIN to correlated subquery conversion"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if JOIN is converted to EXISTS or IN
-        return "join" in original_lower and ("exists" in rewritten_lower or " in " in rewritten_lower)
-
-    def _check_intersect_to_distinct(self, original_query, rewritten_query):
-        """Check INTERSECT to DISTINCT conversion"""
-        original_lower = original_query.lower()
-        rewritten_lower = rewritten_query.lower()
-
-        # Check if INTERSECT is converted to GROUP BY + COUNT
-        return "intersect" in original_lower and "group by" in rewritten_lower and "count" in rewritten_lower
 
 
 def clean_sql(sql):
@@ -406,7 +39,7 @@ def clean_sql(sql):
     return sql
 
 
-def extract_tables(parsed, database_config=None):
+def extract_tables(parsed, database_config):
     tables = set()
 
     def _extract(token_list):
@@ -437,11 +70,7 @@ def extract_tables(parsed, database_config=None):
                     from_seen = False
 
     _extract(parsed)
-    
-    if database_config is None:
-        return list(tables)
 
-    PostgresDB = _get_postgres_db()
     postgres_db = PostgresDB(
         user=database_config["user"],
         password=database_config["password"],
@@ -507,10 +136,6 @@ def extract_columns(parsed, database_config):
     _extract_columns(parsed)
 
     # Connect to database to check if columns exist
-    if database_config is None:
-        return list(columns)
-    
-    PostgresDB = _get_postgres_db()
     postgres_db = PostgresDB(
         user=database_config["user"],
         password=database_config["password"],
@@ -525,25 +150,6 @@ def extract_columns(parsed, database_config):
     existing_columns = postgres_db.get_columns()
 
     return [t for t in columns if t in existing_columns and t != "*"]
-
-
-def base_information_collect(query_info, database_config):
-    PostgresDB = _get_postgres_db()
-    postgres_db = PostgresDB(database_config)
-
-    db_info = {
-        "db_type": postgres_db.db_type,
-        "workload_type": postgres_db.workload_type,
-        "size": postgres_db.get_size(),
-        "schema": postgres_db.fetch_schema_info(),
-    }
-
-    base_info = {
-        "query_info": query_info,
-        "database_info": db_info,
-    }
-
-    return base_info
 
 
 def is_redundant_comparison(token):
@@ -633,7 +239,8 @@ def find_duplicate_subqueries(sql):
 
 
 def find_related_views(sql, database_config):
-    PostgresDB = _get_postgres_db()
+    from dream.database.pg_env import PostgresDB
+
     postgres_db = PostgresDB(
         user=database_config["user"],
         password=database_config["password"],
@@ -669,7 +276,6 @@ def find_related_views(sql, database_config):
 # info collect
 @mcp.tool()
 async def indexes_info_collect(database_config):
-    PostgresDB = _get_postgres_db()
     postgres_db = PostgresDB(
         user=database_config["user"],
         password=database_config["password"],
@@ -711,7 +317,6 @@ async def query_info_collect(query, database_config):
 
 @mcp.tool()
 async def system_knobs_info_collect(database_config, knob_config):
-    PostgresDB = _get_postgres_db()
     postgres_db = PostgresDB(database_config)
 
     system_knobs_info = {}
@@ -725,7 +330,6 @@ async def system_knobs_info_collect(database_config, knob_config):
 
 @mcp.tool()
 async def query_knobs_info_collect(database_config, knob_config):
-    PostgresDB = _get_postgres_db()
     postgres_db = PostgresDB(database_config)
 
     query_knobs_info = {}
@@ -739,7 +343,6 @@ async def query_knobs_info_collect(database_config, knob_config):
 
 @mcp.tool()
 async def plan_info_collect(query, database_config):
-    PostgresDB = _get_postgres_db()
     postgres_db = PostgresDB(
         user=database_config["user"],
         password=database_config["password"],
@@ -855,7 +458,7 @@ async def indexes_action_space(query):
 async def system_knobs_action_space(database_config, knob_config):
 
     # Can also narrow down to a space that only adjusts knobs related to the query
-    PostgresDB = _get_postgres_db()
+
     postgres_db = PostgresDB(database_config)
 
     knob_info = {}
@@ -996,7 +599,7 @@ async def rewrite_action_space(sql, database_config):
 
 @mcp.tool()
 async def query_knobs_action_space(database_config, knob_config):
-    PostgresDB = _get_postgres_db()
+
     postgres_db = PostgresDB(database_config)
 
     knob_info = {}

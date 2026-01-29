@@ -16,6 +16,7 @@ from dream.utils.types import QueryInfo
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def format_execution_time(time: float) -> str:
@@ -89,7 +90,7 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
     plan_json = query_data['plan_json']
     
     # Load template
-    template_path = os.path.join(os.path.dirname(__file__), 'font', 'multi-tune.html')
+    template_path = BASE_DIR / "font" / "multi-tune.html"
     with open(template_path, 'r', encoding='utf-8') as f:
         template = f.read()
     
@@ -278,7 +279,7 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
     )
     
     # Save
-    output_path = os.path.join(os.path.dirname(__file__), 'font', 'multi-tune.html')
+    output_path = BASE_DIR / "results" / "multi-tune.html"
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write(template)
     
@@ -292,15 +293,15 @@ async def main():
     # Load config
     config_path = sys.argv[1] if len(sys.argv) > 1 else None
     if config_path is None:
-        config_path = os.path.join(os.path.dirname(__file__), 'config', 'tpch_config.json')
-        if not os.path.exists(config_path):
-            config_path = os.path.join(os.path.dirname(__file__), 'config', 'tpch_config.json.example')
+        config_path = BASE_DIR / "config" / "tpch_config.json"
+        if not config_path.exists():
+            config_path = BASE_DIR / "config" / "tpch_config.json.example"
     
     with open(config_path, 'r', encoding='utf-8') as f:
         configs = json.load(f)
     
     # Load slow query data
-    json_path = os.path.join(os.path.dirname(__file__), 'slow_query_list.json')
+    json_path = BASE_DIR / "results" / "slow_query_list.json"
     with open(json_path, 'r', encoding='utf-8') as f:
         slow_query_data = json.load(f)
     

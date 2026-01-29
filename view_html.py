@@ -14,8 +14,8 @@ PORT = 8000
 
 class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
-        # 设置工作目录为 /root/dream，这样 /font/diagnosis.html 就能正确访问
-        base_dir = os.path.dirname(os.path.abspath(__file__))
+        # 设置工作目录为 /root/dream/results，用于查看渲染后的HTML
+        base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
         super().__init__(*args, directory=base_dir, **kwargs)
     
     def translate_path(self, path):
@@ -24,9 +24,9 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = path.split('?')[0]
         path = path.split('#')[0]
         
-        # 如果路径以 /font/ 开头，直接映射到 font 目录
-        if path.startswith('/font/'):
-            base_dir = os.path.dirname(os.path.abspath(__file__))
+        # 如果路径以 /results/ 开头，直接映射到 results 目录
+        if path.startswith('/results/'):
+            base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results")
             file_path = os.path.join(base_dir, path.lstrip('/'))
             return file_path
         
@@ -43,13 +43,13 @@ class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 def main():
     """启动HTTP服务器"""
     # 确保工作目录正确
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)), "results"))
     
     # 生成初始HTML（如果不存在或需要更新）
-    from generate_initial_html import generate_initial_diagnosis_html, main as gen_main
+    from font_generate.generate_initial_html import generate_initial_diagnosis_html, main as gen_main
     
-    font_dir = os.path.join(os.path.dirname(__file__), 'font')
-    diagnosis_file = os.path.join(font_dir, 'diagnosis.html')
+    results_dir = os.path.join(os.path.dirname(__file__), 'results')
+    diagnosis_file = os.path.join(results_dir, 'diagnosis.html')
     
     if not os.path.exists(diagnosis_file):
         print("正在生成初始HTML文件...")
@@ -58,14 +58,14 @@ def main():
     Handler = MyHTTPRequestHandler
     
     with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        url = f"http://localhost:{PORT}/font/diagnosis.html"
+        url = f"http://localhost:{PORT}/diagnosis.html"
         print("=" * 60)
         print("HTML查看服务器已启动！")
         print("=" * 60)
         print(f"访问地址: {url}")
-        print(f"诊断页面: http://localhost:{PORT}/font/diagnosis.html")
-        print(f"调优建议: http://localhost:{PORT}/font/handling.html")
-        print(f"多轮调优: http://localhost:{PORT}/font/multi-tune.html")
+        print(f"诊断页面: http://localhost:{PORT}/diagnosis.html")
+        print(f"调优建议: http://localhost:{PORT}/handling.html")
+        print(f"多轮调优: http://localhost:{PORT}/multi-tune.html")
         print("=" * 60)
         print("提示: 点击'一键诊断'按钮进行诊断，或单独诊断每条SQL")
         print("按 Ctrl+C 停止服务器")

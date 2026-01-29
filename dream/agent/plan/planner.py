@@ -246,4 +246,8 @@ class Planner:
         state["confidence"] = llm_result.get("confidence")
         explanation = llm_result.get("explanation", "")
 
+        print("predicted_root: ", predicted_root)
+        print("state: ", state)
+        print("explanation: ", explanation)
+
         return predicted_root, state, explanation
