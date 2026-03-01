@@ -304,11 +304,11 @@ class ReplayCompareRunner:
         count = 0
         matched_lines = []
         
-        # 匹配 standard stderr format: time=2023-01-01 12:00:00
-        time_pattern_std = re.compile(r'time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
-        # 匹配 CSV/Unix format: user,db,1768995830.784,...
-        # assuming timestamp is the 3rd field, but let's be more loose: find a large float early in the line
-        time_pattern_unix = re.compile(r'^[^,]+,[^,]+,(\d{10}\.\d+)')
+        # # 匹配 standard stderr format: time=2023-01-01 12:00:00
+        # time_pattern_std = re.compile(r'time=(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})')
+        # # 匹配 CSV/Unix format: user,db,1768995830.784,...
+        # # assuming timestamp is the 3rd field, but let's be more loose: find a large float early in the line
+        # time_pattern_unix = re.compile(r'^[^,]+,[^,]+,(\d{10}\.\d+)')
         
         print(f"Reading log file (this may take a moment)...")
         
@@ -677,7 +677,7 @@ class ReplayCompareRunner:
                     "task_id": task_id,
                     "speed_factor": speed_factor
                 },
-                timeout=30
+                timeout=300
             )
             
             if resp.status_code == 200:
@@ -1323,9 +1323,15 @@ def main():
     parser.add_argument('--task-id', help='Task ID for replay (skip original test)')
     parser.add_argument('--speed', type=float, default=0, help='Replay speed factor (default: 0 = fast mode)')
     parser.add_argument('--original-data', help='Path to original stats JSON file')
-    parser.add_argument('--mode', choices=['original', 'replay', 'full', 'compare'], default='full',
-                       help='Test mode: original (run sysbench only), replay (run replay only), full (complete test), compare (just plot)')
+    parser.add_argument('--mode', choices=['original', 'replay', 'full', 'compare', 'extract-logs'], default='full',
+                       help='Test mode: original (run sysbench only), replay (run replay only), full (complete test), compare (just plot), extract-logs (extract audit logs by time range)')
     parser.add_argument('--pg-log', help='PostgreSQL log file path')
+    
+    # extract-logs mode arguments
+    parser.add_argument('--start-time', help='Start time for log extraction (format: YYYY-MM-DD HH:MM:SS or Unix timestamp)')
+    parser.add_argument('--end-time', help='End time for log extraction (format: YYYY-MM-DD HH:MM:SS or Unix timestamp)')
+    parser.add_argument('--username', help='Username filter for log extraction')
+    parser.add_argument('--extract-output', default='extracted_audit.log', help='Output file for extracted logs (default: extracted_audit.log)')
     parser.add_argument('--output-dir', help='Output directory for test results')
     parser.add_argument('--description', '-d', default='', help='Test description (what changes were made)')
     parser.add_argument('--no-restore', action='store_true', help='Skip database restore before replay')
@@ -1397,6 +1403,51 @@ def main():
         
         runner.plot_comparison()
         runner.save_test_summary()
+    
+    elif args.mode == 'extract-logs':
+        # 提取审计日志模式
+        if not args.start_time or not args.end_time:
+            print("Error: --start-time and --end-time are required for extract-logs mode")
+            print("Example: python replay_compare.py --mode extract-logs --start-time '2024-01-01 10:00:00' --end-time '2024-01-01 11:00:00' --username test")
+            sys.exit(1)
+        
+        # 解析时间参数
+        def parse_time(time_str):
+            """解析时间字符串，支持标准格式和 Unix 时间戳"""
+            # 尝试 Unix 时间戳
+            try:
+                ts = float(time_str)
+                return datetime.fromtimestamp(ts)
+            except ValueError:
+                pass
+            
+            # 尝试标准格式
+            for fmt in ['%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M:%S.%f', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d']:
+                try:
+                    return datetime.strptime(time_str, fmt)
+                except ValueError:
+                    continue
+            
+            print(f"Error: Cannot parse time '{time_str}'. Use format 'YYYY-MM-DD HH:MM:SS' or Unix timestamp.")
+            sys.exit(1)
+        
+        start_time = parse_time(args.start_time)
+        end_time = parse_time(args.end_time)
+        username = args.username or ''
+        output_file = args.extract_output
+        
+        print(f"Extracting audit logs:")
+        print(f"  Start time: {start_time}")
+        print(f"  End time: {end_time}")
+        print(f"  Username filter: {username if username else '(none)'}")
+        print(f"  Output file: {output_file}")
+        
+        count = runner.extract_audit_logs_by_time(start_time, end_time, username, output_file)
+        
+        if count > 0:
+            print(f"\nSuccessfully extracted {count} audit log entries to {output_file}")
+        else:
+            print("\nNo matching audit log entries found")
 
 
 if __name__ == "__main__":

@@ -8,8 +8,12 @@ database:
 sysbench:
   threads: 40
   time: 10  # seconds (shorter for testing)
-  tables: 10
+  tables: 1
   table_size: 10000
+
+tpcc:
+  command: "cd tools/benchmarksql/target/run && ./runBenchmark.sh prop.pg"
+  # Add other TPCC specific configurations here if needed
 
 api:
   base_url: "http://localhost:8080"

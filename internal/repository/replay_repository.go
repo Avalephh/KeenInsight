@@ -83,6 +83,13 @@ func (r *ReplayRepository) UpdateTaskStatus(taskID string, status string) error 
 	return r.db.Model(&model.TaskInfo{}).Where("task_id = ?", taskID).Update("status", status).Error
 }
 
+// GetAllTasks 获取所有任务
+func (r *ReplayRepository) GetAllTasks() ([]*model.TaskInfo, error) {
+	var tasks []*model.TaskInfo
+	err := r.db.Order("create_time desc").Find(&tasks).Error
+	return tasks, err
+}
+
 // ==================== Transaction 操作 ====================
 
 // BatchCreateTransactions 批量创建或更新事务记录
