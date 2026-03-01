@@ -53,7 +53,11 @@ type ReplayStats struct {
 	// 最终需要批量写入 database
 	Divergences []model.ReplayDetail
 	Errors      []ReplayError
-	mu          sync.Mutex
+
+	// 逐语句延迟采集 (Thesis 5.4: 回放时延与保真度)
+	Latencies []float64 // 每条 SQL 的执行耗时 (ms)
+
+	mu sync.Mutex
 }
 
 // ReplayError 内部错误结构，用于临时存储
@@ -103,6 +107,7 @@ func NewReplayer(config ReplayConfig, statements []*model.TrafficBaseline) *Repl
 			TotalStatements: int64(len(statements)),
 			Errors:          make([]ReplayError, 0),
 			Divergences:     make([]model.ReplayDetail, 0),
+			Latencies:       make([]float64, 0, 100000),
 		},
 	}
 
@@ -342,9 +347,7 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 		}
 
 		var execErr error
-		// var rowsAffected int64 = 0
-		// var result sql.Result
-		// startTime := time.Now()
+		startTime := time.Now()
 
 		switch strings.ToUpper(stmt.Operation) {
 		case "BEGIN":
@@ -375,23 +378,16 @@ func (r *Replayer) runSessionWorker(sessionID string, stmts []*model.TrafficBase
 			} else {
 				_, execErr = db.Exec(stmt.SQLText)
 			}
-
-			// if result != nil && execErr == nil {
-			// 	rowsAffected, _ = result.RowsAffected()
-			// }
 		}
 
-		// duration := time.Since(startTime).Seconds() * 1000 // ms
+		duration := time.Since(startTime).Seconds() * 1000 // ms
 
 		atomic.AddInt64(&r.stats.ExecutedStatements, 1)
 
-		// 结果校验与差异检测 (Thesis 4.3.1)
-		// replayState, divergenceType, hasDivergence := r.checkDivergence(stmt, execErr, rowsAffected)
-
-		// if hasDivergence {
-		// 	atomic.AddInt64(&r.stats.DivergenceCount, 1)
-		// 	r.recordDivergence(stmt, sessionID, divergenceType, rowsAffected, replayState, "", duration)
-		// }
+		// 记录逐语句延迟 (Thesis 5.4)
+		if duration > 0 {
+			r.recordLatency(duration)
+		}
 
 		if execErr != nil {
 			atomic.AddInt64(&r.stats.FailureCount, 1)
@@ -454,6 +450,16 @@ func (r *Replayer) recordError(txID string, stmtID int64, sqlStr string, errMsg 
 			Error:     errMsg,
 			Timestamp: time.Now(),
 		})
+	}
+}
+
+// recordLatency 记录单条语句执行延迟 (Thesis 5.4)
+func (r *Replayer) recordLatency(durationMs float64) {
+	r.stats.mu.Lock()
+	defer r.stats.mu.Unlock()
+	// 限制最多采集 500K 个样本防止 OOM
+	if len(r.stats.Latencies) < 500000 {
+		r.stats.Latencies = append(r.stats.Latencies, durationMs)
 	}
 }
 
