@@ -1,15 +1,120 @@
 \newpage
 \setcounter{table}{0}
 \setcounter{figure}{0}
-\section{XXXXX}
+\section{相关技术基础}
 
+本章将系统地介绍与数据库流量回放系统设计与实现密切相关的核心技术基础。首先，阐述 PostgreSQL 的审计日志机制及 pgaudit 扩展的工作原理；其次，回顾数据库事务管理中的 ACID 理论与多版本并发控制技术；接着，介绍 Go 语言基于 CSP 理论的并发编程模型；最后，概述数据库性能评估所依赖的标准基准测试体系。这些技术基础共同构成了本系统设计与实现的理论支撑。
 
+\subsection{PostgreSQL 审计日志与 pgaudit 扩展}
 
-\subsection{XXXXX}
+\subsubsection{PostgreSQL 原生日志机制}
 
-\subsection{XXXXX}
+PostgreSQL 提供了灵活且可配置的日志记录系统。通过设置 \texttt{postgresql.conf} 中的相关参数，管理员可以控制日志的输出目标、格式和详细程度。与本研究相关的核心配置参数包括：
 
+\begin{itemize}
+    \item \texttt{log\_destination}：指定日志输出方式，支持 \texttt{stderr}、\texttt{csvlog} 和 \texttt{syslog} 等多种格式。其中 \texttt{csvlog} 格式以逗号分隔值的形式输出日志，利于程序化解析。
+    \item \texttt{log\_statement}：控制记录哪些类型的 SQL 语句。可选值包括 \texttt{none}（不记录）、\texttt{ddl}（仅记录数据定义语句）、\texttt{mod}（记录数据修改语句）和 \texttt{all}（记录所有语句）。
+    \item \texttt{log\_line\_prefix}：定义每行日志的前缀格式，可嵌入时间戳（\texttt{\%t}）、进程 ID（\texttt{\%p}）、会话 ID（\texttt{\%c}）、虚拟事务 ID（\texttt{\%v}）等上下文信息。
+\end{itemize}
+
+然而，PostgreSQL 的原生日志存在一些局限性：首先，对于使用 Prepared Statement 执行的参数化查询，原生日志通常只记录 \texttt{EXECUTE <name>} 语句，而不直接展示填充后的完整 SQL 文本和参数值，这给后续的 SQL 重构带来了困难；其次，原生日志缺乏以标准化审计格式进行输出的能力，信息的结构化程度不高。
+
+\subsubsection{pgaudit 扩展的架构与工作原理}
+
+pgaudit\cite{pgaudit} 是一个 PostgreSQL 的开源审计日志扩展，旨在为 PostgreSQL 提供符合行业合规标准（如 PCI-DSS、SOX、HIPAA）的细粒度审计能力。pgaudit 通过 PostgreSQL 内核提供的以下两个钩子点（Hook）插入审计逻辑：
+
+\begin{itemize}
+    \item \textbf{ExecutorRun\_hook}：拦截标准的 DML（SELECT、INSERT、UPDATE、DELETE）语句执行，记录查询语句、涉及的数据库对象以及操作类型。
+    \item \textbf{ProcessUtility\_hook}：拦截非 DML 类型的实用程序命令（如 DDL 语句 CREATE、ALTER、DROP，以及 GRANT、REVOKE 等 DCL 语句）。
+\end{itemize}
+
+当 \texttt{pgaudit.log} 参数被配置为 \texttt{ALL} 或指定的操作子类型后，pgaudit 会在 SQL 语句执行时生成结构化的审计日志记录。一条典型的 pgaudit 审计日志条目包含以下关键字段：
+
+\begin{table}[htbp]
+    \centering
+    \caption{pgaudit 审计日志核心字段说明}
+    \label{tab:pgaudit_fields}
+    \begin{tabular}{l l p{6cm}}
+        \toprule
+        \textbf{字段} & \textbf{示例} & \textbf{描述} \\
+        \midrule
+        Audit Type & SESSION & 审计类型，SESSION 表示会话级审计 \\
+        Statement ID & 3 & 当前会话中的语句序号 \\
+        Substatement ID & 1 & 子语句序号 \\
+        Class & WRITE & 操作分类（READ/WRITE/DDL 等） \\
+        Command & UPDATE & 具体命令类型 \\
+        Object Type & TABLE & 操作对象类型 \\
+        Object Name & public.orders & 包含 Schema 的完整对象名 \\
+        Statement & UPDATE ... SET ... & SQL 语句模板（含 \$N 占位符） \\
+        Parameter & \$1='shipped', \$2='1001' & 绑定参数的值列表 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+pgaudit 生成的审计日志通过 PostgreSQL 标准的日志输出通道写入日志文件。结合 \texttt{log\_line\_prefix} 中配置的上下文信息（如时间戳 \texttt{\%t}、虚拟事务 ID \texttt{\%v}、会话 ID \texttt{\%c}），即可获得每条 SQL 语句的完整执行上下文，为流量回放提供了充分的信息基础。
+
+\subsection{数据库事务与并发控制}
+
+\subsubsection{ACID 特性}
+
+事务（Transaction）是数据库系统中保证数据一致性的核心机制。Gray\cite{ACIDProperties} 在其经典论文中系统地阐述了事务概念的优势与局限。一个数据库事务必须满足 ACID 四大特性：
+
+\begin{itemize}
+    \item \textbf{原子性（Atomicity）}：事务中的所有操作要么全部成功执行，要么全部不执行。如果事务在执行过程中发生错误，系统会自动回滚（Rollback）到事务开始前的状态。
+    \item \textbf{一致性（Consistency）}：事务的执行必须将数据库从一个一致性状态转换到另一个一致性状态。所有定义在数据库上的完整性约束（如外键、唯一性约束等）在事务完成后必须得到满足。
+    \item \textbf{隔离性（Isolation）}：并发执行的事务之间不应相互干扰。SQL 标准定义了四种隔离级别：读未提交（Read Uncommitted）、读已提交（Read Committed）、可重复读（Repeatable Read）和可序列化（Serializable）\cite{SQLStandard}。
+    \item \textbf{持久性（Durability）}：一旦事务成功提交，其对数据库所做的修改就是永久性的，即使系统发生崩溃也不会丢失。
+\end{itemize}
+
+在流量回放系统中，ACID 特性的保证至关重要。回放引擎必须完整地尊重原始日志中的事务边界：同属于一个事务的所有 SQL 语句必须在同一个数据库连接上按序执行，并作为一个不可分割的工作单元提交或回滚。违反事务原子性的回放将导致回放结果与原始执行结果出现不可预期的差异，从而失去测试的意义。
+
+\subsubsection{PostgreSQL 的多版本并发控制}
+
+PostgreSQL 采用多版本并发控制（Multi-Version Concurrency Control, MVCC）\cite{MVCC} 作为其核心的并发控制机制。MVCC 的基本思想是：当事务修改数据时，不直接覆盖旧版本的数据行，而是创建一个新版本的数据行。这使得读操作可以在不加锁的情况下访问数据的一个一致性快照（Snapshot），从而避免了读写之间的阻塞，显著提升了系统的并发性能。
+
+在 PostgreSQL 的实现中，每一行数据（Tuple）都包含两个隐藏的系统列：\texttt{xmin}（创建该行版本的事务 ID）和 \texttt{xmax}（删除或更新该行版本的事务 ID）。当一个事务执行查询时，它只能看到那些 \texttt{xmin} 对应的事务已提交且 \texttt{xmax} 对应的事务尚未提交的行版本。这一机制保证了每个事务都运行在一个逻辑上一致的数据视图上。
+
+MVCC 机制对流量回放的影响体现在：回放产生的数据版本与原始执行产生的数据版本在时间线上是不同的。因此，回放系统在进行结果比对时，不能简单地依赖行的物理版本，而应当关注逻辑层面的执行结果（如影响行数、返回数据集、错误码等）。
+
+\subsection{Go 语言并发编程模型}
+
+\subsubsection{CSP 理论基础}
+
+通信顺序进程（Communicating Sequential Processes, CSP）是 Hoare\cite{CSP} 于 1978 年提出的一种用于描述并发系统交互模式的形式化方法。CSP 的核心思想是：并发实体（Process）之间不应通过共享内存进行通信，而应通过消息传递（Message Passing）来同步和交换数据。Go 语言的设计者直接将 CSP 理论融入了语言层面，其著名的并发格言——"不要通过共享内存来通信，而要通过通信来共享内存"（Don't communicate by sharing memory; share memory by communicating）\cite{GoConcurrencyPatterns}——即是 CSP 思想的直接体现。
+
+\subsubsection{Goroutine 与 Channel}
+
+Go 语言提供了两个核心并发原语：Goroutine 和 Channel。
+
+\textbf{Goroutine} 是 Go 运行时（Runtime）管理的用户态轻量级线程。与操作系统线程（OS Thread）相比，Goroutine 的初始栈空间极小（通常为 2KB$\sim$8KB，且可按需动态增长），创建和销毁的开销几乎可以忽略不计。Go 运行时内置了一个 M:N 调度器（将 M 个 Goroutine 多路复用到 N 个 OS 线程上），使得应用程序可以轻松创建和管理数十万甚至百万级的并发 Goroutine。
+
+\textbf{Channel} 是 Goroutine 之间进行类型安全通信和同步的管道。Channel 分为无缓冲（Unbuffered）和有缓冲（Buffered）两种：无缓冲 Channel 要求发送方和接收方同时就绪，提供强同步语义；有缓冲 Channel 则在缓冲区未满时允许发送方非阻塞地写入数据，起到解耦生产者和消费者速率的作用。
+
+在本文设计的流量回放系统中，Goroutine 被用于实现"每会话一协程"的并发模型——为每一个原始数据库会话创建一个独立的 Goroutine 来模拟其并发行为。Channel 则被用于在解析器和回放引擎之间传递结构化的"回放单元"数据，以及在各个工作者协程和监控协程之间传递执行状态和差异信息。
+
+\subsubsection{同步原语与原子操作}
+
+除了 Channel 之外，Go 语言的标准库还提供了丰富的同步原语以应对更复杂的并发场景：
+
+\begin{itemize}
+    \item \texttt{sync.WaitGroup}：用于等待一组 Goroutine 全部完成执行，是实现"Fork-Join"并行模式的基础工具。在回放引擎中，它被用于等待所有会话工作者协程执行完毕后再生成汇总报告。
+    \item \texttt{sync.Mutex / sync.RWMutex}：互斥锁与读写锁，用于保护对共享数据的互斥访问。
+    \item \texttt{sync/atomic} 包：提供了对整型变量的原子操作（如 \texttt{AddInt64}、\texttt{LoadInt64}），在硬件层面保证操作的不可分割性。在回放引擎中，原子操作被用于实现对"已执行语句数"、"成功数"、"失败数"等全局计数器的无锁（Lock-free）更新，避免了锁竞争带来的性能开销\cite{GoConcurrencyPatterns}。
+\end{itemize}
+
+\subsection{数据库性能基准测试}
+
+\subsubsection{TPC-C 基准测试}
+
+TPC-C 是由事务处理性能委员会（Transaction Processing Performance Council, TPC）制定的面向联机事务处理（OLTP）系统的标准基准测试\cite{TPC-C}。TPC-C 模拟了一个批发商的订单处理系统，定义了五种事务类型：新订单（New-Order）、支付（Payment）、订单状态查询（Order-Status）、发货（Delivery）和库存水平查询（Stock-Level）\cite{TPCCModeling}。这五种事务类型在混合比例、数据访问模式和锁竞争特征上各不相同，能够全面地衡量数据库系统在复杂 OLTP 场景下的处理能力。
+
+TPC-C 的主要性能指标是 tpmC（Transactions Per Minute, C），即每分钟处理的新订单事务数。在本文的实验评估中，TPC-C 工作负载被用作流量生成的数据源，其产生的审计日志经过系统解析后，在目标数据库上进行回放并评估保真度。
+
+\subsubsection{Sysbench 基准测试}
+
+Sysbench\cite{sysbench} 是一个模块化、跨平台的多线程基准测试工具，广泛应用于评估操作系统和数据库系统的性能。在数据库测试方面，Sysbench 提供了多种预置的 OLTP 测试脚本（如 \texttt{oltp\_read\_write}、\texttt{oltp\_insert}、\texttt{oltp\_point\_select} 等），支持高度可配置的并发线程数、表规模、测试时长等参数。
+
+与 TPC-C 相比，Sysbench 的工作负载模型更为简化和单一，但其配置灵活、使用便捷的特点使得它非常适合用于快速的性能摸底和回归测试。在本文的功能测试中，Sysbench 被用于在源端数据库上生成可控的 OLTP 负载，并配合 pgaudit 产生审计日志，为回放系统的端到端测试提供数据支撑。
 
 \subsection{本章小结}
-XXXX.
-
+本章系统地介绍了与本文研究相关的核心技术基础。首先，详细阐述了 PostgreSQL 审计日志的机制与 pgaudit 扩展的工作原理，说明了其作为高质量流量数据源的优势；其次，回顾了数据库事务管理的 ACID 理论和 PostgreSQL 的 MVCC 并发控制机制，为回放过程中事务一致性的保障提供了理论依据；接着，介绍了 Go 语言基于 CSP 模型的并发编程体系，阐明了构建高并发回放引擎的技术基础；最后，概述了 TPC-C 和 Sysbench 两种数据库基准测试标准，为后续实验评估方案的设计奠定了基础。
