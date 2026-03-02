@@ -34,15 +34,16 @@
 
 \subsection{系统架构}
 
-系统采用经典的分层架构设计（Layered Architecture），自上而下划分为接入层、服务层、核心逻辑层与数据持久层。层级之间遵循低耦合原则，通过清晰的接口定义进行交互。
+系统采用经典的分层架构设计（Layered Architecture）\cite{CleanArchitecture}，自上而下划分为接入层、服务层、核心逻辑层与数据持久层。层级之间遵循低耦合原则，通过清晰的接口定义进行交互。
 
-\textbf{接入层 (Web/API Layer)} 基于 Gin 框架构建 RESTful API，作为系统的对外门户。它主要负责接收用户的任务指令，进行参数校验，并统一返回 JSON 格式的响应结果。其中，\texttt{internal/handler} 包定义了 \texttt{ReplayHandler}，用于处理具体的业务路由。
+\textbf{接入层 (Web/API Layer)} 基于 Gin 框架\cite{GinFramework}构建 RESTful API，作为系统的对外门户。它主要负责接收用户的任务指令，进行参数校验，并统一返回 JSON 格式的响应结果。其中，\texttt{internal/handler} 包定义了 \texttt{ReplayHandler}，用于处理具体的业务路由。
 
 \textbf{服务层 (Service Layer)} 位于 \texttt{internal/service}，承担业务逻辑编排的角色。它负责协调解析器与回放器的工作流，管理任务从 Preparing、Running 到 Completed 的状态机转换，并处理异步任务的生命周期。
 
 \textbf{核心逻辑层 (Core Logic Layer)} 包含两个核心引擎：\textbf{Parser Engine} 和 \textbf{Replayer Engine}。\texttt{PgAuditParser} 利用高效的正则引擎处理文本日志，生成内部的 SQL 对象；而 \texttt{Replayer} 则维护 Worker 池，内置速率控制器（Rate Limiter）和差异检测逻辑。
 
-\textbf{数据层 (Data/Repository Layer)} 基于 GORM 框架实现元数据的持久化。\texttt{internal/repository} 封装了对持久化存储的 CRUD 操作，而 \textbf{Target DB Adapter} 则负责与被测目标数据库建立物理连接并执行 SQL。
+\textbf{数据层 (Data/Repository Layer)} 基于 GORM 框架\cite{GORM}实现元数据的持久化。\texttt{internal/repository} 封装了对持久化存储的 CRUD 操作，而 \textbf{Target DB Adapter} 则负责与被测目标数据库建立物理连接并执行 SQL。
+\textbf{执行控制}：Target DB Adapter 内部维护一个带连接池（Connection Pool）\cite{ConnectionPooling}的并发执行队列。它从数据层拉取回放队列中的任务单元，依据调度算法指派工作协程并发执行，并实时收集 SQL 执行的结果（受影响行数、响应时间、错误码）。
 
 % 插入架构图占位符
 \begin{figure}[htbp]
@@ -55,9 +56,9 @@
 \subsection{数据库设计}
 
 \subsubsection{设计原则与选型}
-本系统选用 PostgreSQL 作为核心存储引擎。PostgreSQL 不仅支持标准的 SQL 规范，具备优秀的 ACID 事务特性，还提供了强大的 JSONB 数据类型支持，能够高效存储和查询非结构化的审计日志元数据。
+本系统选用 PostgreSQL 作为核心存储引擎\cite{PostgreSQLDoc}。PostgreSQL 不仅支持标准的 SQL 规范，具备优秀的 ACID 事务特性，还提供了强大的 JSONB 数据类型支持，能够高效存储和查询非结构化的审计日志元数据。
 
-数据库设计遵循第三范式（3NF）原则，以减少数据冗余并保证数据的一致性。同时，考虑到流量回放场景下存在海量日志数据的写入与聚合查询需求，针对核心查询字段（如 \texttt{task\_id}、\texttt{sql\_id}、\texttt{round}）建立了必要的 B-Tree 索引，以提升检索性能。所有主键 ID 均采用 UUID 标准（36位字符），以确保在分布式环境下的唯一性。
+数据库设计遵循第三范式（3NF）原则\cite{DatabaseSystemConcepts}，以减少数据冗余并保证数据的一致性。同时，考虑到流量回放场景下存在海量日志数据的写入与聚合查询需求，针对核心查询字段（如 \texttt{task\_id}、\texttt{sql\_id}、\texttt{round}）建立了必要的 B-Tree 索引，以提升检索性能。所有主键 ID 均采用 UUID 标准（36位字符），以确保在分布式环境下的唯一性。
 
 \subsubsection{实体关系图（ER图）}
 系统核心实体包括任务（Task）、流量基线（Traffic Baseline）、回放明细（Replay Detail）、回放轮次总览（Replay Summary）以及聚合分析（Replay Aggregation）。其中，任务表作为核心父表，与其他子表通过 \texttt{task\_id} 形成一对多的关联关系。系统的实体关系图（Entity-Relationship Diagram）如图 \ref{fig:er_diagram} 所示。

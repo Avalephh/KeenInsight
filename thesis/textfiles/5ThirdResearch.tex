@@ -23,7 +23,7 @@
     \end{tabular}
 \end{table}
 
-在软件环境方面，操作系统统一采用 CentOS Linux 7.9 (Kernel 5.4.x)。数据库管理系统（Database Management System, DBMS）选用 PostgreSQL 18.1 版本，并开启 standard\_conforming\_strings 等标准配置以配合审计插件。本文设计的回放系统基于 Go 1.21 编译构建，利用其 Goroutine 调度机制实现高并发流量的解析与重放。源端安装并配置了 \texttt{pgaudit} 扩展插件，用于生成审计日志流。
+在软件环境方面，操作系统统一采用 CentOS Linux 7.9 (Kernel 5.4.x)。数据库管理系统（Database Management System, DBMS）选用 PostgreSQL 18.1 版本\cite{PostgreSQLDoc}，并开启 standard\_conforming\_strings 等标准配置以配合审计插件。本文设计的回放系统基于 Go 1.21\cite{GoSpec} 编译构建，利用其 Goroutine 调度机制实现高并发流量的解析与重放。源端安装并配置了 \texttt{pgaudit} 扩展插件\cite{pgaudit}，用于生成审计日志流。
 
 \subsubsection{网络环境构建}
 
@@ -55,7 +55,7 @@ RTT_{avg} \approx 0.12ms, \quad \sigma_{RTT} < 0.05ms
     
     \item \textbf{日志传输与解析}：为了解耦生产库与回放端的计算压力，审计日志通过异步文件传输协议实时同步至 Replayer 节点。Replayer 内部的解析器（Parser）模块读取日志流，重构出包含事务上下文（Transaction Context）的中间表示结构。
     
-    \item \textbf{并发回放}：Replayer 节点依据日志中的时间戳信息，通过维护一个全局虚拟时钟（Virtual Clock）来调度并发请求。它作为 Target DB 的客户端，建立连接池并复现原始流量的并发特征。
+    \item \textbf{并发回放}：Replayer 节点依据日志中的时间戳信息，通过维护一个全局虚拟时钟（Virtual Clock）来调度并发请求。它作为 Target DB 的客户端，建立连接池\cite{pgbouncer}并复现原始流量的并发特征。
     
     \item \textbf{结果收集}：Target DB 在执行回放请求的同时，记录自身的性能指标（如 TPS, QPS, Latency），用于后续与 Source DB 的基准数据进行一致性比对。
 \end{enumerate}
@@ -114,7 +114,7 @@ func (p *Parser) StreamLog(ctx context.Context, outputChan chan<- *Transaction) 
 \subsection{功能测试}
 功能测试旨在验证回放系统是否能够正确解析并执行各类 SQL 语句，确保数据的一致性。测试集覆盖了 DDL（数据定义）、DML（数据操纵）以及 TCL（事务控制）三大类操作。
 
-实验采用了 TPC-C 标准测试集生成的 50GB 数据集作为初始状态。表~\ref{tab:func_test_result} 展示了不同类型操作的回放成功率。
+实验采用了 TPC-C\cite{TPC-C} 标准测试集生成的 50GB 数据集作为初始状态。表~\ref{tab:func_test_result} 展示了不同类型操作的回放成功率。
 
 \begin{table}[htbp]
     \centering
@@ -159,7 +159,7 @@ F_{tps} = 1 - \frac{RMSE}{\bar{X}}
 
 \textbf{2. 时延分布保真度 ($F_{lat}$)}
 
-由于硬件环境的差异（如 CPU 代际、磁盘 IOPS 不同），回放端绝对时延数值可能与源端不同，但其概率分布形态应当保持一致。我们采用 Kolmogorov-Smirnov (KS)检验统计量来衡量两个时延分布的相似性。设 $F_{src}(t)$ 和 $F_{tgt}(t)$ 分别为源端和目标端事务响应时间的经验累积分布函数（ECDF）：
+由于硬件环境的差异（如 CPU 代际、磁盘 IOPS 不同），回放端绝对时延数值可能与源端不同，但其概率分布形态应当保持一致。我们采用 Kolmogorov-Smirnov (KS)检验统计量\cite{KSTest}来衡量两个时延分布的相似性。设 $F_{src}(t)$ 和 $F_{tgt}(t)$ 分别为源端和目标端事务响应时间的经验累积分布函数（ECDF）：
 
 \begin{equation}
 D_{KS} = \sup_t |F_{src}(t) - F_{tgt}(t)|
@@ -201,7 +201,7 @@ S_{stab} = \frac{1}{1 + \sigma_{\delta}}
     \label{fig:latency_dist}
 \end{figure}
 
-数据显示，在 95\% 的置信区间内，回放产生的时延抖动控制在 Source 端的 1.2 倍以内。考虑到 Target DB 是全新的裸机环境，消除了生产环境的历史碎片（Fragmentation），部分复杂查询的性能甚至优于源端（即 $T_{tgt} < T_{src}$）。
+数据显示，在 95\% 的置信区间内，回放产生的时延抖动控制在 Source 端的 1.2 倍以内。考虑到 Target DB 是全新的裸机环境，消除了生产环境的历史碎片（Fragmentation），部分复杂查询的性能甚至优于源端（即 $T_{tgt} < T_{src}$）。这一现象与尾部延迟理论\cite{PercentileLatency}中所述的分布式系统尾部效应相吻合。
 
 我们将上述三种保真度指标应用于实验数据，计算得到的各项指标数值如表~\ref{tab:fidelity_results} 所示。
 
@@ -224,4 +224,4 @@ S_{stab} = \frac{1}{1 + \sigma_{\delta}}
 
 \subsection{本章小结}
 
-本章详细介绍了基于数据库内核审计技术的高保真流量回放系统的实现细节与实验验证。通过引入无锁日志解析架构与基于滑动时间窗口的调度算法，系统在维持 4.5 万 QPS 高吞吐的同时，实现了微秒级的时序对齐。功能测试证明了系统在 ACID 事务一致性上的鲁棒性，而与 Sysbench 生产基准的对比测试则验证了其高达 99.99\% 的流量行为保真度。该系统的实现为后续章节中的索引自动推荐与参数调优提供了可靠的实验平台。
+本章详细介绍了基于数据库内核审计技术的高保真流量回放系统的实现细节与实验验证。通过引入无锁日志解析架构与基于滑动时间窗口的调度算法，系统在维持 4.5 万 QPS 高吞吐的同时，实现了微秒级的时序对齐。功能测试证明了系统在 ACID 事务一致性上的鲁棒性，而与 Sysbench 生产基准的对比测试则验证了其高达 99.99\% 的流量行为保真度。

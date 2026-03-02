@@ -9,7 +9,7 @@
 
 \subsubsection{PostgreSQL 原生日志机制}
 
-PostgreSQL 提供了灵活且可配置的日志记录系统。通过设置 \texttt{postgresql.conf} 中的相关参数，管理员可以控制日志的输出目标、格式和详细程度。与本研究相关的核心配置参数包括：
+PostgreSQL 提供了灵活且可配置的日志记录系统\cite{PostgreSQLDoc}。通过设置 \texttt{postgresql.conf} 中的相关参数，管理员可以控制日志的输出目标、格式和详细程度。与本研究相关的核心配置参数包括：
 
 \begin{itemize}
     \item \texttt{log\_destination}：指定日志输出方式，支持 \texttt{stderr}、\texttt{csvlog} 和 \texttt{syslog} 等多种格式。其中 \texttt{csvlog} 格式以逗号分隔值的形式输出日志，利于程序化解析。
@@ -62,17 +62,17 @@ pgaudit 生成的审计日志通过 PostgreSQL 标准的日志输出通道写入
 \begin{itemize}
     \item \textbf{原子性（Atomicity）}：事务中的所有操作要么全部成功执行，要么全部不执行。如果事务在执行过程中发生错误，系统会自动回滚（Rollback）到事务开始前的状态。
     \item \textbf{一致性（Consistency）}：事务的执行必须将数据库从一个一致性状态转换到另一个一致性状态。所有定义在数据库上的完整性约束（如外键、唯一性约束等）在事务完成后必须得到满足。
-    \item \textbf{隔离性（Isolation）}：并发执行的事务之间不应相互干扰。SQL 标准定义了四种隔离级别：读未提交（Read Uncommitted）、读已提交（Read Committed）、可重复读（Repeatable Read）和可序列化（Serializable）\cite{SQLStandard}。
-    \item \textbf{持久性（Durability）}：一旦事务成功提交，其对数据库所做的修改就是永久性的，即使系统发生崩溃也不会丢失。
+    \item \textbf{隔离性（Isolation）}：并发执行的事务之间不应相互干扰。SQL 标准定义了四种隔离级别：读未提交（Read Uncommitted）、读已提交（Read Committed）、可重复读（Repeatable Read）和可序列化（Serializable）\cite{SQLStandard}。其中，可序列化隔离级别要求并发事务的执行结果等价于某种串行执行顺序\cite{Serializability}。
+    \item \textbf{持久性（Durability）}：一旦事务成功提交，其对数据库所做的修改就是永久性的，即使系统发生崩溃也不会丢失\cite{TransactionProcessing}。
 \end{itemize}
 
 在流量回放系统中，ACID 特性的保证至关重要。回放引擎必须完整地尊重原始日志中的事务边界：同属于一个事务的所有 SQL 语句必须在同一个数据库连接上按序执行，并作为一个不可分割的工作单元提交或回滚。违反事务原子性的回放将导致回放结果与原始执行结果出现不可预期的差异，从而失去测试的意义。
 
 \subsubsection{PostgreSQL 的多版本并发控制}
 
-PostgreSQL 采用多版本并发控制（Multi-Version Concurrency Control, MVCC）\cite{MVCC} 作为其核心的并发控制机制。MVCC 的基本思想是：当事务修改数据时，不直接覆盖旧版本的数据行，而是创建一个新版本的数据行。这使得读操作可以在不加锁的情况下访问数据的一个一致性快照（Snapshot），从而避免了读写之间的阻塞，显著提升了系统的并发性能。
+PostgreSQL 采用多版本并发控制（Multi-Version Concurrency Control, MVCC）\cite{MVCC} 作为其核心的并发控制机制。MVCC 的基本思想是：当事务修改数据时，不直接覆盖旧版本的数据行，而是创建一个新版本的数据行。这使得读操作可以在不加锁的情况下访问数据的一个一致性快照（Snapshot），从而避免了读写之间的阻塞，显著提升了系统的并发性能。这一机制与传统的二阶段加锁协议\cite{TwoPhaseLocking}相比，能够在不牺牲一致性的前提下大幅降低读写冲突。
 
-在 PostgreSQL 的实现中，每一行数据（Tuple）都包含两个隐藏的系统列：\texttt{xmin}（创建该行版本的事务 ID）和 \texttt{xmax}（删除或更新该行版本的事务 ID）。当一个事务执行查询时，它只能看到那些 \texttt{xmin} 对应的事务已提交且 \texttt{xmax} 对应的事务尚未提交的行版本。这一机制保证了每个事务都运行在一个逻辑上一致的数据视图上。
+在 PostgreSQL 的实现中\cite{PostgreSQLDesign}，每一行数据（Tuple）都包含两个隐藏的系统列：\texttt{xmin}（创建该行版本的事务 ID）和 \texttt{xmax}（删除或更新该行版本的事务 ID）。当一个事务执行查询时，它只能看到那些 \texttt{xmin} 对应的事务已提交且 \texttt{xmax} 对应的事务尚未提交的行版本。这一机制保证了每个事务都运行在一个逻辑上一致的数据视图上。
 
 MVCC 机制对流量回放的影响体现在：回放产生的数据版本与原始执行产生的数据版本在时间线上是不同的。因此，回放系统在进行结果比对时，不能简单地依赖行的物理版本，而应当关注逻辑层面的执行结果（如影响行数、返回数据集、错误码等）。
 
@@ -86,9 +86,9 @@ MVCC 机制对流量回放的影响体现在：回放产生的数据版本与原
 
 Go 语言提供了两个核心并发原语：Goroutine 和 Channel。
 
-\textbf{Goroutine} 是 Go 运行时（Runtime）管理的用户态轻量级线程。与操作系统线程（OS Thread）相比，Goroutine 的初始栈空间极小（通常为 2KB$\sim$8KB，且可按需动态增长），创建和销毁的开销几乎可以忽略不计。Go 运行时内置了一个 M:N 调度器（将 M 个 Goroutine 多路复用到 N 个 OS 线程上），使得应用程序可以轻松创建和管理数十万甚至百万级的并发 Goroutine。
+\textbf{Goroutine} 是 Go 运行时（Runtime）管理的用户态轻量级线程。与操作系统线程（OS Thread）相比，Goroutine 的初始栈空间极小（通常为 2KB$\sim$8KB，且可按需动态增长），创建和销毁的开销几乎可以忽略不计\cite{GoSpec}。Go 运行时内置了一个 M:N 调度器（将 M 个 Goroutine 多路复用到 N 个 OS 线程上）\cite{GoScheduler}，该调度器采用了经典的工作窃取（Work Stealing）算法\cite{WorkStealing}来平衡各个线程的负载，使得应用程序可以轻松创建和管理数十万甚至百万级的并发 Goroutine。
 
-\textbf{Channel} 是 Goroutine 之间进行类型安全通信和同步的管道。Channel 分为无缓冲（Unbuffered）和有缓冲（Buffered）两种：无缓冲 Channel 要求发送方和接收方同时就绪，提供强同步语义；有缓冲 Channel 则在缓冲区未满时允许发送方非阻塞地写入数据，起到解耦生产者和消费者速率的作用。
+\textbf{Channel} 是 Goroutine 之间进行类型安全通信和同步的管道\cite{GoBook}。Channel 分为无缓冲（Unbuffered）和有缓冲（Buffered）两种：无缓冲 Channel 要求发送方和接收方同时就绪，提供强同步语义；有缓冲 Channel 则在缓冲区未满时允许发送方非阻塞地写入数据，起到解耦生产者和消费者速率的作用。
 
 在本文设计的流量回放系统中，Goroutine 被用于实现"每会话一协程"的并发模型——为每一个原始数据库会话创建一个独立的 Goroutine 来模拟其并发行为。Channel 则被用于在解析器和回放引擎之间传递结构化的"回放单元"数据，以及在各个工作者协程和监控协程之间传递执行状态和差异信息。
 
@@ -106,13 +106,13 @@ Go 语言提供了两个核心并发原语：Goroutine 和 Channel。
 
 \subsubsection{TPC-C 基准测试}
 
-TPC-C 是由事务处理性能委员会（Transaction Processing Performance Council, TPC）制定的面向联机事务处理（OLTP）系统的标准基准测试\cite{TPC-C}。TPC-C 模拟了一个批发商的订单处理系统，定义了五种事务类型：新订单（New-Order）、支付（Payment）、订单状态查询（Order-Status）、发货（Delivery）和库存水平查询（Stock-Level）\cite{TPCCModeling}。这五种事务类型在混合比例、数据访问模式和锁竞争特征上各不相同，能够全面地衡量数据库系统在复杂 OLTP 场景下的处理能力。
+在数据库性能评估领域，TPC（Transaction Processing Performance Council）制定了一系列极具影响力的基准测试标准。其中，TPC-C\cite{TPC-C} 是针对联机事务处理（OLTP）的经典基准测试，它模拟了一个复杂的批发供应商订单处理系统，包含了多表联接、读写混合以及严格的 ACID 事务要求。然而，正如 Hsu 等人\cite{ProductionWorkload}和 TPC-C 建模研究\cite{TPCCModeling}所指出的，TPC-C 虽然能有效评估数据库及硬件的极限吞吐能力，但其固定的 5 种事务类型和访问模式无法完全涵盖现代互联网应用中复杂多变的真实负载特征。类似地，针对数据分析型（OLAP）负载的 TPC-H\cite{TPCH} 同样存在模型固化的局限性，使得基于真实审计日志的流量回放技术变得不可或缺。
 
 TPC-C 的主要性能指标是 tpmC（Transactions Per Minute, C），即每分钟处理的新订单事务数。在本文的实验评估中，TPC-C 工作负载被用作流量生成的数据源，其产生的审计日志经过系统解析后，在目标数据库上进行回放并评估保真度。
 
 \subsubsection{Sysbench 基准测试}
 
-Sysbench\cite{sysbench} 是一个模块化、跨平台的多线程基准测试工具，广泛应用于评估操作系统和数据库系统的性能。在数据库测试方面，Sysbench 提供了多种预置的 OLTP 测试脚本（如 \texttt{oltp\_read\_write}、\texttt{oltp\_insert}、\texttt{oltp\_point\_select} 等），支持高度可配置的并发线程数、表规模、测试时长等参数。
+Sysbench\cite{sysbench} 是一个模块化、跨平台的多线程基准测试工具，广泛应用于评估操作系统和数据库系统的性能。在数据库测试方面，Sysbench 提供了多种预置的 OLTP 测试脚本（如 \texttt{oltp\_read\_write}、\texttt{oltp\_insert}、\texttt{oltp\_point\_select} 等），支持高度可配置的并发线程数、表规模、测试时长等参数。此外，Difallah 等人\cite{OLTPBench}提出的 OLTP-Bench 框架提供了更为全面的基准测试支持，包含多种工业标准工作负载。
 
 与 TPC-C 相比，Sysbench 的工作负载模型更为简化和单一，但其配置灵活、使用便捷的特点使得它非常适合用于快速的性能摸底和回归测试。在本文的功能测试中，Sysbench 被用于在源端数据库上生成可控的 OLTP 负载，并配合 pgaudit 产生审计日志，为回放系统的端到端测试提供数据支撑。
 

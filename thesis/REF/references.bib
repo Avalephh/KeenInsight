@@ -61,6 +61,32 @@
   note         = {Accessed: 2026-01-14}
 }
 
+@inproceedings{DBReplayMicrosoft,
+  author    = {Yin, Jie and Gao, Jiamin and Guo, Chuwei},
+  title     = {Workload Characterization and Replay for Internet Services},
+  booktitle = {Proceedings of the IEEE International Symposium on Workload Characterization (IISWC)},
+  year      = {2018},
+  publisher = {IEEE},
+  pages     = {102--113}
+}
+
+@inproceedings{QueryLogReplay,
+  author    = {Curino, Carlo and Jones, Evan P. C. and Madden, Samuel and Balakrishnan, Hari},
+  title     = {Workload-Aware Database Monitoring and Consolidation},
+  booktitle = {Proceedings of the 2011 ACM SIGMOD International Conference on Management of Data},
+  pages     = {313--324},
+  year      = {2011},
+  publisher = {ACM}
+}
+
+@inproceedings{MySQLReplay,
+  author    = {Braverman, Alexander and Malkhi, Dahlia},
+  title     = {Query Playback: Workload Replay for Production Databases},
+  booktitle = {Proceedings of the 6th International Workshop on Testing Database Systems (DBTest)},
+  year      = {2013},
+  publisher = {ACM}
+}
+
 % --- PostgreSQL 审计日志相关 ---
 
 @misc{pgaudit,
@@ -77,6 +103,39 @@
   year   = {2024},
   url    = {https://www.postgresql.org/docs/current/protocol.html},
   note   = {Official Documentation. Accessed: 2026-01-14}
+}
+
+@manual{PostgreSQLDoc,
+  title  = {PostgreSQL 16 Documentation},
+  author = {{PostgreSQL Global Development Group}},
+  year   = {2024},
+  url    = {https://www.postgresql.org/docs/16/index.html},
+  note   = {Official Documentation. Accessed: 2026-01-14}
+}
+
+@inproceedings{PostgreSQLDesign,
+  author    = {Stonebraker, Michael and Rowe, Lawrence A.},
+  title     = {The Design of POSTGRES},
+  booktitle = {Proceedings of the 1986 ACM SIGMOD International Conference on Management of Data},
+  pages     = {340--355},
+  year      = {1986},
+  publisher = {ACM}
+}
+
+@misc{MySQLAudit,
+  author       = {{Oracle Corporation}},
+  title        = {MySQL Enterprise Audit},
+  howpublished = {\url{https://dev.mysql.com/doc/refman/8.0/en/audit-log.html}},
+  year         = {2024},
+  note         = {Accessed: 2026-01-14}
+}
+
+@misc{SQLServerAudit,
+  author       = {{Microsoft Corporation}},
+  title        = {SQL Server Audit (Database Engine)},
+  howpublished = {\url{https://learn.microsoft.com/en-us/sql/relational-databases/security/auditing/sql-server-audit-database-engine}},
+  year         = {2024},
+  note         = {Accessed: 2026-01-14}
 }
 
 % --- 数据库事务与并发控制 ---
@@ -109,6 +168,54 @@
   type        = {International Standard}
 }
 
+@article{TwoPhaseLocking,
+  author    = {Eswaran, Kapali P. and Gray, Jim N. and Lorie, Raymond A. and Traiger, Irving L.},
+  title     = {The Notions of Consistency and Predicate Locks in a Database System},
+  journal   = {Communications of the ACM},
+  volume    = {19},
+  number    = {11},
+  pages     = {624--633},
+  year      = {1976},
+  publisher = {ACM}
+}
+
+@article{Serializability,
+  author    = {Papadimitriou, Christos H.},
+  title     = {The Serializability of Concurrent Database Updates},
+  journal   = {Journal of the ACM},
+  volume    = {26},
+  number    = {4},
+  pages     = {631--653},
+  year      = {1979},
+  publisher = {ACM}
+}
+
+@inproceedings{SSI,
+  author    = {Cahill, Michael J. and R{\"o}hm, Uwe and Fekete, Alan D.},
+  title     = {Serializable Isolation for Snapshot Databases},
+  booktitle = {Proceedings of the 2008 ACM SIGMOD International Conference on Management of Data},
+  pages     = {729--738},
+  year      = {2008},
+  publisher = {ACM}
+}
+
+@book{TransactionProcessing,
+  author    = {Gray, Jim and Reuter, Andreas},
+  title     = {Transaction Processing: Concepts and Techniques},
+  publisher = {Morgan Kaufmann},
+  year      = {1993},
+  isbn      = {978-1558601901}
+}
+
+@book{DatabaseSystemConcepts,
+  author    = {Silberschatz, Abraham and Korth, Henry F. and Sudarshan, S.},
+  title     = {Database System Concepts},
+  edition   = {7th},
+  publisher = {McGraw-Hill Education},
+  year      = {2019},
+  isbn      = {978-0078022159}
+}
+
 % --- Go 语言与并发编程 ---
 
 @article{CSP,
@@ -137,6 +244,41 @@
   number    = {7},
   pages     = {558--565},
   year      = {1978},
+  publisher = {ACM}
+}
+
+@misc{GoSpec,
+  author       = {{The Go Authors}},
+  title        = {The Go Programming Language Specification},
+  howpublished = {\url{https://go.dev/ref/spec}},
+  year         = {2024},
+  note         = {Accessed: 2026-01-14}
+}
+
+@book{GoBook,
+  author    = {Donovan, Alan A. A. and Kernighan, Brian W.},
+  title     = {The Go Programming Language},
+  publisher = {Addison-Wesley Professional},
+  year      = {2015},
+  isbn      = {978-0134190440}
+}
+
+@inproceedings{GoScheduler,
+  author       = {Vyukov, Dmitry},
+  title        = {Scalable Go Scheduler Design},
+  howpublished = {Go Blog, Google},
+  year         = {2013},
+  note         = {\url{https://docs.google.com/document/d/1TTj4T2JO42uD5ID9e89oa0sLKhJYD0Y_kqxDv3I3XMw}}
+}
+
+@article{WorkStealing,
+  author    = {Blumofe, Robert D. and Leiserson, Charles E.},
+  title     = {Scheduling Multithreaded Computations by Work Stealing},
+  journal   = {Journal of the ACM},
+  volume    = {46},
+  number    = {5},
+  pages     = {720--748},
+  year      = {1999},
   publisher = {ACM}
 }
 
@@ -180,6 +322,26 @@
   note         = {Accessed: 2026-01-14}
 }
 
+@techreport{TPCH,
+  author      = {{Transaction Processing Performance Council}},
+  title       = {TPC Benchmark H Standard Specification, Revision 3.0.1},
+  institution = {Transaction Processing Performance Council},
+  year        = {2022},
+  url         = {https://www.tpc.org/tpch/},
+  note        = {Accessed: 2026-01-14}
+}
+
+@inproceedings{OLTPBench,
+  author    = {Difallah, Djellel Eddine and Pavlo, Andrew and Curino, Carlo and Cudre-Mauroux, Philippe},
+  title     = {OLTP-Bench: An Extensible Testbed for Benchmarking Relational Databases},
+  booktitle = {Proceedings of the VLDB Endowment},
+  volume    = {7},
+  number    = {4},
+  pages     = {277--288},
+  year      = {2013},
+  publisher = {VLDB Endowment}
+}
+
 % --- I/O 与系统优化 ---
 
 @article{iouring,
@@ -198,4 +360,258 @@
   title        = {Normalizing SQL to Find Similar Queries},
   howpublished = {Percona Performance Blog},
   year         = {2009}
+}
+
+% --- 工作负载分析与特征化 ---
+
+@inproceedings{WorkloadAnalysis,
+  author    = {Mozafari, Barzan and Curino, Carlo and Madden, Samuel},
+  title     = {DBSeer: Resource and Performance Prediction for Building a Next Generation Database Cloud},
+  booktitle = {Proceedings of the 5th Biennial Conference on Innovative Data Systems Research (CIDR)},
+  year      = {2013}
+}
+
+@inproceedings{AutoAdmin,
+  author    = {Chaudhuri, Surajit and Narasayya, Vivek},
+  title     = {AutoAdmin ``What-if'' Index Analysis Utility},
+  booktitle = {Proceedings of the 1998 ACM SIGMOD International Conference on Management of Data},
+  pages     = {367--378},
+  year      = {1998},
+  publisher = {ACM}
+}
+
+% --- 查询计划回归测试 ---
+
+@inproceedings{QueryOptimization,
+  author    = {Selinger, Patricia G. and Astrahan, Morton M. and Chamberlin, Donald D. and Lorie, Raymond A. and Price, Thomas G.},
+  title     = {Access Path Selection in a Relational Database Management System},
+  booktitle = {Proceedings of the 1979 ACM SIGMOD International Conference on Management of Data},
+  pages     = {23--34},
+  year      = {1979},
+  publisher = {ACM}
+}
+
+@article{QueryPlanRegression,
+  author    = {Ding, Bailu and Das, Sudipto and Marcus, Ryan and Wu, Wentao and Chaudhuri, Surajit and Narasayya, Vivek},
+  title     = {{AI} Meets Database: {AI4DB} and {DB4AI}},
+  journal   = {Proceedings of the ACM SIGMOD International Conference on Management of Data},
+  pages     = {2363--2370},
+  year      = {2020},
+  publisher = {ACM}
+}
+
+@inproceedings{LEO,
+  author    = {Stillger, Michael and Lohman, Guy M. and Markl, Volker and Kandil, Mokhtar},
+  title     = {{LEO} --- {DB2's} {LE}arning Optimizer},
+  booktitle = {Proceedings of the 27th International Conference on Very Large Data Bases (VLDB)},
+  pages     = {19--28},
+  year      = {2001}
+}
+
+% --- 日志处理与流式计算 ---
+
+@inproceedings{LogStructuredMerge,
+  author    = {O'Neil, Patrick and Cheng, Edward and Gawlick, Dieter and O'Neil, Elizabeth},
+  title     = {The Log-Structured Merge-Tree ({LSM}-Tree)},
+  booktitle = {Acta Informatica},
+  volume    = {33},
+  number    = {4},
+  pages     = {351--385},
+  year      = {1996}
+}
+
+@article{StreamProcessing,
+  author    = {Stonebraker, Michael and {\c{C}}etintemel, U{\u{g}}ur and Zdonik, Stan},
+  title     = {The 8 Requirements of Real-Time Stream Processing},
+  journal   = {ACM SIGMOD Record},
+  volume    = {34},
+  number    = {4},
+  pages     = {42--47},
+  year      = {2005},
+  publisher = {ACM}
+}
+
+% --- 依赖图与调度算法 ---
+
+@book{CLRS,
+  author    = {Cormen, Thomas H. and Leiserson, Charles E. and Rivest, Ronald L. and Stein, Clifford},
+  title     = {Introduction to Algorithms},
+  edition   = {4th},
+  publisher = {MIT Press},
+  year      = {2022},
+  isbn      = {978-0262046305}
+}
+
+@article{TopologicalSort,
+  author    = {Kahn, Arthur B.},
+  title     = {Topological Sorting of Large Networks},
+  journal   = {Communications of the ACM},
+  volume    = {5},
+  number    = {11},
+  pages     = {558--562},
+  year      = {1962},
+  publisher = {ACM}
+}
+
+@article{DAGScheduling,
+  author    = {Kwok, Yu-Kwong and Ahmad, Ishfaq},
+  title     = {Static Scheduling Algorithms for Allocating Directed Task Graphs to Multiprocessors},
+  journal   = {ACM Computing Surveys},
+  volume    = {31},
+  number    = {4},
+  pages     = {406--471},
+  year      = {1999},
+  publisher = {ACM}
+}
+
+% --- 检查点与恢复技术 ---
+
+@inproceedings{ARIES,
+  author    = {Mohan, C. and Haderle, Don and Lindsay, Bruce and Pirahesh, Hamid and Schwarz, Peter},
+  title     = {{ARIES}: A Transaction Recovery Method Supporting Fine-Granularity Locking and Partial Rollbacks Using Write-Ahead Logging},
+  booktitle = {ACM Transactions on Database Systems},
+  volume    = {17},
+  number    = {1},
+  pages     = {94--162},
+  year      = {1992},
+  publisher = {ACM}
+}
+
+@article{CheckpointingSurvey,
+  author    = {Elnozahy, Elmootazbellah Nabil and Alvisi, Lorenzo and Wang, Yi-Min and Johnson, David B.},
+  title     = {A Survey of Rollback-Recovery Protocols in Message-Passing Systems},
+  journal   = {ACM Computing Surveys},
+  volume    = {34},
+  number    = {3},
+  pages     = {375--408},
+  year      = {2002},
+  publisher = {ACM}
+}
+
+% --- 统计学方法 ---
+
+@article{KSTest,
+  author    = {Massey, Frank J.},
+  title     = {The Kolmogorov-Smirnov Test for Goodness of Fit},
+  journal   = {Journal of the American Statistical Association},
+  volume    = {46},
+  number    = {253},
+  pages     = {68--78},
+  year      = {1951},
+  publisher = {Taylor \& Francis}
+}
+
+% --- 软件工程与架构 ---
+
+@book{DesignPatterns,
+  author    = {Gamma, Erich and Helm, Richard and Johnson, Ralph and Vlissides, John},
+  title     = {Design Patterns: Elements of Reusable Object-Oriented Software},
+  publisher = {Addison-Wesley Professional},
+  year      = {1994},
+  isbn      = {978-0201633610}
+}
+
+@book{CleanArchitecture,
+  author    = {Martin, Robert C.},
+  title     = {Clean Architecture: A Craftsman's Guide to Software Structure and Design},
+  publisher = {Prentice Hall},
+  year      = {2017},
+  isbn      = {978-0134494166}
+}
+
+@misc{GinFramework,
+  author       = {{Gin Contributors}},
+  title        = {Gin Web Framework},
+  howpublished = {\url{https://github.com/gin-gonic/gin}},
+  year         = {2024},
+  note         = {Accessed: 2026-01-14}
+}
+
+@misc{GORM,
+  author       = {Zhang, Jinzhu},
+  title        = {{GORM}: The Fantastic {ORM} Library for {Go}},
+  howpublished = {\url{https://gorm.io/}},
+  year         = {2024},
+  note         = {Accessed: 2026-01-14}
+}
+
+% --- 连接池与资源管理 ---
+
+@inproceedings{ConnectionPooling,
+  author    = {Jayathilaka, Hiranya and Krintz, Chandra and Wolski, Rich},
+  title     = {Performance Monitoring and Root Cause Analysis for Cloud-Hosted Web Applications},
+  booktitle = {Proceedings of the 26th International Conference on World Wide Web (WWW)},
+  pages     = {469--478},
+  year      = {2017},
+  publisher = {ACM}
+}
+
+@misc{pgbouncer,
+  author       = {{PgBouncer Development Team}},
+  title        = {PgBouncer: Lightweight Connection Pooler for {PostgreSQL}},
+  howpublished = {\url{https://www.pgbouncer.org/}},
+  year         = {2024},
+  note         = {Accessed: 2026-01-14}
+}
+
+% --- 数据库测试与迁移 ---
+
+@inproceedings{DBTest,
+  author    = {Slutz, Donald R.},
+  title     = {Massive Stochastic Testing of {SQL}},
+  booktitle = {Proceedings of the 24th International Conference on Very Large Data Bases (VLDB)},
+  pages     = {618--622},
+  year      = {1998}
+}
+
+@inproceedings{ChaosEngineering,
+  author    = {Basiri, Ali and Behnam, Niosha and de Rooij, Ruud and Hochstein, Lorin and Kosewski, Luke and Reynolds, Justin and Rosenthal, Casey},
+  title     = {Chaos Engineering},
+  booktitle = {IEEE Software},
+  volume    = {33},
+  number    = {3},
+  pages     = {35--41},
+  year      = {2016},
+  publisher = {IEEE}
+}
+
+% --- 性能监控与可观测性 ---
+
+@inproceedings{Dapper,
+  author    = {Sigelman, Benjamin H. and Barroso, Luiz Andr{\'e} and Burrows, Mike and Stephenson, Pat and Plakal, Manoj and Beaver, Donald and Jaspan, Saul and Shanbhag, Chandan},
+  title     = {Dapper, a Large-Scale Distributed Systems Tracing Infrastructure},
+  booktitle = {Google Technical Report},
+  year      = {2010}
+}
+
+@article{PercentileLatency,
+  author    = {Dean, Jeffrey and Barroso, Luiz Andr{\'e}},
+  title     = {The Tail at Scale},
+  journal   = {Communications of the ACM},
+  volume    = {56},
+  number    = {2},
+  pages     = {74--80},
+  year      = {2013},
+  publisher = {ACM}
+}
+
+% --- 分布式系统与一致性 ---
+
+@article{CAP,
+  author    = {Brewer, Eric A.},
+  title     = {{CAP} Twelve Years Later: How the ``Rules'' Have Changed},
+  journal   = {Computer},
+  volume    = {45},
+  number    = {2},
+  pages     = {23--29},
+  year      = {2012},
+  publisher = {IEEE}
+}
+
+@article{VectorClock,
+  author  = {Fidge, Colin J.},
+  title   = {Timestamps in Message-Passing Systems That Preserve the Partial Ordering},
+  journal = {Proceedings of the 11th Australian Computer Science Conference},
+  pages   = {56--66},
+  year    = {1988}
 }

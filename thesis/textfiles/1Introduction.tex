@@ -5,9 +5,9 @@
 \section{绪论}
 \subsection{研究背景和意义}
 
-随着信息技术的飞速发展，数据库系统已成为现代企业信息化基础设施的核心组件。从金融交易、电子商务到社交网络、物联网等领域，关系型数据库管理系统（Relational Database Management System, RDBMS）承载着海量的在线事务处理（Online Transaction Processing, OLTP）负载，其稳定性和性能直接关系到业务的连续性与用户体验\cite{TPC-C}。在此背景下，数据库系统的版本升级、硬件迁移、参数调优以及索引优化等运维操作日益频繁。然而，这些变更往往伴随着不可预知的性能风险：一次看似无害的数据库版本升级可能引发查询计划的退化（Query Plan Regression），一项配置参数的修改可能在高并发场景下导致严重的锁竞争（Lock Contention）。如何在变更正式上线之前，充分、准确地评估其对生产环境的潜在影响，是数据库运维领域面临的核心挑战之一。
+随着信息技术的飞速发展，数据库系统已成为现代企业信息化基础设施的核心组件。从金融交易、电子商务到社交网络、物联网等领域，关系型数据库管理系统（Relational Database Management System, RDBMS）\cite{DatabaseSystemConcepts}承载着海量的在线事务处理（Online Transaction Processing, OLTP）负载，其稳定性和性能直接关系到业务的连续性与用户体验\cite{TPC-C}。在此背景下，数据库系统的版本升级、硬件迁移、参数调优以及索引优化等运维操作日益频繁。然而，这些变更往往伴随着不可预知的性能风险：一次看似无害的数据库版本升级可能引发查询计划的退化（Query Plan Regression）\cite{QueryOptimization}，一项配置参数的修改可能在高并发场景下导致严重的锁竞争（Lock Contention）。如何在变更正式上线之前，充分、准确地评估其对生产环境的潜在影响，是数据库运维领域面临的核心挑战之一。
 
-传统的数据库变更测试方法主要依赖人工构造测试用例或使用标准化基准测试工具（如 Sysbench\cite{sysbench}、TPC-C\cite{TPC-C}）。前者存在测试覆盖率不足、难以模拟真实业务负载复杂性的问题；后者虽然能提供标准化的性能度量，但其固定的工作负载模式与实际生产环境的流量特征（如时间分布的不均匀性、SQL 类型的多样性、并发模式的复杂性）存在显著差异\cite{ProductionWorkload}。Oracle 公司在其 11g 版本中率先引入了 Database Replay\cite{OracleDatabaseReplay} 功能，开创了"捕获生产负载—回放测试"的技术路线，证明了利用真实生产流量进行变更验证的巨大价值。这一方法的核心优势在于：它不再依赖人工假设或抽象模型，而是直接使用生产环境中真实发生的数据库访问请求作为测试输入，从而能够最大程度地覆盖业务逻辑的复杂性和多样性。
+传统的数据库变更测试方法主要依赖人工构造测试用例或使用标准化基准测试工具（如 Sysbench\cite{sysbench}、TPC-C\cite{TPC-C}）。前者存在测试覆盖率不足、难以模拟真实业务负载复杂性的问题，且在大规模随机生成测试（Stochastic Testing）\cite{DBTest}方面面临极大挑战；后者虽然能提供标准化的性能度量，但其固定的工作负载模式与实际生产环境的流量特征（如时间分布的不均匀性、SQL 类型的多样性、并发模式的复杂性）存在显著差异\cite{ProductionWorkload}。Oracle 公司在其 11g 版本中率先引入了 Database Replay\cite{OracleDatabaseReplay} 功能，开创了"捕获生产负载—回放测试"的技术路线，证明了利用真实生产流量进行变更验证以及作为混沌工程（Chaos Engineering）\cite{ChaosEngineering}实践的基础室验的巨大价值。这一方法的核心优势在于：它不再依赖人工假设或抽象模型，而是直接使用生产环境中真实发生的数据库访问请求作为测试输入，从而能够最大程度地覆盖业务逻辑的复杂性和多样性。
 
 然而，对于广泛应用于互联网和关键基础设施领域的开源数据库 PostgreSQL 而言，目前尚缺乏一套成熟的、高保真的流量回放解决方案。现有的开源工具如 pgreplay\cite{pgreplay} 虽然能够解析 PostgreSQL 日志并重放 SQL 语句，但在事务一致性保障、高并发模拟精度以及结果差异自动检测等方面存在明显不足。特别是，pgreplay 主要基于 PostgreSQL 原生日志格式进行解析，其对参数化查询（Prepared Statement）的支持有限，且缺乏对事务边界的精细化管理，难以满足对回放保真度有严格要求的场景（如数据库版本兼容性验证、SQL执行计划回归测试等）。
 
@@ -41,7 +41,7 @@ Oracle Database Replay\cite{OracleDatabaseReplay} 是该领域最具代表性的
 
 \subsubsection{数据库审计日志技术}
 
-数据库审计日志（Database Audit Log）是记录数据库操作行为的重要机制，广泛应用于安全合规、入侵检测和操作审计等场景。从本文研究的角度来看，审计日志也是一种高质量的流量数据源，其记录的操作级别、信息完整性和结构化程度优于传统的数据库查询日志。
+数据库审计日志（Database Audit Log）是记录数据库操作行为的重要机制，广泛应用于安全合规、入侵检测和操作审计等场景\cite{MySQLAudit,SQLServerAudit}。从本文研究的角度来看，审计日志也是一种高质量的流量数据源，其记录的操作级别、信息完整性和结构化程度优于传统的数据库查询日志。
 
 PostgreSQL 提供了基础的日志记录能力（通过 \texttt{log\_statement} 配置参数），可以记录执行的 SQL 语句。然而，原生日志的信息粒度有限，例如无法直接获取参数化查询的实际参数值。pgaudit 扩展\cite{pgaudit}弥补了这一不足，它作为 PostgreSQL 的审计扩展模块，利用数据库内核提供的标准钩子机制（Executor Hook 和 ProcessUtility Hook），在 SQL 语句执行的关键路径上植入审计记录逻辑。pgaudit 能够生成符合多种合规标准（如 PCI-DSS、SOX）要求的审计日志，其记录内容包括：语句类型（DDL/DML/DCL）、操作子类型（SELECT/INSERT/UPDATE/DELETE）、完整的 SQL 文本及其绑定参数、操作涉及的数据库对象（Schema、Table）以及虚拟事务 ID（Virtual Transaction ID, VxID）等。
 
@@ -53,7 +53,7 @@ PostgreSQL 提供了基础的日志记录能力（通过 \texttt{log\_statement}
 
 在并发编程模型方面，Go 语言基于 CSP（Communicating Sequential Processes）\cite{CSP} 理论实现的 Goroutine 与 Channel 机制，为构建高并发系统提供了天然的支持。Goroutine 作为用户态轻量级线程，其创建和上下文切换开销极低（约 2KB 栈空间），单个进程可轻松创建数十万级的并发执行单元\cite{GoConcurrencyPatterns}。这一特性使得为每个原始数据库会话分配一个独立的 Goroutine 来模拟并发行为成为可行且高效的方案。
 
-在时序控制方面，现有研究多集中在分布式系统的事件排序和因果一致性（Causal Consistency）领域。Lamport 时间戳\cite{LamportClock} 为分布式事件定序提供了经典的理论框架。在数据库回放场景中，时序控制的核心挑战在于如何精确复现原始负载中各 SQL 语句之间的时间间隔（Inter-arrival Time），同时支持可控的速率变换（如加速回放用于压力测试、减速回放用于问题定位）。Oracle Database Replay 通过内核级的全局时钟同步实现了高精度的时序对齐，而对于外部回放工具，则需要依赖操作系统提供的高精度计时器（如 \texttt{clock\_gettime}）并结合自适应等待算法来尽可能减少时序偏差。
+在时序控制方面，现有研究多集中在分布式系统的事件排序和因果一致性（Causal Consistency）领域。例如，在面对CAP定理（CAP Theorem）\cite{CAP}带来的分布式取舍时，系统往往需要折中一致性与可用性。Lamport 时间戳\cite{LamportClock}及其后续发展的向量时钟（Vector Clocks）\cite{VectorClock} 为分布式事件定序提供了经典的理论框架，而现代大型分布式追踪系统如 Dapper\cite{Dapper} 进一步证明了复杂调用链时序重构的工程可行性。在数据库回放场景中，时序控制的核心挑战在于如何精确复现原始负载中各 SQL 语句之间的时间间隔（Inter-arrival Time），同时支持可控的速率变换（如加速回放用于压力测试、减速回放用于问题定位）。Oracle Database Replay 通过内核级的全局时钟同步实现了高精度的时序对齐，而对于外部回放工具，则需要依赖操作系统提供的高精度计时器（如 \texttt{clock\_gettime}）并结合自适应等待算法来尽可能减少时序偏差。
 
 
 \subsection{研究内容与创新点}
@@ -64,7 +64,7 @@ PostgreSQL 提供了基础的日志记录能力（通过 \texttt{log\_statement}
 
 \item[(2)] \textbf{设计并实现了一个高并发、时序对齐的流量回放引擎。}本文基于 Go 语言的 Goroutine 并发模型，设计了"每会话一协程"的回放架构，通过信号量机制实现并发度的弹性控制。同时，提出了一种基于时间缩放因子的时序对齐算法，能够在精确复现原始负载时间动态的基础上，支持任意倍速的变速回放（加速压测或减速排查），并通过无锁的原子计数器和有界通道实现了低侵入性的实时监控。
 
-\item[(3)] \textbf{构建了一套多维度的回放保真度评估体系。}本文从正确性、性能和负载特征三个维度，提出了一套完整的回放质量评估指标体系。定义了"回放保真度"（Replay Fidelity）的概念，通过归一化均方根误差（NRMSE）衡量吞吐量保真度、Kolmogorov-Smirnov 检验衡量时延分布保真度、调度滞后标准差衡量回放稳定性，为流量回放系统的质量评估提供了可量化的理论工具。
+\item[(3)] \textbf{构建了一套多维度的回放保真度评估体系。}本文从正确性、性能和负载特征三个维度，提出了一套完整的回放质量评估指标体系。定义了"回放保真度"（Replay Fidelity）的概念，通过归一化均方根误差（NRMSE）衡量吞吐量保真度、Kolmogorov-Smirnov 检验\cite{KSTest}衡量时延分布保真度、调度滞后标准差衡量回放稳定性，为流量回放系统的质量评估提供了可量化的理论工具。
 
 \end{itemize}
 
