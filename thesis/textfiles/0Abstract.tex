@@ -16,19 +16,22 @@
 \begin{abstract}
 \setlength{\baselineskip}{20pt}
 \vspace{30pt}
-内容简述：
+随着信息技术的飞速发展，数据库系统的稳定性和性能对现代业务至关重要。数据库在进行版本升级、迁移、调优等运维变更时，面临不可预知的风险。传统的压力测试方法难以真实模拟复杂的生产业务环境。利用真实生产流量进行捕获与回放，是评估变更影响的有效手段。然而，在 PostgreSQL 生态中，现有的开源回放工具在高并发模拟精度、事务一致性保障等方面存在明显不足。
+
+针对上述挑战，本文以 PostgreSQL 为研究目标，设计并实现了一套基于数据库审计日志（pgaudit）的高保真流量回放系统，为数据库变更测试提供了可靠的解决方案。本文的主要研究工作和贡献如下：
 
 \textbf{1.}
-工作1。
+提出了一种基于插件化架构的异构审计日志解析与流式事务重组机制。针对海量乱序的审计日志，设计了基于哈希映射的单遍重组算法，在 $O(N)$ 时间复杂度内精确重构了会话分流与事务时序上下文，解决了传统工具难以获取准确事务边界的问题。
 
 \textbf{2.}
-工作2。
+设计并实现了一个高并发、时序对齐的流量回放引擎。基于 Go 语言的 Goroutine 并发模型构建了“每会话一协程”的回放架构，并提出了一种基于滑动时间窗口的时序对齐调度算法，能够在精确复现场景并发行为的基础上，支持任意倍数变速回放，显著降低了模拟调度产生的时序误差。
 
 \textbf{3.}
-工作3。
+构建了一套多维度的回放保真度评估体系。从功能一致性、吞吐量保真度、时延分布保真度及系统回放稳定性等方面，使用归一化均方根误差（NRMSE）与 K-S 检验等方法，定性与定量结合地证明了本系统的有效性。
 
+性能与功能测试表明，系统在 TPC-C 50GB 规模负载下，不仅能够稳定支撑近 4.5 万 QPS 的高并发吞吐量，且实现了 99.99\% 的事务执行成功率。对原负载的吞吐趋势和时延分布的保真度均超过 98\%，满足了工业级高保真数据库流量回放的需求。
 
-\textbf{\textbf{\heiti 关键词：}}XXX；XXX；XXX
+\textbf{\textbf{\heiti 关键词：}}流量回放；PostgreSQL；审计日志；并发控制；数据库测试
 
 \end{abstract}
 \setcounter{page}{1}
@@ -47,18 +50,22 @@
 \begin{enabstract}
 \setlength{\baselineskip}{20pt}
 \vspace{30pt}
-Contribution.
+With the rapid development of information technology, the stability and performance of database systems are critical to modern businesses. When executing operational changes such as version upgrades, migrations, and parameter tuning, databases face unpredictable risks. Traditional stress testing methods fall short in accurately simulating complex production workloads. Capturing and replaying real production traffic has proven to be an effective approach for evaluating the impact of such changes. However, in the PostgreSQL ecosystem, existing open-source replay tools exhibit significant deficiencies in high-concurrency simulation accuracy and transaction consistency guarantees.
+
+To address these challenges, this thesis designs and implements a high-fidelity database workload replay system based on database audit logs (pgaudit) for PostgreSQL, providing a reliable solution for database change testing. The main research work and contributions are as follows:
 
 \textbf{1.}
-My Work1.
+Proposed a heterogeneous audit log parsing and streaming transaction recombination mechanism based on a plugin architecture. To handle massive and out-of-order audit logs, a single-pass recombination algorithm based on hash mapping was designed. It achieves precise reconstruction of session streams and transaction timing contexts in $O(N)$ time complexity, overcoming the difficulty of obtaining accurate transaction boundaries in traditional replay tools.
 
 \textbf{2.}
-My Work2.
+Designed and implemented a highly concurrent and time-aligned workload replay engine. Utilizing the Goroutine concurrency model in Go, a "per-session, per-goroutine" replay architecture was constructed. Furthermore, a timing alignment scheduling algorithm based on a sliding time window was proposed. It can precisely reproduce the concurrent behavior of the original workload while supporting arbitrary variable-speed replay, significantly reducing scheduling timing errors.
 
 \textbf{3.}
-My Work3.
+Constructed a multi-dimensional replay fidelity evaluation system. We evaluate the effectiveness of the system qualitatively and quantitatively across dimensions such as functional consistency, throughput fidelity, latency distribution fidelity, and playback stability, utilizing statistical methods such as Normalized Root Mean Square Error (NRMSE) and the Kolmogorov-Smirnov (K-S) Test.
 
-\textbf{Keywords：}XXX; XXX; XXX
+Performance and functional testing demonstrate that under a 50GB TPC-C workload, the system stably supports high concurrent throughput of nearly 45,000 QPS, achieving a transaction execution success rate of 99.99\%. The fidelity of throughput trends and latency distributions compared to the original workload both exceed 98\%, successfully fulfilling the requirements for industrial-grade high-fidelity database workload replay.
+
+\textbf{Keywords：}Workload Replay; PostgreSQL; Audit Log; Concurrency Control; Database Testing
 
 \end{enabstract}
 

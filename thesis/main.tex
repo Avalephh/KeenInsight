@@ -32,7 +32,7 @@
 \usepackage{cite}
 \usepackage{listings}
 \usepackage{graphicx}
-\usepackage{epstopdf}
+% \usepackage{epstopdf} % 移除此行，因为项目中所有图片均为 pdf 格式，且 XeLaTeX 不支持其驱动
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{geometry}
@@ -117,7 +117,8 @@
 % 装订线位置（T）：左
 
 \geometry{a4paper,left = 3.5cm,right = 3cm,top = 4.5cm,bottom= 4cm}
-\geometry{textheight=21.2cm,textwidth=14.5cm}
+\setlength{\headheight}{14.5pt}
+\addtolength{\topmargin}{-2.5pt}
 
 
 % 页眉：学校标志（教务处主页提供下载）：

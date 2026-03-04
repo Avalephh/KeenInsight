@@ -11,6 +11,7 @@
 \begin{table}[htbp]
     \centering
     \caption{实验环境硬件配置表}
+    \label{tab:hardware_config}
     \renewcommand{\arraystretch}{1.2}
     \begin{tabular}{lccc}
         \toprule
@@ -32,6 +33,7 @@
 各节点均配备双路 10Gbps 网络接口控制器（Network Interface Controller, NIC），并开启了网卡多队列（RSS）与直接内存访问（DMA）功能，以降低 CPU 的软中断开销。经 iPerf3 工具实测，Replayer 与 Target DB 之间的链路带宽稳定在 9.4 Gbps 以上，平均往返时延（Round-Trip Time, RTT）控制在微秒级，具体测试数据如下公式~\ref{eq:network_latency} 所示：
 
 \begin{equation}
+\label{eq:network_latency}
 RTT_{avg} \approx 0.12ms, \quad \sigma_{RTT} < 0.05ms
 \end{equation}
 
@@ -68,7 +70,10 @@ RTT_{avg} \approx 0.12ms, \quad \sigma_{RTT} < 0.05ms
 日志解析器采用流式处理（Streaming Processing）架构，基于 Go 语言的 \texttt{bufio.Scanner} 实现零拷贝读取。为了应对每秒数万行的高吞吐日志，解析器维护了一个带缓冲的 Channel 队列。Listing~\ref{lst:parser_core} 展示了核心解析逻辑的伪代码。
 
 \begin{lstlisting}[language=Go, caption=基于 Channel 的无锁日志解析伪代码, label=lst:parser_core]
-func (p *Parser) StreamLog(ctx context.Context, outputChan chan<- *Transaction) {
+func (p *Parser) StreamLog(
+    ctx context.Context, 
+    outputChan chan<- *Transaction,
+) {
     scanner := bufio.NewScanner(p.logReader)
     for scanner.Scan() {
         line := scanner.Text()
@@ -88,7 +93,7 @@ func (p *Parser) StreamLog(ctx context.Context, outputChan chan<- *Transaction) 
 \end{lstlisting}
 
 \subsubsection{时序对齐调度算法}
-为了保证回放的并发时序保真度，调度器依据事务的 Commit Timestamp 进行全局排序与发射。我们提出了一种基于滑动时间窗口（Sliding Time Window）的调度算法，如下 Algorithm~\ref{alg:scheduler} 所示。
+为了保证回放的并发时序保真度，调度器依据事务的 Commit Timestamp 进行全局排序与发射。我们提出了一种基于滑动时间窗口（Sliding Time Window）的调度算法，其伪代码如下所示。
 
 % \begin{algorithm}[H]
 % \caption{基于时间戳对齐的并发回放调度算法}
