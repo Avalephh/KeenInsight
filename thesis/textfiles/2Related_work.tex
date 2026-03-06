@@ -3,7 +3,7 @@
 \setcounter{figure}{0}
 \section{相关技术基础}
 
-本章将系统地介绍与数据库流量回放系统设计与实现密切相关的核心技术基础。首先，回顾数据库流量捕获与回放技术的研究现状，分析各类技术路线的演进与优劣；其次，深入剖析 PostgreSQL 的审计日志机制及其底层 Hook 工作原理；接着，依托数据库事务管理中的 ACID 理论与多版本并发控制剖析事务隔离挑战；然后，结合 Go 语言的调度理论探讨分布系统中的时间轴时序控制与并发模型；最后，系统总结数据库性能基准测试体系以及用于衡量回放保真度的相关统计学理论，为本系统的设计提供全方位的理论支撑。
+本章将系统地介绍与数据库流量回放系统设计与实现密切相关的核心技术基础。首先，回顾数据库流量捕获与回放技术的研究现状，分析各类技术路线的演进与优劣；其次，介绍数据库审计日志技术的通用架构与关键需求；接着，依托数据库事务管理中的 ACID 理论与多版本并发控制剖析事务隔离挑战；然后，结合 Go 语言的调度理论探讨分布系统中的时间轴时序控制与并发模型；最后，系统总结数据库性能基准测试体系以及用于衡量回放保真度的相关统计学理论，为本系统的设计提供全方位的理论支撑。
 
 \subsection{数据库流量捕获与回放技术研究现状}
 
@@ -25,52 +25,27 @@ Oracle Database Replay\cite{OracleDatabaseReplay} 是该领域极具代表性的
 
 此外，Percona 公司针对 MySQL 生态开发的 \texttt{pt-upgrade}\cite{ptupgrade} 与 \texttt{Percona Playback} 工具，主要利用慢查询日志（Slow Query Log）或通用查询日志（General Query Log）作为数据源。HANA 团队\cite{SAPHANAWorkloadReplay} 也曾发表过将工作负载回放技术深度用于自动化回归测试和异常根因分析的探索。虽然这些工作在错误排查上取得了显著成果，但在基于纯文本日志进行长连接、长事务流的精准会话重排与时间轴拟合方面，仍未提供完美的通用范式。这正是本课题引入具备强大结构化与挂钩能力的审计插件以突破回放瓶颈的立足点。
 
-\subsection{PostgreSQL 审计日志与核心机制}
+\subsection{数据库审计日志技术}
 
-\subsubsection{PostgreSQL 原生日志机制及其局限性}
+\subsubsection{数据库原生日志机制及其局限性}
 
-PostgreSQL 数据库提供了一套高度可配置的日志记录框架，作为其运维监控与故障诊断的核心支撑\cite{PostgreSQLDoc}。通过对 \texttt{postgresql.conf} 配置文件中特定参数的精细化调节，系统管理员能够实现对日志输出目标、报文格式及详略程度的差异化控制。其中，\texttt{log\_destination} 参数界定了日志的物理存储媒介，支持 \texttt{stderr}、\texttt{csvlog} 及 \texttt{syslog} 等多种模式；特别是 \texttt{csvlog} 模式以逗号分隔值的结构化形式输出，显著提升了日志自动化解析的效率。此外，\texttt{log\_statement} 参数用于限定记录的 SQL 语句类型，涵盖了从数据定义语句（DDL）到全量请求（all）的过滤能力；而 \texttt{log\_line\_prefix} 则赋予了日志行前缀高度的定制化空间，可将时间戳、进程 ID、会话标识符（Session ID）及虚拟事务 ID（Virtual Transaction ID, VxID）等关键上下文元数据嵌入其中。
+主流关系型数据库管理系统均提供了不同程度的日志记录能力，用以支撑运维监控与故障诊断。PostgreSQL 通过 \texttt{log\_statement} 配置参数可记录执行的 SQL 语句\cite{PostgreSQLDoc}，MySQL 则提供了通用查询日志（General Query Log）与慢查询日志（Slow Query Log）两种机制\cite{MySQLAudit}，SQL Server 同样具备原生的审计追踪功能\cite{SQLServerAudit}。
 
-尽管原生日志机制具备基础的记录能力，但在高保真流量回放场景下仍表现出显著的局限性。首先，针对由中间件或特定接口发起的预处理语句（Prepared Statement）和参数化查询，原生日志的 \texttt{log\_statement = 'all'} 机制往往仅记录 \texttt{PARSE} 或 \texttt{EXECUTE} 指令，而未能直接在同一行物理文本中提供绑定参数（Bind Variables）后的完整 SQL 文本。这为下游回放系统在重构动态查询时带来了难以跨越的解析鸿沟。其次，原生文本日志缺乏对特定行业审计合规标准（如安全层面的敏感对象拦截）的结构化语义支持，其信息的松散性与非标准化特征极大地增加了回放前置处理过程中的误判概率。
+尽管各数据库的原生日志机制具备基础的记录能力，但在高保真流量回放场景下均表现出显著的共性局限。首先，针对由中间件或特定接口发起的预处理语句（Prepared Statement）和参数化查询，原生日志往往仅记录命令模板（如 \texttt{EXECUTE} 指令），而未能直接在同一行物理文本中提供绑定参数（Bind Variables）后的完整 SQL 文本。这为下游回放系统在重构动态查询时带来了难以跨越的解析鸿沟。其次，原生文本日志缺乏对特定行业审计合规标准（如敏感对象拦截）的结构化语义支持，其信息的松散性与非标准化特征极大地增加了回放前置处理过程中的误判概率。
 
-\subsubsection{pgaudit 扩展的架构与内核 Hook 机制}
+\subsubsection{结构化审计扩展的通用架构}
 
-针对原生日志在审计维度的缺失与信息粒度不足，开源插件 pgaudit\cite{pgaudit} 提供了深度的补强，其原本旨在构建满足 PCI-DSS\cite{PCIDSS}、SOX\cite{SOX} 及 HIPAA\cite{HIPAA} 等主流合规性要求的细粒度审计体系，却恰好为高保真流量回放提供了理想的数据底座。pgaudit 的架构核心并非通过外部抓取或简单的日志正则过滤实现，而是深度依赖了 PostgreSQL 内核所提供的两类关键侵入式探针（Hook）机制。
+针对原生日志在审计维度的缺失与信息粒度不足，各主流数据库生态催生了相应的审计扩展方案。这些扩展的共同设计思想是深度依赖数据库内核所提供的扩展机制（如 Hook、插件接口或事件监听器），在 SQL 语句执行的关键路径上植入审计记录逻辑，旨在构建满足 PCI-DSS\cite{PCIDSS}、SOX\cite{SOX} 及 HIPAA\cite{HIPAA} 等主流合规性要求的细粒度审计体系。
 
-在 PostgreSQL 的执行引擎中，几乎所有的外部 SQL 请求都要经历词法分析、语法生成抽象语法树（AST）、查询重写、路径规划，直至生成物理执行树并移交执行器（Executor）这一完整生命周期。pgaudit 巧妙地在这条核心链路上实现了挂载拦截（Hooking）：
-一方面，它通过劫持并代理原生的 \texttt{ExecutorRun\_hook} 钩子，深度拦截了标准数据操纵语言（DML，如 SELECT、INSERT、UPDATE、DELETE）的执行流。在该阶段，SQL 语句已经完成了参数绑定并生成了被实际调用的执行计划，pgaudit 直接从执行器上下文中实时提取处于激活状态的查询文本及底层关联的数据库对象（如表、视图的 OID 和名称），从而彻底解决了预处理语句参数丢失的问题。
-另一方面，对于不通过常规执行器流转的各类实用程序命令（如数据定义语言 DDL，或授权指令 DCL 语句），pgaudit 则利用了 \texttt{ProcessUtility\_hook} 探针进行全面捕获。这种在内核数据结构（C 语言 \texttt{struct}）层面的直接字段提取，确保了审计维度的绝对全面与信息还原的极高精度。
+从技术实现的角度，一个理想的结构化审计日志需满足以下核心要求，才能作为高保真流量回放的数据源：
+\begin{itemize}
+    \item \textbf{完整的语句与参数捕获}：在 SQL 语句完成参数绑定后，从执行器上下文中直接提取完整的查询文本及实际参数值，彻底解决预处理语句参数丢失的问题。
+    \item \textbf{事务标识关联}：每条审计记录需强制关联所属的事务标识符（Transaction ID），这是精确重构事务边界、保障回放原子性的基础。
+    \item \textbf{会话上下文嵌入}：记录会话标识（Session ID）、操作时间戳、操作类型（DDL/DML/DCL）及涉及的数据库对象等上下文元数据，支持下游系统按会话分流和时序对齐。
+    \item \textbf{结构化输出格式}：以 CSV 或 JSON 等结构化格式输出，便于自动化解析与处理。
+\end{itemize}
 
-\subsubsection{审计日志的事务标识与可见性映射}
-
-在 pgaudit 输出的结构化 CSV 载荷中，极其关键的一环是其能够强制关联并抛出当前操作所处的虚拟事务 ID (VxID) 和底层物理事务 ID (XID)。在高并发访问环境下，不同的客户端会话会创建错综复杂的隔离视图，而重组正确事务边界的前提便是精确解析这些事务标识。
-
-结合 PostgreSQL 的多版本并发控制（MVCC）架构，我们可以深刻理解事务标识在回放系统中的核心价值。PostgreSQL 通过维护全局的事务快照（Snapshot）和行级的 \texttt{xmin/xmax} 隐藏字段，实现了“读已提交（Read Committed）”或“可重复读（Repeatable Read）”的隔离级别。审计日志中记录的事务 ID 直观地反映了该语句写入时所属的活跃事务域。当我们的流式解析引擎捕获到包含相同 XID 的连续甚至乱序的审计条目时，便能依据这些严格的标识刻画出原始原子的操作生命周期（从 BEGIN 开启隐式或显式事务，到最终的 COMMIT 或 ROLLBACK）。这不仅帮助回放系统精准地分发事务至特定的工作协程，更避免了因为回放时乱序插入操作而导致目标数据库产生不可预知的死锁（Deadlock）或脏读/幻读错误。
-
-通过对 \texttt{pgaudit.log} 及其子参数的合理配置，系统能够在整个高并发执行周期内生成高度结构化、上下文完备的审计记录（如表 \ref{tab:pgaudit_fields} 所述）。
-
-\begin{table}[htbp]
-    \centering
-    \caption{pgaudit 审计日志核心字段说明}
-    \label{tab:pgaudit_fields}
-    \begin{tabular}{l l p{6cm}}
-        \toprule
-        \textbf{字段} & \textbf{示例} & \textbf{描述} \\
-        \midrule
-        Audit Type & SESSION & 审计模式标识，SESSION 代表会话级维度的连续记录 \\
-        Statement ID & 3 & 当前会话语境下的语句递增序列号 \\
-        Substatement ID & 1 & 复合语句结构中的子查询序号 \\
-        Class & WRITE & 操作类别归口（涉及 READ、WRITE 及 DDL 等范畴） \\
-        Command & UPDATE & 具体执行的 SQL 操作原语义 \\
-        Object Type & TABLE & 操作靶向的数据库对象逻辑类型 \\
-        Object Name & public.orders & 包含模式（Schema）全路径的对象名称 \\
-        Statement & UPDATE ... SET ... & 包含 \$N 等符号的 SQL 指令模板 \\
-        Parameter & \$1='shipped', \$2='1001' & 绑定参数的具体取值序列 \\
-        \bottomrule
-    \end{tabular}
-\end{table}
-
-这种深植于内核、信息丰富的审计协议流，不仅超越了网络层抓包与原生零散日志的局限，更从根本上夯实了构建端到端、金融级高保真流量回放引擎的数据基石。
+以 PostgreSQL 生态中的 pgaudit\cite{pgaudit} 为例，该扩展通过劫持内核的 \texttt{ExecutorRun\_hook} 与 \texttt{ProcessUtility\_hook} 两类关键钩子，能够全面捕获 DML 和 DDL 操作，完整满足上述全部要求。类似地，MySQL 原生审计插件\cite{MySQLAudit}以及各国产数据库的审计模块也在不同程度上提供了结构化审计日志能力。本文所提出的通用回放机制正是建立在这一类结构化审计日志的共性基础之上，具体的 pgaudit 实现细节将在第五章系统实现部分予以详述。
 
 \subsection{数据库事务与并发控制}
 
@@ -144,4 +119,4 @@ Go 语言在架构设计层面深度集成了 Hoare\cite{CSP} 提出的通信顺
 为此，引入两样本的 Kolmogorov-Smirnov (K-S) 检验\cite{KSTest}。与 T 检验等要求数据符合正态分布的假设检验不同，K-S 检验属于非参数检验（Non-parametric Test），它无需预设数据分布模型，而是直接基于两条时延序列的经验累积分布函数（ECDF）之间的最大垂直差异距离（Supremum Distance）来判决它们是否同属一个母体分布。K-S 统计量对分布形状变化的敏感度极高，使其成为衡量目标数据库系统在承受回放流量冲击时内部调度与锁反应是否原汁原味的极佳裁决工具。
 
 \subsection{本章小结}
-本章系统地介绍了与本文研究相关的核心技术基础。首先，回顾了数据库流量捕获与回放技术研究现状；其次，深度探讨了 PostgreSQL 审计日志与核心 Hook 拦截机制，并阐明了事务标识与多版本并发可见性映射的原理；接着，详尽论述了 Go 语言基于 CSP 模型的百万级并发调度机制，以及支撑高并发多节点的滑动时间轴验证理论；随后，分析了 TPC 系列与 Sysbench 压测标准的内在逻辑及其不可替代性；最后，预先构建了基于 NRMSE 时序相似度与 K-S 非参数检验的回放保真度评估统计模型。这些底层原理与学术脉络共同编织了后续提出高保真流量回放引擎技术架构（第3、4章）及评测证明（第5章）的完整理论支撑与依据。
+本章系统地介绍了与本文研究相关的核心技术基础。首先，回顾了数据库流量捕获与回放技术研究现状；其次，从通用视角介绍了数据库审计日志技术的架构需求与共性特征，分析了原生日志的局限性及结构化审计扩展的核心设计要求；接着，详尽论述了 Go 语言基于 CSP 模型的百万级并发调度机制，以及支撑高并发多节点的滑动时间轴验证理论；随后，分析了 TPC 系列与 Sysbench 压测标准的内在逻辑及其不可替代性；最后，预先构建了基于 NRMSE 时序相似度与 K-S 非参数检验的回放保真度评估统计模型。这些底层原理与学术脉络共同编织了后续提出高保真流量回放引擎技术架构（第3、4章）及评测证明（第5章）的完整理论支撑与依据。

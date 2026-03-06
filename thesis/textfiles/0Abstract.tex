@@ -16,9 +16,9 @@
 \begin{abstract}
 \setlength{\baselineskip}{20pt}
 \vspace{30pt}
-随着信息技术的飞速发展，数据库系统的稳定性和性能对现代业务至关重要。数据库在进行版本升级、迁移、调优等运维变更时，面临不可预知的风险。传统的压力测试方法难以真实模拟复杂的生产业务环境。利用真实生产流量进行捕获与回放，是评估变更影响的有效手段。然而，在 PostgreSQL 生态中，现有的开源回放工具在高并发模拟精度、事务一致性保障等方面存在明显不足。
+随着信息技术的飞速发展，数据库系统的稳定性和性能对现代业务至关重要。数据库在进行版本升级、迁移、调优等运维变更时，面临不可预知的风险。传统的压力测试方法难以真实模拟复杂的生产业务环境。利用真实生产流量进行捕获与回放，是评估变更影响的有效手段。然而，在开源数据库生态中，现有的回放工具在高并发模拟精度、事务一致性保障等方面存在明显不足。
 
-针对上述挑战，本文以 PostgreSQL 为研究目标，设计并实现了一套基于数据库审计日志（pgaudit）的高保真流量回放系统，为数据库变更测试提供了可靠的解决方案。本文的主要研究工作和贡献如下：
+针对上述挑战，本文设计并提出了一套通用的基于结构化审计日志的高保真流量回放机制，并以 PostgreSQL 及其 pgaudit 审计扩展为典型平台进行了系统实现与验证，为数据库变更测试提供了可靠的解决方案。本文的主要研究工作和贡献如下：
 
 \textbf{1.}
 提出了一种基于插件化架构的异构审计日志解析与流式事务重组机制。针对海量乱序的审计日志，设计了基于哈希映射的单遍重组算法，在 $O(N)$ 时间复杂度内精确重构了会话分流与事务时序上下文，解决了传统工具难以获取准确事务边界的问题。
@@ -50,9 +50,9 @@
 \begin{enabstract}
 \setlength{\baselineskip}{20pt}
 \vspace{30pt}
-With the rapid development of information technology, the stability and performance of database systems are critical to modern businesses. When executing operational changes such as version upgrades, migrations, and parameter tuning, databases face unpredictable risks. Traditional stress testing methods fall short in accurately simulating complex production workloads. Capturing and replaying real production traffic has proven to be an effective approach for evaluating the impact of such changes. However, in the PostgreSQL ecosystem, existing open-source replay tools exhibit significant deficiencies in high-concurrency simulation accuracy and transaction consistency guarantees.
+With the rapid development of information technology, the stability and performance of database systems are critical to modern businesses. When executing operational changes such as version upgrades, migrations, and parameter tuning, databases face unpredictable risks. Traditional stress testing methods fall short in accurately simulating complex production workloads. Capturing and replaying real production traffic has proven to be an effective approach for evaluating the impact of such changes. However, in the open-source database ecosystem, existing replay tools exhibit significant deficiencies in high-concurrency simulation accuracy and transaction consistency guarantees.
 
-To address these challenges, this thesis designs and implements a high-fidelity database workload replay system based on database audit logs (pgaudit) for PostgreSQL, providing a reliable solution for database change testing. The main research work and contributions are as follows:
+To address these challenges, this thesis proposes a general high-fidelity database workload replay mechanism based on structured audit logs, and implements and validates it using PostgreSQL with the pgaudit extension as a representative platform, providing a reliable solution for database change testing. The main research work and contributions are as follows:
 
 \textbf{1.}
 Proposed a heterogeneous audit log parsing and streaming transaction recombination mechanism based on a plugin architecture. To handle massive and out-of-order audit logs, a single-pass recombination algorithm based on hash mapping was designed. It achieves precise reconstruction of session streams and transaction timing contexts in $O(N)$ time complexity, overcoming the difficulty of obtaining accurate transaction boundaries in traditional replay tools.
