@@ -34,6 +34,40 @@
 
 在\textbf{评测可重复性与观测扰动}方面，系统不仅要“回放得快”，还要“测得准”。因此，评估链路必须能够基于统一时间窗稳定采样 TPS/QPS、活跃事务数和时延分位数，且采样与聚合本身的额外开销应尽量低，以免统计逻辑反过来影响回放过程。同一任务在相同输入、相同初始快照和相同配置下重复执行时，其关键指标波动应控制在可解释范围内，从而保证评测结果具备可重复、可比较和可审计的工程价值。
 
+\subsection{问题建模与核心抽象}
+
+为了避免后续章节在介绍日志解析、事务重组与回放调度时反复回到概念层讨论，本文首先对系统处理对象作统一抽象。对于任意来源的数据库审计日志，只要解析器能够将其转换为统一的“回放单元”（Replay Unit）序列，后续的流量处理与并发回放过程便可在同一形式化框架下展开。
+
+\textbf{定义 1 (解析日志流, Parsed Log Stream)}
+设解析后的日志流为 $S_{log}$，它是一个按时间戳粗略排序的日志条目序列：
+\begin{equation}
+    S_{log} = \langle l_1, l_2, \dots, l_N \rangle
+\end{equation}
+其中，每个日志条目 $l_i$ 可视为一个“回放单元”，包含了执行该操作所需的核心信息：
+\begin{equation}
+    l_i = (ts_i, sid_i, xid_i, op_i, sql_i, \dots)
+\end{equation}
+式中，$ts_i$ 为语句执行的精确时间戳，$sid_i$ 为会话标识符（Session ID），$xid_i$ 为事务标识符（Transaction ID），$op_i$ 为操作类型（如 \texttt{SELECT}, \texttt{INSERT}, \texttt{BEGIN}），$sql_i$ 为具体的 SQL 语句文本。
+
+\textbf{定义 2 (可回放事务, Replayable Transaction)}
+一个可回放事务 $T_j$ 是一个严格有序的操作序列，该序列在逻辑上构成一个不可分割的工作单元，满足 ACID (Atomicity, Consistency, Isolation, Durability) 特性。
+\begin{equation}
+    T_j = \langle l_{j,1}, l_{j,2}, \dots, l_{j,m} \rangle, \quad \text{s.t.} \quad \forall k \in [1, m-1], ts_{j,k} \le ts_{j,k+1}
+\end{equation}
+
+\textbf{定义 3 (会话, Session)}
+一个会话 $C_k$ 是由单个客户端连接产生的所有事务的集合。在理想情况下，一个会话内的所有操作在时间上是连续的，且事务之间不会交叉。
+\begin{equation}
+    C_k = \{ T_j \mid \forall l \in T_j, l.sid = k \}
+\end{equation}
+
+因此，数据库流量回放系统在建模层面的核心任务，就是实现一个函数 $\mathcal{F}$，将输入的 $S_{log}$ 转化为一个由若干可回放事务组成的集合 $\mathcal{T}_{replay}$：
+\begin{equation}
+    \mathcal{F}: S_{log} \rightarrow \mathcal{T}_{replay} = \{ T_1, T_2, \dots, T_M \}
+\end{equation}
+
+上述形式化定义明确了本文后续各章节的分工：第 4 章重点讨论如何从异构日志中构造并重组这些回放单元，第 5 章则基于该抽象验证系统实现与实验评估结果。
+
 \subsection{系统架构}
 
 系统采用经典的分层架构设计（Layered Architecture）\cite{CleanArchitecture}，自上而下划分为接入层、服务层、核心逻辑层与数据持久层。层级之间遵循低耦合原则，通过清晰的接口定义进行交互。
@@ -195,4 +229,4 @@
 表 \ref{tab:replay_aggregation} 按照 SQL 指纹维度对回放数据进行聚合，用于分析慢查询及特定类型 SQL 的性能表现。
 \subsection{本章小结}
 
-本章详细阐述了数据库流量回放系统的总体设计方案。首先从日志解析、回放控制、差异校验三个维度明确了功能需求；其次确定了高并发、低延迟的性能目标；接着提出了基于 Go 语言的分层架构设计；最后给出了基于 GORM 的核心数据库表结构设计。该方案为后续的核心实现提供了坚实的架构指导。
+本章从系统层面对数据库流量回放平台进行了总体设计。首先围绕日志解析、流量控制、差异校验与两类报告生成梳理了功能需求，并明确了高并发、低延迟、流式处理、可重复观测等性能目标；随后给出了面向后续章节的统一问题建模与核心抽象，明确了“回放单元—事务—会话”的基本处理对象；在此基础上，进一步完成了系统分层架构与元数据存储结构设计。上述内容共同构成了全文的设计基线，为第 4 章展开关键技术实现、第 5 章开展平台落地、保真验证与变更评估提供了统一前提。
