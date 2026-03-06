@@ -7,7 +7,7 @@
 
 随着信息技术的飞速发展，数据库系统已成为现代企业信息化基础设施的核心组件。从金融交易、电子商务到社交网络、物联网等领域，关系型数据库管理系统（Relational Database Management System, RDBMS）\cite{DatabaseSystemConcepts}承载着海量的在线事务处理（Online Transaction Processing, OLTP）负载，其稳定性和性能直接关系到业务的连续性与用户体验\cite{TPC-C}。在此背景下，数据库系统的版本升级、硬件迁移、参数调优以及索引优化等运维操作日益频繁。然而，这些变更往往伴随着不可预知的性能风险：一次看似无害的数据库版本升级可能引发查询计划的退化（Query Plan Regression）\cite{QueryOptimization}，一项配置参数的修改可能在高并发场景下导致严重的锁竞争（Lock Contention）。如何在变更正式上线之前，充分、准确地评估其对生产环境的潜在影响，是数据库运维领域面临的核心挑战之一。
 
-传统的数据库变更测试方法主要依赖人工构造测试用例或使用标准化基准测试工具（如 Sysbench\cite{sysbench}、TPC-C\cite{TPC-C}）。前者存在测试覆盖率不足、难以模拟真实业务负载复杂性的问题，且在大规模随机生成测试（Stochastic Testing）\cite{DBTest}方面面临极大挑战；后者虽然能提供标准化的性能度量，但其固定的工作负载模式与实际生产环境的流量特征（如时间分布的不均匀性、SQL 类型的多样性、并发模式的复杂性）存在显著差异\cite{ProductionWorkload}。Oracle 公司在其 11g 版本中率先引入了 Database Replay\cite{OracleDatabaseReplay} 功能，开创了"捕获生产负载—回放测试"的技术路线，证明了利用真实生产流量进行变更验证以及作为混沌工程（Chaos Engineering）\cite{ChaosEngineering}实践的基础室验的巨大价值。这一方法的核心优势在于：它不再依赖人工假设或抽象模型，而是直接使用生产环境中真实发生的数据库访问请求作为测试输入，从而能够最大程度地覆盖业务逻辑的复杂性和多样性。
+传统的数据库变更测试方法主要依赖人工构造测试用例或使用标准化基准测试工具（如 Sysbench\cite{sysbench}、TPC-C\cite{TPC-C}）。前者存在测试覆盖率不足、难以模拟真实业务负载复杂性的问题，且在大规模随机生成测试（Stochastic Testing）\cite{DBTest}方面面临极大挑战；后者虽然能提供标准化的性能度量，但其固定的工作负载模式与实际生产环境的流量特征（如时间分布的不均匀性、SQL 类型的多样性、并发模式的复杂性）存在显著差异\cite{ProductionWorkload}。Oracle 公司在其 11g 版本中率先引入了 Database Replay\cite{OracleDatabaseReplay} 功能，开创了"捕获生产负载—回放测试"的技术路线，证明了利用真实生产流量进行变更验证，并将其作为混沌工程（Chaos Engineering）\cite{ChaosEngineering}实践的重要基础的巨大价值。这一方法的核心优势在于：它不再依赖人工假设或抽象模型，而是直接使用生产环境中真实发生的数据库访问请求作为测试输入，从而能够最大程度地覆盖业务逻辑的复杂性和多样性。
 
 然而，对于广泛应用于互联网和关键基础设施领域的开源数据库而言，目前普遍缺乏一套成熟的、高保真的流量回放解决方案。以 PostgreSQL 为例，开源工具 pgreplay\cite{pgreplay} 虽然能够解析其原生日志并重放 SQL 语句，但在事务一致性保障、高并发模拟精度以及结果差异自动检测等方面存在明显不足：pgreplay 对参数化查询（Prepared Statement）的支持有限，且缺乏对事务边界的精细化管理。在 MySQL 生态中，Percona 公司开发的 pt-upgrade\cite{ptupgrade} 同样局限于逐条顺序执行 SQL 语句，不涉及并发模拟和事务边界管理。总体而言，现有开源回放工具均难以满足对回放保真度有严格要求的场景（如数据库版本兼容性验证、SQL 执行计划回归测试等）。
 
@@ -41,11 +41,11 @@
 
 \subsubsection{数据库审计日志技术}
 
-数据库审计日志（Database Audit Log）是记录数据库操作行为的重要机制，广泛应用于安全合规、入侵检测和操作审计等场景\cite{MySQLAudit,SQLServerAudit}。从本文研究的角度来看，审计日志也是一种高质量的流量数据源，其记录的操作级别、信息完整性和结构化程度优于传统的数据库查询日志。
+如果说网络层方案更擅长还原数据库客户端与服务端之间的“通信过程”，那么审计日志技术则更接近数据库内部真实的执行语义。相较于普通查询日志或慢查询日志，结构化审计日志能够在数据库执行路径上记录更细粒度的操作信息，因此不仅广泛应用于安全合规、入侵检测和操作审计等场景\cite{MySQLAudit,SQLServerAudit}，也为高保真流量回放提供了更合适的数据来源。
 
-PostgreSQL 提供了基础的日志记录能力（通过 \texttt{log\_statement} 配置参数），可以记录执行的 SQL 语句。然而，原生日志的信息粒度有限，例如无法直接获取参数化查询的实际参数值。pgaudit 扩展\cite{pgaudit}弥补了这一不足，它作为 PostgreSQL 的审计扩展模块，利用数据库内核提供的标准钩子机制（Executor Hook 和 ProcessUtility Hook），在 SQL 语句执行的关键路径上植入审计记录逻辑。pgaudit 能够生成符合多种合规标准（如 PCI-DSS、SOX）要求的审计日志，其记录内容包括：语句类型（DDL/DML/DCL）、操作子类型（SELECT/INSERT/UPDATE/DELETE）、完整的 SQL 文本及其绑定参数、操作涉及的数据库对象（Schema、Table）以及虚拟事务 ID（Virtual Transaction ID, VxID）等。
+以 PostgreSQL 为例，系统虽然可以通过 \texttt{log\_statement} 等机制记录 SQL 语句，但原生日志通常缺少参数值、稳定的事务关联标识以及足够丰富的上下文信息，难以直接支撑事务级别的精确回放。pgaudit 扩展\cite{pgaudit} 在此基础上提供了更强的结构化审计能力。它借助数据库内核提供的标准钩子机制（Executor Hook 和 ProcessUtility Hook），在语句执行的关键路径上记录审计信息，其内容包括语句类型（DDL/DML/DCL）、操作子类型（SELECT/INSERT/UPDATE/DELETE）、完整的 SQL 文本及其绑定参数、操作涉及的数据库对象（Schema、Table）以及虚拟事务 ID（Virtual Transaction ID, VxID）等。
 
-这些丰富的结构化信息使得基于 pgaudit 日志的流量回放成为可能，且相比其他数据源具有以下优势：首先，VxID 信息使得事务边界的精确重构成为可能；其次，完整的参数信息消除了参数化查询重新绑定的困难；最后，操作对象信息有助于更细粒度的差异分析和归因。
+这些结构化字段恰好对应高保真回放所需的关键上下文：VxID 信息有助于精确重构事务边界，完整参数信息降低了参数化语句重新绑定的难度，而操作对象信息则便于在回放后开展更细粒度的差异定位与原因分析。因此，数据库审计日志技术不仅是安全审计的重要基础，也构成了本文后续流量提取、事务重组与结果校验机制的数据基础。
 
 \subsubsection{并发编程与流量模拟技术}
 
@@ -72,7 +72,7 @@ PostgreSQL 提供了基础的日志记录能力（通过 \texttt{log\_statement}
 
 \subsection{本文组织结构}
 
-本文的主要内容一共分为六章，各章节的安排如下。
+全文共分为六章，各章节的安排如下。
 
 第一章为绪论，介绍本文的研究背景与意义，综述数据库流量回放技术、审计日志技术和并发编程模型的研究现状，阐述本文的主要研究内容与创新点，并给出全文的组织结构。
 
