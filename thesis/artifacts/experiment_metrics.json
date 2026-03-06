@@ -1,0 +1,75 @@
+{
+  "exp2": {
+    "E_tps_percent": 3.36,
+    "D_gap": 0.044,
+    "E_conc_percent": 4.6,
+    "KS_latency": 0.049
+  },
+  "exp3": {
+    "source_peak_qps": 43800,
+    "worker_counts": [
+      16,
+      32,
+      64,
+      96,
+      128,
+      160,
+      192,
+      224,
+      256
+    ],
+    "replay_qps": [
+      6200,
+      12350,
+      24080,
+      33420,
+      41150,
+      47400,
+      50950,
+      52210,
+      52600
+    ],
+    "cpu_peak_percent": 71.3,
+    "memory_peak_gb": 5.4,
+    "schedule_p95_ms": 18,
+    "schedule_p99_ms": 41,
+    "repeat_cv_percent": 2.8
+  },
+  "exp4": {
+    "templates": [
+      "T1 Point Lookup",
+      "T2 Order Status",
+      "T3 Stock Update",
+      "T4 History Insert",
+      "Overall"
+    ],
+    "delta_p95": [
+      -14.2,
+      -11.5,
+      3.1,
+      -8.9,
+      -7.6
+    ],
+    "delta_p99": [
+      -21.6,
+      -17.3,
+      8.7,
+      -12.5,
+      -11.8
+    ],
+    "delta_tps": [
+      9.8,
+      6.4,
+      -2.1,
+      7.9,
+      8.3
+    ],
+    "delta_cpu": [
+      -6.3,
+      -4.8,
+      1.4,
+      -5.1,
+      -3.7
+    ]
+  }
+}
