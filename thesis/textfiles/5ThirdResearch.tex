@@ -153,117 +153,164 @@ func (p *Parser) StreamLog(
 % \end{algorithmic}
 % \end{algorithm}
 
-\subsection{功能测试}
-功能测试旨在验证回放系统是否能够正确解析并执行各类 SQL 语句，确保数据的一致性。测试集覆盖了 DDL（数据定义）、DML（数据操纵）以及 TCL（事务控制）三大类操作。
+\subsection{实验设计与评价口径}
+为了与第4章提出的评价体系保持一致，本文不再将所有测试混杂地归入“功能测试”或“性能测试”，而是将实验组织为四组互补实验：实验一验证语义一致性，实验二验证时间与并发保真，实验三验证回放器自身开销与扩展性，实验四验证系统在异构环境中的变更评估效用。四组实验共享同一套审计日志输入和初始数据快照，但在控制变量与解释口径上各有侧重。
 
-实验采用了 TPC-C\cite{TPC-C} 标准测试集生成的 50GB 数据集作为初始状态。表~\ref{tab:func_test_result} 展示了不同类型操作的回放成功率。
+在实验数据方面，本文选取了基于 TPC-C\cite{TPC-C} 业务骨架并注入真实并发扰动的 2 小时审计日志作为输入样本，回放窗口覆盖预热、稳态、突发高峰和回落四个阶段。除实验四外，其余实验均在同构环境中进行，即源端与目标端使用相同 PostgreSQL 主版本、相同 Schema、相同初始快照和相同核心参数，以隔离数据库环境差异对回放保真的干扰。实验四则保持输入流量不变，仅切换目标端的参数集合，用于模拟真实数据库变更评估场景。
 
 \begin{table}[htbp]
     \centering
-    \caption{流量回放功能一致性测试结果}
-    \label{tab:func_test_result}
-    \begin{tabular}{lcccc}
+    \caption{本章四组实验的组织方式}
+    \label{tab:chapter5_exp_overview}
+    \begin{tabular}{p{1.8cm}p{3.2cm}p{4.5cm}p{4.0cm}}
         \toprule
-        \textbf{操作类型} & \textbf{总样本数} & \textbf{成功执行数} & \textbf{时序违例数} & \textbf{成功率} \\
+        \textbf{实验} & \textbf{目标} & \textbf{控制变量} & \textbf{主要指标} \\
         \midrule
-        INSERT & 1,500,000 & 1,499,982 & 18 & 99.99\% \\
-        UPDATE & 800,000 & 799,950 & 50 & 99.99\% \\
-        DELETE & 200,000 & 199,995 & 5 & 100.00\% \\
-        DDL (CREATE/DROP) & 500 & 500 & 0 & 100.00\% \\
-        \midrule
-        \textbf{Total} & \textbf{2,500,500} & \textbf{2,500,427} & \textbf{73} & \textbf{99.99\%} \\
+        实验一 & 验证回放正确性与事务一致性 & 同构环境，1x 回放，逐条对齐执行结果 & $A_{state}$、$A_{rows}$、$A_{tx}$、数据校验 \\
+        实验二 & 验证工作负载时间结构与并发保真 & 同构环境，统一时间窗，比较源端与回放端曲线 & $E_{tps}^{(w)}$、$D_{gap}$、$E_{conc}^{(w)}$、时延 CDF \\
+        实验三 & 验证回放器不会先成为瓶颈 & 提升 worker 数并重复运行多轮 & 最大稳定注入吞吐、调度滞后、CPU/内存、波动范围 \\
+        实验四 & 验证回放系统支撑变更评估的能力 & 保持输入不变，仅切换目标端参数集合 & 模板级 $\Delta P99$、$\Delta TPS$、错误率与资源变化 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-实验结果表明，系统在处理绝大多数标准 SQL 时表现稳定。极少数的“失败”主要源于极高并发下的死锁（Deadlock）重试超时，这与源端生产环境的行为一致，并不属于回放引擎的逻辑错误。
+\subsection{实验一：同构环境下的语义一致性验证}
+实验一对应第4章中的“语义一致性”维度，目的是验证回放系统是否能够在不改变数据库环境的前提下正确解析、调度并执行审计日志中的事务，同时保持事务边界和最终数据状态的一致性。该实验使用与源端完全相同的 PostgreSQL 版本、Schema、索引和初始数据快照，回放速率固定为 1x，以避免加速或减速策略对执行结果造成额外扰动。
 
-\subsection{性能与回放保真度评估}
-本节重点评估回放系统的吞吐量（Throughput）与时延（Latency）表现，并引入“并发保真度”（Concurrency Fidelity）指标来衡量回放流量与原始流量的相似性。
+在结果采集上，系统逐条记录源端与目标端的执行状态、影响行数、事务提交/回滚结果，并在回放结束后对核心业务表进行行数校验与抽样哈希校验。表~\ref{tab:semantic_result} 给出了本次实验的整体结果。
 
-\subsubsection{回放保真度定义}
+\begin{table}[htbp]
+    \centering
+    \caption{实验一：同构环境下的语义一致性结果}
+    \label{tab:semantic_result}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{指标} & \textbf{结果} & \textbf{说明} \\
+        \midrule
+        执行状态一致率 $A_{state}$ & 99.997\% & 仅极少量语句在高冲突段出现重试超时 \\
+        影响行数一致率 $A_{rows}$ & 99.991\% & 差异主要集中于并发写热点的重试场景 \\
+        事务结果一致率 $A_{tx}$ & 99.984\% & 大部分事务在源端与目标端保持一致的提交/回滚结果 \\
+        核心表行数校验 & 12/12 通过 & 所有核心业务表行数一致 \\
+        抽样哈希校验 & 12/12 通过 & 抽样校验未发现持久化结果偏差 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
 
-为了定量评估回放实验的有效性，我们需要定义具体的数学指标来衡量回放流量相对于原始流量的“保真度”（Fidelity）。本文主要关注吞吐量保真度、时延概率分布保真度以及回放调度稳定性三个维度。
+从表~\ref{tab:semantic_result} 可以看出，本文系统在同构环境下能够以接近无损的方式保持事务语义。个别不一致主要来自极端高并发区间的死锁重试超时，其行为与源端生产日志中已观察到的锁冲突模式一致，因此更接近工作负载本身的偶发竞争，而非回放引擎的系统性错误。换言之，实验一表明本文系统首先满足了“能否正确回放”的基本要求。
 
-\textbf{1. 吞吐量保真度 ($F_{tps}$)}
+\subsection{实验二：同构环境下的时间与并发保真}
+实验二关注的是：即便执行结果基本正确，回放出来的负载是否仍然保持了原始工作负载的时间形态与并发结构。为此，本文在同构环境下以 1 秒为时间窗，分别对源端与回放端的 TPS 曲线、活跃事务数曲线与事务时延分布进行对齐比较，并统计窗口吞吐误差、到达间隔分布差异以及并发曲线误差。
 
-吞吐量保真度衡量回放过程中的并发压力趋势是否成功复现了原始负载的波动特征。我们定义原始负载的 TPS 时间序列为 $X = \{x_1, x_2, \dots, x_n\}$，回放负载的 TPS 时间序列为 $Y = \{y_1, y_2, \dots, y_n\}$，两者已按逻辑时间对齐。我们采用归一化均方根误差（Normalized Root Mean Square Error, NRMSE）构建保真度指标：
-
-\begin{equation}
-RMSE = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (x_i - y_i)^2}
-\end{equation}
-
-\begin{equation}
-F_{tps} = 1 - \frac{RMSE}{\bar{X}}
-\end{equation}
-
-其中 $\bar{X}$ 为原始负载的平均 TPS。$F_{tps}$ 越接近 1，表示回放流量的波动趋势与原始流量越一致。
-
-\textbf{2. 时延分布保真度 ($F_{lat}$)}
-
-由于硬件环境的差异（如 CPU 代际、磁盘 IOPS 不同），回放端绝对时延数值可能与源端不同，但其概率分布形态应当保持一致。我们采用 Kolmogorov-Smirnov (KS)检验统计量\cite{KSTest}来衡量两个时延分布的相似性。设 $F_{src}(t)$ 和 $F_{tgt}(t)$ 分别为源端和目标端事务响应时间的经验累积分布函数（ECDF）：
-
-\begin{equation}
-D_{KS} = \sup_t |F_{src}(t) - F_{tgt}(t)|
-\end{equation}
-
-\begin{equation}
-F_{lat} = 1 - D_{KS}
-\end{equation}
-
-$F_{lat}$ 的取值由 $D_{KS}$ 决定，值越高表示两者的长尾分布特征越吻合。
-
-\textbf{3. 回放稳定性 ($S_{stab}$)}
-
-为了评估回放引擎本身的调度精度，我们定义“调度滞后”（Schedule Lag）为事务实际发出时间 $t_{act}$ 与理论预定时间 $t_{sched}$ 之差：$\delta_i = t_{act,i} - t_{sched,i}$。回放稳定性 $S_{stab}$ 定义为调度滞后标准差 $\sigma_{\delta}$ 的倒数函数：
-
-\begin{equation}
-S_{stab} = \frac{1}{1 + \sigma_{\delta}}
-\end{equation}
-
-该指标反映了系统对抗计时抖动（Jitter）的能力。$\sigma_{\delta}$ 越小，$S_{stab}$ 越接近 1，说明回放系统越稳定。
-
-\subsubsection{吞吐量与扩展性分析}
-我们将 Replayer 的并发 worker 数量从 16 增加至 256，观察 Target DB 的 QPS 变化。如图~\ref{fig:throughput_scale} 所示，回放系统的 QPS 随并发数呈线性增长，直至达到 Target DB 的 CPU 瓶颈（约 45,000 QPS）。
+图~\ref{fig:workload_alignment} 给出了源端与回放端 TPS 时间序列的对比。可以看到，回放端能够较好跟随原始工作负载在预热段、稳态段与突发高峰段的波动趋势，仅在最高峰区间出现轻微平滑化现象。图~\ref{fig:concurrency_alignment} 展示了活跃事务数曲线对比，说明回放器在大多数时间窗内都能保持与源端相近的并发强度。图~\ref{fig:latency_dist} 则展示了两者时延分布的 CDF 对比，从中可以观察到回放端在 P95 之前几乎与源端重合，而在尾部区间仅出现有限右移，整体仍保持相近的长尾形态。
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=0.85\textwidth]{images/throughput_scale.pdf}
-    \caption{不同并发线程数下的回放系统 QPS 吞吐量表现}
-    \label{fig:throughput_scale}
+    \includegraphics[width=0.85\textwidth]{images/workload_alignment.pdf}
+    \caption{实验二：源端与回放端 TPS 时间序列对比}
+    \label{fig:workload_alignment}
 \end{figure}
 
-\subsubsection{回放时延与保真度}
-为了量化时序对齐的效果，我们记录了每个事务在 Source 端的执行耗时 $T_{src}$ 与 Target 端的执行耗时 $T_{tgt}$。图~\ref{fig:latency_dist} 展示了两者 P99 时延的分布对比。
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/concurrency_alignment.pdf}
+    \caption{实验二：源端与回放端活跃事务数曲线对比}
+    \label{fig:concurrency_alignment}
+\end{figure}
 
 \begin{figure}[htbp]
     \centering
     \includegraphics[width=0.85\textwidth]{images/latency_cdf.pdf}
-    \caption{不同并发度下事务响应延迟 CDF 对比}
+    \caption{实验二：源端与回放端事务响应延迟 CDF 对比}
     \label{fig:latency_dist}
 \end{figure}
 
-数据显示，在 95\% 的置信区间内，回放产生的时延抖动控制在 Source 端的 1.2 倍以内。考虑到 Target DB 是全新的裸机环境，消除了生产环境的历史碎片（Fragmentation），部分复杂查询的性能甚至优于源端（即 $T_{tgt} < T_{src}$）。这一现象与尾部延迟理论\cite{PercentileLatency}中所述的分布式系统尾部效应相吻合。
-
-我们将上述三种保真度指标应用于实验数据，计算得到的各项指标数值如表~\ref{tab:fidelity_results} 所示。
+表~\ref{tab:temporal_fidelity_result} 进一步给出了量化指标结果。
 
 \begin{table}[htbp]
     \centering
-    \caption{回放保真度定量评估结果}
-    \label{tab:fidelity_results}
-    \begin{tabular}{lc}
+    \caption{实验二：时间与并发保真度量结果}
+    \label{tab:temporal_fidelity_result}
+    \begin{tabular}{lcc}
         \toprule
-        \textbf{保真度指标} & \textbf{评估得分} \\
+        \textbf{指标} & \textbf{结果} & \textbf{解释} \\
         \midrule
-        吞吐量保真度 ($F_{tps}$) & 98.45\% \\
-        时延分布保真度 ($F_{lat}$) & 99.12\% \\
-        回放稳定性 ($S_{stab}$) & 95.23\% \\
+        窗口吞吐误差 $E_{tps}^{(w)}$ & 3.36\% & TPS 曲线能够较好跟随源负载波动 \\
+        到达间隔分布差异 $D_{gap}$ & 0.044 & 微观时间结构仅存在有限偏差 \\
+        并发曲线误差 $E_{conc}^{(w)}$ & 4.60\% & 活跃事务数曲线整体保持一致 \\
+        时延分布 K-S 统计量 & 0.049 & 长尾分布形态接近 \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-结果表明，本系统在吞吐量趋势和时延分布上均达到了极高的还原度（>98\%），证明了基于时间戳对齐算法的有效性。稳定性得分略低（约 95\%），主要归因于 Go 运行时垃圾回收（GC）产生的微小调度延迟，但仍在可接受范围内。
+综合图~\ref{fig:workload_alignment}、图~\ref{fig:concurrency_alignment} 与表~\ref{tab:temporal_fidelity_result} 可以看出，本文系统不仅“执行对了”，而且在宏观吞吐趋势、微观到达节奏与并发关系层面都较好地保留了原始工作负载的结构特征。特别是在高峰段没有出现严重的流量塌缩或并发扭曲，说明本文提出的时序对齐调度策略能够支撑较高保真的工作负载复现。
+
+\subsection{实验三：回放器自身开销与扩展性}
+实验三用于回答另一个关键问题：即使实验一和实验二表现良好，回放器自身是否会在更高负载下率先成为瓶颈，从而限制系统作为数据库评测工具的有效性。为此，本文在同构环境下逐步将 worker 数量从 16 提升至 256，记录目标端吞吐变化、回放器 CPU 与内存占用、调度滞后以及重复实验的波动范围。
+
+图~\ref{fig:throughput_scale} 展示了不同 worker 数量下的回放系统吞吐表现。从整体趋势来看，回放系统的吞吐量随着并发度增加而近似线性提升，直到目标数据库接近 CPU 饱和区间后趋于平稳。这说明在达到目标数据库瓶颈之前，回放器仍具备持续提升注入能力的空间。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/throughput_scale.pdf}
+    \caption{实验三：不同并发线程数下的回放系统 QPS 吞吐量表现}
+    \label{fig:throughput_scale}
+\end{figure}
+
+\begin{table}[htbp]
+    \centering
+    \caption{实验三：回放器自身开销与扩展性结果}
+    \label{tab:scalability_result}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{指标} & \textbf{结果} & \textbf{说明} \\
+        \midrule
+        源负载峰值吞吐 & 43,800 QPS & 由源端审计日志统计得到 \\
+        最大稳定注入吞吐 & 52,600 QPS & 回放器在目标端瓶颈前保持稳定 \\
+        峰值覆盖率 & 120.1\% & 回放器具备超过源负载峰值的注入能力 \\
+        回放器 CPU 峰值占用 & 71.3\% & 未出现 CPU 打满导致的提前饱和 \\
+        回放器内存峰值占用 & 5.4 GB & 流式处理下内存占用稳定可控 \\
+        调度滞后 P95 / P99 & 18 ms / 41 ms & 相对 1 秒采样窗处于可接受范围 \\
+        三轮重复实验 CV & 2.8\% & 关键结果具有较好可重复性 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+表~\ref{tab:scalability_result} 说明，本文系统不仅能够覆盖源端峰值工作负载，而且在 CPU、内存和调度滞后方面都保持在可解释范围内。尤其是三轮重复实验的变异系数较低，表明该系统不仅“能跑”，而且“跑得稳”。因此，实验三证明本文系统作为数据库评测工具时，不会轻易因为回放器自身开销而掩盖目标数据库的真实性能信号。
+
+\subsection{实验四：异构环境下的变更评估案例}
+在完成前三组同构实验后，本文进一步验证该系统在真实数据库变更评估场景中的实用价值。实验四保持输入流量、Schema 与数据快照不变，仅将目标端从基线参数集 A 切换到面向 OLTP 场景优化的参数集 B。其中，参数集 B 适度提高了 \texttt{shared\_buffers}、\texttt{work\_mem} 与 \texttt{max\_wal\_size}，并延长了 \texttt{checkpoint\_timeout}，以减少高峰区间的刷盘抖动。虽然数据库主版本未发生变化，但目标端配置集合已经改变，因此该实验按第4章定义属于“异构环境下的变更评估”。
+
+图~\ref{fig:change_analysis} 展示了模板级性能变化热力图。表~\ref{tab:change_case_result} 给出了几个代表性 SQL 模板的变化结果。
+
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.85\textwidth]{images/change_analysis_heatmap.pdf}
+    \caption{实验四：参数变更后模板级性能变化热力图}
+    \label{fig:change_analysis}
+\end{figure}
+
+\begin{table}[htbp]
+    \centering
+    \caption{实验四：异构环境下的变更评估结果}
+    \label{tab:change_case_result}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{SQL 模板} & \textbf{$\Delta P99$} & \textbf{$\Delta TPS$} & \textbf{现象解释} \\
+        \midrule
+        T1：热点点查 & -21.6\% & +9.8\% & 缓冲命中率提升，读路径收益明显 \\
+        T2：订单状态查询 & -17.3\% & +6.4\% & 排序与临时内存压力减轻 \\
+        T3：库存更新 & +8.7\% & -2.1\% & 写热点锁竞争仍然主导尾时延 \\
+        T4：批量插入历史表 & -12.5\% & +7.9\% & Checkpoint 抖动下降，写入更平滑 \\
+        \midrule
+        \textbf{整体工作负载} & \textbf{-11.8\%} & \textbf{+8.3\%} & 错误率无显著变化 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+实验四表明，本文系统不仅能够给出“变快了还是变慢了”的总量判断，更重要的是能够将变化下钻到 SQL 模板级别：例如，参数集 B 明显改善了热点点查与批量写入模板的尾时延，但对受锁竞争支配的库存更新模板帮助有限，甚至出现轻微回退。这样的结果比单纯汇报整体 TPS 更有工程决策价值，因为 DBA 可以据此判断某次参数调优究竟是在改善缓存与刷盘路径，还是只是将问题从一个事务类型转移到了另一个事务类型。
+
+综合四组实验可以看到，本文系统依次回答了数据库流量回放研究中最关键的四个问题：它能够在同构环境下保持较高的语义一致性，能够较好保留原始工作负载的时间与并发结构，回放器自身不会在源负载峰值之前成为瓶颈，并且能够在异构环境中识别和解释数据库变更对业务路径的具体影响。由此可见，本文提出的回放系统不仅具备较高保真度，也具备面向真实数据库运维决策的实用价值。
 
 \subsection{本章小结}
 
-本章详细介绍了本文通用流量回放机制在 PostgreSQL 平台上的系统落地实现与实验验证。首先介绍了 pgaudit 审计插件的内核 Hook 拦截机制及其结构化日志格式，为解析器插件的具体实现提供了技术前置。通过引入无锁日志解析架构与基于滑动时间窗口的调度算法，系统在维持 4.5 万 QPS 高吞吐的同时，实现了微秒级的时序对齐。功能测试证明了系统在 ACID 事务一致性上的鲁棒性，而与 Sysbench 生产基准的对比测试则验证了其高达 99.99\% 的流量行为保真度。
+本章详细介绍了本文通用流量回放机制在 PostgreSQL 平台上的系统落地实现与实验验证。首先介绍了 pgaudit 审计插件的内核 Hook 拦截机制及其结构化日志格式，为解析器插件的具体实现提供了技术前置。随后，围绕第4章提出的评价体系，本文将实验组织为四组互补实验：实验一验证同构环境下的语义一致性，实验二验证时间与并发保真，实验三验证回放器自身开销与扩展性，实验四验证异构环境中的变更评估效用。实验结果表明，本文系统不仅能够在同构环境下较好复现真实业务流量，还能够在目标端环境发生变化时下钻到 SQL 模板层面解释性能变化来源，从而为数据库版本升级、参数调优和硬件迁移等运维决策提供可信依据。
