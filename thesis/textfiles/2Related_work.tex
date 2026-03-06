@@ -3,21 +3,51 @@
 \setcounter{figure}{0}
 \section{相关技术基础}
 
-本章将系统地介绍与数据库流量回放系统设计与实现密切相关的核心技术基础。首先，阐述 PostgreSQL 的审计日志机制及 pgaudit 扩展的工作原理；其次，回顾数据库事务管理中的 ACID 理论与多版本并发控制技术；接着，介绍 Go 语言基于 CSP 理论的并发编程模型；最后，概述数据库性能评估所依赖的标准基准测试体系。这些技术基础共同构成了本系统设计与实现的理论支撑。
+本章将系统地介绍与数据库流量回放系统设计与实现密切相关的核心技术基础。首先，回顾数据库流量捕获与回放技术的研究现状，分析各类技术路线的演进与优劣；其次，深入剖析 PostgreSQL 的审计日志机制及其底层 Hook 工作原理；接着，依托数据库事务管理中的 ACID 理论与多版本并发控制剖析事务隔离挑战；然后，结合 Go 语言的调度理论探讨分布系统中的时间轴时序控制与并发模型；最后，系统总结数据库性能基准测试体系以及用于衡量回放保真度的相关统计学理论，为本系统的设计提供全方位的理论支撑。
 
-\subsection{PostgreSQL 审计日志与 pgaudit 扩展}
+\subsection{数据库流量捕获与回放技术研究现状}
 
-\subsubsection{PostgreSQL 原生日志机制}
+数据库流量回放（Database Workload Replay）技术的核心思想是在不影响生产环境性能和可用性的前提下，捕捉真实的业务读写流量，并在测试环境中重新执行这些流量，以评估数据库版本升级、架构迁移、参数调优或索引变更的潜在影响。近年来，随着高可用架构和混沌工程的普及，该技术成为了学术界与工业界共同关注的研究热点。从实现途径来看，现有的流量回放方案主要分为基于网络层旁路嗅探的方法体系与基于数据库系统日志的无侵入式回放架构。
 
-PostgreSQL 数据库提供了一套高度可配置的日志记录框架，作为其运维监控与故障诊断的核心支撑\cite{PostgreSQLDoc}。通过对 \texttt{postgresql.conf} 配置文件中特定参数的精细化调节，系统管理员能够实现对日志输出目标、报文格式及详略程度的差异化控制。其中，\texttt{log\_destination} 参数界定了日志的物理存储媒介，支持 \texttt{stderr}、\texttt{csvlog} 及 \texttt{syslog} 等多种模式；特别是 \texttt{csvlog} 模式以逗号分隔值的结构化形式输出，显著提升了日志自动化解析的效率。此外，\texttt{log\_statement} 参数用于限定记录的 SQL 语句类型，涵盖了从数据定义语句（DDL）到全量请求（all）的过滤能力；而 \texttt{log\_line\_prefix} 则赋予了日志行前缀高度的定制化空间，可将时间戳、进程 ID、会话标识符及虚拟事务 ID 等关键上下文元数据嵌入其中。
+\subsubsection{基于网络层的流量旁路嗅探方案}
 
-尽管原生日志机制具备基础的记录能力，但在高保真流量回放场景下仍表现出显著的局限性。首先，针对预处理语句（Prepared Statement）触发的参数化查询，原生日志仅记录 \texttt{EXECUTE} 指令，而未能直接提供绑定参数后的完整 SQL 文本，这为后续的精确流量重构带来了极高挑战；其次，原生日志缺乏对特定行业审计合规标准的标准化支持，其信息的非结构化特征限制了其在严苛安全审计与高精度仿真中的应用价值。
+基于网络通信协议（Network Protocol）的旁路流量嗅探是相对成熟的一种解耦捕获方案。该技术路线的核心在于对数据库服务端与客户端之间的 TCP/IP 数据包进行深度包检测（Deep Packet Inspection, DPI）。例如，通过部署 \texttt{libpcap} 或类似的网络抓包工具，旁路拦截进出数据库默认监听端口的流量，并依据底层的通信协议规范（如 MySQL 的文本/二进制协议、PostgreSQL 的 Frontend/Backend 协议，或 SQL Server 的 TDS 协议）还原出原始的 SQL 语句和执行参数。
 
-\subsubsection{pgaudit 扩展的架构与工作原理}
+这种架构的显著优势在于对数据库内核处于绝对的“零侵入”状态，基本不消耗数据库服务器的 CPU 或磁盘 I/O 资源，极大降低了在生产核心库部署的门槛与风险。然而，网络层嗅探方案亦面临着难以跨越的瓶颈。首先，随着现代网络安全规范在数据传输层的要求日益严格，大多数生产数据库均已强制开启 SSL/TLS 加密传输。旁路嗅探难以在不持有私钥或不干扰客户端证书校验的情况下实现密文还原，这严重制约了其部署范围。其次，网络层捕获难以准确映射复杂的事务上下文。在一个高并发的 TCP 连接流中，事务的边界标识（如隐式提交、多语句组合、存储过程调用产生的递归 SQL）常常在网络包的分片与乱序中变得模糊不清，导致回放端难以精确重建原始的 ACID 事务原子性特征。
 
-针对原生日志在审计维度的缺失，开源插件 pgaudit\cite{pgaudit} 提供了深度的补强，旨在构建满足 PCI-DSS\cite{PCIDSS}、SOX\cite{SOX} 及 HIPAA\cite{HIPAA} 等主流合规性要求的细粒度审计体系。其架构核心在于对 PostgreSQL 内核两类关键钩子（Hook）的侵入式集成：一方面，通过 \texttt{ExecutorRun\_hook} 深度拦截标准数据操纵语言（DML）的执行流，实时捕获查询文本与其涉及的数据库对象；另一方面，利用 \texttt{ProcessUtility\_hook} 捕获各类实用程序命令（如 DDL 与 DCL 语句），确保了审计维度的全面性。
+\subsubsection{基于数据库日志与内核的捕获回放系统}
 
-通过对 \texttt{pgaudit.log} 及其子参数的合理配置，系统能够在 SQL 执行周期内生成高度结构化的审计记录，具体核心字段如表 \ref{tab:pgaudit_fields} 定义。
+为克服网络层嗅探在事务一致性和加密协议上的挑战，学术界与工业界更多转向了基于数据库原生日志机制或直接在数据库内核植入捕获逻辑的深度集成方案。
+
+Oracle Database Replay\cite{OracleDatabaseReplay} 是该领域极具代表性的工业级标杆。作为 Oracle Real Application Testing (RAT) 组件的核心，Database Replay 被深度植入于 Oracle 数据库引擎内部。它能够在极低的系统开销（官方宣称性能损耗通常低于 5\%）下，全面、高保真地捕获所有外部客户端发起的工作负载（Workload），涵盖纯 SQL 语句、PL/SQL 执行块、并发控制元数据及各类上下文时序信息。回放阶段，它利用原始负载中的系统全局可序列化号（System Change Number, SCN）以及严格的内核时钟同步机制\cite{OracleReplayVLDB}，精确重建事务的前后依赖关系，从而能在高度并发的状态下最大限度地避免回放发散（Divergence）问题。
+
+在开源数据库生态中，PostgreSQL 的 \texttt{pgreplay}\cite{pgreplay} 是一款广泛使用的经典分析与评测工具。它通过读取 PostgreSQL 的原生文本或 CSV 格式日志，提取出 SQL 文本并尝试根据原始的相对时间间隔发往目标库重放。然而，\texttt{pgreplay} 的设计初衷更多倾斜于简单的性能压测而非事务级的高保真验证。其局限性体现在：首先，面对由驱动层发起的预编译查询（Prepared Statement），\texttt{pgreplay} 往往仅能捕获到 \texttt{EXECUTE} 指令，而丢失了实际的绑定参数（Bind Parameters），致使大量含有动态变量的业务逻辑无法还原；其次，它在多并发回放时缺乏对事务内在顺序和多版本可见性的深层管理，容易在回放因冲突重试等复杂业务流时出现大量非预期的报错。
+
+此外，Percona 公司针对 MySQL 生态开发的 \texttt{pt-upgrade}\cite{ptupgrade} 与 \texttt{Percona Playback} 工具，主要利用慢查询日志（Slow Query Log）或通用查询日志（General Query Log）作为数据源。HANA 团队\cite{SAPHANAWorkloadReplay} 也曾发表过将工作负载回放技术深度用于自动化回归测试和异常根因分析的探索。虽然这些工作在错误排查上取得了显著成果，但在基于纯文本日志进行长连接、长事务流的精准会话重排与时间轴拟合方面，仍未提供完美的通用范式。这正是本课题引入具备强大结构化与挂钩能力的审计插件以突破回放瓶颈的立足点。
+
+\subsection{PostgreSQL 审计日志与核心机制}
+
+\subsubsection{PostgreSQL 原生日志机制及其局限性}
+
+PostgreSQL 数据库提供了一套高度可配置的日志记录框架，作为其运维监控与故障诊断的核心支撑\cite{PostgreSQLDoc}。通过对 \texttt{postgresql.conf} 配置文件中特定参数的精细化调节，系统管理员能够实现对日志输出目标、报文格式及详略程度的差异化控制。其中，\texttt{log\_destination} 参数界定了日志的物理存储媒介，支持 \texttt{stderr}、\texttt{csvlog} 及 \texttt{syslog} 等多种模式；特别是 \texttt{csvlog} 模式以逗号分隔值的结构化形式输出，显著提升了日志自动化解析的效率。此外，\texttt{log\_statement} 参数用于限定记录的 SQL 语句类型，涵盖了从数据定义语句（DDL）到全量请求（all）的过滤能力；而 \texttt{log\_line\_prefix} 则赋予了日志行前缀高度的定制化空间，可将时间戳、进程 ID、会话标识符（Session ID）及虚拟事务 ID（Virtual Transaction ID, VxID）等关键上下文元数据嵌入其中。
+
+尽管原生日志机制具备基础的记录能力，但在高保真流量回放场景下仍表现出显著的局限性。首先，针对由中间件或特定接口发起的预处理语句（Prepared Statement）和参数化查询，原生日志的 \texttt{log\_statement = 'all'} 机制往往仅记录 \texttt{PARSE} 或 \texttt{EXECUTE} 指令，而未能直接在同一行物理文本中提供绑定参数（Bind Variables）后的完整 SQL 文本。这为下游回放系统在重构动态查询时带来了难以跨越的解析鸿沟。其次，原生文本日志缺乏对特定行业审计合规标准（如安全层面的敏感对象拦截）的结构化语义支持，其信息的松散性与非标准化特征极大地增加了回放前置处理过程中的误判概率。
+
+\subsubsection{pgaudit 扩展的架构与内核 Hook 机制}
+
+针对原生日志在审计维度的缺失与信息粒度不足，开源插件 pgaudit\cite{pgaudit} 提供了深度的补强，其原本旨在构建满足 PCI-DSS\cite{PCIDSS}、SOX\cite{SOX} 及 HIPAA\cite{HIPAA} 等主流合规性要求的细粒度审计体系，却恰好为高保真流量回放提供了理想的数据底座。pgaudit 的架构核心并非通过外部抓取或简单的日志正则过滤实现，而是深度依赖了 PostgreSQL 内核所提供的两类关键侵入式探针（Hook）机制。
+
+在 PostgreSQL 的执行引擎中，几乎所有的外部 SQL 请求都要经历词法分析、语法生成抽象语法树（AST）、查询重写、路径规划，直至生成物理执行树并移交执行器（Executor）这一完整生命周期。pgaudit 巧妙地在这条核心链路上实现了挂载拦截（Hooking）：
+一方面，它通过劫持并代理原生的 \texttt{ExecutorRun\_hook} 钩子，深度拦截了标准数据操纵语言（DML，如 SELECT、INSERT、UPDATE、DELETE）的执行流。在该阶段，SQL 语句已经完成了参数绑定并生成了被实际调用的执行计划，pgaudit 直接从执行器上下文中实时提取处于激活状态的查询文本及底层关联的数据库对象（如表、视图的 OID 和名称），从而彻底解决了预处理语句参数丢失的问题。
+另一方面，对于不通过常规执行器流转的各类实用程序命令（如数据定义语言 DDL，或授权指令 DCL 语句），pgaudit 则利用了 \texttt{ProcessUtility\_hook} 探针进行全面捕获。这种在内核数据结构（C 语言 \texttt{struct}）层面的直接字段提取，确保了审计维度的绝对全面与信息还原的极高精度。
+
+\subsubsection{审计日志的事务标识与可见性映射}
+
+在 pgaudit 输出的结构化 CSV 载荷中，极其关键的一环是其能够强制关联并抛出当前操作所处的虚拟事务 ID (VxID) 和底层物理事务 ID (XID)。在高并发访问环境下，不同的客户端会话会创建错综复杂的隔离视图，而重组正确事务边界的前提便是精确解析这些事务标识。
+
+结合 PostgreSQL 的多版本并发控制（MVCC）架构，我们可以深刻理解事务标识在回放系统中的核心价值。PostgreSQL 通过维护全局的事务快照（Snapshot）和行级的 \texttt{xmin/xmax} 隐藏字段，实现了“读已提交（Read Committed）”或“可重复读（Repeatable Read）”的隔离级别。审计日志中记录的事务 ID 直观地反映了该语句写入时所属的活跃事务域。当我们的流式解析引擎捕获到包含相同 XID 的连续甚至乱序的审计条目时，便能依据这些严格的标识刻画出原始原子的操作生命周期（从 BEGIN 开启隐式或显式事务，到最终的 COMMIT 或 ROLLBACK）。这不仅帮助回放系统精准地分发事务至特定的工作协程，更避免了因为回放时乱序插入操作而导致目标数据库产生不可预知的死锁（Deadlock）或脏读/幻读错误。
+
+通过对 \texttt{pgaudit.log} 及其子参数的合理配置，系统能够在整个高并发执行周期内生成高度结构化、上下文完备的审计记录（如表 \ref{tab:pgaudit_fields} 所述）。
 
 \begin{table}[htbp]
     \centering
@@ -40,7 +70,7 @@ PostgreSQL 数据库提供了一套高度可配置的日志记录框架，作为
     \end{tabular}
 \end{table}
 
-pgaudit 特产出的审计数据通过 PostgreSQL 的标准日志通道进行持久化。通过将其与 \texttt{log\_line\_prefix} 定义的上下文信息（如精确时间戳、虚拟事务 ID 及会话标识符）进行关联聚合，即可重构出每条 SQL 执行时的全时空上下文。这种基于审计协议的丰富信息流，为构建端到端的高保真流量回放引擎提供了不可或缺的数据基石。
+这种深植于内核、信息丰富的审计协议流，不仅超越了网络层抓包与原生零散日志的局限，更从根本上夯实了构建端到端、金融级高保真流量回放引擎的数据基石。
 
 \subsection{数据库事务与并发控制}
 
@@ -56,27 +86,62 @@ PostgreSQL 采用多版本并发控制（Multi-Version Concurrency Control, MVCC
 
 由于 MVCC 导致数据在物理层面的多版本共存特征，回放系统在进行结果校验时表现出独特的复杂性。流量重放引发的数据版本演进在时间轴上与原始生产过程并不重合，因此校验逻辑必须超越物理行版本的约束，转而聚焦于逻辑层面的执行反馈——如受影响行数的匹配、结果集内容的等价性以及 SQLSTATE 错误码的归一化比对。
 
-\subsection{Go 语言并发编程模型}
+\subsection{并发编程与时间轴调度理论}
 
-\subsubsection{CSP 理论与核心并发原语}
+\subsubsection{CSP 理论与百万级协程调度模型}
 
-Go 语言在架构设计层面深度集成了 Hoare\cite{CSP} 提出的通信顺序进程（Communicating Sequential Processes, CSP）理论。其核心范式倡导通过消息传递（Message Passing）而非共享内存（Shared Memory）来实现并发实体间的解耦同步\cite{GoConcurrencyPatterns}。这一思想的具体工程实现依托于 Goroutine 与 Channel 两大核心原语：
+Go 语言在架构设计层面深度集成了 Hoare\cite{CSP} 提出的通信顺序进程（Communicating Sequential Processes, CSP）理论。其核心范式倡导通过“消息传递（Message Passing）而非共享内存（Shared Memory）”来实现并发实体间的解耦同步\cite{GoConcurrencyPatterns}。这一思想的具体工程实现依托于 Goroutine 与 Channel 两大核心原语。
 
-\textbf{Goroutine} 作为用户态的轻量级线程，凭借其微毫秒级的创建成本与动态伸缩的栈空间（初始仅为 2KB$\sim$8KB）\cite{GoSpec}，突破了传统操作系统线程的资源瓶颈。依托底层的 M:N 调度模型及高效的工作窃取（Work Stealing）算法\cite{GoScheduler, WorkStealing}，系统得以在普通硬件环境下维系百万量级的并发上下文切换。
+不同于传统操作系统线程（OS Thread）因内核态切换、庞大保守栈空间（1~8MB）及锁竞争带来的高昂开销，\textbf{Goroutine} 作为运行在用户态的轻量级协程，凭借其微毫秒级的创建成本与动态伸缩的微缩栈空间（初始仅为 2KB~8KB）\cite{GoSpec}，彻底突破了 C10K 乃至 C10M 并发瓶颈。这种量变引发系统级质变的基础在于 Go runtime 所独创的 G-M-P（Goroutine - Machine - Processor）混合调度模型。
 
-\textbf{Channel} 则构建了类型安全的同步管道\cite{GoBook}，涵盖了具备强同步语义的无缓冲模式（Unbuffered）以及提供流量削峰与解耦能力的带缓冲模式（Buffered）。在本回放系统设计中，Goroutine 承担了“每会话一协程”的任务调度职能，精准模拟了大规模并发连接行为；而 Channel 则充当了日志解析流与任务执行流之间的粘合剂，保障了回放数据的有序流转与异常状态的异步回传。
+系统中的 P（Processor）扮演着逻辑处理器的角色，数量通常与底层 CPU 核心数绑定；M（Machine）映射为真实的系统线程；而海量的 G（Goroutine）则依附于 P 的本地执行队列。借助于高效的工作窃取（Work-Stealing）算法\cite{GoScheduler, WorkStealing}，当某个 P 上的 G 发生阻塞（如触发文件 I/O、数据库网络等待）时，底层的 M 会迅速解绑并挂起，P 则顺势认领新的 M 并继续执行队列中就绪的 G；与此同时，空闲的 P 更能主动从其他繁忙 P 的队列乃至全局队列中“窃取”计算任务。
+正是得益于这种 M:N 调度架构中近乎零妥协的用户态上下文切换能力，本系统在高并发压测实验中得以通过普通双路服务器轻松维系 256 甚至更高数量级的“每会话一协程（Per-Session Per-Goroutine）”并行映射，保障了单机吞吐越过 4.5 万 QPS 极致负载时不发生内核颠簸震荡。
 
-\subsubsection{同步机制与无锁操作}
+\subsubsection{同步机制与无锁监控结构}
 
-除了 CSP 范式，Go 语言标准库亦提供了针对底层资源竞争的同步原语补强。其中，\texttt{sync.WaitGroup} 提供了 Fork-Join 并行模式的协调能力，确保了回放任务全周期监控的完整性；\texttt{sync.Mutex} 及其变体则负责保障局部共享状态的互斥访问。值得强调的是，为了满足回放引擎对极低入侵性的追求，本研究大量采用了 \texttt{sync/atomic} 包提供的硬件级原子操作。通过对全局性能计数器进行无锁化（Lock-free）更新，有效消除了上下文竞争引发的性能衰减\cite{GoConcurrencyPatterns}，从而保证了监控指标的实时性与精确度。
+除了 CSP 并发范式构建的主干流，高保真回放同样需要在微观数据共享层消除锁争用。本系统中大量运用了 \texttt{sync/atomic} 包提供的处理器级别的底层原子操作原语，对每秒数万频次的成功/失败等细粒度打点进行无锁化（Lock-free）累加；结合 \texttt{sync.WaitGroup} 的 Fork-Join 并行栅栏调度与容量可控的带缓冲 Channel（Buffered Channel）削峰设计，实现了统计指标汇聚模块与核心回放业务流之间的完美退耦与异步流水线式处理，消除了传统互斥锁（Mutex）带来的长尾阻滞。
 
-\subsection{数据库性能基准测试}
+\subsubsection{高并发环境下的时间对齐与时序理论}
 
-在数据库性能评测领域，基准测试（Benchmarking）提供了标准化的负载模型与评估依据。TPC-C\cite{TPC-C} 与 Sysbench\cite{sysbench} 作为该领域的工业标准，分别应对了复杂的业务逻辑仿真与通用的底层性能压力测试需求。
+如果说 Goroutine 构建了高保真引擎的物理吞吐骨架，那么针对多事务交叉发生时的\textbf{时间对齐（Temporal Alignment）}则赋予了回放系统以真实世界的灵魂。在面对CAP定理\cite{CAP}带来的分布式取舍时，任何多节点的时钟天然存在微小的钟漂（Clock Drift）。由 Lamport 所提出的逻辑时钟（Lamport Clock）\cite{LamportClock}及其衍生品向量时钟（Vector Clocks）\cite{VectorClock}，被广泛应用于工业界以判定分布式事件间的偏序或因果关系（如 Dapper\cite{Dapper} 追踪系统）。
 
-TPC-C 基准测试模拟了典型的批发商订单处理系统，涵盖了包含多表联查、读写混合及严苛 ACID 约束在内的 5 种核心事务类型。虽然其 tpmC 指标能有效映射系统在极限负载下的吞吐天花板，但已有研究指出其固化的访问模式难以全面刻画现代互联网流量的高动态性与复杂倾斜特征\cite{ProductionWorkload, TPCCModeling}。
+但在数据库流量回放领域，仅仅维持“先读后写”的单调递增因果序列是不够的，系统更加苛求能够严格重现各操作之间的绝对时间间隔差距（Inter-arrival Time）。试想在原生产环境中产生于不同会话的两次写入如果在极短毫秒级窗口内竞争同一行锁，回放系统若丧失对该毫秒级间距的控制，则可能无法复现因锁超时而触发的业务异动降级。
 
-相比之下，Sysbench 凭借其模块化与高度可配置的特性，在 \texttt{oltp\_read\_write} 及 \texttt{oltp\_insert} 等细分场景下表现出极高的测试灵活性。它常被用于系统的性能摸底与回归验证，配合本研究采用的 pgaudit 插件，能够快速在受控环境下生成可复现的基准审计流，为流量回放引擎的端到端保真度校验提供标准化的输入支撑\cite{OLTPBench}。
+为此，本系统基于全局同步时钟源，将每一个带有强约束的原子事务事件置入一套\textbf{滑动时间窗口（Sliding Time Window）}预测模型中。设初始基准时刻为 $t_0$，每一个剥离出的离散 SQL 操作附带源库所标记发生的精确延时偏移 $\Delta t$。当且仅当回放运行主循环指针推进至区间 $[t_0 + \alpha\Delta t - \epsilon, t_0 + \alpha\Delta t + \epsilon]$ （其中 $\alpha$ 为时间缩放倍速因子，$\epsilon$ 为可容忍的毫秒精度系统抖动阈值），对应的 Goroutine 才能脱离调度挂起状态向目标数据库释放 TCP 请求脉冲。这种将虚拟时钟与物理推进钟强校验映射的时间轴调度机制，赋予了该引擎随时变速重放、任意切片还原而不致大规模时间散乱的底层理论依据。
+
+\subsection{数据库性能基准测试评测体系}
+
+在数据库性能评测领域，基准测试（Benchmarking）提供了标准化的负载模型与评估依据。长久以来，学术界与工业界高度依赖诸如 TPC-C\cite{TPC-C} 与 Sysbench\cite{sysbench} 等作为标准，它们分别应对了复杂的业务逻辑仿真与通用的底层物理性能压力测试测试需求。
+
+\subsubsection{TPC 系列标准及其局限性}
+
+事务处理性能委员会（Transaction Processing Performance Council, TPC）发布了一系列针对不同应用场景的基准测试规范。其中影响最为深远的是针对联机事务处理（OLTP）的 TPC-C 测试。TPC-C 模拟了一个典型的批发商订单处理系统，它严格规定了数据库的逻辑结构（包括 9 张强关联表），并要求系统并发执行涵盖读写混合、多表联查及严苛 ACID 约束在内的 5 种核心事务类型（New-Order, Payment, Order-Status, Delivery, Stock-Level）。通过统计每分钟成功执行的 New-Order 事务数量（tpmC），它能够极其有效地映射出数据库系统在面对重度并发事务锁竞争时的吞吐天花板。
+
+除了 TPC-C 外，业界亦广泛使用 TPC-H（面向复杂决策支持与 OLAP 分析）以及针对 NoSQL/KV 存储引擎的 YCSB (Yahoo! Cloud Serving Benchmark) 等。尽管这些标准化基准在驱动硬件与数据库版本演进中居功至伟，但现代互联网应用的负载模式正经历着根本性转变：长尾数据分布、高度倾斜的热点访问（如秒杀抢购）、以及偶发的缓存击穿等现象层出不穷。已有大量研究指出，如 TPC-C 这种高度固化、数据均匀填充的访问模式，难以全面刻画现代微服务架构下真实流量的高动态性与复杂业务特征\cite{ProductionWorkload, TPCCModeling}。
+
+\subsubsection{可编程压测与 Sysbench 架构}
+
+相比于 TPC-C 的庞大与刻板，Sysbench 凭借其轻量级、模块化以及极高的可编程性获得了广泛青睐。Sysbench 的核心威力在于其支持基于 Lua 脚本引擎的动态扩展。通过加载自定义的 Lua 压测脚本，测试人员可以非常灵活地构造 \texttt{oltp\_read\_write}、\texttt{oltp\_insert} 乃至 \texttt{point\_select} 等极细粒度的细分场景。
+
+在 \texttt{oltp\_read\_write} 这类综合型负载测试中，Sysbench 精确定义了每个虚拟事务的读写操作配比（默认通常为 10 条 SELECT 配合 4 条各类 UPDATE/INSERT/DELETE），并允许在测试运行时通过参数动态调整线程并发度和事务隔离级别。正是得益于这种敏捷的测试能力，Sysbench 经常被用作云原生数据库容灾演练、版本回归测试以及新硬件上线的基线性能摸底。在本课题中，它被深度用于在受控环境下快速生成可复现的高并发基准审计流，为流量回放引擎在高压拉锯过程中的端到端保真度指标校验提供了标准化、可对标的压力输入源\cite{OLTPBench}。
+
+\subsubsection{生产环境真实流量的不可替代性}
+
+随着系统的演进，即使我们将 TPC 和 Sysbench 运用到极致，也始终无法跨越测试模型与生产现实之间的“鸿沟”。正如 LinkBench\cite{LinkBench} 等尝试模仿社交网络属性的测试框架所揭示的那样，真实的流量蕴含着无可比拟的时序微观波动特征、隐藏的业务逻辑依赖以及随着时间演化的“长尾”SQL查询。这也正是为什么，尽管目前标准化基准测试工具日趋完善，工业界依然亟待从“合成基准测试（Synthetic Benchmarking）”走向“生产流量捕获与回放（Workload Capture and Replay）”，后者的保真价值对发现潜在的深水区 Bug 有着不可替代的意义。
+
+\subsection{回放保真度与统计学评估基准}
+
+正如基准测试无法完全替代真实流量一样，我们评价一个流量回放系统是否“成功”，也不能仅凭其将日志跑通的表象。为了在第5章中科学地评估本系统，有必要在此预先构筑一套关于“回放保真度（Replay Fidelity）”的数理统计学理论基石。评估的核心思想在于将回放视为对原始时序发生器行为的复现，进而从吞吐量趋势与时延偏态分布两个宏观侧面展开统计量比对。
+
+\subsubsection{吞吐量时序相似度与 NRMSE 理论}
+
+针对系统随时间演化的吞吐量（如每秒事务到达率 TPS），可抽象为两条离散的时间序列曲线：源自生产环境的真实负载序列 $X = \{x_1, x_2, \dots, x_n\}$ 与测试环境中回放出来的负载序列 $Y = \{y_1, y_2, \dots, y_n\}$。如果回放引擎实现了完美的时序对齐与发卡调度，那么在相同时间坐标 $i$ 下，两者的差距理应趋近于零。
+为刻画该趋势误差，统计学中通常采用均方根误差（Root Mean Square Error, RMSE）。由于 RMSE 输出结果具有与原数据相同的量纲，不便直接转换为百分比式的“保真度得分”，其归一化版本 NRMSE (Normalized RMSE) 提供了理想的解决方案：通过将绝对误差除以样本总体均值，我们能够跨越不同数量级的系统压力（如 100 TPS 场景与 10,000 TPS 场景）公平衡量预测偏离率，进而以此推导出回放引擎宏观流控能力的直接评分。
+
+\subsubsection{长尾时延的非参数检验方法}
+
+除了全局吞吐，反映多事务并发微观摩擦效应的最佳指标是“响应时间（Latency）的长尾分布”。回放端与源端由于硬盘 IOPS 或主机缓存状况不尽相同，其绝对时延可能存在恒等差。但在一项高保真回放测试中，针对相同比例的数据竞争，其 P95 或 P99 分布形态（即“长尾（Long Tail）”的陡峭程度）应该保持高度的数学相似。
+为此，引入两样本的 Kolmogorov-Smirnov (K-S) 检验\cite{KSTest}。与 T 检验等要求数据符合正态分布的假设检验不同，K-S 检验属于非参数检验（Non-parametric Test），它无需预设数据分布模型，而是直接基于两条时延序列的经验累积分布函数（ECDF）之间的最大垂直差异距离（Supremum Distance）来判决它们是否同属一个母体分布。K-S 统计量对分布形状变化的敏感度极高，使其成为衡量目标数据库系统在承受回放流量冲击时内部调度与锁反应是否原汁原味的极佳裁决工具。
 
 \subsection{本章小结}
-本章系统地介绍了与本文研究相关的核心技术基础。首先，详细阐述了 PostgreSQL 审计日志的机制与 pgaudit 扩展的工作原理，说明了其作为高质量流量数据源的优势；其次，回顾了数据库事务管理的 ACID 理论和 PostgreSQL 的 MVCC 并发控制机制，为回放过程中事务一致性的保障提供了理论依据；接着，介绍了 Go 语言基于 CSP 模型的并发编程体系，阐明了构建高并发回放引擎的技术基础；最后，概述了 TPC-C 和 Sysbench 两种数据库基准测试标准，为后续实验评估方案的设计奠定了基础。
+本章系统地介绍了与本文研究相关的核心技术基础。首先，回顾了数据库流量捕获与回放技术研究现状；其次，深度探讨了 PostgreSQL 审计日志与核心 Hook 拦截机制，并阐明了事务标识与多版本并发可见性映射的原理；接着，详尽论述了 Go 语言基于 CSP 模型的百万级并发调度机制，以及支撑高并发多节点的滑动时间轴验证理论；随后，分析了 TPC 系列与 Sysbench 压测标准的内在逻辑及其不可替代性；最后，预先构建了基于 NRMSE 时序相似度与 K-S 非参数检验的回放保真度评估统计模型。这些底层原理与学术脉络共同编织了后续提出高保真流量回放引擎技术架构（第3、4章）及评测证明（第5章）的完整理论支撑与依据。
