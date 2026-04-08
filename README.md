@@ -12,198 +12,181 @@
 
 </div>
 
-## 📋 项目概述
+## 📋 Project Overview
 
-KeenInsight 是一个强大的系统洞察与性能分析平台，整合了多种技术栈，提供深度的系统监测、性能优化和数据分析能力。项目采用前后端分离架构，结合高性能 C++ 模块实现数据处理。
+KeenInsight is a powerful system insight and performance analytics platform that integrates multiple technology stacks, providing deep system monitoring, performance optimization, and data analysis capabilities. The project adopts a front-end and back-end separation architecture, combined with high-performance C++ modules to achieve efficient data processing.
 
-## 🌟 核心特性
+## 🌟 Core Features
 
-- **系统监测** - 实时监测系统运行状态和性能指标
-- **性能分析** - 深度分析系统瓶颈和优化方向
-- **数据可视化** - 基于 Vue 的交互式仪表板
-- **高性���处理** - C++ 加速的数据处理模块
-- **可扩展架构** - 模块化设计，易于扩展
+- **System Monitoring** - Real-time monitoring of system runtime status and performance metrics
+- **Performance Analysis** - In-depth analysis of system bottlenecks and optimization directions
+- **Data Visualization** - Interactive dashboards based on Vue framework
+- **High-Performance Processing** - C++ accelerated data processing modules
+- **Scalable Architecture** - Modular design for easy extension and maintenance
 
-## 🛠️ 技术栈
+## 🛠️ Technology Stack
 
-| 技术 | 占比 | 用途 |
-|------|------|------|
-| **Python** | 59.7% | 后端核心逻辑、数据处理 |
-| **C++** | 20.6% | 高性能计算、系统级操作 |
-| **Vue** | 8.8% | 前端界面、交互显示 |
-| **TypeScript** | 2.5% | 类型安全的前端开发 |
-| **Makefile** | 4.4% | 构建和编译管理 |
-| **CMake** | 2.0% | C++ 项目构建 |
+| Technology | Percentage | Purpose |
+|------------|-----------|---------|
+| **Python** | 59.7% | Backend core logic, data processing |
+| **C++** | 20.6% | High-performance computing, system-level operations |
+| **Vue** | 8.8% | Frontend UI, interactive display |
+| **TypeScript** | 2.5% | Type-safe frontend development |
+| **Makefile** | 4.4% | Build and compilation management |
+| **CMake** | 2.0% | C++ project building |
 
-## 📦 项目结构
+## 📦 Project Structure
 
 ```
 KeenInsight/
-├── sysinsight_front/          # Vue 前端应用
-├── backend/                   # Python 后端服务
-├── core/                      # C++ 高性能模块
-├── Makefile                   # 构建脚本
-├── CMakeLists.txt            # CMake 构建配置
-└── README.md                 # 项目文档
+├── sysinsight_front/          # Vue frontend application
+├── backend/                   # Python backend service
+├── core/                      # C++ high-performance modules
+├── Makefile                   # Build scripts
+├── CMakeLists.txt            # CMake build configuration
+└── README.md                 # Project documentation
 ```
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 前置要求
+### Prerequisites
 
 - Python 3.8+
-- Node.js 16+ 与 npm
-- C++ 编译器 (GCC/Clang)
+- Node.js 16+ with npm
+- C++ compiler (GCC/Clang)
 - CMake 3.10+
 
-### 安装步骤
+### Installation Steps
 
-#### 1. 克隆仓库
+#### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Avalephh/KeenInsight.git
 cd KeenInsight
 ```
 
-#### 2. 后端设置
+#### 2. Backend Setup
 
 ```bash
-# 创建 Python 虚拟环境
+# Create Python virtual environment
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
-# 或
+# or
 venv\Scripts\activate  # Windows
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-#### 3. 前端设置
+#### 3. Frontend Setup
 
 ```bash
 cd sysinsight_front
 
-# 安装依赖
+# Install dependencies
 npm install
 
-# 开发模式运行
+# Run in development mode
 npm run dev
 
-# 生产构建
+# Production build
 npm run build
 ```
 
-#### 4. C++ 模块编译
+#### 4. Compile C++ Modules
 
 ```bash
-# 在项目根目录
+# In project root directory
 mkdir build
 cd build
 cmake ..
 make
 ```
 
-## 📖 使用指南
+## 📖 Usage Guide
 
-### 开发
+### Development
 
 ```bash
-# 启动后端服务
+# Start backend service
 python main.py
 
-# 启动前端开发服务器（新终端）
+# Start frontend development server (in a new terminal)
 cd sysinsight_front
 npm run dev
 ```
 
-### 测试
+### Testing
 
 ```bash
-# 前端单元测试
+# Frontend unit tests
 npm run test:unit
 
-# 前端 E2E 测试
+# Frontend E2E tests
 npm run test:e2e
 
-# 代码检查
+# Code linting
 npm run lint
 ```
 
-### 构建生产版本
+### Build for Production
 
 ```bash
-# 前端构建
+# Frontend build
 npm run build
 
-# C++ 模块构建
+# C++ module build
 make release
 ```
 
-## 🔧 配置
+## 🔧 Configuration
 
-详细的配置说明请参考各模块的文档：
+For detailed configuration instructions, please refer to the documentation of each module:
 
-- [前端配置](./sysinsight_front/README.md)
-- [后端配置](./backend/README.md)
-- [C++ 模块配置](./core/README.md)
+- [Frontend Configuration](./sysinsight_front/README.md)
+- [Backend Configuration](./backend/README.md)
+- [C++ Module Configuration](./core/README.md)
 
-## 📝 推荐开发环境
+## 📝 Recommended Development Environment
 
-### IDE 推荐
+### IDE Recommendations
 
-**前端开发:**
+**Frontend Development:**
 - VS Code + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar)
-- 禁用 Vetur 插件，使用官方 Vue 扩展
+- Disable Vetur extension, use official Vue extension
 
-**后端开发:**
-- PyCharm / VS Code + Python 扩展
-- 启用类型检查和 Linting
+**Backend Development:**
+- PyCharm / VS Code + Python extension
+- Enable type checking and linting
 
-**C++ 开发:**
-- CLion / VS Code + C/C++ 扩展
-- CMake 支持
+**C++ Development:**
+- CLion / VS Code + C/C++ extension
+- CMake support
 
-### 浏览器工具
+### Browser Tools
 
-- [Vue.js DevTools](https://devtools.vuejs.org/) - Vue 调试工具
-- 浏览器开发者工具的自定义对象格式化器
+- [Vue.js DevTools](https://devtools.vuejs.org/) - Vue debugging tool
+- Browser DevTools custom object formatters
 
-## 🤝 贡献指南
+## 🤝 Contributing
 
-欢迎贡献代码！请遵循以下步骤：
+Contributions are welcome! Please follow these steps:
 
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启 Pull Request
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 MIT 许可证。详见 [LICENSE](./LICENSE) 文件。
+This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
 
-## 👨‍💻 作者
+## 👨‍💻 Author
 
 **Avalephh** - [GitHub Profile](https://github.com/Avalephh)
 
-## 💬 支持与反馈
+## 💬 Support & Feedback
 
-- 提交 [Issue](https://github.com/Avalephh/KeenInsight/issues) 报告问题
-- 提交 [Pull Request](https://github.com/Avalephh/KeenInsight/pulls) 贡献代码
-- 参与 [Discussions](https://github.com/Avalephh/KeenInsight/discussions) 讨论
-
-## 🎯 路线图
-
-- [ ] 完善系统监测模块
-- [ ] 增强数据可视化功能
-- [ ] 优化 C++ 核心模块性能
-- [ ] 支持集群部署
-- [ ] 添加告警通知功能
-
----
-
-<div align="center">
-
-⭐ 如果觉得项目有帮助，请给一个 Star！
-
-</div>
+- Submit [Issues](https://github.com/Avalephh/KeenInsight/issues) to report problems
+- Submit [Pull Requests](https://github.com/Avalephh/KeenInsight/pulls) to contribute code
