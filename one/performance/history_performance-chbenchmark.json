@@ -1,0 +1,24 @@
+{
+  "data": [
+    {
+      "timestamp": "2026-05-08T21:41:23.412489",
+      "workload": "chbenchmark",
+      "external_metrics": {
+        "tps": 7.74,
+        "lat": 2681.8,
+        "qps": 7.74
+      },
+      "configuration": {
+        "shared_buffers": "32MB",
+        "work_mem": "1MB",
+        "maintenance_work_mem": "16MB",
+        "effective_cache_size": "512MB",
+        "max_wal_size": "256MB",
+        "checkpoint_completion_target": "0.5",
+        "random_page_cost": "4",
+        "effective_io_concurrency": "1"
+      },
+      "function_file": "performance/chbench_abnormal_functions.txt"
+    }
+  ]
+}

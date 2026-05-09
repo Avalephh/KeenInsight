@@ -1,0 +1,47 @@
+{
+  "work_mem": {
+    "description": "排序/哈希操作内存不足，增加 work_mem 可以减少磁盘溢出",
+    "increase_factor": 4.0,
+    "recommendation": "建议从当前值增加 4 倍（1MB → 64MB）",
+    "related_functions": ["ExecHashGetHashValue", "ExecScanHashBucket", "ExecParallelScanHashBucket", "hash_search_with_hash_value", "_bt_compare", "ExecHashJoinSaveTuple", "PerformWorkUnit"]
+  },
+  "shared_buffers": {
+    "description": "共享缓冲区过小会增加磁盘 I/O，命中率低",
+    "increase_factor": 8.0,
+    "recommendation": "建议设置为总内存的 25%（32MB → 2GB）",
+    "related_functions": ["BufferShmemSize", "heapgetpage", "LWLockRelease", "StrategyGetBuffer", "LockBufHdr"]
+  },
+  "effective_cache_size": {
+    "description": "查询规划器缓存假设，影响索引选择",
+    "increase_factor": 4.0,
+    "recommendation": "建议设置为总内存的 75%（512MB → 20GB）",
+    "related_functions": ["nocachegetattr", "HeapTupleSatisfiesVisibility", "ExecMakeFunctionResultSet", "FunctionCall2Coll"]
+  },
+  "maintenance_work_mem": {
+    "description": "维护操作（VACUUM/INDEX BUILD）内存不足",
+    "increase_factor": 8.0,
+    "recommendation": "建议增加维护操作内存（16MB → 512MB）",
+    "related_functions": ["heap_compute_data_size", "MemoryContextReset", "heap_deform_tuple"]
+  },
+  "max_wal_size": {
+    "description": "WAL 写入频繁，增加此值可以减少检查点频率",
+    "increase_factor": 4.0,
+    "recommendation": "建议增加检查点间隔（256MB → 4GB）",
+    "related_functions": ["LWLockRelease"]
+  },
+  "checkpoint_completion_target": {
+    "description": "检查点完成目标，增加可分散写入压力",
+    "recommendation": "建议从 0.5 增加到 0.9",
+    "related_functions": []
+  },
+  "random_page_cost": {
+    "description": "随机页访问成本，影响索引使用决策",
+    "recommendation": "建议从 4 降低到 1.1（SSD）",
+    "related_functions": []
+  },
+  "effective_io_concurrency": {
+    "description": "并发 I/O 操作数，SSD 应设置为 200",
+    "recommendation": "建议从 1 增加到 200",
+    "related_functions": []
+  }
+}

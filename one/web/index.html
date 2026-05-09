@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KeenInsight - 数据库自动调优监控</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--accent:#3b82f6;
+        --green:#22c55e;--red:#ef4444;--yellow:#eab308;--text:#e2e8f0;--muted:#94a3b8}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+  /* Header */
+  .header{background:linear-gradient(135deg,#1e3a5f,#0f172a);padding:20px 32px;
+          display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+  .header h1{font-size:22px;font-weight:700;letter-spacing:-0.5px}
+  .header h1 span{color:var(--accent)}
+  .header .subtitle{color:var(--muted);font-size:13px;margin-top:2px}
+  .btn{padding:12px 28px;border:none;border-radius:8px;font-size:15px;font-weight:600;
+       cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{background:#2563eb;transform:translateY(-1px)}
+  .btn-primary:disabled{background:#475569;cursor:not-allowed;transform:none}
+  .btn-primary .icon{font-size:18px}
+
+  /* Layout */
+  .container{max-width:1400px;margin:0 auto;padding:24px}
+  .grid{display:grid;gap:20px}
+  .grid-4{grid-template-columns:repeat(4,1fr)}
+  .grid-2{grid-template-columns:1fr 1fr}
+  .grid-full{grid-template-columns:1fr}
+
+  /* Cards */
+  .card{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:20px;position:relative;overflow:hidden}
+  .card-title{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+  .metric-value{font-size:36px;font-weight:700;line-height:1}
+  .metric-unit{font-size:14px;color:var(--muted);margin-left:4px}
+  .metric-change{font-size:13px;margin-top:6px;font-weight:600}
+  .metric-change.up{color:var(--green)}
+  .metric-change.down{color:var(--red)}
+
+  /* Status bar */
+  .status-bar{background:var(--card);border-radius:12px;border:1px solid var(--border);
+              padding:16px 24px;display:flex;align-items:center;gap:16px;margin-bottom:20px}
+  .status-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+  .status-dot.idle{background:var(--muted)}
+  .status-dot.running{background:var(--yellow);animation:pulse 1.5s infinite}
+  .status-dot.done{background:var(--green)}
+  .status-text{flex:1;font-size:14px}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+  /* Progress */
+  .progress-bar{width:200px;height:6px;background:#334155;border-radius:3px;overflow:hidden;flex-shrink:0}
+  .progress-fill{height:100%;background:var(--accent);transition:width .5s ease;border-radius:3px}
+
+  /* Chart container */
+  .chart-wrap{height:280px;position:relative}
+  .chart-wrap canvas{width:100%!important;height:100%!important}
+
+  /* Diagnosis panel */
+  .diag-list{list-style:none;max-height:320px;overflow-y:auto;font-size:13px;line-height:1.8}
+  .diag-list li{padding:4px 8px;border-radius:4px;margin-bottom:2px}
+  .diag-list li:nth-child(odd){background:rgba(255,255,255,.03)}
+
+  /* Knob table */
+  .knob-table{width:100%;font-size:13px;border-collapse:collapse}
+  .knob-table th{text-align:left;color:var(--muted);font-weight:500;padding:8px;border-bottom:1px solid var(--border)}
+  .knob-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .knob-table .old{color:var(--red)}
+  .knob-table .new{color:var(--green);font-weight:600}
+  .knob-table .arrow{color:var(--muted);padding:0 8px}
+
+  /* Comparison */
+  .compare-grid{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:stretch}
+  .compare-card{text-align:center;padding:20px;border-radius:10px}
+  .compare-card.before{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3)}
+  .compare-card.after{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3)}
+  .compare-arrow{display:flex;align-items:center;font-size:28px;color:var(--accent)}
+  .compare-label{font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:1px}
+  .compare-val{font-size:28px;font-weight:700}
+  .compare-sub{font-size:12px;color:var(--muted);margin-top:4px}
+
+  @media(max-width:900px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <h1><span>KeenInsight</span> Database Auto-Tuning</h1>
+    <div class="subtitle">CH-Benchmark (TPC-C + TPC-H) &nbsp;|&nbsp; PostgreSQL 12 &nbsp;|&nbsp; Scale = 10</div>
+  </div>
+  <button class="btn btn-primary" id="btnStart" onclick="startDemo()">
+    <span class="icon">&#9654;</span> 启动负载测试
+  </button>
+</div>
+
+<div class="container">
+
+  <!-- Status -->
+  <div class="status-bar">
+    <div class="status-dot idle" id="statusDot"></div>
+    <div class="status-text" id="statusText">就绪，点击右上角按钮启动 CH-Benchmark 负载演示</div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <span id="progressPct" style="font-size:13px;color:var(--muted);width:40px;text-align:right">0%</span>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="grid grid-4" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title">实时 TPS</div>
+      <div><span class="metric-value" id="kpiTps">--</span><span class="metric-unit">req/s</span></div>
+      <div class="metric-change" id="kpiTpsChange">&nbsp;</div>
+    </div>
+    <div class="card">
+      <div class="card-title">平均延迟</div>
+      <div><span class="metric-value" id="kpiLat">--</span><span class="metric-unit">ms</span></div>
+      <div class="metric-change" id="kpiLatChange">&nbsp;</div>
+    </div>
+    <div class="card">
+      <div class="card-title">缓存命中率</div>
+      <div><span class="metric-value" id="kpiCache">--</span><span class="metric-unit">%</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">当前阶段</div>
+      <div><span class="metric-value" id="kpiPhase" style="font-size:20px">IDLE</span></div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title">TPS 时间序列</div>
+      <div class="chart-wrap"><canvas id="chartTps"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">缓存命中率时间序列</div>
+      <div class="chart-wrap"><canvas id="chartCache"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Diagnosis + Knobs -->
+  <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="card">
+      <div class="card-title">异常诊断结果</div>
+      <ul class="diag-list" id="diagList">
+        <li style="color:var(--muted)">等待负载运行后自动诊断 ...</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">参数调优方案</div>
+      <table class="knob-table" id="knobTable">
+        <thead><tr><th>参数名</th><th>调优前</th><th></th><th>调优后</th></tr></thead>
+        <tbody id="knobBody">
+          <tr><td colspan="4" style="color:var(--muted)">等待诊断完成 ...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Before / After Comparison -->
+  <div class="card" id="compareSection" style="display:none">
+    <div class="card-title">调优前后对比</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:12px">
+      <div>
+        <div class="compare-grid">
+          <div class="compare-card before"><div class="compare-label">吞吐量 (调优前)</div><div class="compare-val" id="cmpTpsBefore">--</div><div class="compare-sub">req/s</div></div>
+          <div class="compare-arrow">&rarr;</div>
+          <div class="compare-card after"><div class="compare-label">吞吐量 (调优后)</div><div class="compare-val" id="cmpTpsAfter">--</div><div class="compare-sub">req/s</div></div>
+        </div>
+        <div id="cmpTpsDelta" style="text-align:center;margin-top:8px;font-weight:700;font-size:18px;color:var(--green)"></div>
+      </div>
+      <div>
+        <div class="compare-grid">
+          <div class="compare-card before"><div class="compare-label">平均延迟 (调优前)</div><div class="compare-val" id="cmpLatBefore">--</div><div class="compare-sub">ms</div></div>
+          <div class="compare-arrow">&rarr;</div>
+          <div class="compare-card after"><div class="compare-label">平均延迟 (调优后)</div><div class="compare-val" id="cmpLatAfter">--</div><div class="compare-sub">ms</div></div>
+        </div>
+        <div id="cmpLatDelta" style="text-align:center;margin-top:8px;font-weight:700;font-size:18px;color:var(--green)"></div>
+      </div>
+      <div>
+        <div class="compare-grid">
+          <div class="compare-card before"><div class="compare-label">P95 延迟 (调优前)</div><div class="compare-val" id="cmpP95Before">--</div><div class="compare-sub">ms</div></div>
+          <div class="compare-arrow">&rarr;</div>
+          <div class="compare-card after"><div class="compare-label">P95 延迟 (调优后)</div><div class="compare-val" id="cmpP95After">--</div><div class="compare-sub">ms</div></div>
+        </div>
+        <div id="cmpP95Delta" style="text-align:center;margin-top:8px;font-weight:700;font-size:18px;color:var(--green)"></div>
+      </div>
+      <div>
+        <div class="compare-grid">
+          <div class="compare-card before"><div class="compare-label">P99 延迟 (调优前)</div><div class="compare-val" id="cmpP99Before">--</div><div class="compare-sub">ms</div></div>
+          <div class="compare-arrow">&rarr;</div>
+          <div class="compare-card after"><div class="compare-label">P99 延迟 (调优后)</div><div class="compare-val" id="cmpP99After">--</div><div class="compare-sub">ms</div></div>
+        </div>
+        <div id="cmpP99Delta" style="text-align:center;margin-top:8px;font-weight:700;font-size:18px;color:var(--green)"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Charts ──────────────────────────────────────────────────────────────────
+const chartOpts = (label, color) => ({
+  type:'line',
+  data:{labels:[],datasets:[{label,data:[],borderColor:color,backgroundColor:color+'22',
+        borderWidth:2,pointRadius:0,fill:true,tension:.3}]},
+  options:{responsive:true,maintainAspectRatio:false,animation:{duration:0},
+    plugins:{legend:{display:false}},
+    scales:{x:{display:true,ticks:{color:'#64748b',maxTicksLimit:10},grid:{color:'#1e293b'}},
+            y:{display:true,ticks:{color:'#64748b'},grid:{color:'#1e293b33'},beginAtZero:true}}}
+});
+
+const tpsChart  = new Chart(document.getElementById('chartTps'),  chartOpts('TPS','#3b82f6'));
+const cacheChart= new Chart(document.getElementById('chartCache'),chartOpts('Cache Hit %','#22c55e'));
+
+// Add a vertical annotation line when tuning happens
+let tuningAnnotated = false;
+
+function addPoint(ts, tps, cache, phase){
+  const lbl = ts + 's';
+  // TPS chart
+  const tpsDs = tpsChart.data.datasets[0];
+  tpsChart.data.labels.push(lbl);
+  tpsDs.data.push(tps);
+  // Change color after tuning
+  if(phase==='after' && !tuningAnnotated){
+    tuningAnnotated = true;
+    // Add a second dataset for "after" zone
+    tpsChart.data.datasets.push({label:'TPS (tuned)',data:new Array(tpsDs.data.length-1).fill(null).concat([tps]),
+      borderColor:'#22c55e',backgroundColor:'#22c55e22',borderWidth:2,pointRadius:0,fill:true,tension:.3});
+    cacheChart.data.datasets.push({label:'Cache (tuned)',data:new Array(tpsDs.data.length-1).fill(null).concat([cache]),
+      borderColor:'#3b82f6',backgroundColor:'#3b82f622',borderWidth:2,pointRadius:0,fill:true,tension:.3});
+  }
+  if(tuningAnnotated && tpsChart.data.datasets.length>1){
+    tpsChart.data.datasets[1].data.push(phase==='after'?tps:null);
+  }
+  if(tpsChart.data.labels.length>150){tpsChart.data.labels.shift();tpsChart.data.datasets.forEach(d=>d.data.shift())}
+  tpsChart.update();
+
+  // Cache chart
+  cacheChart.data.labels.push(lbl);
+  cacheChart.data.datasets[0].data.push(cache);
+  if(tuningAnnotated && cacheChart.data.datasets.length>1){
+    cacheChart.data.datasets[1].data.push(phase==='after'?cache:null);
+  }
+  if(cacheChart.data.labels.length>150){cacheChart.data.labels.shift();cacheChart.data.datasets.forEach(d=>d.data.shift())}
+  cacheChart.update();
+}
+
+// ── Phase labels ────────────────────────────────────────────────────────────
+const phaseLabels = {
+  idle:'IDLE', resetting:'RESETTING', loading:'LOAD RUNNING',
+  diagnosing:'DIAGNOSING', tuning:'TUNING', verifying:'VERIFYING', done:'DONE'
+};
+
+const phaseColors = {
+  idle:'var(--muted)', resetting:'var(--yellow)', loading:'var(--red)',
+  diagnosing:'var(--accent)', tuning:'var(--yellow)', verifying:'var(--green)', done:'var(--green)'
+};
+
+// ── SSE ─────────────────────────────────────────────────────────────────────
+let evtSource = null;
+
+function connectSSE(){
+  if(evtSource) evtSource.close();
+  evtSource = new EventSource('/api/stream');
+  evtSource.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+
+    // Status
+    document.getElementById('statusText').textContent = d.message;
+    document.getElementById('progressFill').style.width = d.progress + '%';
+    document.getElementById('progressPct').textContent = d.progress + '%';
+
+    const dot = document.getElementById('statusDot');
+    dot.className = 'status-dot ' + (d.phase==='idle'||d.phase==='done'? (d.phase==='done'?'done':'idle') : 'running');
+
+    // KPI phase
+    document.getElementById('kpiPhase').textContent = phaseLabels[d.phase]||d.phase;
+    document.getElementById('kpiPhase').style.color = phaseColors[d.phase]||'var(--text)';
+
+    // New metrics
+    if(d.new_metrics && d.new_metrics.length){
+      d.new_metrics.forEach(m => {
+        addPoint(m.ts, m.tps, m.cache_hit, m.phase);
+        document.getElementById('kpiTps').textContent = m.tps.toFixed(0);
+        document.getElementById('kpiCache').textContent = m.cache_hit.toFixed(1);
+      });
+    }
+
+    // Diagnosis
+    if(d.diagnosis && d.diagnosis.length){
+      const ul = document.getElementById('diagList');
+      ul.innerHTML = d.diagnosis.map(l => '<li>'+escHtml(l)+'</li>').join('');
+    }
+
+    // Knobs
+    if(d.knob_changes && d.knob_changes.length){
+      const tb = document.getElementById('knobBody');
+      tb.innerHTML = d.knob_changes.map(k =>
+        `<tr><td>${k.knob}</td><td class="old">${k.before}</td><td class="arrow">&rarr;</td><td class="new">${k.after}</td></tr>`
+      ).join('');
+    }
+
+    // Before
+    if(d.before && d.before.tps){
+      document.getElementById('kpiLat').textContent = d.before.lat_avg;
+    }
+
+    // Comparison
+    if(d.after && d.after.tps && d.before && d.before.tps){
+      document.getElementById('compareSection').style.display = 'block';
+      fillCompare('Tps', d.before.tps, d.after.tps, false);
+      fillCompare('Lat', d.before.lat_avg, d.after.lat_avg, true);
+      fillCompare('P95', d.before.lat_p95, d.after.lat_p95, true);
+      fillCompare('P99', d.before.lat_p99, d.after.lat_p99, true);
+      document.getElementById('kpiLat').textContent = d.after.lat_avg;
+
+      // Update KPI changes
+      const tpsDelta = ((d.after.tps-d.before.tps)/d.before.tps*100).toFixed(1);
+      const kpiTpsC = document.getElementById('kpiTpsChange');
+      kpiTpsC.textContent = (tpsDelta>0?'+':'')+tpsDelta+'% vs before';
+      kpiTpsC.className = 'metric-change '+(tpsDelta>=0?'up':'down');
+
+      const latDelta = ((d.after.lat_avg-d.before.lat_avg)/d.before.lat_avg*100).toFixed(1);
+      const kpiLatC = document.getElementById('kpiLatChange');
+      kpiLatC.textContent = latDelta+'% vs before';
+      kpiLatC.className = 'metric-change '+(latDelta<=0?'up':'down');
+    }
+
+    // Button
+    document.getElementById('btnStart').disabled = (d.phase!=='idle' && d.phase!=='done');
+    document.getElementById('btnStart').innerHTML = d.phase==='done'
+      ? '<span class="icon">&#8635;</span> 重新演示'
+      : '<span class="icon">&#9654;</span> 启动负载测试';
+  };
+}
+
+function fillCompare(key, before, after, lowerIsBetter){
+  document.getElementById('cmp'+key+'Before').textContent = typeof before==='number'? (before>100?Math.round(before):before) : before;
+  document.getElementById('cmp'+key+'After').textContent  = typeof after==='number'?  (after>100?Math.round(after):after)   : after;
+  if(typeof before==='number' && before>0){
+    const pct = ((after-before)/before*100).toFixed(1);
+    const good = lowerIsBetter ? pct<0 : pct>0;
+    const el = document.getElementById('cmp'+key+'Delta');
+    el.textContent = (pct>0?'+':'')+pct+'%';
+    el.style.color = good?'var(--green)':'var(--red)';
+  }
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function startDemo(){
+  // Reset charts
+  tuningAnnotated = false;
+  tpsChart.data.labels = []; tpsChart.data.datasets = [{...tpsChart.data.datasets[0], data:[]}]; tpsChart.update();
+  cacheChart.data.labels=[]; cacheChart.data.datasets= [{...cacheChart.data.datasets[0],data:[]}]; cacheChart.update();
+  document.getElementById('compareSection').style.display='none';
+  document.getElementById('diagList').innerHTML='<li style="color:var(--muted)">负载运行中，稍后显示诊断结果 ...</li>';
+  document.getElementById('knobBody').innerHTML='<tr><td colspan="4" style="color:var(--muted)">等待诊断完成 ...</td></tr>';
+  document.getElementById('kpiTpsChange').innerHTML='&nbsp;';
+  document.getElementById('kpiLatChange').innerHTML='&nbsp;';
+
+  fetch('/api/start',{method:'POST'}).then(r=>r.json()).then(d=>{
+    if(d.error) alert(d.error);
+  });
+}
+
+connectSSE();
+</script>
+</body>
+</html>

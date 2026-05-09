@@ -1,0 +1,67 @@
+{
+  "info": {
+    "objs": [
+      "tps"
+    ],
+    "constraints": []
+  },
+  "data": [
+    {
+      "configuration": {
+        "binlog_group_commit_sync_delay": 0,
+        "binlog_group_commit_sync_no_delay_count": 0,
+        "div_precision_increment": 4,
+        "host_cache_size": 279,
+        "innodb_adaptive_max_sleep_delay": 150000,
+        "innodb_autoextend_increment": 64,
+        "innodb_buffer_pool_dump_pct": 25,
+        "innodb_buffer_pool_size": 134217728,
+        "innodb_change_buffer_max_size": 25,
+        "innodb_compression_failure_threshold_pct": 5,
+        "innodb_compression_pad_pct_max": 50,
+        "innodb_concurrency_tickets": 5000,
+        "innodb_log_spin_cpu_abs_lwm": 80,
+        "innodb_log_spin_cpu_pct_hwm": 50,
+        "innodb_log_wait_for_flush_spin_hwm": 0,
+        "innodb_log_write_ahead_size": 8192,
+        "innodb_lru_scan_depth": 1024,
+        "innodb_max_dirty_pages_pct": 90,
+        "innodb_max_dirty_pages_pct_lwm": 10,
+        "innodb_max_undo_log_size": 1073741,
+        "innodb_online_alter_log_max_size": 134217,
+        "innodb_purge_batch_size": 300,
+        "innodb_purge_rseg_truncate_frequency": 128,
+        "innodb_read_ahead_threshold": 56,
+        "innodb_spin_wait_delay": 6,
+        "innodb_stats_transient_sample_pages": 8,
+        "innodb_thread_concurrency": 0,
+        "join_buffer_size": 262144,
+        "key_cache_block_size": 1024,
+        "max_heap_table_size": 16777216,
+        "max_relay_log_size": 0,
+        "max_user_connections": 0,
+        "net_write_timeout": 60,
+        "query_prealloc_size": 8192,
+        "range_optimizer_max_mem_size": 8388,
+        "rpl_read_size": 8192,
+        "rpl_stop_slave_timeout": 31536000,
+        "sort_buffer_size": 262144,
+        "stored_program_definition_cache": 256,
+        "table_open_cache": 4000,
+        "tablespace_definition_cache": 256,
+        "temptable_max_ram": 1073741,
+        "thread_cache_size": 9,
+        "tmp_table_size": 16777216
+      },
+      "external_metrics": {
+        "tps": 2527.76,
+        "lat": 42.78333333333333,
+        "qps": 26188.446666666667,
+        "tpsVar": 1796.1300800000015,
+        "latVar": 4.825826666666669,
+        "qpsVar": 664671.800066665
+      },
+      "function_file": "test_perf_output/perf_1776398000_counts_sysbench.txt"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "timestamp": "2026-05-07T20:57:15.968327",
+      "workload": "pgbench",
+      "mode": "tuned",
+      "clients": 30,
+      "threads": 4,
+      "duration": 15,
+      "external_metrics": {
+        "tps": 8754.261866,
+        "lat": 3.427,
+        "lat_stddev": 0.0,
+        "qps": 8754.261866
+      },
+      "configuration": {
+        "effective_cache_size": "6GB",
+        "maintenance_work_mem": "128MB",
+        "max_connections": "100",
+        "shared_buffers": "128MB",
+        "work_mem": "16MB"
+      },
+      "function_file": "performance/pgbench_tuned_functions.txt"
+    }
+  ]
+}
