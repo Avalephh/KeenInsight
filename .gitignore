@@ -1,3 +1,4 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
@@ -10,17 +11,29 @@ dist/
 build/
 .eggs/
 *.log
-log/
-performance/*.data
-performance/*.json
-test_perf_output/
-web/__pycache__/
+
+# 环境
+.env
+venv/
+ENV/
+
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+
+# macOS
 .DS_Store
-.env
-venv/
-ENV/
+
+# 性能数据结果（不要上传）
+performance/*.data
+performance/history_performance-*.json
+test_perf_output/
+
+# 本地日志
+log/
+
+# Web 缓存
+web/__pycache__/
