@@ -10,7 +10,6 @@ __pycache__/
 dist/
 build/
 .eggs/
-*.log
 
 # 环境
 .env
@@ -23,17 +22,17 @@ ENV/
 *.swp
 *.swo
 *~
-
-# macOS
 .DS_Store
 
-# 性能数据结果（不要上传）
-performance/*.data
-performance/history_performance-*.json
-test_perf_output/
-
-# 本地日志
-log/
-
-# Web 缓存
-web/__pycache__/
+# ── 结果/数据文件（不上传）──
+# perf 原始数据
+one/performance/*.data
+# 历史性能 JSON
+one/performance/history_*.json
+# 预训练模型（太大）
+one/premodel/*.pkl
+# 测试输出
+one/test_perf_output/
+# 日志
+one/log/
+*.log
