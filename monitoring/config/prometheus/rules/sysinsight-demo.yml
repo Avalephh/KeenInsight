@@ -1,0 +1,12 @@
+groups:
+  - name: sysinsight-demo
+    rules:
+      - alert: SysInsightDemoAnomaly
+        expr: pg_stat_activity_count{job="postgres",datname="keeninsight",state="active"} >= 3
+        for: 0s
+        labels:
+          severity: warning
+          source: sysinsight-demo
+        annotations:
+          summary: "SysInsight demo database activity anomaly"
+          description: "The local keeninsight database has at least three active PostgreSQL sessions."

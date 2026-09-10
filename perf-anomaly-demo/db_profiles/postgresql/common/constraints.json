@@ -1,0 +1,1918 @@
+{
+  "checkpoint_flush_after": [
+    "int",
+    "linear",
+    [
+      0,
+      256
+    ]
+  ],
+  "wal_buffers": [
+    "int",
+    "linear",
+    [
+      -1,
+      262143
+    ]
+  ],
+  "backend_flush_after": [
+    "int",
+    "linear",
+    [
+      0,
+      256
+    ]
+  ],
+  "wal_writer_flush_after": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "wal_writer_delay": [
+    "int",
+    "linear",
+    [
+      1,
+      10000
+    ]
+  ],
+  "commit_siblings": [
+    "int",
+    "linear",
+    [
+      0,
+      1000
+    ]
+  ],
+  "seq_page_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "commit_delay": [
+    "int",
+    "linear",
+    [
+      0,
+      100000
+    ]
+  ],
+  "join_collapse_limit": [
+    "int",
+    "linear",
+    [
+      1,
+      2147483647
+    ]
+  ],
+  "from_collapse_limit": [
+    "int",
+    "linear",
+    [
+      1,
+      2147483647
+    ]
+  ],
+  "bgwriter_flush_after": [
+    "int",
+    "linear",
+    [
+      0,
+      256
+    ]
+  ],
+  "deadlock_timeout": [
+    "int",
+    "linear",
+    [
+      1,
+      2147483647
+    ]
+  ],
+  "wal_sync_method": [
+    "enum",
+    "linear",
+    [
+      "fsync",
+      "fdatasync",
+      "open_sync",
+      "open_datasync"
+    ]
+  ],
+  "bgwriter_lru_multiplier": [
+    "float",
+    "linear",
+    [
+      0,
+      10
+    ]
+  ],
+  "effective_io_concurrency": [
+    "int",
+    "linear",
+    [
+      0,
+      1000
+    ]
+  ],
+  "max_connections": [
+    "int",
+    "linear",
+    [
+      1,
+      262143
+    ]
+  ],
+  "max_worker_processes": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "max_parallel_workers_per_gather": [
+    "int",
+    "linear",
+    [
+      0,
+      1024
+    ]
+  ],
+  "max_parallel_workers": [
+    "int",
+    "linear",
+    [
+      0,
+      1024
+    ]
+  ],
+  "max_wal_senders": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "shared_buffers": [
+    "int",
+    "linear",
+    [
+      16,
+      1073741823
+    ]
+  ],
+  "huge_pages": [
+    "enum",
+    "linear",
+    [
+      "off",
+      "on",
+      "try"
+    ]
+  ],
+  "work_mem": [
+    "int",
+    "linear",
+    [
+      64,
+      2147483647
+    ]
+  ],
+  "maintenance_work_mem": [
+    "int",
+    "linear",
+    [
+      1024,
+      2147483647
+    ]
+  ],
+  "logging_collector": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_rotation_size": [
+    "int",
+    "linear",
+    [
+      0,
+      2097151
+    ]
+  ],
+  "log_checkpoints": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_connections": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_disconnections": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_temp_files": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "checkpoint_timeout": [
+    "int",
+    "linear",
+    [
+      30,
+      86400
+    ]
+  ],
+  "checkpoint_completion_target": [
+    "float",
+    "linear",
+    [
+      0,
+      1
+    ]
+  ],
+  "min_wal_size": [
+    "int",
+    "linear",
+    [
+      2,
+      2147483647
+    ]
+  ],
+  "max_wal_size": [
+    "int",
+    "linear",
+    [
+      2,
+      2147483647
+    ]
+  ],
+  "checkpoint_warning": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "bgwriter_delay": [
+    "int",
+    "linear",
+    [
+      10,
+      10000
+    ]
+  ],
+  "bgwriter_lru_maxpages": [
+    "int",
+    "linear",
+    [
+      0,
+      1073741823
+    ]
+  ],
+  "vacuum_cost_limit": [
+    "int",
+    "linear",
+    [
+      1,
+      10000
+    ]
+  ],
+  "autovacuum_max_workers": [
+    "int",
+    "linear",
+    [
+      1,
+      262143
+    ]
+  ],
+  "autovacuum_vacuum_scale_factor": [
+    "float",
+    "linear",
+    [
+      0,
+      100
+    ]
+  ],
+  "autovacuum_analyze_scale_factor": [
+    "float",
+    "linear",
+    [
+      0,
+      100
+    ]
+  ],
+  "autovacuum_freeze_max_age": [
+    "int",
+    "linear",
+    [
+      100000,
+      2000000000
+    ]
+  ],
+  "vacuum_cost_delay": [
+    "float",
+    "linear",
+    [
+      0,
+      100
+    ]
+  ],
+  "max_replication_slots": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "hot_standby_feedback": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "max_standby_streaming_delay": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "effective_cache_size": [
+    "int",
+    "linear",
+    [
+      1,
+      2147483647
+    ]
+  ],
+  "default_statistics_target": [
+    "int",
+    "linear",
+    [
+      1,
+      10000
+    ]
+  ],
+  "random_page_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "jit": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "archive_mode": [
+    "enum",
+    "linear",
+    [
+      "always",
+      "on",
+      "off"
+    ]
+  ],
+  "track_activity_query_size": [
+    "int",
+    "linear",
+    [
+      100,
+      1048576
+    ]
+  ],
+  "IntervalStyle": [
+    "enum",
+    "linear",
+    [
+      "postgres",
+      "postgres_verbose",
+      "sql_standard",
+      "iso_8601"
+    ]
+  ],
+  "allow_system_table_mods": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "archive_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      1073741823
+    ]
+  ],
+  "array_nulls": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "authentication_timeout": [
+    "int",
+    "linear",
+    [
+      1,
+      600
+    ]
+  ],
+  "autovacuum": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "autovacuum_analyze_threshold": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "autovacuum_multixact_freeze_max_age": [
+    "int",
+    "linear",
+    [
+      10000,
+      2000000000
+    ]
+  ],
+  "autovacuum_naptime": [
+    "int",
+    "linear",
+    [
+      1,
+      2147483
+    ]
+  ],
+  "autovacuum_vacuum_cost_delay": [
+    "float",
+    "linear",
+    [
+      -1,
+      100
+    ]
+  ],
+  "autovacuum_vacuum_cost_limit": [
+    "int",
+    "linear",
+    [
+      -1,
+      10000
+    ]
+  ],
+  "autovacuum_vacuum_threshold": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "autovacuum_work_mem": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "backslash_quote": [
+    "enum",
+    "linear",
+    [
+      "safe_encoding",
+      "on",
+      "off"
+    ]
+  ],
+  "bonjour": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "bytea_output": [
+    "enum",
+    "linear",
+    [
+      "escape",
+      "hex"
+    ]
+  ],
+  "check_function_bodies": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "client_min_messages": [
+    "enum",
+    "linear",
+    [
+      "debug5",
+      "debug4",
+      "debug3",
+      "debug2",
+      "debug1",
+      "log",
+      "notice",
+      "warning",
+      "error"
+    ]
+  ],
+  "constraint_exclusion": [
+    "enum",
+    "linear",
+    [
+      "partition",
+      "on",
+      "off"
+    ]
+  ],
+  "cpu_index_tuple_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "cpu_operator_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "cpu_tuple_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "cursor_tuple_fraction": [
+    "float",
+    "linear",
+    [
+      0,
+      1
+    ]
+  ],
+  "data_sync_retry": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "db_user_namespace": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "debug_pretty_print": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "debug_print_parse": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "debug_print_plan": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "debug_print_rewritten": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "default_transaction_deferrable": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "default_transaction_isolation": [
+    "enum",
+    "linear",
+    [
+      "serializable",
+      "repeatable read",
+      "read committed",
+      "read uncommitted"
+    ]
+  ],
+  "default_transaction_read_only": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "dynamic_shared_memory_type": [
+    "enum",
+    "linear",
+    [
+      "posix",
+      "sysv",
+      "mmap"
+    ]
+  ],
+  "enable_bitmapscan": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_gathermerge": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_hashagg": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_hashjoin": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_indexonlyscan": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_indexscan": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_material": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_mergejoin": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_nestloop": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_parallel_append": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_parallel_hash": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_partition_pruning": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_partitionwise_aggregate": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_partitionwise_join": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_seqscan": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_sort": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "enable_tidscan": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "escape_string_warning": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "exit_on_error": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "extra_float_digits": [
+    "int",
+    "linear",
+    [
+      -15,
+      3
+    ]
+  ],
+  "force_parallel_mode": [
+    "enum",
+    "linear",
+    [
+      "off",
+      "on",
+      "regress"
+    ]
+  ],
+  "fsync": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "full_page_writes": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "geqo": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "geqo_effort": [
+    "int",
+    "linear",
+    [
+      1,
+      10
+    ]
+  ],
+  "geqo_generations": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "geqo_pool_size": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "geqo_seed": [
+    "float",
+    "linear",
+    [
+      0,
+      1
+    ]
+  ],
+  "geqo_selection_bias": [
+    "float",
+    "linear",
+    [
+      1.5,
+      2
+    ]
+  ],
+  "geqo_threshold": [
+    "int",
+    "linear",
+    [
+      2,
+      2147483647
+    ]
+  ],
+  "gin_fuzzy_search_limit": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "hot_standby": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "idle_in_transaction_session_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "ignore_checksum_failure": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "ignore_system_indexes": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "jit_above_cost": [
+    "float",
+    "linear",
+    [
+      -1,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "jit_debugging_support": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "jit_dump_bitcode": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "jit_expressions": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "jit_inline_above_cost": [
+    "float",
+    "linear",
+    [
+      -1,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "jit_optimize_above_cost": [
+    "float",
+    "linear",
+    [
+      -1,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "jit_profiling_support": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "jit_tuple_deforming": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "krb_caseins_users": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "lo_compat_privileges": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "lock_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "log_autovacuum_min_duration": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "log_duration": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_error_verbosity": [
+    "enum",
+    "linear",
+    [
+      "terse",
+      "default",
+      "verbose"
+    ]
+  ],
+  "log_executor_stats": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_file_mode": [
+    "int",
+    "linear",
+    [
+      0,
+      511
+    ]
+  ],
+  "log_hostname": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_lock_waits": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_min_duration_statement": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "log_min_error_statement": [
+    "enum",
+    "linear",
+    [
+      "debug5",
+      "debug4",
+      "debug3",
+      "debug2",
+      "debug1",
+      "info",
+      "notice",
+      "warning",
+      "error",
+      "log",
+      "fatal",
+      "panic"
+    ]
+  ],
+  "log_min_messages": [
+    "enum",
+    "linear",
+    [
+      "debug5",
+      "debug4",
+      "debug3",
+      "debug2",
+      "debug1",
+      "info",
+      "notice",
+      "warning",
+      "error",
+      "log",
+      "fatal",
+      "panic"
+    ]
+  ],
+  "log_parser_stats": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_planner_stats": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_replication_commands": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_rotation_age": [
+    "int",
+    "linear",
+    [
+      0,
+      35791394
+    ]
+  ],
+  "log_statement": [
+    "enum",
+    "linear",
+    [
+      "none",
+      "ddl",
+      "mod",
+      "all"
+    ]
+  ],
+  "log_statement_stats": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "log_transaction_sample_rate": [
+    "float",
+    "linear",
+    [
+      0,
+      1
+    ]
+  ],
+  "log_truncate_on_rotation": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "max_files_per_process": [
+    "int",
+    "linear",
+    [
+      64,
+      2147483647
+    ]
+  ],
+  "max_locks_per_transaction": [
+    "int",
+    "linear",
+    [
+      10,
+      2147483647
+    ]
+  ],
+  "max_logical_replication_workers": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "max_parallel_maintenance_workers": [
+    "int",
+    "linear",
+    [
+      0,
+      1024
+    ]
+  ],
+  "max_pred_locks_per_page": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "max_pred_locks_per_relation": [
+    "int",
+    "linear",
+    [
+      -2147483648,
+      2147483647
+    ]
+  ],
+  "max_pred_locks_per_transaction": [
+    "int",
+    "linear",
+    [
+      10,
+      2147483647
+    ]
+  ],
+  "max_prepared_transactions": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "max_stack_depth": [
+    "int",
+    "linear",
+    [
+      100,
+      2147483647
+    ]
+  ],
+  "max_standby_archive_delay": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "max_sync_workers_per_subscription": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "min_parallel_index_scan_size": [
+    "int",
+    "linear",
+    [
+      0,
+      715827882
+    ]
+  ],
+  "min_parallel_table_scan_size": [
+    "int",
+    "linear",
+    [
+      0,
+      715827882
+    ]
+  ],
+  "old_snapshot_threshold": [
+    "int",
+    "linear",
+    [
+      -1,
+      86400
+    ]
+  ],
+  "operator_precedence_warning": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "parallel_leader_participation": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "parallel_setup_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "parallel_tuple_cost": [
+    "float",
+    "linear",
+    [
+      0,
+      179769000000000006323030492138942643493033036433685336215410983289126434148906289940615299632196609445533816320312774433484859900046491141051651091672734470972759941382582304802812882753059262973637182942535982636884444611376868582636745405553206881859340916340092953230149901406738427651121855107737424232448
+    ]
+  ],
+  "password_encryption": [
+    "enum",
+    "linear",
+    [
+      "md5",
+      "scram-sha-256"
+    ]
+  ],
+  "plan_cache_mode": [
+    "enum",
+    "linear",
+    [
+      "auto",
+      "force_generic_plan",
+      "force_custom_plan"
+    ]
+  ],
+  "port": [
+    "int",
+    "linear",
+    [
+      1,
+      65535
+    ]
+  ],
+  "post_auth_delay": [
+    "int",
+    "linear",
+    [
+      0,
+      2147
+    ]
+  ],
+  "pre_auth_delay": [
+    "int",
+    "linear",
+    [
+      0,
+      60
+    ]
+  ],
+  "quote_all_identifiers": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "recovery_min_apply_delay": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "recovery_target_action": [
+    "enum",
+    "linear",
+    [
+      "pause",
+      "promote",
+      "shutdown"
+    ]
+  ],
+  "recovery_target_inclusive": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "restart_after_crash": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "row_security": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "session_replication_role": [
+    "enum",
+    "linear",
+    [
+      "origin",
+      "replica",
+      "local"
+    ]
+  ],
+  "shared_memory_type": [
+    "enum",
+    "linear",
+    [
+      "sysv",
+      "mmap"
+    ]
+  ],
+  "ssl": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "ssl_max_protocol_version": [
+    "enum",
+    "linear",
+    [
+      "",
+      "TLSv1",
+      "TLSv1.1",
+      "TLSv1.2",
+      "TLSv1.3"
+    ]
+  ],
+  "ssl_min_protocol_version": [
+    "enum",
+    "linear",
+    [
+      "TLSv1",
+      "TLSv1.1",
+      "TLSv1.2",
+      "TLSv1.3"
+    ]
+  ],
+  "ssl_passphrase_command_supports_reload": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "ssl_prefer_server_ciphers": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "standard_conforming_strings": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "statement_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "superuser_reserved_connections": [
+    "int",
+    "linear",
+    [
+      0,
+      262143
+    ]
+  ],
+  "synchronize_seqscans": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "synchronous_commit": [
+    "enum",
+    "linear",
+    [
+      "local",
+      "remote_write",
+      "remote_apply",
+      "on",
+      "off"
+    ]
+  ],
+  "syslog_facility": [
+    "enum",
+    "linear",
+    [
+      "local0",
+      "local1",
+      "local2",
+      "local3",
+      "local4",
+      "local5",
+      "local6",
+      "local7"
+    ]
+  ],
+  "syslog_sequence_numbers": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "syslog_split_messages": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "tcp_keepalives_count": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "tcp_keepalives_idle": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "tcp_keepalives_interval": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "tcp_user_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "temp_buffers": [
+    "int",
+    "linear",
+    [
+      100,
+      1073741823
+    ]
+  ],
+  "temp_file_limit": [
+    "int",
+    "linear",
+    [
+      -1,
+      2147483647
+    ]
+  ],
+  "trace_notify": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "trace_recovery_messages": [
+    "enum",
+    "linear",
+    [
+      "debug5",
+      "debug4",
+      "debug3",
+      "debug2",
+      "debug1",
+      "log",
+      "notice",
+      "warning",
+      "error"
+    ]
+  ],
+  "trace_sort": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "track_activities": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "track_commit_timestamp": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "track_counts": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "track_functions": [
+    "enum",
+    "linear",
+    [
+      "none",
+      "pl",
+      "all"
+    ]
+  ],
+  "track_io_timing": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "transform_null_equals": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "unix_socket_permissions": [
+    "int",
+    "linear",
+    [
+      0,
+      511
+    ]
+  ],
+  "update_process_title": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "vacuum_cleanup_index_scale_factor": [
+    "float",
+    "linear",
+    [
+      0,
+      10000000000
+    ]
+  ],
+  "vacuum_cost_page_dirty": [
+    "int",
+    "linear",
+    [
+      0,
+      10000
+    ]
+  ],
+  "vacuum_cost_page_hit": [
+    "int",
+    "linear",
+    [
+      0,
+      10000
+    ]
+  ],
+  "vacuum_cost_page_miss": [
+    "int",
+    "linear",
+    [
+      0,
+      10000
+    ]
+  ],
+  "vacuum_defer_cleanup_age": [
+    "int",
+    "linear",
+    [
+      0,
+      1000000
+    ]
+  ],
+  "vacuum_freeze_min_age": [
+    "int",
+    "linear",
+    [
+      0,
+      1000000000
+    ]
+  ],
+  "vacuum_freeze_table_age": [
+    "int",
+    "linear",
+    [
+      0,
+      2000000000
+    ]
+  ],
+  "vacuum_multixact_freeze_min_age": [
+    "int",
+    "linear",
+    [
+      0,
+      1000000000
+    ]
+  ],
+  "vacuum_multixact_freeze_table_age": [
+    "int",
+    "linear",
+    [
+      0,
+      2000000000
+    ]
+  ],
+  "wal_compression": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "wal_init_zero": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "wal_level": [
+    "enum",
+    "linear",
+    [
+      "minimal",
+      "replica",
+      "logical"
+    ]
+  ],
+  "wal_log_hints": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "wal_receiver_status_interval": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483
+    ]
+  ],
+  "wal_receiver_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "wal_recycle": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ],
+  "wal_retrieve_retry_interval": [
+    "int",
+    "linear",
+    [
+      1,
+      2147483647
+    ]
+  ],
+  "wal_sender_timeout": [
+    "int",
+    "linear",
+    [
+      0,
+      2147483647
+    ]
+  ],
+  "xmlbinary": [
+    "enum",
+    "linear",
+    [
+      "base64",
+      "hex"
+    ]
+  ],
+  "xmloption": [
+    "enum",
+    "linear",
+    [
+      "content",
+      "document"
+    ]
+  ],
+  "zero_damaged_pages": [
+    "enum",
+    "linear",
+    [
+      "on",
+      "off"
+    ]
+  ]
+}

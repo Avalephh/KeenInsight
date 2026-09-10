@@ -1,0 +1,2775 @@
+{
+  "format": "sysinsight-postgresql-source-association-provenance-v1",
+  "source_root": "/root/keeninsight-postgres/third_party/postgresql-12.22",
+  "source_revision": "498f30a8b7025a2a7bd3715acc1d1692122ba542",
+  "source_digest": "a663434c952e62b0ffdec16ce42e10ccac344b48349dea228e7427230a1ce8d2",
+  "guc_file": "/root/keeninsight-postgres/third_party/postgresql-12.22/src/backend/utils/misc/guc.c",
+  "target_knobs_file": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/postgresql_source_target_knobs.txt",
+  "legacy_association_source": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/dev/one/database/paramater_association_library.json",
+  "legacy_pg_record_count": 5,
+  "backend_c_file_count": 770,
+  "record_count": 276,
+  "records_with_source_use": 276,
+  "records": [
+    {
+      "knob_name": "checkpoint_flush_after",
+      "guc_variable": "checkpoint_flush_after",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_buffers",
+      "guc_variable": "XLOGbuffers",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 9,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "backend_flush_after",
+      "guc_variable": "backend_flush_after",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_writer_flush_after",
+      "guc_variable": "WalWriterFlushAfter",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_writer_delay",
+      "guc_variable": "WalWriterDelay",
+      "data_flow_functions": 1,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "commit_siblings",
+      "guc_variable": "CommitSiblings",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "seq_page_cost",
+      "guc_variable": "seq_page_cost",
+      "data_flow_functions": 6,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "commit_delay",
+      "guc_variable": "CommitDelay",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "join_collapse_limit",
+      "guc_variable": "join_collapse_limit",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "from_collapse_limit",
+      "guc_variable": "from_collapse_limit",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bgwriter_flush_after",
+      "guc_variable": "bgwriter_flush_after",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "deadlock_timeout",
+      "guc_variable": "DeadlockTimeout",
+      "data_flow_functions": 3,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_sync_method",
+      "guc_variable": "sync_method",
+      "data_flow_functions": 4,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 12,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bgwriter_lru_multiplier",
+      "guc_variable": "bgwriter_lru_multiplier",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "effective_io_concurrency",
+      "guc_variable": "effective_io_concurrency",
+      "data_flow_functions": 2,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_connections",
+      "guc_variable": "MaxConnections",
+      "data_flow_functions": 8,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 20,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_worker_processes",
+      "guc_variable": "max_worker_processes",
+      "data_flow_functions": 17,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 32,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_parallel_workers_per_gather",
+      "guc_variable": "max_parallel_workers_per_gather",
+      "data_flow_functions": 5,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_parallel_workers",
+      "guc_variable": "max_parallel_workers",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_wal_senders",
+      "guc_variable": "max_wal_senders",
+      "data_flow_functions": 18,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 29,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "shared_buffers",
+      "guc_variable": "NBuffers",
+      "data_flow_functions": 30,
+      "control_flow_functions": 7,
+      "source_evidence_rows": 58,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 10,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "huge_pages",
+      "guc_variable": "huge_pages",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 12,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "work_mem",
+      "guc_variable": "work_mem",
+      "data_flow_functions": 73,
+      "control_flow_functions": 15,
+      "source_evidence_rows": 96,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 13,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "maintenance_work_mem",
+      "guc_variable": "maintenance_work_mem",
+      "data_flow_functions": 14,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 19,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 4,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "logging_collector",
+      "guc_variable": "Logging_collector",
+      "data_flow_functions": 0,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_destination",
+      "guc_variable": "Log_destination_string",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_rotation_size",
+      "guc_variable": "Log_RotationSize",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_checkpoints",
+      "guc_variable": "log_checkpoints",
+      "data_flow_functions": 0,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_connections",
+      "guc_variable": "Log_connections",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_disconnections",
+      "guc_variable": "Log_disconnections",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_line_prefix",
+      "guc_variable": "Log_line_prefix",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_temp_files",
+      "guc_variable": "log_temp_files",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "checkpoint_timeout",
+      "guc_variable": "CheckPointTimeout",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "checkpoint_completion_target",
+      "guc_variable": "CheckPointCompletionTarget",
+      "data_flow_functions": 4,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "min_wal_size",
+      "guc_variable": "min_wal_size_mb",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_wal_size",
+      "guc_variable": "max_wal_size_mb",
+      "data_flow_functions": 5,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 3,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "checkpoint_warning",
+      "guc_variable": "CheckPointWarning",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bgwriter_delay",
+      "guc_variable": "BgWriterDelay",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bgwriter_lru_maxpages",
+      "guc_variable": "bgwriter_lru_maxpages",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_cost_limit",
+      "guc_variable": "VacuumCostLimit",
+      "data_flow_functions": 5,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_max_workers",
+      "guc_variable": "autovacuum_max_workers",
+      "data_flow_functions": 4,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_vacuum_scale_factor",
+      "guc_variable": "autovacuum_vac_scale",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_analyze_scale_factor",
+      "guc_variable": "autovacuum_anl_scale",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_freeze_max_age",
+      "guc_variable": "autovacuum_freeze_max_age",
+      "data_flow_functions": 4,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_cost_delay",
+      "guc_variable": "VacuumCostDelay",
+      "data_flow_functions": 6,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 9,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_replication_slots",
+      "guc_variable": "max_replication_slots",
+      "data_flow_functions": 24,
+      "control_flow_functions": 14,
+      "source_evidence_rows": 40,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "hot_standby_feedback",
+      "guc_variable": "hot_standby_feedback",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_standby_streaming_delay",
+      "guc_variable": "max_standby_streaming_delay",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "effective_cache_size",
+      "guc_variable": "effective_cache_size",
+      "data_flow_functions": 5,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 7,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_statistics_target",
+      "guc_variable": "default_statistics_target",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "random_page_cost",
+      "guc_variable": "random_page_cost",
+      "data_flow_functions": 3,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit",
+      "guc_variable": "jit_enabled",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "cluster_name",
+      "guc_variable": "cluster_name",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "archive_mode",
+      "guc_variable": "XLogArchiveMode",
+      "data_flow_functions": 0,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "shared_preload_libraries",
+      "guc_variable": "shared_preload_libraries_string",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "archive_command",
+      "guc_variable": "XLogArchiveCommand",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "track_activity_query_size",
+      "guc_variable": "pgstat_track_activity_query_size",
+      "data_flow_functions": 7,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 11,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "IntervalStyle",
+      "guc_variable": "IntervalStyle",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "allow_system_table_mods",
+      "guc_variable": "allowSystemTableMods",
+      "data_flow_functions": 4,
+      "control_flow_functions": 20,
+      "source_evidence_rows": 24,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "application_name",
+      "guc_variable": "application_name",
+      "data_flow_functions": 5,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 13,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "archive_cleanup_command",
+      "guc_variable": "archiveCleanupCommand",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "archive_timeout",
+      "guc_variable": "XLogArchiveTimeout",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "array_nulls",
+      "guc_variable": "Array_nulls",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "authentication_timeout",
+      "guc_variable": "AuthenticationTimeout",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum",
+      "guc_variable": "autovacuum_start_daemon",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_analyze_threshold",
+      "guc_variable": "autovacuum_anl_thresh",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_multixact_freeze_max_age",
+      "guc_variable": "autovacuum_multixact_freeze_max_age",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_naptime",
+      "guc_variable": "autovacuum_naptime",
+      "data_flow_functions": 4,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_vacuum_cost_delay",
+      "guc_variable": "autovacuum_vac_cost_delay",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_vacuum_cost_limit",
+      "guc_variable": "autovacuum_vac_cost_limit",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_vacuum_threshold",
+      "guc_variable": "autovacuum_vac_thresh",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "autovacuum_work_mem",
+      "guc_variable": "autovacuum_work_mem",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "backslash_quote",
+      "guc_variable": "backslash_quote",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bonjour",
+      "guc_variable": "enable_bonjour",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bonjour_name",
+      "guc_variable": "bonjour_name",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "bytea_output",
+      "guc_variable": "bytea_output",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "check_function_bodies",
+      "guc_variable": "check_function_bodies",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "client_min_messages",
+      "guc_variable": "client_min_messages",
+      "data_flow_functions": 1,
+      "control_flow_functions": 6,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "config_file",
+      "guc_variable": "ConfigFileName",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "constraint_exclusion",
+      "guc_variable": "constraint_exclusion",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "cpu_index_tuple_cost",
+      "guc_variable": "cpu_index_tuple_cost",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "cpu_operator_cost",
+      "guc_variable": "cpu_operator_cost",
+      "data_flow_functions": 26,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 40,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "cpu_tuple_cost",
+      "guc_variable": "cpu_tuple_cost",
+      "data_flow_functions": 27,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 32,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "cursor_tuple_fraction",
+      "guc_variable": "cursor_tuple_fraction",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "data_sync_retry",
+      "guc_variable": "data_sync_retry",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "db_user_namespace",
+      "guc_variable": "Db_user_namespace",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "debug_pretty_print",
+      "guc_variable": "Debug_pretty_print",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "debug_print_parse",
+      "guc_variable": "Debug_print_parse",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "debug_print_plan",
+      "guc_variable": "Debug_print_plan",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "debug_print_rewritten",
+      "guc_variable": "Debug_print_rewritten",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_table_access_method",
+      "guc_variable": "default_table_access_method",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_tablespace",
+      "guc_variable": "default_tablespace",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_text_search_config",
+      "guc_variable": "TSCurrentConfig",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_transaction_deferrable",
+      "guc_variable": "DefaultXactDeferrable",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_transaction_isolation",
+      "guc_variable": "DefaultXactIsoLevel",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "default_transaction_read_only",
+      "guc_variable": "DefaultXactReadOnly",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "dynamic_library_path",
+      "guc_variable": "Dynamic_library_path",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "dynamic_shared_memory_type",
+      "guc_variable": "dynamic_shared_memory_type",
+      "data_flow_functions": 1,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_bitmapscan",
+      "guc_variable": "enable_bitmapscan",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_gathermerge",
+      "guc_variable": "enable_gathermerge",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_hashagg",
+      "guc_variable": "enable_hashagg",
+      "data_flow_functions": 1,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_hashjoin",
+      "guc_variable": "enable_hashjoin",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_indexonlyscan",
+      "guc_variable": "enable_indexonlyscan",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_indexscan",
+      "guc_variable": "enable_indexscan",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_material",
+      "guc_variable": "enable_material",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_mergejoin",
+      "guc_variable": "enable_mergejoin",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_nestloop",
+      "guc_variable": "enable_nestloop",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_parallel_append",
+      "guc_variable": "enable_parallel_append",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_parallel_hash",
+      "guc_variable": "enable_parallel_hash",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_partition_pruning",
+      "guc_variable": "enable_partition_pruning",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_partitionwise_aggregate",
+      "guc_variable": "enable_partitionwise_aggregate",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_partitionwise_join",
+      "guc_variable": "enable_partitionwise_join",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_seqscan",
+      "guc_variable": "enable_seqscan",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_sort",
+      "guc_variable": "enable_sort",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "enable_tidscan",
+      "guc_variable": "enable_tidscan",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "escape_string_warning",
+      "guc_variable": "escape_string_warning",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "event_source",
+      "guc_variable": "event_source",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "exit_on_error",
+      "guc_variable": "ExitOnAnyError",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "external_pid_file",
+      "guc_variable": "external_pid_file",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "extra_float_digits",
+      "guc_variable": "extra_float_digits",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "force_parallel_mode",
+      "guc_variable": "force_parallel_mode",
+      "data_flow_functions": 1,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "fsync",
+      "guc_variable": "enableFsync",
+      "data_flow_functions": 0,
+      "control_flow_functions": 9,
+      "source_evidence_rows": 9,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "full_page_writes",
+      "guc_variable": "fullPageWrites",
+      "data_flow_functions": 8,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 18,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo",
+      "guc_variable": "enable_geqo",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo_effort",
+      "guc_variable": "Geqo_effort",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo_generations",
+      "guc_variable": "Geqo_generations",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo_pool_size",
+      "guc_variable": "Geqo_pool_size",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo_seed",
+      "guc_variable": "Geqo_seed",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo_selection_bias",
+      "guc_variable": "Geqo_selection_bias",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "geqo_threshold",
+      "guc_variable": "geqo_threshold",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "gin_fuzzy_search_limit",
+      "guc_variable": "GinFuzzySearchLimit",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "hba_file",
+      "guc_variable": "HbaFileName",
+      "data_flow_functions": 7,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 53,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "hot_standby",
+      "guc_variable": "EnableHotStandby",
+      "data_flow_functions": 0,
+      "control_flow_functions": 7,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ident_file",
+      "guc_variable": "IdentFileName",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "idle_in_transaction_session_timeout",
+      "guc_variable": "IdleInTransactionSessionTimeout",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ignore_checksum_failure",
+      "guc_variable": "ignore_checksum_failure",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ignore_system_indexes",
+      "guc_variable": "IgnoreSystemIndexes",
+      "data_flow_functions": 1,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_above_cost",
+      "guc_variable": "jit_above_cost",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_debugging_support",
+      "guc_variable": "jit_debugging_support",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_dump_bitcode",
+      "guc_variable": "jit_dump_bitcode",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_expressions",
+      "guc_variable": "jit_expressions",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_inline_above_cost",
+      "guc_variable": "jit_inline_above_cost",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_optimize_above_cost",
+      "guc_variable": "jit_optimize_above_cost",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_profiling_support",
+      "guc_variable": "jit_profiling_support",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_provider",
+      "guc_variable": "jit_provider",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "jit_tuple_deforming",
+      "guc_variable": "jit_tuple_deforming",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "krb_caseins_users",
+      "guc_variable": "pg_krb_caseins_users",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "krb_server_keyfile",
+      "guc_variable": "pg_krb_server_keyfile",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "lc_monetary",
+      "guc_variable": "locale_monetary",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "lc_numeric",
+      "guc_variable": "locale_numeric",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "lc_time",
+      "guc_variable": "locale_time",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "listen_addresses",
+      "guc_variable": "ListenAddresses",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "lo_compat_privileges",
+      "guc_variable": "lo_compat_privileges",
+      "data_flow_functions": 0,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "local_preload_libraries",
+      "guc_variable": "local_preload_libraries_string",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "lock_timeout",
+      "guc_variable": "LockTimeout",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_autovacuum_min_duration",
+      "guc_variable": "Log_autovacuum_min_duration",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_directory",
+      "guc_variable": "Log_directory",
+      "data_flow_functions": 4,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_duration",
+      "guc_variable": "log_duration",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_error_verbosity",
+      "guc_variable": "Log_error_verbosity",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_executor_stats",
+      "guc_variable": "log_executor_stats",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_file_mode",
+      "guc_variable": "Log_file_mode",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_filename",
+      "guc_variable": "Log_filename",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_hostname",
+      "guc_variable": "log_hostname",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_lock_waits",
+      "guc_variable": "log_lock_waits",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_min_duration_statement",
+      "guc_variable": "log_min_duration_statement",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_min_error_statement",
+      "guc_variable": "log_min_error_statement",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_min_messages",
+      "guc_variable": "log_min_messages",
+      "data_flow_functions": 2,
+      "control_flow_functions": 10,
+      "source_evidence_rows": 13,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_parser_stats",
+      "guc_variable": "log_parser_stats",
+      "data_flow_functions": 0,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_planner_stats",
+      "guc_variable": "log_planner_stats",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_replication_commands",
+      "guc_variable": "log_replication_commands",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_rotation_age",
+      "guc_variable": "Log_RotationAge",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_statement",
+      "guc_variable": "log_statement",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_statement_stats",
+      "guc_variable": "log_statement_stats",
+      "data_flow_functions": 4,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_transaction_sample_rate",
+      "guc_variable": "log_xact_sample_rate",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "log_truncate_on_rotation",
+      "guc_variable": "Log_truncate_on_rotation",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_files_per_process",
+      "guc_variable": "max_files_per_process",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_locks_per_transaction",
+      "guc_variable": "max_locks_per_xact",
+      "data_flow_functions": 5,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 13,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_logical_replication_workers",
+      "guc_variable": "max_logical_replication_workers",
+      "data_flow_functions": 8,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_parallel_maintenance_workers",
+      "guc_variable": "max_parallel_maintenance_workers",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_pred_locks_per_page",
+      "guc_variable": "max_predicate_locks_per_page",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_pred_locks_per_relation",
+      "guc_variable": "max_predicate_locks_per_relation",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_pred_locks_per_transaction",
+      "guc_variable": "max_predicate_locks_per_xact",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_prepared_transactions",
+      "guc_variable": "max_prepared_xacts",
+      "data_flow_functions": 17,
+      "control_flow_functions": 7,
+      "source_evidence_rows": 36,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_stack_depth",
+      "guc_variable": "max_stack_depth",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_standby_archive_delay",
+      "guc_variable": "max_standby_archive_delay",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "max_sync_workers_per_subscription",
+      "guc_variable": "max_sync_workers_per_subscription",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "min_parallel_index_scan_size",
+      "guc_variable": "min_parallel_index_scan_size",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "min_parallel_table_scan_size",
+      "guc_variable": "min_parallel_table_scan_size",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "old_snapshot_threshold",
+      "guc_variable": "old_snapshot_threshold",
+      "data_flow_functions": 2,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 8,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "operator_precedence_warning",
+      "guc_variable": "operator_precedence_warning",
+      "data_flow_functions": 0,
+      "control_flow_functions": 12,
+      "source_evidence_rows": 12,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "parallel_leader_participation",
+      "guc_variable": "parallel_leader_participation",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "parallel_setup_cost",
+      "guc_variable": "parallel_setup_cost",
+      "data_flow_functions": 3,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "parallel_tuple_cost",
+      "guc_variable": "parallel_tuple_cost",
+      "data_flow_functions": 3,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "password_encryption",
+      "guc_variable": "Password_encryption",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "plan_cache_mode",
+      "guc_variable": "plan_cache_mode",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "port",
+      "guc_variable": "PostPortNumber",
+      "data_flow_functions": 4,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 8,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "post_auth_delay",
+      "guc_variable": "PostAuthDelay",
+      "data_flow_functions": 0,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "pre_auth_delay",
+      "guc_variable": "PreAuthDelay",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "primary_conninfo",
+      "guc_variable": "PrimaryConnInfo",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "primary_slot_name",
+      "guc_variable": "PrimarySlotName",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "promote_trigger_file",
+      "guc_variable": "PromoteTriggerFile",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "quote_all_identifiers",
+      "guc_variable": "quote_all_identifiers",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "recovery_end_command",
+      "guc_variable": "recoveryEndCommand",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "recovery_min_apply_delay",
+      "guc_variable": "recovery_min_apply_delay",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "recovery_target_action",
+      "guc_variable": "recoveryTargetAction",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "recovery_target_inclusive",
+      "guc_variable": "recoveryTargetInclusive",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "recovery_target_time",
+      "guc_variable": "recovery_target_time_string",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "restart_after_crash",
+      "guc_variable": "restart_after_crash",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "restore_command",
+      "guc_variable": "recoveryRestoreCommand",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "row_security",
+      "guc_variable": "row_security",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "search_path",
+      "guc_variable": "namespace_search_path",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "session_preload_libraries",
+      "guc_variable": "session_preload_libraries_string",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "session_replication_role",
+      "guc_variable": "SessionReplicationRole",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "shared_memory_type",
+      "guc_variable": "shared_memory_type",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl",
+      "guc_variable": "EnableSSL",
+      "data_flow_functions": 0,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_ca_file",
+      "guc_variable": "ssl_ca_file",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_cert_file",
+      "guc_variable": "ssl_cert_file",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_ciphers",
+      "guc_variable": "SSLCipherSuites",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_crl_file",
+      "guc_variable": "ssl_crl_file",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_dh_params_file",
+      "guc_variable": "ssl_dh_params_file",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_ecdh_curve",
+      "guc_variable": "SSLECDHCurve",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_key_file",
+      "guc_variable": "ssl_key_file",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 10,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_max_protocol_version",
+      "guc_variable": "ssl_max_protocol_version",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_min_protocol_version",
+      "guc_variable": "ssl_min_protocol_version",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_passphrase_command",
+      "guc_variable": "ssl_passphrase_command",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_passphrase_command_supports_reload",
+      "guc_variable": "ssl_passphrase_command_supports_reload",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "ssl_prefer_server_ciphers",
+      "guc_variable": "SSLPreferServerCiphers",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "standard_conforming_strings",
+      "guc_variable": "standard_conforming_strings",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "statement_timeout",
+      "guc_variable": "StatementTimeout",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "superuser_reserved_connections",
+      "guc_variable": "ReservedBackends",
+      "data_flow_functions": 1,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "synchronize_seqscans",
+      "guc_variable": "synchronize_seqscans",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "synchronous_commit",
+      "guc_variable": "synchronous_commit",
+      "data_flow_functions": 3,
+      "control_flow_functions": 6,
+      "source_evidence_rows": 19,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "syslog_facility",
+      "guc_variable": "syslog_facility",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "syslog_sequence_numbers",
+      "guc_variable": "syslog_sequence_numbers",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "syslog_split_messages",
+      "guc_variable": "syslog_split_messages",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "tcp_keepalives_count",
+      "guc_variable": "tcp_keepalives_count",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "tcp_keepalives_idle",
+      "guc_variable": "tcp_keepalives_idle",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "tcp_keepalives_interval",
+      "guc_variable": "tcp_keepalives_interval",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "tcp_user_timeout",
+      "guc_variable": "tcp_user_timeout",
+      "data_flow_functions": 2,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "temp_buffers",
+      "guc_variable": "num_temp_buffers",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "temp_file_limit",
+      "guc_variable": "temp_file_limit",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "temp_tablespaces",
+      "guc_variable": "temp_tablespaces",
+      "data_flow_functions": 1,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "trace_notify",
+      "guc_variable": "Trace_notify",
+      "data_flow_functions": 0,
+      "control_flow_functions": 11,
+      "source_evidence_rows": 12,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "trace_recovery_messages",
+      "guc_variable": "trace_recovery_messages",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 3,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "trace_sort",
+      "guc_variable": "trace_sort",
+      "data_flow_functions": 0,
+      "control_flow_functions": 17,
+      "source_evidence_rows": 27,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "track_activities",
+      "guc_variable": "pgstat_track_activities",
+      "data_flow_functions": 0,
+      "control_flow_functions": 6,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "track_commit_timestamp",
+      "guc_variable": "track_commit_timestamp",
+      "data_flow_functions": 3,
+      "control_flow_functions": 4,
+      "source_evidence_rows": 15,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "track_counts",
+      "guc_variable": "pgstat_track_counts",
+      "data_flow_functions": 0,
+      "control_flow_functions": 9,
+      "source_evidence_rows": 9,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "track_functions",
+      "guc_variable": "pgstat_track_functions",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "track_io_timing",
+      "guc_variable": "track_io_timing",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "transform_null_equals",
+      "guc_variable": "Transform_null_equals",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "unix_socket_directories",
+      "guc_variable": "Unix_socket_directories",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "unix_socket_group",
+      "guc_variable": "Unix_socket_group",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 5,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "unix_socket_permissions",
+      "guc_variable": "Unix_socket_permissions",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "update_process_title",
+      "guc_variable": "update_process_title",
+      "data_flow_functions": 0,
+      "control_flow_functions": 9,
+      "source_evidence_rows": 13,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_cleanup_index_scale_factor",
+      "guc_variable": "vacuum_cleanup_index_scale_factor",
+      "data_flow_functions": 2,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 4,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_cost_page_dirty",
+      "guc_variable": "VacuumCostPageDirty",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_cost_page_hit",
+      "guc_variable": "VacuumCostPageHit",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_cost_page_miss",
+      "guc_variable": "VacuumCostPageMiss",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_defer_cleanup_age",
+      "guc_variable": "vacuum_defer_cleanup_age",
+      "data_flow_functions": 2,
+      "control_flow_functions": 0,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_freeze_min_age",
+      "guc_variable": "vacuum_freeze_min_age",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_freeze_table_age",
+      "guc_variable": "vacuum_freeze_table_age",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_multixact_freeze_min_age",
+      "guc_variable": "vacuum_multixact_freeze_min_age",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "vacuum_multixact_freeze_table_age",
+      "guc_variable": "vacuum_multixact_freeze_table_age",
+      "data_flow_functions": 1,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_compression",
+      "guc_variable": "wal_compression",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_init_zero",
+      "guc_variable": "wal_init_zero",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 1,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_level",
+      "guc_variable": "wal_level",
+      "data_flow_functions": 3,
+      "control_flow_functions": 8,
+      "source_evidence_rows": 23,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_log_hints",
+      "guc_variable": "wal_log_hints",
+      "data_flow_functions": 3,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 11,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_receiver_status_interval",
+      "guc_variable": "wal_receiver_status_interval",
+      "data_flow_functions": 0,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_receiver_timeout",
+      "guc_variable": "wal_receiver_timeout",
+      "data_flow_functions": 2,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 7,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_recycle",
+      "guc_variable": "wal_recycle",
+      "data_flow_functions": 0,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_retrieve_retry_interval",
+      "guc_variable": "wal_retrieve_retry_interval",
+      "data_flow_functions": 2,
+      "control_flow_functions": 3,
+      "source_evidence_rows": 6,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "wal_sender_timeout",
+      "guc_variable": "wal_sender_timeout",
+      "data_flow_functions": 3,
+      "control_flow_functions": 5,
+      "source_evidence_rows": 9,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "xmlbinary",
+      "guc_variable": "xmlbinary",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "xmloption",
+      "guc_variable": "xmloption",
+      "data_flow_functions": 15,
+      "control_flow_functions": 1,
+      "source_evidence_rows": 20,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    },
+    {
+      "knob_name": "zero_damaged_pages",
+      "guc_variable": "zero_damaged_pages",
+      "data_flow_functions": 0,
+      "control_flow_functions": 2,
+      "source_evidence_rows": 2,
+      "direct_source_use": true,
+      "inherited_legacy_functions": 0,
+      "has_source_use": true
+    }
+  ]
+}

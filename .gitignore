@@ -1,0 +1,42 @@
+# Runtime state and downloaded/open-source distributions.
+monitoring/data/
+monitoring/logs/
+monitoring/run/
+monitoring/downloads/
+monitoring/vendor/
+monitoring/grafana-*/
+monitoring/bin/
+
+# Experiment output can contain large perf data, raw API traces and local paths.
+perf-anomaly-demo/results/
+perf-anomaly-demo/.venv/
+perf-anomaly-demo/.pydeps/
+perf-anomaly-demo/.pptx_deps/
+perf-anomaly-demo/产品性能展示.pptx
+sysinsight-tuning-demo/results/
+
+# Local copies of upstream repositories and PostgreSQL source trees.
+repositories/
+
+# Python and local/editor state.
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+*.env
+.env.*
+*.key
+*.pem
+
+# Generated profiling artifacts.
+*.perf.data
+*.perf.script
+*.folded
+*_samples.jsonl
+*_counts*.txt
+*.log
+*.pid
+
+# Downloaded archives.
+*.tar.gz

@@ -1,0 +1,36 @@
+{
+  "dbms": "postgresql",
+  "version": "14",
+  "display_name": "PostgreSQL",
+  "kernel_info": "PostgreSQL 14.7 (Ubuntu 14.7-0ubuntu0.22.04.1)",
+  "hardware_info": "4 vCPUs and 30.82 GiB RAM; the live resource snapshot is supplied separately",
+  "unit_note": "Candidate values use pg_settings native units: work_mem and maintenance_work_mem are kB, shared_buffers and effective_cache_size are 8 kB blocks, max_wal_size is MB, and the cost/concurrency parameters are unitless.",
+  "knowledge_source": {
+    "type": "acquired PostgreSQL repository assets",
+    "association_source": "pinned PostgreSQL 12.22 source-derived library (276 documented GUC records; 231 numeric/enum/bool search dimensions), retaining the 5 acquired PG records as an explicitly labelled legacy subset",
+    "association_provenance": "../common/function_parameter_association.provenance.json",
+    "manual_source": "WorkloadTune_new/sysinsight/library/knowledge_collection/postgres/structured_knowledge",
+    "official_document_source": "WorkloadTune_new/sysinsight/library/knowledge_collection/postgres/knob_info/official_document.json; system_view.json",
+    "official_document_version": "13 manual constraints plus 14.7 system_view snapshot",
+    "historical_rules": false
+  },
+  "files": {
+    "association": "../common/function_parameter_association.json",
+    "constraints": "../common/constraints.json",
+    "defaults": "../common/defaults.json",
+    "initial_config": "initial_config.json",
+    "manual": "../common/knob_info_manual.json",
+    "parameter_metadata": "../common/parameter_metadata.json",
+    "target_knobs": "../common/gptuner_target_knobs.json",
+    "source_target_knobs": "../common/postgresql_source_target_knobs.txt",
+    "source_target_provenance": "../common/postgresql_source_target_knobs.provenance.json",
+    "rule": "../common/rules.txt",
+    "code_folder": "../common/code",
+    "prompt_template": "../common/prompt_template.txt"
+  },
+  "snapshot": {
+    "type": "acquired system_view",
+    "captured_on": "2026-09-10",
+    "server_version_num": "140007"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "dbms": "mysql",
+  "version": "8.0.36",
+  "display_name": "MySQL",
+  "kernel_info": "mysql Ver 8.0.36 for Linux on x86_64 (MySQL Community Server - GPL)",
+  "hardware_info": "4 vCPUs and 15 GiB RAM",
+  "unit_note": "Use the units expected by the original MySQL SysInsight parameter files.",
+  "constraints_key": "MySQL_Parameters",
+  "knowledge_source": {
+    "type": "original repository files",
+    "source_root": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune",
+    "historical_rules": true
+  },
+  "files": {
+    "association": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/DBTuner/utils/paramater_association_library.json",
+    "constraints": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/db_configurations/dbtune.json",
+    "defaults": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/db_configurations/init/mysql_default_values.json",
+    "initial_config": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/db_configurations/init/dbtune.json",
+    "manual": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/DBTuner/utils/knob_info_manual.json",
+    "target_knobs": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/DBTuner/knobspace/gptuner_target_knobs.json",
+    "rule": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/HisRule/mysql_sysbench_update_rule_revision.txt",
+    "code_folder": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/library/extractCode"
+  },
+  "defaults_index": 0,
+  "initial_config_index": 0
+}

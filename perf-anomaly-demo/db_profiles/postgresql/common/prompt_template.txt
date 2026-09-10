@@ -1,0 +1,31 @@
+As a database parameter tuning expert, you should provide optimization recommendations for the parameter {variable} in {dbms_name} based on the following information:
+
+1. Database Environment:
+    - Database kernel: {dbms_info}
+    - Hardware configuration: {hardware_info}
+    - Configuration value convention: {unit_note}
+
+2. Workload Characteristics:
+    {benchmark}
+
+3. Target Parameter: {variable}
+
+4. The bottleneck functions that are affected by parameters in perf:
+    {keyFunction_section}
+
+5. Relevant Dataflow and Control Dependencies:
+    {dataflow_section}
+
+6. The rules extracted from historical data are association rules about parameter changes, function ranges and performance changes:
+    {rule_section}
+
+7. In the previous round of parameter configuration, the system resource usage was as follows:
+    {resource_usage}
+
+8. The recommended values, recommended ranges and recommended mechanisms of the parameters in the manual are as follows:
+    {recommendation_section}
+
+9. Optimization Goals:
+    {optimization_goal}
+
+Please do not recommend values that appear repeatedly.

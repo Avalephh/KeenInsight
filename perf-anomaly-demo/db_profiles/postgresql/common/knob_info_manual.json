@@ -1,0 +1,1305 @@
+[
+  {
+    "parameter": "archive_command",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": [
+      "",
+      "/bin/true (REM on Windows)"
+    ]
+  },
+  {
+    "parameter": "archive_mode",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": "off"
+  },
+  {
+    "parameter": "autovacuum",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_analyze_scale_factor",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.1"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_analyze_threshold",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "50"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_freeze_max_age",
+    "min_value": null,
+    "max_value": "200,000,000",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_max_workers",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "7"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_multixact_freeze_max_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_naptime",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "60 s"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_vacuum_cost_delay",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2 ms"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "autovacuum_vacuum_cost_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "autovacuum_vacuum_insert_scale_factor",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.2"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_vacuum_insert_threshold",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "autovacuum_vacuum_scale_factor",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.2"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_vacuum_threshold",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "50"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "autovacuum_work_mem",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "backend_flush_after",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "bgwriter_delay",
+    "min_value": "10 ms",
+    "max_value": "200 ms",
+    "suggested_values": [
+      "200 ms"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "bgwriter_flush_after",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "512 KB"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "bgwriter_lru_maxpages",
+    "min_value": "0",
+    "max_value": null,
+    "suggested_values": [
+      "100"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "bgwriter_lru_multiplier",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2.0"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "checkpoint_completion_target",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.9"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "checkpoint_flush_after",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "256 KB"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "checkpoint_timeout",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "checkpoint_warning",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "client_connection_check_interval",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "cluster_name",
+    "min_value": null,
+    "max_value": "64 characters",
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "commit_delay",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0 ms"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "commit_siblings",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "5"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "cpu_index_tuple_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.004",
+      "0.005"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "cpu_operator_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.0025"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "cpu_tuple_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "cursor_tuple_fraction",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "data_sync_retry",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on"
+    ],
+    "special_value": "off"
+  },
+  {
+    "parameter": "deadlock_timeout",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1 s"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "default_statistics_target",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "200"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "default_transaction_deferrable",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "effective_cache_size",
+    "min_value": "31 GB",
+    "max_value": "43.4 GB",
+    "suggested_values": [
+      "31 GB",
+      "43.4 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "effective_io_concurrency",
+    "min_value": "1",
+    "max_value": "200",
+    "suggested_values": [
+      "100",
+      "200"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "enable_async_append",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_bitmapscan",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_hashagg",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_hashjoin",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_indexonlyscan",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_indexscan",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_material",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_mergejoin",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_nestloop",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_seqscan",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_sort",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "enable_tidscan",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "from_collapse_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "full_page_writes",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "geqo",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "geqo_effort",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "5"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "geqo_generations",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "geqo_pool_size",
+    "min_value": "100",
+    "max_value": "1000",
+    "suggested_values": [
+      "100",
+      "1000"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "geqo_seed",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "geqo_selection_bias",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2.00"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "geqo_threshold",
+    "min_value": "12",
+    "max_value": null,
+    "suggested_values": [
+      "12"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "gin_fuzzy_search_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "gin_pending_list_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "4 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "hash_mem_multiplier",
+    "min_value": "1.5",
+    "max_value": "8.0",
+    "suggested_values": [
+      "1.5",
+      "2.0"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "hot_standby_feedback",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "huge_pages",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "jit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "jit_above_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "100000"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "jit_inline_above_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "500000"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "jit_optimize_above_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "join_collapse_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1"
+    ],
+    "special_value": 1
+  },
+  {
+    "parameter": "log_checkpoints",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "log_connections",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "log_destination",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "log_disconnections",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "log_line_prefix",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "log_min_duration_statement",
+    "min_value": "250 ms",
+    "max_value": "1 s",
+    "suggested_values": [
+      "250 ms",
+      "1 s"
+    ],
+    "special_value": [
+      -1,
+      0
+    ]
+  },
+  {
+    "parameter": "log_rotation_size",
+    "min_value": null,
+    "max_value": "884 GB",
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "log_temp_files",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "logging_collector",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "logical_decoding_work_mem",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "64 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "maintenance_io_concurrency",
+    "min_value": "1",
+    "max_value": "10",
+    "suggested_values": [
+      "10"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "maintenance_work_mem",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "8 GB",
+      "16 GB",
+      "32 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_connections",
+    "min_value": "10",
+    "max_value": "40",
+    "suggested_values": [
+      "16"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_files_per_process",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_locks_per_transaction",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "max_logical_replication_workers",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "4"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_parallel_maintenance_workers",
+    "min_value": "0",
+    "max_value": "8",
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "max_parallel_workers",
+    "min_value": null,
+    "max_value": "8",
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_parallel_workers_per_gather",
+    "min_value": "1",
+    "max_value": "4",
+    "suggested_values": [
+      "4"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "max_pred_locks_per_page",
+    "min_value": "2",
+    "max_value": null,
+    "suggested_values": [
+      "2"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_pred_locks_per_relation",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "max_pred_locks_per_transaction",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "64"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_prepared_transactions",
+    "min_value": "8",
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "max_replication_slots",
+    "min_value": "5",
+    "max_value": null,
+    "suggested_values": [
+      "5"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_slot_wal_keep_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "max_stack_depth",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_standby_archive_delay",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "30000 ms"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "max_standby_streaming_delay",
+    "min_value": "0",
+    "max_value": "30000 ms",
+    "suggested_values": [
+      "0",
+      "30000 ms"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "max_sync_workers_per_subscription",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_wal_senders",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "11"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "max_wal_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "4 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "max_worker_processes",
+    "min_value": "8",
+    "max_value": null,
+    "suggested_values": [
+      "8"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "min_dynamic_shared_memory",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "min_parallel_index_scan_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "512 kB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "min_parallel_table_scan_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "8 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "min_wal_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "old_snapshot_threshold",
+    "min_value": "3 hours",
+    "max_value": "3 days",
+    "suggested_values": [
+      "6 hours",
+      "1 day"
+    ],
+    "special_value": -1
+  },
+  {
+    "parameter": "parallel_leader_participation",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "parallel_setup_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "parallel_tuple_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "0.1"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "quote_all_identifiers",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "random_page_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1.2"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "seq_page_cost",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "shared_buffers",
+    "min_value": null,
+    "max_value": "24.8 GB",
+    "suggested_values": [
+      "15.5 GB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "shared_preload_libraries",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "pg_stat_statements",
+      "auto_explain"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "temp_buffers",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "8 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "temp_file_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "trace_notify",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "trace_recovery_messages",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "debug5",
+      "debug4",
+      "debug3",
+      "debug2",
+      "debug1",
+      "log"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "trace_sort",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "track_activities",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "track_activity_query_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "track_commit_timestamp",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "on",
+      "off"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "track_counts",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "track_functions",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "pl",
+      "all",
+      "none"
+    ],
+    "special_value": "none"
+  },
+  {
+    "parameter": "track_io_timing",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "track_wal_io_timing",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_cost_delay",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "vacuum_cost_limit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_cost_page_dirty",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "20"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_cost_page_hit",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "1"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_cost_page_miss",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "10"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_defer_cleanup_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "vacuum_failsafe_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_freeze_min_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_freeze_table_age",
+    "min_value": null,
+    "max_value": "142500000",
+    "suggested_values": [
+      "150000000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_multixact_failsafe_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "400 million"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_multixact_freeze_min_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "5,000,000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "vacuum_multixact_freeze_table_age",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "150000000",
+      "150,000,000"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_block_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_buffers",
+    "min_value": "64 KB",
+    "max_value": "16 MB",
+    "suggested_values": [],
+    "special_value": -1
+  },
+  {
+    "parameter": "wal_compression",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_init_zero",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_keep_size",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": 0
+  },
+  {
+    "parameter": "wal_level",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "replica",
+      "minimal",
+      "logical"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_log_hints",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_receiver_timeout",
+    "min_value": null,
+    "max_value": "60 s",
+    "suggested_values": [
+      "60 s"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "wal_sender_timeout",
+    "min_value": "0 ms",
+    "max_value": "60 s",
+    "suggested_values": [
+      "60 s"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "wal_skip_threshold",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "2048 KB",
+      "2 MB"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_sync_method",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "open_datasync",
+      "fdatasync",
+      "fsync",
+      "fsync_writethrough",
+      "open_sync"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_writer_delay",
+    "min_value": null,
+    "max_value": null,
+    "suggested_values": [
+      "200 ms"
+    ],
+    "special_value": null
+  },
+  {
+    "parameter": "wal_writer_flush_after",
+    "min_value": "0 MB",
+    "max_value": null,
+    "suggested_values": [
+      "1 MB"
+    ],
+    "special_value": 0
+  },
+  {
+    "parameter": "work_mem",
+    "min_value": "4 MB",
+    "max_value": "62 GB",
+    "suggested_values": [
+      "4 MB"
+    ],
+    "special_value": null
+  }
+]
