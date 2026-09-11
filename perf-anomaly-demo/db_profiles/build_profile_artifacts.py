@@ -33,9 +33,20 @@ DEFAULT_REPO_ROOT = Path(
 PG_SOURCE_ROOT = Path(
     os.environ.get(
         "POSTGRES_SOURCE_ROOT",
-        "/root/keeninsight-postgres/third_party/postgresql-12.22",
+        str(HERE.parent.parent / "third_party/postgresql-12.22"),
     )
 )
+
+
+def provenance_path(path: Path, logical_path: str) -> str:
+    """Keep generated provenance independent of the generating workstation."""
+
+    resolved = path.resolve()
+    project_root = HERE.parent.parent.resolve()
+    try:
+        return resolved.relative_to(project_root).as_posix()
+    except ValueError:
+        return logical_path
 
 
 def read_json(path: Path) -> Any:
@@ -216,13 +227,19 @@ def build(repo_root: Path) -> None:
     )
     source_target_provenance = {
         "format": "sysinsight-postgresql-source-target-knobs-v1",
-        "official_document": str((knowledge_root / "knob_info" / "official_document.json").resolve()),
+        "official_document": provenance_path(
+            knowledge_root / "knob_info" / "official_document.json",
+            "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune_new/sysinsight/library/knowledge_collection/postgres/knob_info/official_document.json",
+        ),
         "official_document_version": official.get("version"),
         "official_document_parameter_count": len(official_document_knobs),
         "official_tunable_candidate_count": len(official_tunable_knobs),
-        "original_target_knob_file": str(original_target_knob_path.resolve()),
+        "original_target_knob_file": provenance_path(
+            original_target_knob_path,
+            "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune_new/sysinsight/library/knowledge_collection/postgres/target_knobs.txt",
+        ),
         "original_target_knob_count": len(original_pg_knobs),
-        "source_root": str(PG_SOURCE_ROOT.resolve()),
+        "source_root": provenance_path(PG_SOURCE_ROOT, "third_party/postgresql-12.22"),
         "source_revision": (
             (PG_SOURCE_ROOT / ".gitrevision").read_text(encoding="utf-8").strip()
             if (PG_SOURCE_ROOT / ".gitrevision").exists()

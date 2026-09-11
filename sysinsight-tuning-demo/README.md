@@ -1,6 +1,6 @@
 # SysInsight 调优过程隔离回放
 
-这个目录独立于 `/root/new/monitoring`，用于验证 SysInsight 的调优链路，当前只做文件回放和大模型预测，不连接数据库，也不修改 Prometheus/Grafana。
+这个目录独立于 `monitoring/`，用于验证 SysInsight 的调优链路，当前只做文件回放和大模型预测，不连接数据库，也不修改 Prometheus/Grafana。
 
 ## 已完成
 
@@ -17,14 +17,14 @@
 只运行本地、无 API 请求的回放：
 
 ```bash
-cd /root/new/sysinsight-tuning-demo
+cd /path/to/checkout/sysinsight-tuning-demo
 python3 replay_onestep.py
 ```
 
 需要重新调用接口时，把密钥通过环境变量传入：
 
 ```bash
-cd /root/new/sysinsight-tuning-demo
+cd /path/to/checkout/sysinsight-tuning-demo
 SYSINSIGHT_API_KEY='<你的接口密钥>' python3 replay_onestep.py --live-api
 ```
 

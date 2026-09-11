@@ -392,7 +392,7 @@ def build_deck(cases):
     add_box(slide, 0.42, 6.18, 12.48, 0.68, NAVY, NAVY)
     add_text(slide, "恢复比例定义：修复后控制 TPS ÷ 压力阶段控制 TPS。\n配置来自真实 GPT API response 的解析结果，不是预设修复值；每行的 26–27 项是完整 API 配置，关键参数仅用于说明主要调优方向。",
              0.64, 6.28, 12.05, 0.47, size=8.0, color=WHITE, margin=0)
-    add_footer(slide, "数据证据：/root/new/perf-anomaly-demo/results/tpcc_api_validation/；d07 未达到修复上升 >20% 标准，未计入以上六组。", color=MUTED)
+    add_footer(slide, "数据证据：perf-anomaly-demo/results/tpcc_api_validation/；d07 未达到修复上升 >20% 标准，未计入以上六组。", color=MUTED)
 
     prs.save(OUTPUT)
     return OUTPUT

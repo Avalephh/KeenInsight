@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -94,7 +95,22 @@ class DatabaseProfile:
             if required:
                 raise FileNotFoundError("profile {} has no file entry '{}'".format(self.name, key))
             return None
-        path = Path(value)
+        value_text = os.path.expandvars(str(value))
+        if value_text == "@sysinsight_source" or value_text.startswith("@sysinsight_source/"):
+            source_root = os.environ.get("SYSINSIGHT_SOURCE_ROOT", "")
+            if not source_root:
+                repository_root = os.environ.get(
+                    "SYSINSIGHT_REPOSITORY_ROOT",
+                    str(ROOT.parent / "repositories/Avalephh-KeenInsight/branch-sources"),
+                )
+                source_root = str(Path(repository_root) / "WorkloadTune")
+            suffix = value_text[len("@sysinsight_source"):].lstrip("/")
+            path = Path(source_root).expanduser()
+            if not path.is_absolute():
+                path = (Path.cwd() / path).resolve()
+            path = path / suffix
+        else:
+            path = Path(value_text)
         if not path.is_absolute():
             path = (self.root / path).resolve()
         if required and not path.exists():

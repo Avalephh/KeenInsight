@@ -1,6 +1,6 @@
 # PostgreSQL 突发异常与 perf 采样测试
 
-这个目录独立于 `/root/new/monitoring` 和 `/root/new/sysinsight-tuning-demo`。
+这个目录独立于仓库中的 `monitoring/` 和 `sysinsight-tuning-demo/`。
 
 栈折叠使用 FlameGraph 官方开源脚本 `stackcollapse-perf.pl`，来源为
 `https://raw.githubusercontent.com/brendangregg/FlameGraph/master/stackcollapse-perf.pl`，本地副本位于 `vendor/FlameGraph/`。
@@ -19,7 +19,7 @@
 运行：
 
 ```bash
-cd /root/new/perf-anomaly-demo
+cd /path/to/checkout/perf-anomaly-demo
 python3 run_demo.py --anomaly-duration 45
 ```
 
@@ -40,7 +40,7 @@ python3 run_demo.py --anomaly-duration 45
 对某次已经完成的测试运行原始 SysInsight 检测和原始函数匹配：
 
 ```bash
-cd /root/new/perf-anomaly-demo
+cd /path/to/checkout/perf-anomaly-demo
 python3 sysinsight_detection.py --run-dir results/<时间目录>
 ```
 
@@ -62,6 +62,7 @@ Prometheus 测试规则位于 `../monitoring/config/prometheus/rules/sysinsight-
 原始 LLAMBO 配置流程现在通过 profile 选择数据库和版本，MySQL 默认文件仍直接使用仓库原有文件，PostgreSQL 使用固定源码生成的关联库以及仓库中已有的 PG 手册、结构化知识资料：
 
 ```bash
+cd /path/to/checkout/perf-anomaly-demo
 # 查看可用 profile
 python3 sysinsight_original_llm.py --list-profiles
 
@@ -79,6 +80,7 @@ python3 sysinsight_original_llm.py \
 异常函数匹配也接受相同开关：
 
 ```bash
+cd /path/to/checkout/perf-anomaly-demo
 python3 sysinsight_detection.py --run-dir results/<run>/<case>/anomaly \
   --dbms postgresql --db-version 12
 ```

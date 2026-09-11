@@ -10,6 +10,9 @@ GRAFANA_HOME="${GRAFANA_HOME:-$BASE_DIR/grafana-13.2.1}"
 GRAFANA_BIN="${GRAFANA_BIN:-$GRAFANA_HOME/bin/grafana}"
 PROMETHEUS_CONFIG="$BASE_DIR/config/prometheus/prometheus.yml"
 GRAFANA_CONFIG="$BASE_DIR/config/grafana/grafana.ini"
+MONITORING_DASHBOARDS_DIR="${MONITORING_DASHBOARDS_DIR:-$BASE_DIR/dashboards}"
+POSTGRES_QUERY_CONFIG="${POSTGRES_EXPORTER_QUERY_CONFIG:-$BASE_DIR/config/postgres_exporter/queries.yaml}"
+POSTGRES_EXPORTER_DATA_SOURCE_NAME="${POSTGRES_EXPORTER_DATA_SOURCE_NAME:-postgresql://postgres@/keeninsight?host=/var/run/postgresql&sslmode=disable}"
 
 mkdir -p "$BASE_DIR/run" "$BASE_DIR/logs" "$BASE_DIR/data/prometheus" "$BASE_DIR/data/grafana"
 
@@ -45,19 +48,14 @@ if [ ! -x "$GRAFANA_BIN" ]; then
   exit 1
 fi
 
-# /root is intentionally not traversable by the postgres OS account. A hard
-# link keeps the same binary while making only this executable reachable from
-# /tmp for the local peer-authenticated exporter process.
+# /root is intentionally not traversable by the postgres OS account. A private
+# runtime copy makes only this executable and query file reachable from /tmp
+# for the local peer-authenticated exporter process. Copying instead of using
+# a hard link also works when the checkout and /tmp are different filesystems.
 POSTGRES_EXPORTER_RUNTIME_BIN="/tmp/new-monitoring-postgres-exporter"
-if [ ! -e "$POSTGRES_EXPORTER_RUNTIME_BIN" ]; then
-  ln "$POSTGRES_EXPORTER_BIN" "$POSTGRES_EXPORTER_RUNTIME_BIN"
-  chmod 755 "$POSTGRES_EXPORTER_RUNTIME_BIN"
-fi
-POSTGRES_QUERY_CONFIG="$BASE_DIR/config/postgres_exporter/queries.yaml"
 POSTGRES_QUERY_RUNTIME="/tmp/new-monitoring-postgres-queries.yaml"
-if [ ! -e "$POSTGRES_QUERY_RUNTIME" ]; then
-  ln "$POSTGRES_QUERY_CONFIG" "$POSTGRES_QUERY_RUNTIME"
-fi
+install -m 0755 "$POSTGRES_EXPORTER_BIN" "$POSTGRES_EXPORTER_RUNTIME_BIN"
+install -m 0644 "$POSTGRES_QUERY_CONFIG" "$POSTGRES_QUERY_RUNTIME"
 
 start_process prometheus \
   "$PROMETHEUS_BIN" \
@@ -73,12 +71,12 @@ start_process node_exporter \
 
 start_process postgres_exporter \
   runuser -u postgres -- env \
-  DATA_SOURCE_NAME='postgresql://postgres@/keeninsight?host=/var/run/postgresql&sslmode=disable' \
+  DATA_SOURCE_NAME="$POSTGRES_EXPORTER_DATA_SOURCE_NAME" \
   "$POSTGRES_EXPORTER_RUNTIME_BIN" \
   --extend.query-path="$POSTGRES_QUERY_RUNTIME" \
   --web.listen-address=127.0.0.1:9187
 
-MONITORING_DASHBOARDS_DIR="$BASE_DIR/dashboards" \
+MONITORING_DASHBOARDS_DIR="$MONITORING_DASHBOARDS_DIR" \
 GF_PATHS_DATA="$BASE_DIR/data/grafana" \
 GF_PATHS_LOGS="$BASE_DIR/logs" \
 GF_PATHS_PLUGINS="$BASE_DIR/data/grafana/plugins" \

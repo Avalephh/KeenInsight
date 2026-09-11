@@ -7,10 +7,13 @@
 需要 PostgreSQL exporter 能访问目标数据库，并准备原生 Prometheus、node_exporter、postgres_exporter 和 Grafana OSS。当前目录中的 `vendor/` 与 `grafana-13.2.1/` 是本机运行时安装目录，已被 Git 忽略。
 
 ```bash
+./install_open_source.sh
 cp env.example .env.local
-# 按本机实际安装路径修改 .env.local
+# 如果组件安装到了非默认目录，在 .env.local 中取消注释并修改路径
 source .env.local
 ```
+
+安装脚本按 `versions.lock` 下载并校验 Prometheus 2.15.2、node_exporter 0.18.1、postgres_exporter 0.8.0 和 Grafana OSS 13.2.1。所有发行包和运行目录均被 Git 忽略。
 
 ## 启停
 
@@ -32,5 +35,5 @@ Grafana 只监听本机回环地址，适合首期本机 Demo。Dashboard 由 `d
 ## 已验证组件
 
 - Grafana OSS 13.2.1 官方发行包。
-- Prometheus 2.15.2、node_exporter 0.18.1、postgres_exporter 0.8.0，均为 Ubuntu 原生开源包中的对应组件。
+- Prometheus 2.15.2、node_exporter 0.18.1、postgres_exporter 0.8.0，均为开源官方发行物。
 - Prometheus 的 `prometheus`、`node`、`postgres` 三个采集目标均已验证为 `up`。

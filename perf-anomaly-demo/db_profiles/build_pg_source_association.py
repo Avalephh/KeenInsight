@@ -29,7 +29,7 @@ HERE = Path(__file__).resolve().parent
 DEFAULT_SOURCE_ROOT = Path(
     os.environ.get(
         "POSTGRES_SOURCE_ROOT",
-        "/root/keeninsight-postgres/third_party/postgresql-12.22",
+        str(HERE.parent.parent / "third_party/postgresql-12.22"),
     )
 )
 DEFAULT_TARGET_KNOBS = (
@@ -51,6 +51,17 @@ DEFAULT_LEGACY_ASSOCIATION = (
     )
     / "dev/one/database/paramater_association_library.json"
 )
+
+
+def provenance_path(path: Path, logical_path: str) -> str:
+    """Keep generated provenance independent of the generating workstation."""
+
+    resolved = path.resolve()
+    project_root = HERE.parent.parent.resolve()
+    try:
+        return resolved.relative_to(project_root).as_posix()
+    except ValueError:
+        return logical_path
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -425,7 +436,10 @@ def build_association_library(
             {
                 **legacy_locations[function],
                 "evidence_type": "legacy_association_function_source_validation",
-                "association_source": str(legacy_association_path.resolve()),
+                "association_source": provenance_path(
+                    legacy_association_path,
+                    "repositories/Avalephh-KeenInsight/branch-sources/dev/one/database/paramater_association_library.json",
+                ),
                 "association_relation": (
                     "data_flow" if function in inherited_data_functions else "control_flow"
                 ),
@@ -448,14 +462,17 @@ def build_association_library(
             "association_method": "legacy_asset_plus_guc_binding_to_source_identifier_use",
             "guc_variable": binding.get("variable"),
             "legacy_association": {
-                "source": str(legacy_association_path.resolve()),
+                "source": provenance_path(
+                    legacy_association_path,
+                    "repositories/Avalephh-KeenInsight/branch-sources/dev/one/database/paramater_association_library.json",
+                ),
                 "present": bool(old_record),
                 "data_flow_functions": inherited_data_functions,
                 "control_flow_functions": inherited_control_functions,
                 "function_source_validation_count": len(inherited_evidence),
             },
             "source_provenance": {
-                "source_root": str(source_root),
+                "source_root": provenance_path(source_root, "third_party/postgresql-12.22"),
                 "source_revision": source_revision,
                 "source_digest": source_digest,
                 "guc_binding": binding,
@@ -489,12 +506,21 @@ def build_association_library(
     output_path.write_text(json.dumps(records, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     manifest = {
         "format": "sysinsight-postgresql-source-association-provenance-v1",
-        "source_root": str(source_root),
+        "source_root": provenance_path(source_root, "third_party/postgresql-12.22"),
         "source_revision": source_revision,
         "source_digest": source_digest,
-        "guc_file": str(source_root / "src/backend/utils/misc/guc.c"),
-        "target_knobs_file": str(target_knobs_path.resolve()),
-        "legacy_association_source": str(legacy_association_path.resolve()),
+        "guc_file": provenance_path(
+            source_root / "src/backend/utils/misc/guc.c",
+            "third_party/postgresql-12.22/src/backend/utils/misc/guc.c",
+        ),
+        "target_knobs_file": provenance_path(
+            target_knobs_path,
+            "perf-anomaly-demo/db_profiles/postgresql/common/postgresql_source_target_knobs.txt",
+        ),
+        "legacy_association_source": provenance_path(
+            legacy_association_path,
+            "repositories/Avalephh-KeenInsight/branch-sources/dev/one/database/paramater_association_library.json",
+        ),
         "legacy_pg_record_count": len(legacy),
         "backend_c_file_count": len(c_files),
         "record_count": len(records),

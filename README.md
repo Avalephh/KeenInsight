@@ -21,11 +21,26 @@ SysInsight 使用的原始开源源码不是本项目重写的实现。复现所
 - Prometheus、node_exporter、postgres_exporter 和 Grafana OSS。当前主机已有的发行包路径可通过 `monitoring/env.example` 中的变量指定；这些大文件不进 Git；
 - 调用真实 SysInsight API 时，需要原始 WorkloadTune 源码快照和 Python 依赖。
 
+## 从干净检出准备环境
+
+下面的步骤只获取源码和开源运行组件；不会获取数据库数据，也不会把 API key 写入文件：
+
+```bash
+./scripts/fetch_keeninsight_sources.sh
+./scripts/fetch_postgresql_source.sh       # 只有要重建 PG profile artifact 时必需
+./monitoring/install_open_source.sh
+INSTALL_PPT_DEPENDENCIES=1 ./scripts/setup_python.sh
+./scripts/check_reproducibility.sh --strict
+```
+
+只运行监控时可跳过两个源码脚本和 Python 依赖安装。`psql`、`pgbench`、`perf` 等系统工具以及
+PostgreSQL 实例需要由运行环境另行提供；检查脚本会验证它们是否存在。
+
 安装 Python 依赖：
 
 ```bash
-python3 -m pip install -r requirements-sysinsight.txt
-python3 -m pip install -r requirements-ppt.txt  # 仅生成 PPT 时需要
+./.venv/bin/python -m pip install -r requirements-sysinsight.txt
+./.venv/bin/python -m pip install -r requirements-ppt.txt  # 仅生成 PPT 时需要
 ```
 
 ## 运行本机监控
@@ -48,14 +63,12 @@ Grafana：<http://127.0.0.1:3000/>；Prometheus：<http://127.0.0.1:9090/>。Gra
 ```bash
 export SYSINSIGHT_GPT_API_KEY='<your-api-key>'
 export SYSINSIGHT_SOURCE_ROOT="$PWD/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune"
-export SYSINSIGHT_PYDEPS="$PWD/perf-anomaly-demo/.pydeps"
 ```
 
 确保监控已启动后，使用真实 API 验证一个场景：
 
 ```bash
-cd perf-anomaly-demo
-python3 tpcc_api_recommendation_validation.py \
+./.venv/bin/python perf-anomaly-demo/tpcc_api_recommendation_validation.py \
   --only d01_work_mem_sort \
   --api-base 'http://35.212.195.134:28317/v1' \
   --model 'GPT5.6-SOL' \
@@ -71,7 +84,7 @@ python3 tpcc_api_recommendation_validation.py \
 ## 静态检查
 
 ```bash
-python3 -m py_compile \
+./.venv/bin/python -m py_compile \
   perf-anomaly-demo/*.py \
   perf-anomaly-demo/db_profiles/*.py \
   sysinsight-tuning-demo/replay_onestep.py
