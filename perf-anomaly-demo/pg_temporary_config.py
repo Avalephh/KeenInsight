@@ -10,6 +10,7 @@ restores the previous ALTER SYSTEM state when the context exits.
 from __future__ import annotations
 
 import json
+import copy
 import re
 import subprocess
 from pathlib import Path
@@ -17,7 +18,13 @@ from typing import Any, Dict, Iterable, List, Optional
 
 
 _IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
-_VALUE = re.compile(r"^[A-Za-z0-9_./:+%\- ]+$")
+# ``*`` is a valid PostgreSQL value for settings such as listen_addresses;
+# it is still passed as a SQL literal, never interpreted by a shell.
+# Empty is a valid value for string GUCs such as bonjour_name.  Keep the
+# whitelist (the value is still emitted as one SQL literal) while allowing
+# that PostgreSQL-supported case.
+_VALUE = re.compile(r"^[A-Za-z0-9_./:+%\-* ]*$")
+_RESTART_TIMEOUT_SECONDS = 300
 
 
 def _literal(value: Any) -> str:
@@ -34,7 +41,7 @@ def _ident(value: str) -> str:
 
 
 def _command(db_args: Any, sql: str, application_name: str) -> List[str]:
-    return [
+    command = [
         "runuser",
         "-u",
         str(db_args.run_as),
@@ -54,9 +61,12 @@ def _command(db_args: Any, sql: str, application_name: str) -> List[str]:
         str(db_args.db_user),
         "-d",
         str(db_args.db),
-        "-c",
-        sql,
     ]
+    port = getattr(db_args, "port", None)
+    if port is not None:
+        command.extend(["-p", str(port)])
+    command.extend(["-c", sql])
+    return command
 
 
 def _psql(db_args: Any, sql: str, label: str, timeout: float = 60.0) -> str:
@@ -122,25 +132,100 @@ def _reload(db_args: Any) -> str:
     return _psql(db_args, "SELECT pg_reload_conf()", "reload")
 
 
-def _restart(db_args: Any) -> Dict[str, Any]:
+def connection_args_for_configuration(db_args: Any, normalized: Dict[str, Any]) -> Any:
+    """Clone DB connection arguments for the endpoint in an applied GUC set."""
+
+    connection_args = copy.copy(db_args)
+    if "port" in normalized:
+        connection_args.port = int(normalized["port"])
+    if "unix_socket_directories" in normalized:
+        sockets = str(normalized["unix_socket_directories"]).strip()
+        if sockets:
+            # PostgreSQL accepts a comma-separated list.  The validator uses
+            # the first local socket, which is deterministic and sufficient
+            # for this single-instance demo.
+            connection_args.host = sockets.split(",", 1)[0].strip()
+    return connection_args
+
+
+def _service_name(version: str, cluster: str) -> str:
+    return "postgresql@{}-{}.service".format(version, cluster)
+
+
+def _stop_cluster(db_args: Any) -> Dict[str, Any]:
+    """Stop both the systemd view and any directly started cluster process."""
+
     version = str(getattr(db_args, "pg_version", "12"))
     cluster = str(getattr(db_args, "pg_cluster", "main"))
-    completed = subprocess.run(
-        ["pg_ctlcluster", version, cluster, "restart"],
+    unit = _service_name(version, cluster)
+    managed = subprocess.run(
+        ["systemctl", "stop", unit],
         cwd="/",
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        timeout=120,
+        timeout=_RESTART_TIMEOUT_SECONDS,
+        check=False,
+    )
+    direct = subprocess.run(
+        ["pg_ctlcluster", "--skip-systemctl-redirect", version, cluster, "stop", "-m", "fast"],
+        cwd="/",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=_RESTART_TIMEOUT_SECONDS,
+        check=False,
+    )
+    # pg_ctlcluster returns 2 when systemd already stopped the cluster.  That
+    # is a successful outcome for this cleanup helper.
+    if direct.returncode not in (0, 2):
+        raise RuntimeError(
+            "pg_ctlcluster stop failed ({}): {}".format(
+                direct.returncode, direct.stdout[-4000:]
+            )
+        )
+    return {
+        "systemctl_returncode": managed.returncode,
+        "systemctl_output": managed.stdout[-2000:],
+        "pg_ctlcluster_returncode": direct.returncode,
+        "pg_ctlcluster_output": direct.stdout[-2000:],
+    }
+
+
+def _restart(db_args: Any, direct_start: bool = False) -> Dict[str, Any]:
+    version = str(getattr(db_args, "pg_version", "12"))
+    cluster = str(getattr(db_args, "pg_cluster", "main"))
+    unit = _service_name(version, cluster)
+    stopped = _stop_cluster(db_args)
+    if direct_start:
+        # The API may change external_pid_file.  Starting directly while the
+        # unit is stopped avoids systemd waiting for its original PID path.
+        command = ["pg_ctlcluster", "--skip-systemctl-redirect", version, cluster, "start"]
+    else:
+        # After restoring the original file-backed settings, hand ownership
+        # back to the normal systemd unit.
+        command = ["systemctl", "start", unit]
+    completed = subprocess.run(
+        command,
+        cwd="/",
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=_RESTART_TIMEOUT_SECONDS,
         check=False,
     )
     if completed.returncode != 0:
         raise RuntimeError(
-            "pg_ctlcluster restart failed ({}): {}".format(
+            "PostgreSQL restart failed ({}): {}".format(
                 completed.returncode, completed.stdout[-4000:]
             )
         )
-    return {"returncode": completed.returncode, "output": completed.stdout[-4000:]}
+    return {
+        "stop": stopped,
+        "start_command": command,
+        "returncode": completed.returncode,
+        "output": completed.stdout[-4000:],
+    }
 
 
 def _alter_system_set(db_args: Any, name: str, value: Any) -> None:
@@ -186,7 +271,7 @@ def _restore_global_state(
             )
     if restart_required:
         try:
-            restored["restart"] = _restart(db_args)
+            restored["restart"] = _restart(db_args, direct_start=False)
         except Exception as exc:
             restored["errors"].append(
                 {"phase": "restart_after_restore", "error": "{}: {}".format(type(exc).__name__, exc)}
@@ -222,12 +307,26 @@ class TemporaryPostgresConfiguration:
         self._global_names: List[str] = []
         self._file_snapshot: Dict[str, Dict[str, Any]] = {}
         self._restart_required = False
+        self._connection_args = copy.copy(db_args)
 
     @staticmethod
     def _normalise_value(name: str, value: Any, detail: Dict[str, Any]) -> Any:
         """Convert only parser representation, never change the numeric value."""
 
         vartype = str(detail.get("vartype") or "")
+        if (
+            vartype in {"string", "enum"}
+            and isinstance(value, str)
+            and len(value) >= 2
+            and value[0] == "'"
+            and value[-1] == "'"
+        ):
+            # Some model responses serialize a PostgreSQL string literal in
+            # the configuration field (for example, '\'stderr\'').  Strip
+            # only this single outer pair before passing the actual value to
+            # ALTER SYSTEM; the raw API value remains preserved in the
+            # artifact for audit.
+            value = value[1:-1]
         if vartype in {"integer", "bigint", "oid"}:
             if isinstance(value, bool):
                 raise ValueError("boolean is not a valid integer value for {}".format(name))
@@ -266,6 +365,11 @@ class TemporaryPostgresConfiguration:
             for name, value in self.config.items()
         }
         self.state["normalized_configuration"] = normalized
+        self._connection_args = connection_args_for_configuration(self.db_args, normalized)
+        self.state["connection_endpoint"] = {
+            "host": getattr(self._connection_args, "host", None),
+            "port": getattr(self._connection_args, "port", None),
+        }
 
         for name, value in normalized.items():
             context = str(details[name].get("context") or "")
@@ -298,11 +402,11 @@ class TemporaryPostgresConfiguration:
             for name, item in self.state["global_configuration"].items():
                 _alter_system_set(self.db_args, name, item["value"])
             if self._restart_required:
-                self.state["activation"] = _restart(self.db_args)
+                self.state["activation"] = _restart(self.db_args, direct_start=True)
             elif self._global_names:
                 self.state["activation"] = _reload(self.db_args)
             self.state["post_settings"] = settings_details(
-                self.db_args, self.config, self.label + "-applied-details"
+                self._connection_args, self.config, self.label + "-applied-details"
             )
             self.state["status"] = "applied"
             return self.state
@@ -311,7 +415,7 @@ class TemporaryPostgresConfiguration:
             # behind.  Best-effort restoration is included in the raised error
             # object's state by the caller's surrounding artifact.
             self.state["restore"] = _restore_global_state(
-                self.db_args, self._global_names, self._file_snapshot, self._restart_required
+                self._connection_args, self._global_names, self._file_snapshot, self._restart_required
             )
             self.state["status"] = "apply_failed"
             raise
@@ -319,7 +423,7 @@ class TemporaryPostgresConfiguration:
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> bool:
         if self._global_names:
             self.state["restore"] = _restore_global_state(
-                self.db_args, self._global_names, self._file_snapshot, self._restart_required
+                self._connection_args, self._global_names, self._file_snapshot, self._restart_required
             )
             if self.state["restore"].get("errors"):
                 self.state["status"] = "restore_failed"

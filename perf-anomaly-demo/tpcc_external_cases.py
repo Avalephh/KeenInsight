@@ -542,6 +542,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-user", default="postgres")
     parser.add_argument("--run-as", default="postgres")
     parser.add_argument("--host", default="/var/run/postgresql")
+    parser.add_argument("--port", type=int, default=5432)
     parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
     parser.add_argument("--alert-name", default="SysInsightDemoAnomaly")
     parser.add_argument("--baseline-duration", type=int, default=20)
@@ -549,6 +550,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tuned-duration", type=int, default=15)
     parser.add_argument("--normal-clients", type=int, default=2)
     parser.add_argument("--perf-frequency", type=int, default=300)
+    parser.add_argument("--normal-sql", default="normal.sql")
     parser.add_argument(
         "--only",
         default="",
@@ -613,6 +615,8 @@ def psql_command(
         "ON_ERROR_STOP=1",
         "-h",
         args.host,
+        "-p",
+        str(getattr(args, "port", 5432)),
         "-U",
         args.db_user,
         "-d",
@@ -696,7 +700,32 @@ SELECT json_build_object(
   'checkpoints_req', (SELECT checkpoints_req FROM pg_stat_bgwriter),
   'checkpoints_timed', (SELECT checkpoints_timed FROM pg_stat_bgwriter),
   'checkpoint_write_time', (SELECT checkpoint_write_time FROM pg_stat_bgwriter),
-  'checkpoint_sync_time', (SELECT checkpoint_sync_time FROM pg_stat_bgwriter)
+  'checkpoint_sync_time', (SELECT checkpoint_sync_time FROM pg_stat_bgwriter),
+  'buffers_backend', (SELECT buffers_backend FROM pg_stat_bgwriter),
+  'buffers_backend_fsync', (SELECT buffers_backend_fsync FROM pg_stat_bgwriter),
+  'buffers_checkpoint', (SELECT buffers_checkpoint FROM pg_stat_bgwriter),
+  'buffers_clean', (SELECT buffers_clean FROM pg_stat_bgwriter),
+  'maxwritten_clean', (SELECT maxwritten_clean FROM pg_stat_bgwriter),
+  'tpcc_n_dead_tup', COALESCE((SELECT sum(n_dead_tup)::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc'), 0),
+  'tpcc_n_tup_ins', COALESCE((SELECT sum(n_tup_ins)::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc'), 0),
+  'tpcc_n_tup_upd', COALESCE((SELECT sum(n_tup_upd)::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc'), 0),
+  'tpcc_n_tup_del', COALESCE((SELECT sum(n_tup_del)::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc'), 0),
+  'tpcc_autovacuum_count', COALESCE((SELECT sum(autovacuum_count)::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc'), 0),
+  'tpcc_demo_n_dead_tup', COALESCE((SELECT n_dead_tup::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc' AND relname='tpcc_demo_autovacuum'), 0),
+  'tpcc_demo_n_tup_upd', COALESCE((SELECT n_tup_upd::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc' AND relname='tpcc_demo_autovacuum'), 0),
+  'tpcc_demo_autovacuum_count', COALESCE((SELECT autovacuum_count::bigint FROM pg_stat_user_tables
+      WHERE schemaname='keeninsight_tpcc' AND relname='tpcc_demo_autovacuum'), 0),
+  'autovacuum_active', (SELECT count(*)::int FROM pg_stat_activity
+      WHERE datname=current_database() AND backend_type='autovacuum'),
+  'lock_waits', (SELECT count(*)::int FROM pg_stat_activity
+      WHERE datname=current_database() AND wait_event_type='Lock')
 )::text
 FROM pg_stat_database d
 WHERE d.datname=current_database();
@@ -796,6 +825,8 @@ def start_pgbench(
         "pgbench",
         "-h",
         args.host,
+        "-p",
+        str(getattr(args, "port", 5432)),
         "-U",
         args.db_user,
         "-n",
@@ -981,10 +1012,15 @@ def sample_phase(
     }
 
 
-def baseline_run(args: argparse.Namespace, run_dir: Path, stage_dir: Path) -> Dict[str, Any]:
+def baseline_run(
+    args: argparse.Namespace,
+    run_dir: Path,
+    stage_dir: Path,
+    normal_sql_name: str = "normal.sql",
+) -> Dict[str, Any]:
     baseline_dir = run_dir / "baseline"
     baseline_dir.mkdir(parents=True, exist_ok=True)
-    normal_sql = stage_sql(CASE_ROOT / "normal.sql", stage_dir)
+    normal_sql = stage_sql(CASE_ROOT / normal_sql_name, stage_dir)
     prefix = "perf-anomaly-demo-tpcc-baseline-"
     workers = [
         start_pgbench(
@@ -1190,7 +1226,7 @@ def run_case(
     case_dir = run_dir / case["id"]
     case_dir.mkdir(parents=True, exist_ok=True)
     prefix = "perf-anomaly-demo-tpcc-{}-".format(case["id"])
-    normal_sql = stage_sql(CASE_ROOT / "normal.sql", stage_dir)
+    normal_sql = stage_sql(CASE_ROOT / case.get("normal_sql", "normal.sql"), stage_dir)
     anomaly_sql = stage_sql(CASE_ROOT / case["sql"], stage_dir)
     tuned_sql = stage_tuned_sql(case, stage_dir, tuned_override)
 
@@ -1450,7 +1486,7 @@ def main() -> int:
 
     try:
         print("[1/{}] 采集 TPCC 正常负载基线...".format(len(cases) + 2), flush=True)
-        baseline = baseline_run(args, run_dir, stage_dir)
+        baseline = baseline_run(args, run_dir, stage_dir, normal_sql_name=args.normal_sql)
         summary["baseline"] = baseline
         profile_rel = baseline.get("normal_profile", {}).get("path")
         if not profile_rel:

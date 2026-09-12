@@ -5,11 +5,14 @@
 - `monitoring/`：原生 Prometheus、node_exporter、postgres_exporter 和 Grafana OSS 的本机监控配置与启动脚本；
 - `perf-anomaly-demo/`：TPCC 外部压力、Prometheus 告警触发 perf、原始 SysInsight 异常提取以及真实 GPT API 配置验证；
 - `sysinsight-tuning-demo/`：与数据库隔离的 SysInsight 单步回放；
-- `监控产品文档.md`、`产品性能展示.pptx`：当前产品文档和展示材料。
+- `监控产品文档.md`、`产品性能展示.pptx`：当前产品文档和展示材料；
+- `perf-anomaly-demo/TPCC场景验证报告.md`：本轮 TPCC 外部压力与真实 SysInsight API 闭环实验报告。
 
 ## Git 内容边界
 
-Git 只提交源码、SQL、配置、输入样例、profile 和文档。Prometheus/Grafana 数据目录、运行日志、perf 二进制结果、原始 API 运行结果、下载包以及本地上游仓库快照均被 `.gitignore` 排除，避免把 3GB 级运行状态或密钥带入仓库。
+Git 只提交源码、SQL、配置、输入样例、profile 和文档。Prometheus/Grafana 数据目录、运行日志、perf 二进制结果、时间序列采样、数据库数据、下载包以及本地上游仓库快照均被 `.gitignore` 排除，避免把 3GB 级运行状态或密钥带入仓库。
+
+本轮另外保留了 6 组达标 TPCC 场景的结构化 `summary.json`、`case_result.json`、`selected_api_configuration.json`、SysInsight 原始检测结果和真实 API `result.json`，用于复核 TPS、配置应用/还原和 API 返回；这些是精选的实验凭证，不包含原始 perf 大文件或 API key。其余运行目录仍按上述规则留在本地。
 
 SysInsight 使用的原始开源源码不是本项目重写的实现。复现所需的源码快照和 PostgreSQL 12.22 源码树见 [EXTERNAL_SOURCES.md](EXTERNAL_SOURCES.md)。API key 只通过环境变量传入，不写入文件或结果。
 
@@ -77,7 +80,7 @@ export SYSINSIGHT_SOURCE_ROOT="$PWD/repositories/Avalephh-KeenInsight/branch-sou
 
 这个入口会运行 TPCC 正常控制负载和外部压力，轮询 Prometheus firing 告警；告警触发后对当前 PostgreSQL backend 执行原生 `perf record`，再执行原始 SysInsight 文件分析和函数匹配，调用 API，严格解析 API 返回的配置，临时应用后复测并恢复。默认不会使用 preset repair 作为 API 结果。
 
-输出只保存在本地 `perf-anomaly-demo/results/`，不会被 Git 提交。
+运行输出默认保存在本地 `perf-anomaly-demo/results/`；除本轮报告列出的 6 组结构化实验凭证外，完整运行目录不会被 Git 提交。
 
 `tpcc_external_cases.py` 保留用于旧的受控实验，其中的 `repair` 字段是预设对照实验值，不能作为真实 GPT 推荐证据；需要真实 API 时使用上面的 `tpcc_api_recommendation_validation.py`。
 

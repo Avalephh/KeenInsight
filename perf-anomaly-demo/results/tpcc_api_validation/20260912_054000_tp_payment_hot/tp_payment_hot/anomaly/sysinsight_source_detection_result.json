@@ -1,0 +1,7288 @@
+{
+  "generated_at": "2026-09-11T20:31:24.817910+00:00",
+  "run_dir": "/root/new/perf-anomaly-demo/results/tpcc_api_validation/20260912_054000_tp_payment_hot/tp_payment_hot/anomaly",
+  "scope": {
+    "prometheus_alert_to_perf": "custom trigger extension in run_demo.py",
+    "function_range": "original SysInsight DBEnv.get_perf_function_range",
+    "exception_compare": "original SysInsight analyzeException.compare_file_sample_rate",
+    "function_matching": "original SysInsight matchFunctions.find_top_and_matched_functions",
+    "custom_filtering": false,
+    "custom_threshold": false,
+    "custom_top_k": false
+  },
+  "source_compare": {
+    "source": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/DBTuner/utils/analyzeException.py",
+    "input_counts": "results/tpcc_api_validation/20260912_054000_tp_payment_hot/tp_payment_hot/anomaly/anomaly_counts_tpcc.txt",
+    "normal_profile": "results/tpcc_api_validation/20260912_054000_tp_payment_hot/tp_payment_hot/anomaly/normal_profile_postgresql_demo.csv",
+    "key_function_file": "results/tpcc_api_validation/20260912_054000_tp_payment_hot/tp_payment_hot/anomaly/anomaly_counts_tpcc_btFunctions.txt",
+    "key_function_count": 1119,
+    "key_functions": [
+      {
+        "Function": "ExecComputeStoredGenerated",
+        "Sample Rate": 37.35,
+        "Diff From Mean": 7.059999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "ScheduleBufferTagForWriteback",
+        "Sample Rate": 7.14,
+        "Diff From Mean": 5.06,
+        "Change": 0
+      },
+      {
+        "Function": "ReadBufferExtended",
+        "Sample Rate": 7.42,
+        "Diff From Mean": 4.91,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_doinsert",
+        "Sample Rate": 7.3,
+        "Diff From Mean": 4.53,
+        "Change": 0
+      },
+      {
+        "Function": "btinsert",
+        "Sample Rate": 7.63,
+        "Diff From Mean": 4.47,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInsertIndexTuples",
+        "Sample Rate": 7.79,
+        "Diff From Mean": 4.39,
+        "Change": 0
+      },
+      {
+        "Function": "standard_ExecutorRun",
+        "Sample Rate": 24.63,
+        "Diff From Mean": 4.34,
+        "Change": 0
+      },
+      {
+        "Function": "PortalRun",
+        "Sample Rate": 34.14,
+        "Diff From Mean": 4.229999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "[pg_stat_statements.so]",
+        "Sample Rate": 37.15,
+        "Diff From Mean": 4.210000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "PlannedStmtRequiresSnapshot",
+        "Sample Rate": 34.33,
+        "Diff From Mean": 3.8400000000000034,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_search",
+        "Sample Rate": 6.34,
+        "Diff From Mean": 3.790000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "FreeQueryDesc",
+        "Sample Rate": 31.08,
+        "Diff From Mean": 3.480000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "pwrite",
+        "Sample Rate": 3.17,
+        "Diff From Mean": 3.34,
+        "Change": 0
+      },
+      {
+        "Function": "pg_plan_queries",
+        "Sample Rate": 103.64,
+        "Diff From Mean": 3.239999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_relandgetbuf",
+        "Sample Rate": 4.29,
+        "Diff From Mean": 3.2299999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "ksys_pwrite64",
+        "Sample Rate": 3.06,
+        "Diff From Mean": 3.2099999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_pwrite64",
+        "Sample Rate": 3.11,
+        "Diff From Mean": 3.1700000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "__vfs_write",
+        "Sample Rate": 2.95,
+        "Diff From Mean": 3.08,
+        "Change": 0
+      },
+      {
+        "Function": "vfs_write",
+        "Sample Rate": 3.05,
+        "Diff From Mean": 3.0700000000000003,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_file_write_iter",
+        "Sample Rate": 2.9,
+        "Diff From Mean": 3.06,
+        "Change": 0
+      },
+      {
+        "Function": "new_sync_write",
+        "Sample Rate": 2.95,
+        "Diff From Mean": 3.0599999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "__generic_file_write_iter",
+        "Sample Rate": 2.87,
+        "Diff From Mean": 3.0300000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "ExecScan",
+        "Sample Rate": 8.94,
+        "Diff From Mean": 2.91,
+        "Change": 0
+      },
+      {
+        "Function": "generic_perform_write",
+        "Sample Rate": 2.69,
+        "Diff From Mean": 2.9099999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "ExecHashJoinInitializeWorker",
+        "Sample Rate": 5.89,
+        "Diff From Mean": 2.87,
+        "Change": 0
+      },
+      {
+        "Function": "index_getnext_slot",
+        "Sample Rate": 5.75,
+        "Diff From Mean": 2.7699999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "LockBufHdr",
+        "Sample Rate": 3.35,
+        "Diff From Mean": 2.6999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "mdwrite",
+        "Sample Rate": 2.67,
+        "Diff From Mean": 2.59,
+        "Change": 0
+      },
+      {
+        "Function": "PostgresMain",
+        "Sample Rate": 98.26,
+        "Diff From Mean": 2.549999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "pg_foreach_ifaddr",
+        "Sample Rate": 16.48,
+        "Diff From Mean": 2.4299999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "try_to_wake_up",
+        "Sample Rate": 4.33,
+        "Diff From Mean": 2.37,
+        "Change": 1
+      },
+      {
+        "Function": "ExecAppendInitializeWorker",
+        "Sample Rate": 2.64,
+        "Diff From Mean": 1.98,
+        "Change": 0
+      },
+      {
+        "Function": "ExecReScanModifyTable",
+        "Sample Rate": 1.65,
+        "Diff From Mean": 1.77,
+        "Change": 0
+      },
+      {
+        "Function": "subquery_planner",
+        "Sample Rate": 17.51,
+        "Diff From Mean": 1.7399999999999984,
+        "Change": 0
+      },
+      {
+        "Function": "indexcol_is_bool_constant_for_query",
+        "Sample Rate": 4.94,
+        "Diff From Mean": 1.6199999999999992,
+        "Change": 0
+      },
+      {
+        "Function": "LockAcquireExtended",
+        "Sample Rate": 2.27,
+        "Diff From Mean": 1.54,
+        "Change": 1
+      },
+      {
+        "Function": "copy_user_enhanced_fast_string",
+        "Sample Rate": 1.44,
+        "Diff From Mean": 1.48,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_futex",
+        "Sample Rate": 1.91,
+        "Diff From Mean": 1.45,
+        "Change": 1
+      },
+      {
+        "Function": "heap_update",
+        "Sample Rate": 3.92,
+        "Diff From Mean": 1.4499999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "index_getnext_tid",
+        "Sample Rate": 2.93,
+        "Diff From Mean": 1.4499999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "btgettuple",
+        "Sample Rate": 2.87,
+        "Diff From Mean": 1.4399999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "do_futex",
+        "Sample Rate": 1.89,
+        "Diff From Mean": 1.43,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_compare",
+        "Sample Rate": 3.85,
+        "Diff From Mean": 1.3800000000000003,
+        "Change": 0
+      },
+      {
+        "Function": "send",
+        "Sample Rate": 4.83,
+        "Diff From Mean": 1.37,
+        "Change": 1
+      },
+      {
+        "Function": "GetLockNameFromTagType",
+        "Sample Rate": 1.93,
+        "Diff From Mean": 1.3699999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitNode",
+        "Sample Rate": 9.51,
+        "Diff From Mean": 1.33,
+        "Change": 1
+      },
+      {
+        "Function": "XactLockTableWait",
+        "Sample Rate": 1.34,
+        "Diff From Mean": 1.31,
+        "Change": 1
+      },
+      {
+        "Function": "ProcSleep",
+        "Sample Rate": 1.32,
+        "Diff From Mean": 1.29,
+        "Change": 1
+      },
+      {
+        "Function": "index_fetch_heap",
+        "Sample Rate": 2.8,
+        "Diff From Mean": 1.2800000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "ReadyForQuery",
+        "Sample Rate": 5.08,
+        "Diff From Mean": 1.27,
+        "Change": 1
+      },
+      {
+        "Function": "__wake_up_common",
+        "Sample Rate": 3.29,
+        "Diff From Mean": 1.27,
+        "Change": 1
+      },
+      {
+        "Function": "pollwake",
+        "Sample Rate": 3.08,
+        "Diff From Mean": 1.23,
+        "Change": 1
+      },
+      {
+        "Function": "die",
+        "Sample Rate": 7.28,
+        "Diff From Mean": 1.2000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "__wake_up_common_lock",
+        "Sample Rate": 3.35,
+        "Diff From Mean": 1.2000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "default_wake_function",
+        "Sample Rate": 2.92,
+        "Diff From Mean": 1.2,
+        "Change": 1
+      },
+      {
+        "Function": "__wake_up_sync_key",
+        "Sample Rate": 3.28,
+        "Diff From Mean": 1.1999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "pread64",
+        "Sample Rate": 1.29,
+        "Diff From Mean": 1.19,
+        "Change": 0
+      },
+      {
+        "Function": "sock_def_readable",
+        "Sample Rate": 3.21,
+        "Diff From Mean": 1.1800000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "__x64_sys_pread64",
+        "Sample Rate": 1.19,
+        "Diff From Mean": 1.1800000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "native_queued_spin_lock_slowpath",
+        "Sample Rate": 1.19,
+        "Diff From Mean": 1.18,
+        "Change": 1
+      },
+      {
+        "Function": "CommitTransactionCommand",
+        "Sample Rate": 7.21,
+        "Diff From Mean": 1.1799999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "ksys_pread64",
+        "Sample Rate": 1.19,
+        "Diff From Mean": 1.1600000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "__vfs_read",
+        "Sample Rate": 1.13,
+        "Diff From Mean": 1.1600000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "vfs_read",
+        "Sample Rate": 1.18,
+        "Diff From Mean": 1.1500000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "mdread",
+        "Sample Rate": 1.29,
+        "Diff From Mean": 1.15,
+        "Change": 0
+      },
+      {
+        "Function": "generic_file_read_iter",
+        "Sample Rate": 1.11,
+        "Diff From Mean": 1.1499999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "__libc_start_main",
+        "Sample Rate": 96.81,
+        "Diff From Mean": 1.1499999999999915,
+        "Change": 0
+      },
+      {
+        "Function": "main",
+        "Sample Rate": 96.81,
+        "Diff From Mean": 1.1499999999999915,
+        "Change": 0
+      },
+      {
+        "Function": "PostmasterMain",
+        "Sample Rate": 96.81,
+        "Diff From Mean": 1.1499999999999915,
+        "Change": 0
+      },
+      {
+        "Function": "ClosePostmasterPorts",
+        "Sample Rate": 96.81,
+        "Diff From Mean": 1.1499999999999915,
+        "Change": 0
+      },
+      {
+        "Function": "new_sync_read",
+        "Sample Rate": 1.13,
+        "Diff From Mean": 1.1400000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "generic_file_buffered_read",
+        "Sample Rate": 1.11,
+        "Diff From Mean": 1.14,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_file_read_iter",
+        "Sample Rate": 1.12,
+        "Diff From Mean": 1.1399999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "make_one_rel",
+        "Sample Rate": 6.62,
+        "Diff From Mean": 1.0999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "do_syscall_64",
+        "Sample Rate": 20.39,
+        "Diff From Mean": 1.0,
+        "Change": 0
+      },
+      {
+        "Function": "SS_process_ctes",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.99,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_first",
+        "Sample Rate": 3.1,
+        "Diff From Mean": 0.9899999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "__sched_text_start",
+        "Sample Rate": 4.57,
+        "Diff From Mean": 0.9800000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "_raw_spin_lock",
+        "Sample Rate": 1.44,
+        "Diff From Mean": 0.97,
+        "Change": 1
+      },
+      {
+        "Function": "schedule",
+        "Sample Rate": 4.62,
+        "Diff From Mean": 0.9500000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "WaitLatchOrSocket",
+        "Sample Rate": 0.94,
+        "Diff From Mean": 0.9299999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "sem_post@@GLIBC_2.2.5",
+        "Sample Rate": 1.15,
+        "Diff From Mean": 0.9099999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "__x64_sys_sendto",
+        "Sample Rate": 4.19,
+        "Diff From Mean": 0.8800000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_da_write_begin",
+        "Sample Rate": 0.83,
+        "Diff From Mean": 0.88,
+        "Change": 0
+      },
+      {
+        "Function": "unix_stream_sendmsg",
+        "Sample Rate": 3.85,
+        "Diff From Mean": 0.8500000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "__sys_sendto",
+        "Sample Rate": 4.1,
+        "Diff From Mean": 0.8299999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "futex_wake",
+        "Sample Rate": 1.03,
+        "Diff From Mean": 0.8200000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "wake_up_q",
+        "Sample Rate": 0.95,
+        "Diff From Mean": 0.8099999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "clauselist_selectivity",
+        "Sample Rate": 3.24,
+        "Diff From Mean": 0.8099999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "__sock_sendmsg",
+        "Sample Rate": 3.97,
+        "Diff From Mean": 0.8000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "expression_tree_walker",
+        "Sample Rate": 5.05,
+        "Diff From Mean": 0.79,
+        "Change": 0
+      },
+      {
+        "Function": "iov_iter_copy_from_user_atomic",
+        "Sample Rate": 0.85,
+        "Diff From Mean": 0.7899999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "issue_xlog_fsync",
+        "Sample Rate": 2.19,
+        "Diff From Mean": 0.7800000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "entry_SYSCALL_64_after_hwframe",
+        "Sample Rate": 20.81,
+        "Diff From Mean": 0.7699999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_da_write_end",
+        "Sample Rate": 0.71,
+        "Diff From Mean": 0.76,
+        "Change": 0
+      },
+      {
+        "Function": "fdatasync",
+        "Sample Rate": 1.93,
+        "Diff From Mean": 0.7500000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "base_yylex",
+        "Sample Rate": 2.18,
+        "Diff From Mean": 0.75,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_fdatasync",
+        "Sample Rate": 1.87,
+        "Diff From Mean": 0.75,
+        "Change": 0
+      },
+      {
+        "Function": "do_fsync",
+        "Sample Rate": 1.87,
+        "Diff From Mean": 0.75,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_sync_file",
+        "Sample Rate": 1.86,
+        "Diff From Mean": 0.7499999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "vfs_fsync_range",
+        "Sample Rate": 1.87,
+        "Diff From Mean": 0.7399999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "limit_needed",
+        "Sample Rate": 14.68,
+        "Diff From Mean": 0.7200000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "file_write_and_wait_range",
+        "Sample Rate": 1.67,
+        "Diff From Mean": 0.71,
+        "Change": 0
+      },
+      {
+        "Function": "build_column_default",
+        "Sample Rate": 1.44,
+        "Diff From Mean": 0.6799999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "copy_page_to_iter",
+        "Sample Rate": 0.5,
+        "Diff From Mean": 0.6699999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "pagecache_get_page",
+        "Sample Rate": 0.97,
+        "Diff From Mean": 0.6400000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "core_yylex",
+        "Sample Rate": 1.95,
+        "Diff From Mean": 0.6399999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "do_futex_wait.constprop.0",
+        "Sample Rate": 0.92,
+        "Diff From Mean": 0.6300000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "futex_wait",
+        "Sample Rate": 0.83,
+        "Diff From Mean": 0.62,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReScanValuesScan",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.62,
+        "Change": 0
+      },
+      {
+        "Function": "query_planner",
+        "Sample Rate": 14.56,
+        "Diff From Mean": 0.6199999999999992,
+        "Change": 0
+      },
+      {
+        "Function": "LockRelease",
+        "Sample Rate": 1.73,
+        "Diff From Mean": 0.6099999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "nodeRead",
+        "Sample Rate": 1.0,
+        "Diff From Mean": 0.6,
+        "Change": 1
+      },
+      {
+        "Function": "do_writepages",
+        "Sample Rate": 1.18,
+        "Diff From Mean": 0.5900000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "finish_task_switch",
+        "Sample Rate": 1.88,
+        "Diff From Mean": 0.5899999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "generate_base_implied_equalities",
+        "Sample Rate": 0.68,
+        "Diff From Mean": 0.5800000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "heapgetpage",
+        "Sample Rate": 0.35,
+        "Diff From Mean": 0.5800000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "table_index_fetch_tuple_check",
+        "Sample Rate": 0.81,
+        "Diff From Mean": 0.5799999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "__filemap_fdatawrite_range",
+        "Sample Rate": 1.21,
+        "Diff From Mean": 0.56,
+        "Change": 0
+      },
+      {
+        "Function": "find_get_entry",
+        "Sample Rate": 0.93,
+        "Diff From Mean": 0.5599999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "XactLogCommitRecord",
+        "Sample Rate": 5.23,
+        "Diff From Mean": 0.54,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_writepages",
+        "Sample Rate": 1.16,
+        "Diff From Mean": 0.54,
+        "Change": 0
+      },
+      {
+        "Function": "standard_ExecutorFinish",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.53,
+        "Change": 0
+      },
+      {
+        "Function": "copyObjectImpl",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.51,
+        "Change": 0
+      },
+      {
+        "Function": "XactLogAbortRecord",
+        "Sample Rate": 1.42,
+        "Diff From Mean": 0.5099999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "ret_from_intr",
+        "Sample Rate": 0.65,
+        "Diff From Mean": 0.5,
+        "Change": 1
+      },
+      {
+        "Function": "do_IRQ",
+        "Sample Rate": 0.65,
+        "Diff From Mean": 0.5,
+        "Change": 1
+      },
+      {
+        "Function": "futex_wait_queue_me",
+        "Sample Rate": 0.65,
+        "Diff From Mean": 0.49,
+        "Change": 1
+      },
+      {
+        "Function": "create_index_paths",
+        "Sample Rate": 3.27,
+        "Diff From Mean": 0.48999999999999977,
+        "Change": 0
+      },
+      {
+        "Function": "compute_parallel_worker",
+        "Sample Rate": 3.51,
+        "Diff From Mean": 0.4800000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "generic_write_end",
+        "Sample Rate": 0.55,
+        "Diff From Mean": 0.48,
+        "Change": 0
+      },
+      {
+        "Function": "select_idle_sibling",
+        "Sample Rate": 0.51,
+        "Diff From Mean": 0.47000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "__softirqentry_text_start",
+        "Sample Rate": 0.73,
+        "Diff From Mean": 0.47,
+        "Change": 1
+      },
+      {
+        "Function": "pg_parse_query",
+        "Sample Rate": 8.26,
+        "Diff From Mean": 0.46999999999999975,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReScanSampleScan",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.46,
+        "Change": 0
+      },
+      {
+        "Function": "distribute_restrictinfo_to_rels",
+        "Sample Rate": 3.18,
+        "Diff From Mean": 0.45999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "irq_exit",
+        "Sample Rate": 0.73,
+        "Diff From Mean": 0.45999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "block_write_end",
+        "Sample Rate": 0.53,
+        "Diff From Mean": 0.45999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "load_tzoffsets",
+        "Sample Rate": 4.31,
+        "Diff From Mean": 0.4500000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_binsrch_insert",
+        "Sample Rate": 0.8,
+        "Diff From Mean": 0.44999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "pg_plan_query",
+        "Sample Rate": 20.43,
+        "Diff From Mean": 0.4499999999999993,
+        "Change": 0
+      },
+      {
+        "Function": "standard_planner",
+        "Sample Rate": 20.31,
+        "Diff From Mean": 0.4400000000000013,
+        "Change": 0
+      },
+      {
+        "Function": "epoll_wait",
+        "Sample Rate": 4.87,
+        "Diff From Mean": 0.4400000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "QueryRewrite",
+        "Sample Rate": 1.36,
+        "Diff From Mean": 0.44000000000000006,
+        "Change": 1
+      },
+      {
+        "Function": "__perf_event_task_sched_in",
+        "Sample Rate": 1.41,
+        "Diff From Mean": 0.43999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "get_visible_ENR",
+        "Sample Rate": 9.73,
+        "Diff From Mean": 0.4399999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "__block_commit_write.isra.0",
+        "Sample Rate": 0.53,
+        "Diff From Mean": 0.42999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "mark_buffer_dirty",
+        "Sample Rate": 0.48,
+        "Diff From Mean": 0.42000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "iov_iter_fault_in_readable",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.42000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "nvme_pci_complete_rq",
+        "Sample Rate": 0.52,
+        "Diff From Mean": 0.41000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "assign_list_collations",
+        "Sample Rate": 1.36,
+        "Diff From Mean": 0.4099999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "GetTopTransactionId",
+        "Sample Rate": 0.78,
+        "Diff From Mean": 0.4,
+        "Change": 1
+      },
+      {
+        "Function": "blk_done_softirq",
+        "Sample Rate": 0.52,
+        "Diff From Mean": 0.4,
+        "Change": 1
+      },
+      {
+        "Function": "heap_getnextslot",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.4,
+        "Change": 0
+      },
+      {
+        "Function": "clauselist_selectivity_simple",
+        "Sample Rate": 1.65,
+        "Diff From Mean": 0.3900000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "recv",
+        "Sample Rate": 1.44,
+        "Diff From Mean": 0.3900000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "RelationGetBufferForTuple",
+        "Sample Rate": 0.57,
+        "Diff From Mean": 0.39,
+        "Change": 0
+      },
+      {
+        "Function": "nvme_complete_rq",
+        "Sample Rate": 0.49,
+        "Diff From Mean": 0.39,
+        "Change": 1
+      },
+      {
+        "Function": "wake_up_state",
+        "Sample Rate": 0.4,
+        "Diff From Mean": 0.38,
+        "Change": 1
+      },
+      {
+        "Function": "SlabContextCreate",
+        "Sample Rate": 2.11,
+        "Diff From Mean": 0.3799999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitModifyTable",
+        "Sample Rate": 5.09,
+        "Diff From Mean": 0.3700000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_getstackbuf",
+        "Sample Rate": 0.55,
+        "Diff From Mean": 0.37,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_end_request",
+        "Sample Rate": 0.47,
+        "Diff From Mean": 0.37,
+        "Change": 1
+      },
+      {
+        "Function": "select_task_rq_fair",
+        "Sample Rate": 0.68,
+        "Diff From Mean": 0.36000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "join_search_one_level",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.36,
+        "Change": 0
+      },
+      {
+        "Function": "make_join_rel",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.36,
+        "Change": 0
+      },
+      {
+        "Function": "view_query_is_auto_updatable",
+        "Sample Rate": 1.0,
+        "Diff From Mean": 0.35,
+        "Change": 1
+      },
+      {
+        "Function": "xas_load",
+        "Sample Rate": 0.51,
+        "Diff From Mean": 0.35,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_block_write_begin",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.35,
+        "Change": 0
+      },
+      {
+        "Function": "select_idle_sibling.part.0",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.34,
+        "Change": 1
+      },
+      {
+        "Function": "blk_update_request",
+        "Sample Rate": 0.43,
+        "Diff From Mean": 0.33999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "standard_join_search",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.33999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "LWLockRelease",
+        "Sample Rate": 1.73,
+        "Diff From Mean": 0.33000000000000007,
+        "Change": 1
+      },
+      {
+        "Function": "pg_analyze_and_rewrite",
+        "Sample Rate": 11.8,
+        "Diff From Mean": 0.3200000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "set_baserel_size_estimates",
+        "Sample Rate": 1.63,
+        "Diff From Mean": 0.32000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_recvfrom",
+        "Sample Rate": 1.21,
+        "Diff From Mean": 0.32000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "__sys_recvfrom",
+        "Sample Rate": 1.19,
+        "Diff From Mean": 0.32000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "grab_cache_page_write_begin",
+        "Sample Rate": 0.6,
+        "Diff From Mean": 0.32000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "clause_selectivity",
+        "Sample Rate": 1.35,
+        "Diff From Mean": 0.31999999999999984,
+        "Change": 0
+      },
+      {
+        "Function": "is_projection_capable_path",
+        "Sample Rate": 2.63,
+        "Diff From Mean": 0.31000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "sock_recvmsg",
+        "Sample Rate": 1.13,
+        "Diff From Mean": 0.31000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "__close",
+        "Sample Rate": 0.33,
+        "Diff From Mean": 0.31,
+        "Change": 1
+      },
+      {
+        "Function": "blk_flush_plug_list",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.31,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_sched_insert_requests",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.30999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "gimme_tour",
+        "Sample Rate": 2.67,
+        "Diff From Mean": 0.30000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_end_bio",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.30000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "blk_finish_plug",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.3,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_flush_plug_list",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.3,
+        "Change": 0
+      },
+      {
+        "Function": "standard_ExecutorStart",
+        "Sample Rate": 5.8,
+        "Diff From Mean": 0.2999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "BootstrapToastTable",
+        "Sample Rate": 2.41,
+        "Diff From Mean": 0.2999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "bio_endio",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.29,
+        "Change": 1
+      },
+      {
+        "Function": "parserOpenTable",
+        "Sample Rate": 1.42,
+        "Diff From Mean": 0.28,
+        "Change": 1
+      },
+      {
+        "Function": "unix_stream_read_generic",
+        "Sample Rate": 0.96,
+        "Diff From Mean": 0.28,
+        "Change": 0
+      },
+      {
+        "Function": "stringToNode",
+        "Sample Rate": 0.53,
+        "Diff From Mean": 0.28,
+        "Change": 1
+      },
+      {
+        "Function": "mark_dummy_rel",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.28,
+        "Change": 0
+      },
+      {
+        "Function": "unix_stream_recvmsg",
+        "Sample Rate": 1.1,
+        "Diff From Mean": 0.2799999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "sock_alloc_send_pskb",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.2700000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "setTargetTable",
+        "Sample Rate": 2.23,
+        "Diff From Mean": 0.27,
+        "Change": 1
+      },
+      {
+        "Function": "perf_pmu_enable.part.0",
+        "Sample Rate": 0.55,
+        "Diff From Mean": 0.27,
+        "Change": 1
+      },
+      {
+        "Function": "x86_pmu_enable",
+        "Sample Rate": 0.53,
+        "Diff From Mean": 0.27,
+        "Change": 1
+      },
+      {
+        "Function": "blk_mq_run_hw_queue",
+        "Sample Rate": 0.23,
+        "Diff From Mean": 0.27,
+        "Change": 0
+      },
+      {
+        "Function": "ExecSortRetrieveInstrumentation",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.27,
+        "Change": 0
+      },
+      {
+        "Function": "mdextend",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.27,
+        "Change": 0
+      },
+      {
+        "Function": "LockReleaseCurrentOwner",
+        "Sample Rate": 0.72,
+        "Diff From Mean": 0.26999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "SearchCatCache1",
+        "Sample Rate": 1.6,
+        "Diff From Mean": 0.26,
+        "Change": 1
+      },
+      {
+        "Function": "OidFunctionCall4Coll",
+        "Sample Rate": 1.21,
+        "Diff From Mean": 0.26,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_finish_bio",
+        "Sample Rate": 0.35,
+        "Diff From Mean": 0.26,
+        "Change": 1
+      },
+      {
+        "Function": "__ext4_journal_start_sb",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.26,
+        "Change": 0
+      },
+      {
+        "Function": "eval_const_expressions",
+        "Sample Rate": 3.28,
+        "Diff From Mean": 0.25,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitExprList",
+        "Sample Rate": 1.74,
+        "Diff From Mean": 0.25,
+        "Change": 1
+      },
+      {
+        "Function": "table_openrv_extended",
+        "Sample Rate": 1.38,
+        "Diff From Mean": 0.25,
+        "Change": 1
+      },
+      {
+        "Function": "reduce_unique_semijoins",
+        "Sample Rate": 1.22,
+        "Diff From Mean": 0.25,
+        "Change": 1
+      },
+      {
+        "Function": "btcharcmp",
+        "Sample Rate": 0.49,
+        "Diff From Mean": 0.25,
+        "Change": 0
+      },
+      {
+        "Function": "__blk_mq_run_hw_queue",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.25,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_sched_dispatch_requests",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.25,
+        "Change": 0
+      },
+      {
+        "Function": "jbd2_journal_stop",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.25,
+        "Change": 0
+      },
+      {
+        "Function": "add_paths_to_joinrel",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.24999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "lappend",
+        "Sample Rate": 1.82,
+        "Diff From Mean": 0.24999999999999978,
+        "Change": 0
+      },
+      {
+        "Function": "colNameToVar",
+        "Sample Rate": 0.82,
+        "Diff From Mean": 0.2400000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "end_page_writeback",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.24000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "__blk_mq_delay_run_hw_queue",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.24000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "__blk_mq_sched_dispatch_requests",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.24000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "cost_index",
+        "Sample Rate": 1.44,
+        "Diff From Mean": 0.24,
+        "Change": 0
+      },
+      {
+        "Function": "__ext4_journal_stop",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.24,
+        "Change": 0
+      },
+      {
+        "Function": "create_index_path",
+        "Sample Rate": 1.63,
+        "Diff From Mean": 0.2300000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "make_const",
+        "Sample Rate": 1.07,
+        "Diff From Mean": 0.2300000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "jbd2__journal_start",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.23000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "parseNodeString",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.23,
+        "Change": 1
+      },
+      {
+        "Function": "blk_mq_do_dispatch_sched",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.23,
+        "Change": 0
+      },
+      {
+        "Function": "ExecReScanSetOp",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.23,
+        "Change": 0
+      },
+      {
+        "Function": "XLogInsert",
+        "Sample Rate": 0.9,
+        "Diff From Mean": 0.22000000000000008,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitSeqScan",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.22000000000000003,
+        "Change": 0
+      },
+      {
+        "Function": "is_pseudo_constant_for_index",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.22,
+        "Change": 0
+      },
+      {
+        "Function": "intel_pmu_enable_all",
+        "Sample Rate": 0.49,
+        "Diff From Mean": 0.21999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "alloc_skb_with_frags",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.21999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "__alloc_skb",
+        "Sample Rate": 0.35,
+        "Diff From Mean": 0.21999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "restriction_selectivity",
+        "Sample Rate": 1.28,
+        "Diff From Mean": 0.20999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "parse_analyze",
+        "Sample Rate": 10.29,
+        "Diff From Mean": 0.20000000000000107,
+        "Change": 0
+      },
+      {
+        "Function": "transformStmt",
+        "Sample Rate": 8.79,
+        "Diff From Mean": 0.20000000000000107,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitResultTypeTL",
+        "Sample Rate": 0.91,
+        "Diff From Mean": 0.20000000000000007,
+        "Change": 1
+      },
+      {
+        "Function": "pg_strtok",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.2,
+        "Change": 1
+      },
+      {
+        "Function": "async_page_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.2,
+        "Change": 0
+      },
+      {
+        "Function": "select_common_collation",
+        "Sample Rate": 1.78,
+        "Diff From Mean": 0.19999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "FunctionCall4Coll",
+        "Sample Rate": 1.2,
+        "Diff From Mean": 0.19999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "var_eq_non_const",
+        "Sample Rate": 1.16,
+        "Diff From Mean": 0.19000000000000017,
+        "Change": 0
+      },
+      {
+        "Function": "heap_form_tuple",
+        "Sample Rate": 0.88,
+        "Diff From Mean": 0.19000000000000006,
+        "Change": 1
+      },
+      {
+        "Function": "transformAssignedExpr",
+        "Sample Rate": 0.7,
+        "Diff From Mean": 0.19000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "FunctionCall2Coll",
+        "Sample Rate": 0.49,
+        "Diff From Mean": 0.19000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "heap_insert",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.19,
+        "Change": 0
+      },
+      {
+        "Function": "pg_qsort",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.19,
+        "Change": 1
+      },
+      {
+        "Function": "__mark_inode_dirty",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.19,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_dispatch_rq_list",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.18999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "create_plan",
+        "Sample Rate": 1.75,
+        "Diff From Mean": 0.18999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "RememberSimpleDeadLock",
+        "Sample Rate": 1.46,
+        "Diff From Mean": 0.18999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "__strlen_avx2",
+        "Sample Rate": 0.84,
+        "Diff From Mean": 0.18999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "XLogFlush",
+        "Sample Rate": 4.02,
+        "Diff From Mean": 0.1800000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "eqsel",
+        "Sample Rate": 1.19,
+        "Diff From Mean": 0.18000000000000016,
+        "Change": 0
+      },
+      {
+        "Function": "SearchCatCache3",
+        "Sample Rate": 0.9,
+        "Diff From Mean": 0.18000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "nextval_internal",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.18000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "pg_comp_crc32c_sse42",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.18000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "ExecIndexOnlyScanInitializeWorker",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.18000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "scanner_init",
+        "Sample Rate": 0.49,
+        "Diff From Mean": 0.18,
+        "Change": 1
+      },
+      {
+        "Function": "GetCurrentTransactionId",
+        "Sample Rate": 0.48,
+        "Diff From Mean": 0.18,
+        "Change": 1
+      },
+      {
+        "Function": "nulltestsel",
+        "Sample Rate": 0.46,
+        "Diff From Mean": 0.18,
+        "Change": 0
+      },
+      {
+        "Function": "slot_getsomeattrs_int",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.18,
+        "Change": 0
+      },
+      {
+        "Function": "ExecAssignProjectionInfo",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.18,
+        "Change": 1
+      },
+      {
+        "Function": "add_base_rels_to_query",
+        "Sample Rate": 1.72,
+        "Diff From Mean": 0.17999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "query_tree_walker",
+        "Sample Rate": 0.81,
+        "Diff From Mean": 0.17999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "native_write_msr",
+        "Sample Rate": 0.73,
+        "Diff From Mean": 0.17999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "get_attavgwidth",
+        "Sample Rate": 0.72,
+        "Diff From Mean": 0.17999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "palloc",
+        "Sample Rate": 2.97,
+        "Diff From Mean": 0.17999999999999972,
+        "Change": 0
+      },
+      {
+        "Function": "ExecMakeFunctionResultSet",
+        "Sample Rate": 2.86,
+        "Diff From Mean": 0.17999999999999972,
+        "Change": 1
+      },
+      {
+        "Function": "pvclock_clocksource_read",
+        "Sample Rate": 0.87,
+        "Diff From Mean": 0.17000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "inet_spg_leaf_consistent",
+        "Sample Rate": 0.32,
+        "Diff From Mean": 0.17,
+        "Change": 1
+      },
+      {
+        "Function": "do_async_page_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.17,
+        "Change": 0
+      },
+      {
+        "Function": "do_page_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.17,
+        "Change": 0
+      },
+      {
+        "Function": "__do_page_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.17,
+        "Change": 0
+      },
+      {
+        "Function": "do_user_addr_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.17,
+        "Change": 0
+      },
+      {
+        "Function": "handle_mm_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.17,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitExpr",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.16999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "register_label_provider",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.16999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "base_yyparse",
+        "Sample Rate": 6.16,
+        "Diff From Mean": 0.16999999999999993,
+        "Change": 0
+      },
+      {
+        "Function": "schedule_hrtimeout_range",
+        "Sample Rate": 3.37,
+        "Diff From Mean": 0.16000000000000014,
+        "Change": 1
+      },
+      {
+        "Function": "relation_openrv_extended",
+        "Sample Rate": 1.06,
+        "Diff From Mean": 0.16000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "lcons",
+        "Sample Rate": 0.87,
+        "Diff From Mean": 0.16000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "LockReleaseAll",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.16000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "update_curr",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.16000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "ProcReleaseLocks",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.16,
+        "Change": 1
+      },
+      {
+        "Function": "wake_up_page_bit",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.16,
+        "Change": 1
+      },
+      {
+        "Function": "__wake_up_locked_key_bookmark",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.16,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReScanRecursiveUnion",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.15999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "pull_varnos_new",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.15999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_dirty_inode",
+        "Sample Rate": 0.25,
+        "Diff From Mean": 0.15999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitResultTupleSlotTL",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.15999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "MemoryContextAllocZeroAligned",
+        "Sample Rate": 1.91,
+        "Diff From Mean": 0.15999999999999992,
+        "Change": 0
+      },
+      {
+        "Function": "activate_task",
+        "Sample Rate": 1.24,
+        "Diff From Mean": 0.15999999999999992,
+        "Change": 1
+      },
+      {
+        "Function": "hash_search_with_hash_value",
+        "Sample Rate": 2.7,
+        "Diff From Mean": 0.1599999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "XLogInsertRecord",
+        "Sample Rate": 0.59,
+        "Diff From Mean": 0.15000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "_raw_spin_lock_irqsave",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.15000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "strcoll_l",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.15000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "wait_on_page_writeback",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.15000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "skb_release_all",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.15000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "wake_page_function",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.15000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReScanUnique",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.15,
+        "Change": 0
+      },
+      {
+        "Function": "__filemap_fdatawait_range",
+        "Sample Rate": 0.43,
+        "Diff From Mean": 0.14999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "equal",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.14999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "plan_create_index_workers",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.14999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "transformTargetList",
+        "Sample Rate": 1.45,
+        "Diff From Mean": 0.14000000000000012,
+        "Change": 0
+      },
+      {
+        "Function": "heap_page_prune_opt",
+        "Sample Rate": 0.72,
+        "Diff From Mean": 0.14,
+        "Change": 1
+      },
+      {
+        "Function": "perf_event_sched_in",
+        "Sample Rate": 0.68,
+        "Diff From Mean": 0.14,
+        "Change": 1
+      },
+      {
+        "Function": "wait_on_page_bit",
+        "Sample Rate": 0.35,
+        "Diff From Mean": 0.14,
+        "Change": 0
+      },
+      {
+        "Function": "__vdso_clock_gettime",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.14,
+        "Change": 0
+      },
+      {
+        "Function": "io_schedule",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.14,
+        "Change": 0
+      },
+      {
+        "Function": "generic_update_time",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.14,
+        "Change": 0
+      },
+      {
+        "Function": "nvme_queue_rq",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.14,
+        "Change": 0
+      },
+      {
+        "Function": "hash_mask",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.13999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "AddWaitEventToSet",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.13999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "epoll_ctl",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.13999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "coerce_to_target_type",
+        "Sample Rate": 0.81,
+        "Diff From Mean": 0.1399999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_epoll_wait",
+        "Sample Rate": 4.21,
+        "Diff From Mean": 0.13999999999999968,
+        "Change": 1
+      },
+      {
+        "Function": "make_op",
+        "Sample Rate": 1.27,
+        "Diff From Mean": 0.13000000000000012,
+        "Change": 1
+      },
+      {
+        "Function": "enqueue_task_fair",
+        "Sample Rate": 0.54,
+        "Diff From Mean": 0.13000000000000006,
+        "Change": 1
+      },
+      {
+        "Function": "ExecEndModifyTable",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.13000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "RangeVarGetRelidExtended",
+        "Sample Rate": 1.0,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "sched_clock",
+        "Sample Rate": 0.87,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "kvm_sched_clock_read",
+        "Sample Rate": 0.84,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "ctx_sched_in",
+        "Sample Rate": 0.66,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "dequeue_task_fair",
+        "Sample Rate": 0.53,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitQual",
+        "Sample Rate": 0.4,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_parallel_advance_array_keys",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.13,
+        "Change": 0
+      },
+      {
+        "Function": "DirectFunctionCall3Coll",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_checkpage",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.13,
+        "Change": 0
+      },
+      {
+        "Function": "get_func_retset",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "makeSimpleA_Expr",
+        "Sample Rate": 0.23,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "TransactionIdSetTreeStatus",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.13,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReScanLimit",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.13,
+        "Change": 0
+      },
+      {
+        "Function": "start_this_handle",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.13,
+        "Change": 0
+      },
+      {
+        "Function": "__handle_mm_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.13,
+        "Change": 0
+      },
+      {
+        "Function": "enqueue_entity",
+        "Sample Rate": 0.36,
+        "Diff From Mean": 0.12999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "secure_read",
+        "Sample Rate": 4.89,
+        "Diff From Mean": 0.1299999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "do_epoll_wait",
+        "Sample Rate": 4.18,
+        "Diff From Mean": 0.1299999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "schedule_hrtimeout_range_clock",
+        "Sample Rate": 3.32,
+        "Diff From Mean": 0.1299999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "deactivate_task",
+        "Sample Rate": 1.46,
+        "Diff From Mean": 0.1299999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "transformTargetEntry",
+        "Sample Rate": 1.4,
+        "Diff From Mean": 0.1200000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "exprTypmod",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.12000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "MemoryContextAllocZero",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.12000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "ExecEvalAggOrderedTransTuple",
+        "Sample Rate": 0.91,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "get_attstatsslot",
+        "Sample Rate": 0.76,
+        "Diff From Mean": 0.12,
+        "Change": 0
+      },
+      {
+        "Function": "LockRelationOid",
+        "Sample Rate": 0.71,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "split_pathtarget_at_srfs",
+        "Sample Rate": 0.62,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "ReleaseCatCache",
+        "Sample Rate": 0.48,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "LookupExplicitNamespace",
+        "Sample Rate": 0.43,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "is_redundant_with_indexclauses",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "mpage_prepare_extent_to_map",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.12,
+        "Change": 0
+      },
+      {
+        "Function": "__strncmp_avx2",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.12,
+        "Change": 1
+      },
+      {
+        "Function": "nocachegetattr",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.12,
+        "Change": 0
+      },
+      {
+        "Function": "is_projection_capable_plan",
+        "Sample Rate": 0.25,
+        "Diff From Mean": 0.12,
+        "Change": 0
+      },
+      {
+        "Function": "simple_copy_to_iter",
+        "Sample Rate": 0.25,
+        "Diff From Mean": 0.12,
+        "Change": 0
+      },
+      {
+        "Function": "make_pathtarget_from_tlist",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.12,
+        "Change": 0
+      },
+      {
+        "Function": "ttwu_do_activate",
+        "Sample Rate": 1.38,
+        "Diff From Mean": 0.11999999999999988,
+        "Change": 1
+      },
+      {
+        "Function": "make_restrictinfo_new",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.11000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "ItemPointerCompare",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.11000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "newidle_balance",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.11000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "GetTsmRoutine",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.11,
+        "Change": 1
+      },
+      {
+        "Function": "CreateCommandTag",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.11,
+        "Change": 1
+      },
+      {
+        "Function": "do_fault",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.11,
+        "Change": 0
+      },
+      {
+        "Function": "hash_search",
+        "Sample Rate": 0.9,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "RelationIdGetRelation",
+        "Sample Rate": 0.75,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "transformExpressionList",
+        "Sample Rate": 0.63,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "__strcmp_avx2",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "unix_stream_read_actor",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "skb_copy_datagram_iter",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "_int_free",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "BufTableDelete",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "file_update_time",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "nvme_map_data",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.10999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "ep_poll",
+        "Sample Rate": 4.06,
+        "Diff From Mean": 0.10999999999999943,
+        "Change": 1
+      },
+      {
+        "Function": "apic_timer_interrupt",
+        "Sample Rate": 0.54,
+        "Diff From Mean": 0.10000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "updateTargetListEntry",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.10000000000000003,
+        "Change": 1
+      },
+      {
+        "Function": "submit_bio",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.10000000000000003,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_moveright",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.10000000000000003,
+        "Change": 0
+      },
+      {
+        "Function": "AcquireRewriteLocks",
+        "Sample Rate": 0.32,
+        "Diff From Mean": 0.1,
+        "Change": 1
+      },
+      {
+        "Function": "event_sched_in.isra.0",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.1,
+        "Change": 1
+      },
+      {
+        "Function": "RI_FKey_fk_upd_check_required",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.1,
+        "Change": 0
+      },
+      {
+        "Function": "get_opfamily_member",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.1,
+        "Change": 1
+      },
+      {
+        "Function": "ScanKeywordLookup",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.1,
+        "Change": 0
+      },
+      {
+        "Function": "fetch_finfo_record",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.1,
+        "Change": 0
+      },
+      {
+        "Function": "core_yylex_init",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.09999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "heap_compute_xid_horizon_for_tuples",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "ConditionVariableBroadcast",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "index_compute_xid_horizon_for_tuples",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "sched_clock_cpu",
+        "Sample Rate": 0.89,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "BufTableLookup",
+        "Sample Rate": 0.87,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "index_open",
+        "Sample Rate": 0.61,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "ep_scan_ready_list.constprop.0",
+        "Sample Rate": 0.5,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "examine_variable",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "kmem_cache_alloc",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "__skb_datagram_iter",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_io_submit",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.09999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "extract_query_dependencies",
+        "Sample Rate": 1.73,
+        "Diff From Mean": 0.09000000000000008,
+        "Change": 1
+      },
+      {
+        "Function": "ExecBuildProjectionInfoExt",
+        "Sample Rate": 1.29,
+        "Diff From Mean": 0.09000000000000008,
+        "Change": 1
+      },
+      {
+        "Function": "btcostestimate",
+        "Sample Rate": 1.16,
+        "Diff From Mean": 0.09000000000000008,
+        "Change": 0
+      },
+      {
+        "Function": "get_namespace_oid",
+        "Sample Rate": 0.4,
+        "Diff From Mean": 0.09000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "pull_varattnos",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.09000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "checkInsertTargets",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "XactLockTableInsert",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "sock_wfree",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "WaitEventSetWait",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "bttextcmp",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "switch_fpu_return",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "parse_sub_analyze",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "kmem_cache_alloc_node",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "set_task_cpu",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "rb_next",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "SimpleLruReadPage",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "repalloc",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.09,
+        "Change": 1
+      },
+      {
+        "Function": "PrepareSortSupportFromIndexRel",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "analyzeCTETargetList",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "BufTableInsert",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "ExecGetJunkAttribute",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "get_baserel_parampathinfo",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitResultSlot",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.09,
+        "Change": 0
+      },
+      {
+        "Function": "BufferShmemSize",
+        "Sample Rate": 0.88,
+        "Diff From Mean": 0.08999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "tblspc_redo",
+        "Sample Rate": 0.7,
+        "Diff From Mean": 0.08999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "_int_malloc",
+        "Sample Rate": 0.32,
+        "Diff From Mean": 0.08999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "transformExpr",
+        "Sample Rate": 3.5,
+        "Diff From Mean": 0.08999999999999986,
+        "Change": 1
+      },
+      {
+        "Function": "heap_mask",
+        "Sample Rate": 9.56,
+        "Diff From Mean": 0.08000000000000007,
+        "Change": 1
+      },
+      {
+        "Function": "pq_getbyte",
+        "Sample Rate": 6.51,
+        "Diff From Mean": 0.08000000000000007,
+        "Change": 0
+      },
+      {
+        "Function": "find_minmax_agg_replacement_param",
+        "Sample Rate": 2.43,
+        "Diff From Mean": 0.08000000000000007,
+        "Change": 1
+      },
+      {
+        "Function": "consume_skb",
+        "Sample Rate": 0.47,
+        "Diff From Mean": 0.08000000000000007,
+        "Change": 0
+      },
+      {
+        "Function": "exprType",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "ep_send_events_proc",
+        "Sample Rate": 0.37,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "escape_single_quotes_ascii",
+        "Sample Rate": 0.32,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "update_load_avg",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "PortalStart",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "[postgres]",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "AllocSetContextCreateInternal",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitScanTupleSlot",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "initial_cost_mergejoin",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "build_join_rel",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "addRangeTableEntryForValues",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.08000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "__check_object_size",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.08,
+        "Change": 0
+      },
+      {
+        "Function": "handle_edge_irq",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.08,
+        "Change": 1
+      },
+      {
+        "Function": "ForwardSyncRequest",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.08,
+        "Change": 1
+      },
+      {
+        "Function": "LWLockAcquireOrWait",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.08,
+        "Change": 1
+      },
+      {
+        "Function": "migrate_task_rq_fair",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.08,
+        "Change": 1
+      },
+      {
+        "Function": "RegisterSyncRequest",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.08,
+        "Change": 1
+      },
+      {
+        "Function": "ExecGetRangeTableRelation",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.08,
+        "Change": 0
+      },
+      {
+        "Function": "transformFromClause",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.08,
+        "Change": 0
+      },
+      {
+        "Function": "PageAddItemExtended",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.08,
+        "Change": 0
+      },
+      {
+        "Function": "ExecStoreBufferHeapTuple",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.08,
+        "Change": 0
+      },
+      {
+        "Function": "ep_item_poll.isra.0",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "heap_compute_data_size",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "pg_verify_mbstr_len",
+        "Sample Rate": 0.25,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "numeric_in",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "index_endscan",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "transformWithClause",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "RelationIncrementReferenceCount",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.07999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "TupleDescInitEntry",
+        "Sample Rate": 0.71,
+        "Diff From Mean": 0.07999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "find_typmod_coercion_function",
+        "Sample Rate": 0.49,
+        "Diff From Mean": 0.07999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "smp_apic_timer_interrupt",
+        "Sample Rate": 0.48,
+        "Diff From Mean": 0.07999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "update_rq_clock",
+        "Sample Rate": 0.35,
+        "Diff From Mean": 0.07999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "MemoryContextStrdup",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.07999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "mpage_submit_page",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.07999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitIndexScan",
+        "Sample Rate": 1.93,
+        "Diff From Mean": 0.07999999999999985,
+        "Change": 1
+      },
+      {
+        "Function": "ExecARUpdateTriggers",
+        "Sample Rate": 0.81,
+        "Diff From Mean": 0.07000000000000006,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_mark_inode_dirty",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.07000000000000003,
+        "Change": 0
+      },
+      {
+        "Function": "pull_var_clause",
+        "Sample Rate": 0.5,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "record_times",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "RelationGetNumberOfBlocksInFork",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "pg_getnameinfo_all",
+        "Sample Rate": 0.37,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "generic_make_request",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "mpage_process_page_bufs",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "pg_verify_mbstr",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "skb_release_head_state",
+        "Sample Rate": 0.25,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "unix_destruct_scm",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "get_appendrel_parampathinfo",
+        "Sample Rate": 0.23,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "perf_event_update_userpage",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "parser_init",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "makeString",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "StrategyGetBuffer",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "update_blocked_averages",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "coerce_to_boolean",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "SearchCatCache4",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "get_typcollation",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "parse_analyze_varparams",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "xact_redo",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "MultiXactIdSetOldestMember",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "hrtimer_wakeup",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_mkscankey",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "ExecReScanMergeJoin",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "pull_up_subqueries",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.07,
+        "Change": 1
+      },
+      {
+        "Function": "OidInputFunctionCall",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "find_get_pages_range_tag",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "smgropen",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "skb_free_head",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "join_selectivity",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "OidFunctionCall5Coll",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "FunctionCall5Coll",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "eqjoinsel",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.07,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerForgetBuffer",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "pgarch_start",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "__kmalloc_reserve.isra.0",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "set_plan_references",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "numeric_add_opt_error",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "ResourceOwnerDelete",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "ksize",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "__ksize",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "skb_queue_tail",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "IsSharedRelation",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.06999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "bms_make_singleton",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.06999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "canonicalize_qual",
+        "Sample Rate": 0.54,
+        "Diff From Mean": 0.06999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "deconstruct_jointree",
+        "Sample Rate": 1.43,
+        "Diff From Mean": 0.06000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "relation_open",
+        "Sample Rate": 1.24,
+        "Diff From Mean": 0.06000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "CreateExecutorState",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.06000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "heap_beginscan",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "makeAlias",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "__update_load_avg_se",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "cpus_share_cache",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "release_pages",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 1
+      },
+      {
+        "Function": "is_pseudo_constant_clause_relids",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "bms_is_subset",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "has_unique_index",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "reweight_entity",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "bio_associate_blkg",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "SearchSysCache1",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.060000000000000005,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInterpExprStillValid",
+        "Sample Rate": 0.45,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "clock_gettime@@GLIBC_2.17",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "MemoryContextAlloc",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "is_parallel_safe",
+        "Sample Rate": 0.4,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerForgetCatCacheRef",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "pg_vsnprintf",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "group_sched_in",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "ExecCloseIndices",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "cost_qual_eval",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "UnlockRelationId",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "run_rebalance_domains",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_preprocess_keys",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "pq_endmessage",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "get_futex_key",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "bms_is_empty",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "RelationGetIndexList",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "check_preempt_curr",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_reserve_inode_write",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "hash_uint32",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "LWLockWaitForVar",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "GetNewTransactionId",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "update_min_vruntime",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "exprIsLengthCoercion",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "__pagevec_release",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "test_clear_page_writeback",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.06,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitValuesScan",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_checkkeys",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "pagevec_lookup_range_tag",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "update_cfs_group",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "build_index_pathkeys",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "typeidType",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "ineq_histogram_selectivity",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "kfree",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "addRangeTableEntry",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.06,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_bio_write_page",
+        "Sample Rate": 0.23,
+        "Diff From Mean": 0.05999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "palloc0",
+        "Sample Rate": 0.84,
+        "Diff From Mean": 0.05999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "check_stack_depth",
+        "Sample Rate": 1.05,
+        "Diff From Mean": 0.050000000000000044,
+        "Change": 0
+      },
+      {
+        "Function": "process_equivalence",
+        "Sample Rate": 0.54,
+        "Diff From Mean": 0.050000000000000044,
+        "Change": 1
+      },
+      {
+        "Function": "heap_hot_search_buffer",
+        "Sample Rate": 0.5,
+        "Diff From Mean": 0.050000000000000044,
+        "Change": 0
+      },
+      {
+        "Function": "makeTargetEntry",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.050000000000000044,
+        "Change": 1
+      },
+      {
+        "Function": "hrtimer_interrupt",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "bms_copy",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "__fdget",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "LWLockReleaseClearVar",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "wake_up_process",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "get_tablespace_page_costs",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "syscall_return_via_sysret",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.05000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "heap_fetch_extended",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "get_relids_in_jointree",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "set_ps_display",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "get_op_opfamily_properties",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_next",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "zap_pte_range.isra.0",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "futex_wait_setup",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "find_next_bit",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "__kmalloc_node_track_caller",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "RelationPutHeapTuple",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "RelationGetIndexAttrBitmap",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "InitResultRelInfo",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "__update_load_avg_cfs_rq",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "canonicalize_ec_expression",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.05,
+        "Change": 1
+      },
+      {
+        "Function": "ResourceOwnerEnlargeCatCacheRefs",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "xas_start",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "InstrAlloc",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "bio_associate_blkg_from_css",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "ExecReScanIndexScan",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "SharedFileSetDeleteAll",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.05,
+        "Change": 0
+      },
+      {
+        "Function": "ExecAssignExprContext",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "put_prev_entity",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "DefineSavepoint",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "list_delete_cell",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "__ctype_b_loc",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "get_hash_value",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "pgstat_count_heap_insert",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "set_next_task_idle",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReScan",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "mergejoinscansel",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "dd_insert_requests",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "clear_page_dirty_for_io",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.049999999999999996,
+        "Change": 0
+      },
+      {
+        "Function": "genericcostestimate",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "index_close",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "intel_pmu_disable_all",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "get_typlen",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "extract_query_dependencies_walker",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "PageIndexMultiDelete",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "heap_tuple_untoast_attr",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_make_request",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "add_path",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "bms_add_member",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "mutex_lock",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "SimpleLruReadPage_ReadOnly",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "index_other_operands_eval_cost",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "make_parsestate",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "skb_release_data",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "build_base_rel_tlists",
+        "Sample Rate": 1.14,
+        "Diff From Mean": 0.04999999999999982,
+        "Change": 1
+      },
+      {
+        "Function": "build_simple_rel",
+        "Sample Rate": 1.74,
+        "Diff From Mean": 0.040000000000000036,
+        "Change": 1
+      },
+      {
+        "Function": "get_relation_info",
+        "Sample Rate": 1.42,
+        "Diff From Mean": 0.040000000000000036,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitResult",
+        "Sample Rate": 0.56,
+        "Diff From Mean": 0.040000000000000036,
+        "Change": 1
+      },
+      {
+        "Function": "GetSysCacheOid",
+        "Sample Rate": 0.52,
+        "Diff From Mean": 0.040000000000000036,
+        "Change": 1
+      },
+      {
+        "Function": "pg_snprintf",
+        "Sample Rate": 0.28,
+        "Diff From Mean": 0.040000000000000036,
+        "Change": 1
+      },
+      {
+        "Function": "ExecFindMatchingSubPlans",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "pg_any_to_server",
+        "Sample Rate": 0.25,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "pick_next_task_fair",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "__errno_location",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "bio_alloc_bioset",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "unix_poll",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "__GI_____strtol_l_internal",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "ttwu_do_wakeup",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "get_eclass_for_sort_expr",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "get_row_security_policies",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "func_parallel",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "apply_tlist_labeling",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "OidFunctionCall1Coll",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "PushActiveSnapshotWithLevel",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "create_projection_path",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "SubTransSetParent",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "ExecReadyInterpretedExpr",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 1
+      },
+      {
+        "Function": "skb_copy_datagram_from_iter",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "smgrnblocks",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "add_transaction_credits",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "GetUserId",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "set_joinrel_size_estimates",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "generate_join_implied_equalities_for_ecs",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "ReleaseSysCache",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "heap_form_minimal_tuple",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerForgetSnapshot",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.04000000000000001,
+        "Change": 0
+      },
+      {
+        "Function": "rewriteTargetListUD",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "printtup_create_DR",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "mutex_unlock",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "ResourceOwnerEnlargeBuffers",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "expand_function_arguments",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "numeric",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "DeconstructQualifiedName",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "AtEOSubXact_SPI",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.04,
+        "Change": 1
+      },
+      {
+        "Function": "submit_bio_wait",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "__slab_alloc",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_freestack",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerRememberCatCacheRef",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "exprSetInputCollation",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "systable_inplace_update_cancel",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "__kmalloc",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "pq_getbytes",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "create_mergejoin_path",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "update_cfs_rq_h_load",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "heap_attisnull",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.04,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_exit_group",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "do_group_exit",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "do_exit",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "mmput",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "exit_mmap",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "unmap_vmas",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "unmap_single_vma",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "unmap_page_range",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "gup_pgd_range",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "cost_seqscan",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "get_user_pages_fast",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "CommandCounterIncrement",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "__ext4_get_inode_loc",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "resched_curr",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "int4eq",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_close",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "ParallelWorkerReportLastRecEnd",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "SIGetDataEntries",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "memset_erms",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 1
+      },
+      {
+        "Function": "exprLocation",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "__memset_avx2_unaligned_erms",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "make_canonical_pathkey",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "__test_set_page_writeback",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "CheckForSerializableConflictOut",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "MarkBufferDirty",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "get_parameterized_baserel_size",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "addRTEtoQuery",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "attnameAttNum",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_start_request",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.039999999999999994,
+        "Change": 0
+      },
+      {
+        "Function": "cost_bitmap_heap_scan",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "dequeue_entity",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "__fget_light",
+        "Sample Rate": 0.37,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "perf_pmu_disable.part.0",
+        "Sample Rate": 0.31,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "__strncpy_avx2",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "__lock_text_start",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "pfree",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "_copy_to_iter",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "touch_atime",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.03999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "query_contains_extern_params",
+        "Sample Rate": 0.66,
+        "Diff From Mean": 0.039999999999999925,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_getroot",
+        "Sample Rate": 0.57,
+        "Diff From Mean": 0.039999999999999925,
+        "Change": 1
+      },
+      {
+        "Function": "scanRTEForColumn",
+        "Sample Rate": 0.55,
+        "Diff From Mean": 0.039999999999999925,
+        "Change": 0
+      },
+      {
+        "Function": "ExecConditionalAssignProjectionInfo",
+        "Sample Rate": 1.14,
+        "Diff From Mean": 0.039999999999999813,
+        "Change": 1
+      },
+      {
+        "Function": "raw_parser",
+        "Sample Rate": 6.84,
+        "Diff From Mean": 0.03000000000000025,
+        "Change": 1
+      },
+      {
+        "Function": "planstate_tree_walker",
+        "Sample Rate": 1.55,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "get_attribute_options",
+        "Sample Rate": 0.77,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "__memcpy_avx_unaligned_erms",
+        "Sample Rate": 0.72,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "hash_any",
+        "Sample Rate": 0.67,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 1
+      },
+      {
+        "Function": "set_pathtarget_cost_width",
+        "Sample Rate": 0.54,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 1
+      },
+      {
+        "Function": "add_vars_to_targetlist",
+        "Sample Rate": 0.5,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "ExecBuildGroupingEqual",
+        "Sample Rate": 0.43,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "visit_groups_merge",
+        "Sample Rate": 0.4,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 1
+      },
+      {
+        "Function": "heap_page_prune",
+        "Sample Rate": 0.4,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 1
+      },
+      {
+        "Function": "PortalDrop",
+        "Sample Rate": 0.39,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 1
+      },
+      {
+        "Function": "x86_pmu_disable",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.030000000000000027,
+        "Change": 0
+      },
+      {
+        "Function": "HeapTupleSatisfiesVacuum",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.030000000000000013,
+        "Change": 1
+      },
+      {
+        "Function": "lappend_oid",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.030000000000000006,
+        "Change": 1
+      },
+      {
+        "Function": "MemoryContextSetParent",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.030000000000000006,
+        "Change": 1
+      },
+      {
+        "Function": "initStringInfo",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.030000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "__slab_free",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.030000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "can_coerce_type",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.030000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "___slab_alloc",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.030000000000000006,
+        "Change": 0
+      },
+      {
+        "Function": "handle_irq_event",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.030000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "FileSize",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.030000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "pgstat_count_heap_update",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.030000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "index_can_return",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.030000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "mark_page_accessed",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.030000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "fmgr_info_copy",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.030000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "btint4cmp",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "tliSwitchPoint",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "hash_any_extended",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "StartTransactionCommand",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "TransactionIdGetStatus",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "__hrtimer_run_queues",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "get_oprrest",
+        "Sample Rate": 0.19,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "core_yy_scan_buffer",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "downcase_identifier",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "ReleaseAndReadBuffer",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "strlcpy",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "coerce_type",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "CreateExprContext",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "memcg_kmem_get_cache",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "execCurrentOf",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitExtraTupleSlot",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "SearchSysCacheExists",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "BuildIndexInfo",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "secure_write",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "mempool_alloc_slab",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "get_mergejoin_opfamilies",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "ExecResetTupleTable",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "pick_next_task_idle",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "get_op_opfamily_strategy",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "copy_user_generic_unrolled",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "__sigsetjmp",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "check_enable_rls",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "_raw_read_lock",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "gup_pud_range.isra.0",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "MakePerTupleExprContext",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "CopyTriggerDesc",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "security_file_permission",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitAgg",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "list_concat",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "account_entity_dequeue",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "read_tsc",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "btrescan",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "AtEOXact_Namespace",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "pg_proc_aclmask",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "ProcArrayEndTransaction",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "numeric_support",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "kvm_guest_apic_eoi_write",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "irq_chip_ack_parent",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "disable_timeout",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "get_opcode",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "relation_excluded_by_constraints",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "bio_free",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.03,
+        "Change": 1
+      },
+      {
+        "Function": "bpchar",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "coerce_to_specific_type",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "tuplesort_performsort",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "bms_membership",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "pg_rusage_show",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "balance_dirty_pages_ratelimited",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "build_implied_join_equality",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_get_driver_tag",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "XLogRegisterBufData",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "XLogRegisterData",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "RecordAndGetPageWithFreeSpace",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "create_modifytable_path",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "RelationGetIndexExpressions",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.03,
+        "Change": 0
+      },
+      {
+        "Function": "HeapTupleSatisfiesVisibility",
+        "Sample Rate": 0.33,
+        "Diff From Mean": 0.02999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "ExecConstraints",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.02999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "preprocess_targetlist",
+        "Sample Rate": 0.69,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 0
+      },
+      {
+        "Function": "ExecOpenIndices",
+        "Sample Rate": 0.47,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 0
+      },
+      {
+        "Function": "SearchCatCache",
+        "Sample Rate": 0.45,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 1
+      },
+      {
+        "Function": "ctx_sched_out",
+        "Sample Rate": 0.43,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 1
+      },
+      {
+        "Function": "AbortBufferIO",
+        "Sample Rate": 0.37,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 1
+      },
+      {
+        "Function": "to_regnamespace",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 1
+      },
+      {
+        "Function": "table_open",
+        "Sample Rate": 0.34,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 1
+      },
+      {
+        "Function": "check_functions_in_node",
+        "Sample Rate": 0.26,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 0
+      },
+      {
+        "Function": "account_page_dirtied",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 1
+      },
+      {
+        "Function": "unix_write_space",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 0
+      },
+      {
+        "Function": "blkdev_issue_flush",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 0
+      },
+      {
+        "Function": "makeConst",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.020000000000000018,
+        "Change": 0
+      },
+      {
+        "Function": "sigprocmask",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "kfree_skbmem",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitNestLoop",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "strtol",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "mdnblocks",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "assign_special_exec_param",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "pgstat_initstats",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "SetCurrentStatementStartTimestamp",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "hash_seq_search",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "ProcessClientReadInterrupt",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "op_input_types",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "table_slot_create",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "__getblk_gfp",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "__find_get_block",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "apparmor_file_permission",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "common_file_perm",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "cost_qual_eval_node",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "op_mergejoinable",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "__intel_pmu_enable_all.constprop.0",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "__GI_____strtoul_l_internal",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "xas_find_marked",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "datumIsEqual",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "PortalCleanup",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerEnlargeTupleDescs",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 1
+      },
+      {
+        "Function": "put_prev_task_fair",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_init_io_end",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "security_socket_recvmsg",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "blk_mq_get_tag",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "fetch_search_path_array",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "WalSndWakeup",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "CreateTemplateTupleDesc",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "bvec_alloc",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "__virt_addr_valid",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "InputFunctionCall",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "stmt_requires_parse_analysis",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "ExecBuildProjectionInfo",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.020000000000000004,
+        "Change": 0
+      },
+      {
+        "Function": "handle_irq_event_percpu",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "PopActiveSnapshot",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "ReleaseCatCacheList",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "ResourceOwnerForgetCatCacheListRef",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "FileWrite",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "tuplestore_puttupleslot",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "__set_current_blocked",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "rq_qos_wait",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "__close_fd",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "__remove_hrtimer",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "cfree@GLIBC_2.2.5",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "__handle_irq_event_percpu",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "HeapTupleHeaderAdvanceLatestRemovedXid",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "RecoveryInProgress",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "__new_sem_wait_slow.constprop.0",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "TupleDescInitEntryCollation",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitLockRows",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.02,
+        "Change": 1
+      },
+      {
+        "Function": "UnlockReleaseBuffer",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "AtEOXact_MultiXact",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "list_nth",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "tick_sched_timer",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "IncrBufferRefCount",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "PrefetchBuffer",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerForgetRelationRef",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "cpuacct_charge",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "has_subclass",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "__blk_mq_get_tag",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "GetFullPageWriteInfo",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "IncrTupleDescRefCount",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.02,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_findsplitloc",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "CreateDestReceiver",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "_raw_write_lock_irq",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "pg_proc_aclcheck",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "_copy_from_iter",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "ExecIndexScanInitializeWorker",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "__blk_mq_sched_bio_merge",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "GetDatabaseEncoding",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "xas_set_mark",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "skb_set_owner_w",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "HeapTupleSatisfiesUpdate",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "blk_mq_sched_try_merge",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "bms_del_member",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "set_opfuncid",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_nonda_switch",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "namestrcmp",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "nvme_irq",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "nocache_index_getattr",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "byteain",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "log_heap_clean",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "native_apic_msr_eoi_write",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "__blk_queue_split",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "GetCurrentSubTransactionId",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "InstrStopNode",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "DataChecksumsEnabled",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "apic_ack_edge",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "LockCheckConflicts",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "TransactionBlockStatusCode",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "AfterTriggerBeginQuery",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "add_other_rels_to_query",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "superuser_arg",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "IsInParallelMode",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "reconsider_outer_join_clauses",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "sbitmap_any_bit_set",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "hash_seq_init",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "setup_parser_errposition_callback",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "PredicateLockPage",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 1
+      },
+      {
+        "Function": "finish_wait",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "AtEOSubXact_PgStat",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_write_checks",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "flatCopyTargetEntry",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "tuplesort_attach_shared",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "SysCacheGetAttr",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "bms_overlap",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "tick_sched_handle",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "update_process_times",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "scheduler_tick",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "ExecInitRangeTable",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "GetCurrentStatementStartTimestamp",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "btbeginscan",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "pgstat_report_xact_timestamp",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "ResourceOwnerEnlargeRelationRefs",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "generate_implied_equalities_for_column",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "XLogInsertAllowed",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "copyout",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "create_nestloop_path",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "__sb_end_write",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "exprSetCollation",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "find_mergeclauses_for_outer_pathkeys",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "index_store_float8_orderby_distances",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.019999999999999997,
+        "Change": 0
+      },
+      {
+        "Function": "index_form_tuple",
+        "Sample Rate": 0.24,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "TransactionIdDidCommit",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "gettimeofday",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "func_get_detail",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "__fdget_pos",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "create_bitmap_heap_path",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "rw_verify_area",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "has_useful_pathkeys",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "RegisterSnapshotOnOwner",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "SS_make_initplan_from_plan",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 1
+      },
+      {
+        "Function": "bms_add_members",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "printsimple",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.01999999999999999,
+        "Change": 0
+      },
+      {
+        "Function": "lseek",
+        "Sample Rate": 0.48,
+        "Diff From Mean": 0.019999999999999962,
+        "Change": 1
+      },
+      {
+        "Function": "GetSnapshotData",
+        "Sample Rate": 0.47,
+        "Diff From Mean": 0.019999999999999962,
+        "Change": 1
+      },
+      {
+        "Function": "CreatePortal",
+        "Sample Rate": 0.41,
+        "Diff From Mean": 0.019999999999999962,
+        "Change": 1
+      },
+      {
+        "Function": "get_rte_attribute_type",
+        "Sample Rate": 0.35,
+        "Diff From Mean": 0.019999999999999962,
+        "Change": 1
+      },
+      {
+        "Function": "MakeTupleTableSlot",
+        "Sample Rate": 0.29,
+        "Diff From Mean": 0.019999999999999962,
+        "Change": 1
+      },
+      {
+        "Function": "transformWhereClause",
+        "Sample Rate": 1.61,
+        "Diff From Mean": 0.019999999999999796,
+        "Change": 0
+      },
+      {
+        "Function": "evaluate_expr",
+        "Sample Rate": 5.53,
+        "Diff From Mean": 0.019999999999999574,
+        "Change": 0
+      },
+      {
+        "Function": "expression_tree_mutator",
+        "Sample Rate": 3.84,
+        "Diff From Mean": 0.010000000000000231,
+        "Change": 0
+      },
+      {
+        "Function": "psi_task_change",
+        "Sample Rate": 1.53,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "ExprEvalPushStep",
+        "Sample Rate": 0.99,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "addRangeTableEntryForRelation",
+        "Sample Rate": 0.78,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "get_variable_numdistinct",
+        "Sample Rate": 0.66,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "oper",
+        "Sample Rate": 0.65,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "GetTransactionSnapshot",
+        "Sample Rate": 0.48,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "__perf_event_task_sched_out",
+        "Sample Rate": 0.44,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "entry_SYSCALL_64",
+        "Sample Rate": 0.43,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "task_ctx_sched_out",
+        "Sample Rate": 0.42,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "make_var",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "_bt_delitems_delete",
+        "Sample Rate": 0.38,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "flexible_sched_in",
+        "Sample Rate": 0.3,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "__x64_sys_lseek",
+        "Sample Rate": 0.27,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "pq_getmessage",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "pgstat_report_activity",
+        "Sample Rate": 0.22,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "__set_page_dirty",
+        "Sample Rate": 0.21,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "perf_swevent_add",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "standard_ProcessUtility",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "add_function_cost",
+        "Sample Rate": 0.18,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "GetPortalByName",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "available_idle_cpu",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "mempool_alloc",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "FreeExecutorState",
+        "Sample Rate": 0.16,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "GetCurrentTimestamp",
+        "Sample Rate": 0.15,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "pg_class_aclmask",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "FuncnameGetCandidates",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "create_seqscan_path",
+        "Sample Rate": 0.13,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "RelidByRelfilenode",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "__ieee754_log_fma",
+        "Sample Rate": 0.12,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "exprCollation",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "CreateQueryDesc",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "fetch_upper_rel",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "ExecEndIndexScan",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "ext4_do_update_inode",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "ExecGetAllUpdatedCols",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "MemoryContextReset",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "LockBuffer",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "ExecSetSlotDescriptor",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 1
+      },
+      {
+        "Function": "LockReassignCurrentOwner",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "SearchCatCacheList",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.010000000000000009,
+        "Change": 0
+      },
+      {
+        "Function": "memcg_kmem_put_cache",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "unlink_chunk.isra.0",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "ExecInitLimit",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "aa_file_perm",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "security_socket_getpeersec_dgram",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "tag_hash",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "AtSubStart_Notify",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "WinGetFuncArgCurrent",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "blk_mq_get_request",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "ResetPlanCache",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "pstrdup",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "find_base_rel",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "tag_pages_for_writeback",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "uint32_hash",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "SHMQueueNext",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "histogram_selectivity",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 1
+      },
+      {
+        "Function": "__x86_indirect_thunk_rax",
+        "Sample Rate": 0.04,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "__strchrnul_avx2",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "mempool_kmalloc",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "ReleaseBuffer",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "relation_close",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "bms_get_singleton_member",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "enlargeStringInfo",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "lappend_int",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.010000000000000002,
+        "Change": 0
+      },
+      {
+        "Function": "select_outer_pathkeys_for_merge",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "__strcpy_avx2",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "PushCopiedSnapshot",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "MakeExpandedObjectReadOnlyInternal",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "match_index_to_operand",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "XidCacheRemoveRunningXids",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "jit_compile_expr",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "fmgr_info",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "CheckForSerializableConflictIn",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "ArrayGetNItems",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "mpage_release_unused_pages",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "AcceptInvalidationMessages",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "bms_intersect",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "isTempToastNamespace",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "AtEOSubXact_RelationCache",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "bms_union",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "getTypeIOParam",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "estimate_rel_size",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "__pthread_disable_asynccancel",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "make_andclause",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_release_io_end",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "EvalPlanQualInit",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "AtCCI_RelationMap",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "blk_add_timer",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "pg_strncasecmp",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "apic_ack_irq",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "pairingheap_add",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "ext4_put_io_end",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "RegisterSnapshot",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "AtEOXact_Inval",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "FunctionCall1Coll",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "IsTransactionOrTransactionBlock",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "elv_merge",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "swapgs_restore_regs_and_return_to_usermode",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "heap_lock_tuple",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.01,
+        "Change": 1
+      },
+      {
+        "Function": "AtSubCommit_Portals",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "make_pathkeys_for_sortclauses",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "__ext4_journal_get_write_access",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "jbd2_journal_get_write_access",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "jbd2_write_access_granted",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "enforce_generic_type_consistency",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "btcanreturn",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "wbt_inflight_cb",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "AtEOSubXact_on_commit_actions",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "AtEOSubXact_LargeObject",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "tuplesort_gettupleslot",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "CommandEndInvalidationMessages",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "__inc_node_page_state",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "IsTransactionBlock",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "sb_mark_inode_writeback",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "AfterTriggerEndQuery",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "CheckCmdReplicaIdentity",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "blk_attempt_plug_merge",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "atime_needs_update",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "bms_equal",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "tbm_calculate_entries",
+        "Sample Rate": 0.01,
+        "Diff From Mean": 0.01,
+        "Change": 0
+      },
+      {
+        "Function": "btendscan",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "EndCommand",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "FileClose",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "ReleasePredicateLocks",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "pg_namespace_aclcheck",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "AtEOXact_Files",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "xas_clear_mark",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "numeric_add",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "RollbackToSavepoint",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "cstring_to_text_with_len",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "lru_add_drain_cpu",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "import_single_range",
+        "Sample Rate": 0.03,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 1
+      },
+      {
+        "Function": "lcons_int",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "compute_bitmap_pages",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "ConditionalLockBufferForCleanup",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "pg_mbstrlen_with_len",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "__x64_sys_rt_sigprocmask",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "index_rescan",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "remove_useless_joins",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "predicate_refuted_by",
+        "Sample Rate": 0.02,
+        "Diff From Mean": 0.009999999999999998,
+        "Change": 0
+      },
+      {
+        "Function": "RestoreComboCIDState",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "FreeExprContext",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "set_cheapest",
+        "Sample Rate": 0.11,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "BufferGetBlockNumber",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "__wake_up",
+        "Sample Rate": 0.1,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "estimate_expression_value",
+        "Sample Rate": 0.09,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "pg_class_aclcheck",
+        "Sample Rate": 0.08,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "core_yy_switch_to_buffer",
+        "Sample Rate": 0.07,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "ExecGetTriggerOldSlot",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "ReceiveSharedInvalidMessages",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "ResourceOwnerCreate",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "__mod_lruvec_state",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "__mod_memcg_state",
+        "Sample Rate": 0.06,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 1
+      },
+      {
+        "Function": "generic_make_request_checks",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_killitems",
+        "Sample Rate": 0.05,
+        "Diff From Mean": 0.009999999999999995,
+        "Change": 0
+      },
+      {
+        "Function": "FloatExceptionHandler",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.009999999999999981,
+        "Change": 0
+      },
+      {
+        "Function": "sock_poll",
+        "Sample Rate": 0.2,
+        "Diff From Mean": 0.009999999999999981,
+        "Change": 0
+      },
+      {
+        "Function": "ParseFuncOrColumn",
+        "Sample Rate": 0.17,
+        "Diff From Mean": 0.009999999999999981,
+        "Change": 0
+      },
+      {
+        "Function": "list_copy",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.009999999999999981,
+        "Change": 0
+      },
+      {
+        "Function": "__libc_malloc",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.009999999999999981,
+        "Change": 0
+      },
+      {
+        "Function": "sockfd_lookup_light",
+        "Sample Rate": 0.14,
+        "Diff From Mean": 0.009999999999999981,
+        "Change": 0
+      },
+      {
+        "Function": "_bt_getbuf",
+        "Sample Rate": 0.57,
+        "Diff From Mean": 0.009999999999999898,
+        "Change": 1
+      }
+    ]
+  },
+  "source_match": {
+    "source": "/root/new/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune/DBTuner/utils/matchFunctions.py",
+    "static_library": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/function_parameter_association.json",
+    "bkFunctions_list": [
+      [
+        "ExecComputeStoredGenerated",
+        37.35,
+        7.059999999999995,
+        0
+      ],
+      [
+        "ScheduleBufferTagForWriteback",
+        7.14,
+        5.06,
+        0
+      ],
+      [
+        "ReadBufferExtended",
+        7.42,
+        4.91,
+        0
+      ],
+      [
+        "_bt_doinsert",
+        7.3,
+        4.53,
+        0
+      ],
+      [
+        "btinsert",
+        7.63,
+        4.47,
+        0
+      ],
+      [
+        "ExecInsertIndexTuples",
+        7.79,
+        4.39,
+        0
+      ],
+      [
+        "standard_ExecutorRun",
+        24.63,
+        4.34,
+        0
+      ],
+      [
+        "PortalRun",
+        34.14,
+        4.229999999999997,
+        0
+      ],
+      [
+        "[pg_stat_statements.so]",
+        37.15,
+        4.210000000000001,
+        0
+      ],
+      [
+        "PlannedStmtRequiresSnapshot",
+        34.33,
+        3.8400000000000034,
+        0
+      ],
+      [
+        "_bt_search",
+        6.34,
+        3.790000000000001,
+        0
+      ],
+      [
+        "FreeQueryDesc",
+        31.08,
+        3.480000000000004,
+        0
+      ],
+      [
+        "pwrite",
+        3.17,
+        3.34,
+        0
+      ],
+      [
+        "pg_plan_queries",
+        103.64,
+        3.239999999999995,
+        0
+      ],
+      [
+        "_bt_relandgetbuf",
+        4.29,
+        3.2299999999999995,
+        0
+      ],
+      [
+        "ksys_pwrite64",
+        3.06,
+        3.2099999999999995,
+        0
+      ],
+      [
+        "__x64_sys_pwrite64",
+        3.11,
+        3.1700000000000004,
+        0
+      ],
+      [
+        "__vfs_write",
+        2.95,
+        3.08,
+        0
+      ],
+      [
+        "vfs_write",
+        3.05,
+        3.0700000000000003,
+        0
+      ],
+      [
+        "ext4_file_write_iter",
+        2.9,
+        3.06,
+        0
+      ],
+      [
+        "ExecScan",
+        8.94,
+        2.91,
+        0
+      ],
+      [
+        "LockBufHdr",
+        3.35,
+        2.6999999999999997,
+        0
+      ],
+      [
+        "PostgresMain",
+        98.26,
+        2.549999999999997,
+        0
+      ],
+      [
+        "_bt_compare",
+        3.85,
+        1.3800000000000003,
+        0
+      ],
+      [
+        "ProcSleep",
+        1.32,
+        1.29,
+        1
+      ],
+      [
+        "mdread",
+        1.29,
+        1.15,
+        0
+      ],
+      [
+        "PostmasterMain",
+        96.81,
+        1.1499999999999915,
+        0
+      ],
+      [
+        "issue_xlog_fsync",
+        2.19,
+        0.7800000000000002,
+        0
+      ],
+      [
+        "query_planner",
+        14.56,
+        0.6199999999999992,
+        0
+      ],
+      [
+        "heapgetpage",
+        0.35,
+        0.5800000000000001,
+        0
+      ],
+      [
+        "XactLogCommitRecord",
+        5.23,
+        0.54,
+        1
+      ],
+      [
+        "compute_parallel_worker",
+        3.51,
+        0.4800000000000004,
+        0
+      ]
+    ],
+    "matched_knob": [
+      {
+        "knob_name": "log_executor_stats",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PortalRun"
+        ]
+      },
+      {
+        "knob_name": "effective_cache_size",
+        "data_flow_functions": [
+          "ExecScan"
+        ],
+        "control_flow_functions": []
+      },
+      {
+        "knob_name": "shared_buffers",
+        "data_flow_functions": [
+          "LockBufHdr"
+        ],
+        "control_flow_functions": []
+      },
+      {
+        "knob_name": "max_wal_size",
+        "data_flow_functions": [
+          "LockBufHdr"
+        ],
+        "control_flow_functions": []
+      },
+      {
+        "knob_name": "log_disconnections",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostgresMain"
+        ]
+      },
+      {
+        "knob_name": "idle_in_transaction_session_timeout",
+        "data_flow_functions": [
+          "PostgresMain"
+        ],
+        "control_flow_functions": [
+          "PostgresMain"
+        ]
+      },
+      {
+        "knob_name": "work_mem",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "_bt_compare"
+        ]
+      },
+      {
+        "knob_name": "deadlock_timeout",
+        "data_flow_functions": [
+          "ProcSleep"
+        ],
+        "control_flow_functions": []
+      },
+      {
+        "knob_name": "lock_timeout",
+        "data_flow_functions": [
+          "ProcSleep"
+        ],
+        "control_flow_functions": [
+          "ProcSleep"
+        ]
+      },
+      {
+        "knob_name": "log_lock_waits",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "ProcSleep"
+        ]
+      },
+      {
+        "knob_name": "zero_damaged_pages",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "mdread"
+        ]
+      },
+      {
+        "knob_name": "max_connections",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "max_wal_senders",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "log_destination",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "archive_mode",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "bonjour",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "bonjour_name",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": []
+      },
+      {
+        "knob_name": "external_pid_file",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "listen_addresses",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "port",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "ssl",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "superuser_reserved_connections",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "unix_socket_directories",
+        "data_flow_functions": [
+          "PostmasterMain"
+        ],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "wal_level",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "PostmasterMain"
+        ]
+      },
+      {
+        "knob_name": "wal_sync_method",
+        "data_flow_functions": [
+          "issue_xlog_fsync"
+        ],
+        "control_flow_functions": [
+          "issue_xlog_fsync"
+        ]
+      },
+      {
+        "knob_name": "force_parallel_mode",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "query_planner"
+        ]
+      },
+      {
+        "knob_name": "shared_buffers",
+        "data_flow_functions": [
+          "heapgetpage"
+        ],
+        "control_flow_functions": []
+      },
+      {
+        "knob_name": "synchronous_commit",
+        "data_flow_functions": [],
+        "control_flow_functions": [
+          "XactLogCommitRecord"
+        ]
+      },
+      {
+        "knob_name": "min_parallel_index_scan_size",
+        "data_flow_functions": [
+          "compute_parallel_worker"
+        ],
+        "control_flow_functions": [
+          "compute_parallel_worker"
+        ]
+      },
+      {
+        "knob_name": "min_parallel_table_scan_size",
+        "data_flow_functions": [
+          "compute_parallel_worker"
+        ],
+        "control_flow_functions": [
+          "compute_parallel_worker"
+        ]
+      }
+    ],
+    "csv_func_to_knob": {
+      "ExecComputeStoredGenerated": [],
+      "ScheduleBufferTagForWriteback": [],
+      "ReadBufferExtended": [],
+      "_bt_doinsert": [],
+      "btinsert": [],
+      "ExecInsertIndexTuples": [],
+      "standard_ExecutorRun": [],
+      "PortalRun": [
+        "log_executor_stats"
+      ],
+      "[pg_stat_statements.so]": [],
+      "PlannedStmtRequiresSnapshot": [],
+      "_bt_search": [],
+      "FreeQueryDesc": [],
+      "pwrite": [],
+      "pg_plan_queries": [],
+      "_bt_relandgetbuf": [],
+      "ksys_pwrite64": [],
+      "__x64_sys_pwrite64": [],
+      "__vfs_write": [],
+      "vfs_write": [],
+      "ext4_file_write_iter": [],
+      "ExecScan": [
+        "effective_cache_size"
+      ],
+      "LockBufHdr": [
+        "shared_buffers",
+        "max_wal_size"
+      ],
+      "PostgresMain": [
+        "log_disconnections",
+        "idle_in_transaction_session_timeout",
+        "idle_in_transaction_session_timeout"
+      ],
+      "_bt_compare": [
+        "work_mem"
+      ],
+      "ProcSleep": [
+        "deadlock_timeout",
+        "lock_timeout",
+        "lock_timeout",
+        "log_lock_waits"
+      ],
+      "mdread": [
+        "zero_damaged_pages"
+      ],
+      "PostmasterMain": [
+        "max_connections",
+        "max_connections",
+        "max_wal_senders",
+        "log_destination",
+        "archive_mode",
+        "bonjour",
+        "bonjour_name",
+        "external_pid_file",
+        "external_pid_file",
+        "listen_addresses",
+        "listen_addresses",
+        "port",
+        "port",
+        "ssl",
+        "superuser_reserved_connections",
+        "superuser_reserved_connections",
+        "unix_socket_directories",
+        "unix_socket_directories",
+        "wal_level"
+      ],
+      "issue_xlog_fsync": [
+        "wal_sync_method",
+        "wal_sync_method"
+      ],
+      "query_planner": [
+        "force_parallel_mode"
+      ],
+      "heapgetpage": [
+        "shared_buffers"
+      ],
+      "XactLogCommitRecord": [
+        "synchronous_commit"
+      ],
+      "compute_parallel_worker": [
+        "min_parallel_index_scan_size",
+        "min_parallel_index_scan_size",
+        "min_parallel_table_scan_size",
+        "min_parallel_table_scan_size"
+      ]
+    }
+  },
+  "profile": {
+    "name": "postgresql/12",
+    "display_name": "PostgreSQL",
+    "kernel_info": "PostgreSQL 12.22 (Ubuntu 12.22-0ubuntu0.20.04.4) on x86_64-pc-linux-gnu",
+    "hardware_info": "4 vCPUs and 30.82 GiB RAM; the live resource snapshot is supplied separately",
+    "unit_note": "Candidate values use pg_settings native units: work_mem and maintenance_work_mem are kB, shared_buffers and effective_cache_size are 8 kB blocks, max_wal_size is MB, and the cost/concurrency parameters are unitless.",
+    "files": {
+      "association": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/function_parameter_association.json",
+      "constraints": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/constraints.json",
+      "defaults": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/defaults.json",
+      "initial_config": "/root/new/perf-anomaly-demo/db_profiles/postgresql/12/initial_config.json",
+      "manual": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/knob_info_manual.json",
+      "parameter_metadata": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/parameter_metadata.json",
+      "target_knobs": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/gptuner_target_knobs.json",
+      "source_target_knobs": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/postgresql_source_target_knobs.txt",
+      "source_target_provenance": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/postgresql_source_target_knobs.provenance.json",
+      "rule": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/rules.txt",
+      "code_folder": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/code",
+      "prompt_template": "/root/new/perf-anomaly-demo/db_profiles/postgresql/common/prompt_template.txt"
+    },
+    "knowledge_source": {
+      "type": "acquired PostgreSQL repository assets",
+      "association_source": "pinned PostgreSQL 12.22 source-derived library (276 documented GUC records; 231 numeric/enum/bool search dimensions), retaining the 5 acquired PG records as an explicitly labelled legacy subset",
+      "association_provenance": "../common/function_parameter_association.provenance.json",
+      "manual_source": "WorkloadTune_new/sysinsight/library/knowledge_collection/postgres/structured_knowledge",
+      "official_document_source": "WorkloadTune_new/sysinsight/library/knowledge_collection/postgres/knob_info/official_document.json",
+      "official_document_version": "13",
+      "historical_rules": false
+    }
+  },
+  "trigger": null,
+  "warning": "PostgreSQL uses the source-derived association snapshot recorded in function_parameter_association.provenance.json: 276 documented GUC records, including 231 numeric/enum/bool search dimensions; the five acquired PG records are retained as an explicitly labelled legacy subset."
+}
