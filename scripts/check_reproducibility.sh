@@ -33,6 +33,12 @@ required_files=(
   perf-anomaly-demo/db_profile.py
   perf-anomaly-demo/sysinsight_detection.py
   perf-anomaly-demo/sysinsight_original_llm.py
+  perf-anomaly-demo/sysinsight_prometheus.py
+  perf-anomaly-demo/sysinsight_candidate_benchmark.py
+  perf-anomaly-demo/sysinsight_pipeline.py
+  perf-anomaly-demo/sysinsight_auto.py
+  perf-anomaly-demo/sysinsight_dream_bridge.py
+  perf-anomaly-demo/dream_live_adapter.py
   perf-anomaly-demo/tpcc_api_recommendation_validation.py
 )
 for relative_path in "${required_files[@]}"; do

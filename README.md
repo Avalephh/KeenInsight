@@ -84,6 +84,63 @@ export SYSINSIGHT_SOURCE_ROOT="$PWD/repositories/Avalephh-KeenInsight/branch-sou
 
 `tpcc_external_cases.py` 保留用于旧的受控实验，其中的 `repair` 字段是预设对照实验值，不能作为真实 GPT 推荐证据；需要真实 API 时使用上面的 `tpcc_api_recommendation_validation.py`。
 
+## SysInsight 统一主流程
+
+在已有 `case_result.json` 上运行统一编排入口：
+
+```bash
+python3 perf-anomaly-demo/sysinsight_pipeline.py \
+  --case-result perf-anomaly-demo/results/<run>/<case>/case_result.json \
+  --api-result perf-anomaly-demo/results/<run>/<case>/sysinsight_api/result.json \
+  --max-candidates 5
+```
+
+入口会生成 Prometheus 采集记录、八段式 `sysinsight_input.json`、原始 SysInsight 检测/匹配状态、候选配置校验以及 `summary.json`/`summary.md`。设置 `SYSINSIGHT_GPT_API_KEY` 且不传 `--api-result` 时，会自动调用同一 GPT5.6-SOL API；显式增加 `--benchmark-candidates 1` 才会对候选执行真实 TPCC 复测。
+
+只验证 Prometheus 到 SysInsight 的输入链路：
+
+```bash
+python3 perf-anomaly-demo/sysinsight_prometheus.py \
+  --wait --output /tmp/sysinsight-prometheus-input.json
+```
+
+需要一次命令自动完成“压力负载→告警/perf/源码检测→GPT5.6-SOL 分析→候选配置实测调优”时，使用自动入口。它只要求选择一个已配置的 TPCC 场景；每个候选只在测试会话中生效，跑完后由现有临时配置生命周期清理，不留下持久配置：
+
+```bash
+python3 perf-anomaly-demo/sysinsight_auto.py \
+  --only d01_work_mem_sort \
+  --workload-module tpcc_external_cases \
+  --benchmark-candidates 3
+```
+
+API key 只从环境变量读取，优先使用 `SYSINSIGHT_GPT_API_KEY`，也兼容 `SYSINSIGHT_API_KEY` 和 `OPENAI_API_KEY`；不会写入结果目录。输出目录中的 `auto_manifest.json` 汇总检测、分析和调优阶段，`pipeline/summary.json` 记录候选实测和最佳候选。
+
+## SysInsight 与 DREAM 在线联动
+
+在线入口为 `perf-anomaly-demo/sysinsight_dream_bridge.py`：Prometheus firing 告警触发 SysInsight
+观测/分析；同一后台循环持续记录每条 SQL 的 `pg_stat_statements` 时间统计和活动 SQL 样本，
+慢 SQL 异步交给 DREAM。DREAM 通过同一组 `SYSINSIGHT_GPT_*` API 环境变量调用 GPT5.6-SOL，
+验证通过的只读 plan Hint 发布到 PostgreSQL `hint_plan.hints`，下一次相同规范化 SQL 自动命中；
+改写 SQL、DDL 和会话级动作只留作 candidate。
+
+这里的统计是 `pg_stat_statements` 的累计值与轮询间隔增量；要获得每次调用的精确耗时，还需同时打开
+应用侧 tracing 或 PostgreSQL `log_min_duration_statement` 日志采集。
+
+```bash
+python3 perf-anomaly-demo/sysinsight_dream_bridge.py \
+  --configure-hint-table --db keeninsight --db-schema tpcds \
+  --dream-config dream/config/tpcds_local_config.json \
+  --state-db /tmp/sysinsight-dream-bridge.sqlite3 \
+  --output /tmp/sysinsight-dream-bridge
+```
+
+API key 不写入配置或结果。`--configure-hint-table` 会设置新连接的 `session_preload_libraries`
+和 `pg_hint_plan.enable_hint_table`；已有连接需要重连。
+
+如果本机使用 Unix socket `peer` 认证，root 启动时还需让 DREAM worker 使用数据库 OS 用户，
+并把 DREAM checkout 放到该用户可读取的位置：追加
+`--dream-run-as postgres --dream-runtime-root <postgres 可读的 DREAM 根目录>`；或改用 TCP/密码认证。
+
 ## 静态检查
 
 ```bash

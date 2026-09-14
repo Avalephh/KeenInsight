@@ -536,6 +536,15 @@ def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def artifact_path(path: Path) -> str:
+    """Use compact paths inside the checkout and absolute paths elsewhere."""
+
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", default="keeninsight")
@@ -1003,7 +1012,7 @@ def sample_phase(
 
     return {
         "phase": phase,
-        "samples_path": str(sample_path.relative_to(ROOT)),
+        "samples_path": artifact_path(sample_path),
         "sample_count": len(samples),
         "first": samples[0] if samples else None,
         "last": samples[-1] if samples else None,
@@ -1059,7 +1068,7 @@ def baseline_run(
             profile_path = baseline_dir / "normal_profile_postgresql_demo.csv"
             count = strict_demo.write_normal_profile(counts_path, profile_path)
             result["normal_profile"] = {
-                "path": str(profile_path.relative_to(ROOT)),
+                "path": artifact_path(profile_path),
                 "function_count": count,
             }
     return result

@@ -57,6 +57,91 @@ PostgreSQL 12.22 源码构建的 276 条文档化 GUC 关联，其中 231 条数
 
 Prometheus 测试规则位于 `../monitoring/config/prometheus/rules/sysinsight-demo.yml`，只用于验证“告警触发 perf”；它不改变 SysInsight 的异常提取逻辑。
 
+## 统一 SysInsight 主流程
+
+`sysinsight_pipeline.py` 把监控输入、原始检测/匹配、LLAMBO 候选和候选实测串成一个入口：
+
+```bash
+python3 sysinsight_pipeline.py \
+  --case-result results/tpcc_api_validation/<run>/<case>/case_result.json \
+  --api-result results/tpcc_api_validation/<run>/<case>/sysinsight_api/result.json \
+  --max-candidates 5
+```
+
+结果目录下的 `sysinsight_input.json` 固定包含八个部分：环境、负载、时间窗口、Prometheus 告警、主机资源、数据库观测、perf/异常函数和调优上下文。若不提供 `--api-result`，且环境中存在 `SYSINSIGHT_GPT_API_KEY`，入口会自动调用 `sysinsight_original_llm.py`；没有 key 时会明确记录候选生成被跳过。
+
+候选的 `pg_settings` 名称和 profile 约束会先做静态校验，再做一次只读的 live `pg_settings` 校验。需要真实执行“候选配置→TPCC→指标比较”时显式增加：
+
+```bash
+python3 sysinsight_pipeline.py \
+  --case-result results/tpcc_api_validation/<run>/<case>/case_result.json \
+  --api-result results/tpcc_api_validation/<run>/<case>/sysinsight_api/result.json \
+  --workload-module tpcc_transaction_cases \
+  --benchmark-candidates 1 --tuned-duration 20
+```
+
+候选评测复用现有 PostgreSQL 临时配置生命周期模块；本入口不另行实现配置快照、应用或恢复机制。
+
+如果需要让各环节自动衔接，不再手工准备 `case_result.json` 或 `--api-result`，运行：
+
+```bash
+python3 sysinsight_auto.py \
+  --only d01_work_mem_sort \
+  --workload-module tpcc_external_cases \
+  --benchmark-candidates 3
+```
+
+这个入口先运行真实 TPCC 基线和压力场景，等待 Prometheus 告警后启动 perf 和原始 SysInsight 检测；随后自动调用 GPT5.6-SOL、解析并校验候选配置，逐个进行真实 TPCC session-only 调优测试，最后按实测控制 TPS 选择最佳候选并写入统一报告。候选测试结束后仍由现有临时配置模块负责清理和恢复。
+
+Prometheus 侧也可以单独等待告警并导出最近窗口：
+
+```bash
+python3 sysinsight_prometheus.py --wait --output /tmp/sysinsight-prometheus-input.json
+```
+
+## SysInsight + DREAM 在线联动
+
+`sysinsight_dream_bridge.py` 是在线链路入口：它持续轮询 Prometheus 告警，同时把每一条
+`pg_stat_statements` 的累计调用数、总耗时、平均/最大耗时和活动会话样本写入 SQLite。告警
+第一次进入 firing 时，后台生成 SysInsight 的八段式输入并异步分析；达到慢 SQL 阈值的只读
+语句进入 DREAM 单 SQL 队列，不阻塞告警检测。
+
+先为新数据库连接启用 `pg_hint_plan` 的 Hint 表（本机已安装 1.3.10）：
+
+```bash
+python3 sysinsight_dream_bridge.py \
+  --configure-hint-table --once --no-api \
+  --state-db /tmp/sysinsight-dream-bridge.sqlite3 \
+  --output /tmp/sysinsight-dream-bridge
+```
+
+再启动常驻链路；API key 只从环境变量读取，SysInsight 和 DREAM 共用同一组变量及
+`GPT5.6-SOL` endpoint：
+
+```bash
+export SYSINSIGHT_GPT_API_KEY='<your-api-key>'
+export SYSINSIGHT_GPT_BASE_URL='http://35.212.195.134:28317/v1'
+export SYSINSIGHT_GPT_MODEL='gpt-5.6-sol'
+python3 sysinsight_dream_bridge.py \
+  --db keeninsight --db-schema tpcds \
+  --dream-config ../dream/config/tpcds_local_config.json \
+  --alert-name SysInsightDemoAnomaly \
+  --state-db /tmp/sysinsight-dream-bridge.sqlite3 \
+  --output /tmp/sysinsight-dream-bridge
+```
+
+DREAM 任务完成后，只有 DREAM 实测提升至少 10%、只读且输出为合法 plan Hint 时，才会发布到
+`hint_plan.hints`；下一次相同规范化 SQL 会由 PostgreSQL 自动套用。SQL 改写、DDL 和仅会话级
+参数会保留为 candidate，不会绕过应用层擅自改写。`pg_hint_plan` 的数据库设置只对新连接生效，
+已有业务连接需要重连。每轮观测、incident、DREAM job、验证和发布记录都在 state SQLite 及
+`output/incidents/` 中。
+
+如果本机 PostgreSQL 使用 Unix socket peer 认证，DREAM worker 需要以数据库 OS 用户运行，并
+把 DREAM checkout 放在该用户可读取的位置；也可以改用 TCP/密码认证。例如本机验证可额外传入
+`--dream-run-as postgres --dream-runtime-root <postgres 可读的 DREAM 根目录>`。捕获不到活动会话
+中的实际参数时，参数化 `pg_stat_statements` 记录会暂存为 blocked，下一次捕获到可回放样本后
+自动重新入队。
+
 ## 数据库 / 版本切换
 
 原始 LLAMBO 配置流程现在通过 profile 选择数据库和版本，MySQL 默认文件仍直接使用仓库原有文件，PostgreSQL 使用固定源码生成的关联库以及仓库中已有的 PG 手册、结构化知识资料：

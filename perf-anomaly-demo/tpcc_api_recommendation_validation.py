@@ -64,6 +64,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--selector-n-gens", type=int, default=1)
     parser.add_argument("--api-result", default="", help="已有 sysinsight_original_llm result.json；不再重复调用 API")
     parser.add_argument("--api-config-index", type=int, default=-1)
+    parser.add_argument(
+        "--prepare-only",
+        action="store_true",
+        help="只运行基线、压力负载和原始检测，生成 case_result 供统一 SysInsight 主流程继续处理",
+    )
     parser.add_argument("--output", default="")
     return parser.parse_args()
 
@@ -352,6 +357,11 @@ def _validate_case(
     preliminary_path = case_dir / "pre_api_case_result.json"
     preliminary_path.write_text(json.dumps(preliminary, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
 
+    if args.prepare_only:
+        preliminary["workflow_mode"] = "prepare_only"
+        preliminary["next_stage"] = "sysinsight_pipeline"
+        return preliminary
+
     if args.api_result:
         api_result_path = Path(args.api_result).resolve()
         api_result = json.loads(api_result_path.read_text(encoding="utf-8"))
@@ -548,19 +558,36 @@ def main() -> int:
             result = validate_case(
                 args, case, output_root, stage_dir, normal_profile, baseline, workload_module
             )
-            results.append({
-                "id": result["id"],
-                "api_configuration": result["api"]["selected_configuration"],
-                "decision": result["decision"],
-                "apply_status": result["temporary_application"].get("status"),
-                "perf_status": result["anomaly"]["perf_postprocess"].get("status"),
-                "prometheus_triggered": bool(result["anomaly"]["samples"].get("trigger")),
-            })
+            if args.prepare_only:
+                results.append({
+                    "id": result["id"],
+                    "workflow_mode": result.get("workflow_mode"),
+                    "perf_status": result["anomaly"].get("perf_postprocess", {}).get("status"),
+                    "prometheus_triggered": bool(result["anomaly"]["samples"].get("trigger")),
+                    "case_result": str(output_root / result["id"] / "case_result.json"),
+                })
+            else:
+                results.append({
+                    "id": result["id"],
+                    "api_configuration": result["api"]["selected_configuration"],
+                    "decision": result["decision"],
+                    "apply_status": result["temporary_application"].get("status"),
+                    "perf_status": result["anomaly"]["perf_postprocess"].get("status"),
+                    "prometheus_triggered": bool(result["anomaly"]["samples"].get("trigger")),
+                })
         summary["cases"] = results
-        summary["complete_case_count"] = sum(1 for item in results if item["decision"].get("complete_case"))
+        if args.prepare_only:
+            summary["workflow_mode"] = "prepare_only"
+            summary["next_stage"] = "sysinsight_pipeline"
+            summary["prepared_case_count"] = len(results)
+        else:
+            summary["complete_case_count"] = sum(1 for item in results if item["decision"].get("complete_case"))
         summary["completed_at"] = utc_now()
         (output_root / "summary.json").write_text(json.dumps(summary, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
         print("结果目录：{}".format(output_root), flush=True)
+        if args.prepare_only:
+            print("已准备案例数：{}".format(summary["prepared_case_count"]), flush=True)
+            return 0
         print("满足完整标准的案例数：{}".format(summary["complete_case_count"]), flush=True)
         return 0 if summary["complete_case_count"] == len(cases) else 1
     finally:

@@ -45,6 +45,16 @@ sys.path.insert(0, str(ROOT))
 from db_profile import DatabaseProfile, profile_summary, resolve_profile, available_profiles  # type: ignore
 
 
+def api_key_from_environment() -> str:
+    """Read the key supplied by the caller without storing it in artifacts."""
+
+    for name in ("SYSINSIGHT_GPT_API_KEY", "SYSINSIGHT_API_KEY", "OPENAI_API_KEY"):
+        value = os.environ.get(name, "")
+        if value:
+            return value
+    return ""
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--case-result", default="")
@@ -52,6 +62,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-version", default=os.environ.get("SYSINSIGHT_DB_VERSION", "12"))
     parser.add_argument("--list-profiles", action="store_true")
     parser.add_argument("--dry-run", action="store_true", help="只生成 profile prompt，不调用模型接口")
+    parser.add_argument(
+        "--sysinsight-input",
+        default="",
+        help="canonical sysinsight_input.json produced by sysinsight_pipeline.py",
+    )
     parser.add_argument("--api-base", default=os.environ.get("SYSINSIGHT_GPT_BASE_URL", DEFAULT_API_BASE))
     parser.add_argument("--model", default=os.environ.get("SYSINSIGHT_GPT_MODEL", DEFAULT_MODEL))
     parser.add_argument("--n-candidates", type=int, default=10)
@@ -170,6 +185,88 @@ def resource_snapshot(case: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _compact_prometheus_record(record: Any) -> Dict[str, Any]:
+    """Keep live metrics useful to the model without copying raw series."""
+
+    if not isinstance(record, dict):
+        return {"status": "missing"}
+    compact: Dict[str, Any] = {
+        "status": record.get("status"),
+        "result_type": record.get("result_type"),
+        "series": [],
+    }
+    for series in record.get("series", [])[:8]:
+        if not isinstance(series, dict):
+            continue
+        values = series.get("values", []) or []
+        compact["series"].append({
+            "labels": series.get("labels", {}),
+            "first": values[0] if values else None,
+            "last": values[-1] if values else None,
+        })
+    if record.get("error"):
+        compact["error"] = record.get("error")
+    return compact
+
+
+def compact_sysinsight_observation(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract the canonical eight-part input relevant to a tuning decision."""
+
+    database_metrics = payload.get("database_metrics", {})
+    if not isinstance(database_metrics, dict):
+        database_metrics = {}
+    prometheus_database = database_metrics.get("prometheus", {})
+    if not isinstance(prometheus_database, dict):
+        prometheus_database = {}
+    host_metrics = payload.get("host_metrics", {})
+    if not isinstance(host_metrics, dict):
+        host_metrics = {}
+    functions = payload.get("function_anomalies", {})
+    if not isinstance(functions, dict):
+        functions = {}
+    alert = payload.get("alert", {})
+    if not isinstance(alert, dict):
+        alert = {}
+    if "selected" in alert or "alert_status" in alert:
+        alert_status = alert.get("alert_status")
+        selected_alert = alert.get("selected")
+    else:
+        # The canonical top-level input stores the selected alert directly;
+        # the step representation wraps it in {selected, alert_status}.
+        alert_status = "completed" if alert else "not_collected"
+        selected_alert = alert
+    if isinstance(selected_alert, dict):
+        selected_alert = {
+            key: selected_alert.get(key)
+            for key in ("triggered", "at", "elapsed_seconds", "source", "alert_name", "alert")
+            if key in selected_alert
+        }
+    return {
+        "schema": payload.get("schema"),
+        "database": payload.get("database"),
+        "workload": payload.get("workload"),
+        "time_window": payload.get("time_window"),
+        "alert": {
+            "status": alert_status,
+            "selected": selected_alert,
+        },
+        "host_metrics": {
+            name: _compact_prometheus_record(record)
+            for name, record in host_metrics.items()
+        },
+        "database_metrics": {
+            name: _compact_prometheus_record(record)
+            for name, record in prometheus_database.items()
+        },
+        "function_anomalies": {
+            "function_count": functions.get("function_count"),
+            "key_functions": functions.get("key_functions", [])[:20],
+            "matched_knobs": functions.get("matched_knobs", [])[:50],
+        },
+        "tuning_context": payload.get("tuning_context", {}),
+    }
+
+
 def case_path(path_text: str) -> Path:
     path = Path(path_text).resolve()
     if not path.exists():
@@ -178,7 +275,8 @@ def case_path(path_text: str) -> Path:
 
 
 def original_context(
-    case_result: Dict[str, Any], case_file: Path, profile: DatabaseProfile
+    case_result: Dict[str, Any], case_file: Path, profile: DatabaseProfile,
+    sysinsight_input: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Any, Any, Any, Dict[str, Any], Dict[str, Any]]:
     """Build the same task/config objects used by the original SysInsight entry."""
 
@@ -204,6 +302,9 @@ def original_context(
     task_context["prompt_metric"] = "transaction per second"
     task_context["hyperparameter_constraints"] = constraints
     task_context["hyperparameter_default"] = defaults
+    compact_observation = compact_sysinsight_observation(sysinsight_input) if sysinsight_input else None
+    if compact_observation:
+        task_context["sysinsight_observation"] = compact_observation
 
     source_compare = case_result.get("sysinsight_source_detection", {}).get("source_compare", {})
     key_file = Path(source_compare.get("key_function_file", ""))
@@ -219,6 +320,12 @@ def original_context(
     promptlib.config = initial_config
     promptlib.keyFunction_file = str(key_file)
     promptlib.resource = resource_snapshot(case_result)
+    if compact_observation:
+        promptlib.question_template += (
+            "\n\n10. Canonical live SysInsight observation captured for this tuning decision "
+            "(use it together with the perf/source evidence above):\n"
+            + json.dumps(compact_observation, ensure_ascii=False, indent=2, default=str)
+        )
     return promptlib, task_context, initial_config, constraints, defaults
 
 
@@ -296,7 +403,7 @@ def main() -> int:
         return 0
     if not args.case_result:
         raise SystemExit("--case-result is required unless --list-profiles is used")
-    api_key = os.environ.get("SYSINSIGHT_GPT_API_KEY", "")
+    api_key = api_key_from_environment()
     if not api_key and not args.dry_run:
         raise SystemExit("SYSINSIGHT_GPT_API_KEY is required")
     if args.n_candidates <= 0 or args.n_templates <= 0:
@@ -305,6 +412,14 @@ def main() -> int:
     profile = resolve_profile(args.dbms, args.db_version)
     case_file = case_path(args.case_result)
     case_result = json.loads(case_file.read_text(encoding="utf-8"))
+    sysinsight_input: Optional[Dict[str, Any]] = None
+    sysinsight_input_path: Optional[Path] = None
+    if args.sysinsight_input:
+        sysinsight_input_path = case_path(args.sysinsight_input)
+        loaded_input = json.loads(sysinsight_input_path.read_text(encoding="utf-8"))
+        if not isinstance(loaded_input, dict):
+            raise ValueError("sysinsight input must be a JSON object")
+        sysinsight_input = loaded_input
     requested_output_dir = Path(args.output).resolve() if args.output else None
     if args.dry_run:
         resolved_model = args.model
@@ -326,7 +441,7 @@ def main() -> int:
     import llambo.extract_knob as extract_knob  # type: ignore
 
     promptlib, task_context, initial_config, constraints, defaults = original_context(
-        case_result, case_file, profile
+        case_result, case_file, profile, sysinsight_input
     )
 
     # Run the original parameter-to-function/rule matching method.  The source
@@ -503,6 +618,9 @@ def main() -> int:
                     },
                     "transport": "sync_compatibility" if args.sync_transport else "source_async",
                     "source_prompt": prompt_text,
+                    "sysinsight_input": str(sysinsight_input_path) if sysinsight_input_path else None,
+                    "canonical_observation": compact_sysinsight_observation(sysinsight_input)
+                    if sysinsight_input else None,
                     "source_stdout": source_stdout.getvalue(),
                     "llm_calls": calls,
                     "api_generated_configurations": extract_api_generated_configurations(
@@ -529,12 +647,15 @@ def main() -> int:
             },
             "input": {
                 "case_result": str(case_file),
+                "sysinsight_input": str(sysinsight_input_path) if sysinsight_input_path else None,
                 "profile": profile_summary(profile),
                 "measured_baseline_tps": float(baseline_score),
                 "initial_config": initial_config,
                 "hyperparameters_from_original_update": promptlib.hyperparameters,
                 "matched_knob_entries": promptlib.store_updateKnobs,
                 "resource_for_prompt": promptlib.resource,
+                "canonical_observation": compact_sysinsight_observation(sysinsight_input)
+                if sysinsight_input else None,
                 "task_context": task_context,
             },
             "api": {

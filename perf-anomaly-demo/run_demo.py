@@ -40,6 +40,15 @@ def utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
 
 
+def artifact_path(path: Path) -> str:
+    """Keep repository-relative paths compact while supporting /tmp outputs."""
+
+    try:
+        return str(path.relative_to(ROOT))
+    except ValueError:
+        return str(path)
+
+
 def read_int_file(path: str) -> int | None:
     try:
         return int(Path(path).read_text(encoding="utf-8").strip())
@@ -351,13 +360,13 @@ def start_perf(
         log_handle.close()
         info["status"] = "failed_to_start"
         info["returncode"] = process.returncode
-        info["data_path"] = str(data_path.relative_to(ROOT))
+        info["data_path"] = artifact_path(data_path)
         return info
     info.update(
         {
             "status": "running",
             "started_at": utc_now(),
-            "data_path": str(data_path.relative_to(ROOT)),
+            "data_path": artifact_path(data_path),
             "command": command,
             "process": process,
             "log_handle": log_handle,
@@ -454,7 +463,7 @@ def collect_samples(
 
     return {
         "phase": phase,
-        "samples_path": str(output_path.relative_to(ROOT)),
+        "samples_path": artifact_path(output_path),
         "sample_count": len(samples),
         "first": samples[0] if samples else None,
         "last": samples[-1] if samples else None,
@@ -538,7 +547,7 @@ def postprocess_perf(args: argparse.Namespace, result_dir: Path, perf_info: dict
         )
     result: dict[str, Any] = {
         "status": "script_generated" if completed.returncode == 0 else "script_failed",
-        "script_path": str(raw_path.relative_to(ROOT)),
+        "script_path": artifact_path(raw_path),
         "script_returncode": completed.returncode,
     }
     if completed.returncode != 0:
@@ -593,8 +602,8 @@ def postprocess_perf(args: argparse.Namespace, result_dir: Path, perf_info: dict
     result.update(
         {
             "status": "sysinsight_counts_generated",
-            "folded_path": str(folded_path.relative_to(ROOT)),
-            "counts_path": str(counts_path.relative_to(ROOT)),
+            "folded_path": artifact_path(folded_path),
+            "counts_path": artifact_path(counts_path),
             "function_count": function_count,
         }
     )
@@ -619,8 +628,8 @@ def compare_with_sysinsight_source(counts_path: Path, normal_profile_path: Path,
     return {
         "status": "completed",
         "source": str(SYSINSIGHT_ANALYZER),
-        "input_counts": str(counts_path.relative_to(ROOT)),
-        "normal_profile": str(normal_profile_path.relative_to(ROOT)),
+        "input_counts": artifact_path(counts_path),
+        "normal_profile": artifact_path(normal_profile_path),
         "key_function_file": relative_output,
         "key_function_count": len(functions),
         "key_functions_top10": functions[:10],
@@ -718,7 +727,7 @@ def main() -> int:
             normal_profile_path = result_dir / "normal_profile_postgresql_demo.csv"
             normal_function_count = write_normal_profile(baseline_counts, normal_profile_path)
             summary["normal_profile"] = {
-                "path": str(normal_profile_path.relative_to(ROOT)),
+                "path": artifact_path(normal_profile_path),
                 "function_count": normal_function_count,
                 "source": "generated from this run's baseline perf window",
             }
