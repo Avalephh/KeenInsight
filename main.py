@@ -1,10 +1,17 @@
 import argparse
+import sys
+from pathlib import Path
 
 import torch
 from model.train_test import train as train_opt_all
 
-from utils.config import Args, ArgsPara, TrainConfig
-from utils.load_data import load_dataset_valid as load_dataset_tensor_valid
+RCRANK_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = RCRANK_ROOT.parents[3]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from dream.agent.plan.RCRank.utils.config import Args, ArgsPara, TrainConfig
+from dream.agent.plan.RCRank.utils.load_data import load_dataset_valid as load_dataset_tensor_valid
 
 
 def train(
@@ -48,6 +55,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--device", type=str, default="cuda:1")
 parser.add_argument("--dataset", type=str, default="tpc_h")
 parser.add_argument("--batch_size", type=int, default=8)
+parser.add_argument("--data_path", type=str, default=None)
+parser.add_argument("--epochs", type=int, default=50)
 args = parser.parse_args()
 
 if __name__ == "__main__":
@@ -59,7 +68,8 @@ if __name__ == "__main__":
     use_valid_dataset = True
     print(torch.cuda.is_available())
 
-    data_path = f"data/{args.dataset}.csv"
+    rcrank_root = Path(__file__).resolve().parent
+    data_path = args.data_path or str(rcrank_root / "data" / f"{args.dataset}.csv")
 
     (
         train_dataloader,
@@ -74,6 +84,7 @@ if __name__ == "__main__":
     config = TrainConfig()
     config.batch_size = batch_size
     config.lr = 1e-4
+    config.epoch = args.epochs
     config.dataset = args.dataset
 
     plan_args = Args()
@@ -99,7 +110,7 @@ if __name__ == "__main__":
     eta = 0.07
     config.margin_loss_margin = eta
     seed = 0
-    config.model_path = f"res/{config.model_name} {args.dataset} eta{eta}/"
+    config.model_path = str(rcrank_root / "res" / f"{config.model_name} {args.dataset} eta{eta}")
     train(
         config,
         train_dataloader,

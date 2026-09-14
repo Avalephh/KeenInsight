@@ -2,6 +2,7 @@ import json
 import math
 import os
 import sys
+import argparse
 
 import torch.optim as optim
 
@@ -10,6 +11,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 rcrank_root = os.path.dirname(current_dir)
 if rcrank_root not in sys.path:
     sys.path.append(rcrank_root)
+rcrank_parent = os.path.dirname(rcrank_root)
+if rcrank_parent not in sys.path:
+    sys.path.append(rcrank_parent)
 
 import random
 
@@ -425,13 +429,20 @@ class PretrainDataset(Dataset):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="RCRank multimodal pre-training")
+    parser.add_argument("--data_path", default=os.path.join(rcrank_root, "pretrain", "pretrain_data.pkl"))
+    parser.add_argument("--device", default="cpu")
+    parser.add_argument("--epochs", type=int, default=20)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--output_dir", default=os.path.join(rcrank_root, "pretrain", "save"))
+    args = parser.parse_args()
 
-    device = "cpu"
+    device = args.device
     # 使用相对路径，基于当前模块所在目录
     bert_path = os.path.join(rcrank_root, "bert-base-uncased")
     tokenizer = BertTokenizer.from_pretrained(bert_path)
     bert = BertModel.from_pretrained(bert_path).to(device)
-    dataset = PretrainDataset("pretrain/pretrain_data.pkl", tokenizer, bert, device)
+    dataset = PretrainDataset(args.data_path, tokenizer, bert, device)
 
     encoding = tokenizer(
         json.dumps(dataset.encoding.idx2table),
@@ -445,14 +456,14 @@ if __name__ == "__main__":
 
     criterion = {"mask_sql": nn.MSELoss(), "mask_plan": nn.CrossEntropyLoss()}
     optimizer = optim.Adam(model.parameters(), lr=1e-5)
-    epochs = 20
+    epochs = args.epochs
     saved = 0
     best = 0.0
     ep = tqdm.tqdm(range(epochs))
     best_val_loss = float("inf")
-    batch_size = 128
+    batch_size = args.batch_size
     batch_loss = {"mask_sql": 0.0, "mask_plan": 0.0}
-    os.makedirs("pretrain/save", exist_ok=True)
+    os.makedirs(args.output_dir, exist_ok=True)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     for epoch in ep:
@@ -485,4 +496,4 @@ if __name__ == "__main__":
                 )
 
             if (epoch + 1) % 10 == 0:
-                torch.save(model.state_dict(), f"pretrain/save/model{(epoch+1)}.pth")
+                torch.save(model.state_dict(), os.path.join(args.output_dir, f"model{(epoch+1)}.pth"))

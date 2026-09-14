@@ -15,9 +15,13 @@ from ..model.modules.QueryFormer.utils import *
 def node2feature(node, encoding, hist_file, table_sample):
     # type, join, filter123, mask123
     # 1, 1, 3x3 (9), 3
-    num_filter = len(node.filterDict["colId"])
-    pad = np.zeros((2, 30 - num_filter))
-    filts = np.array(list(node.filterDict.values()))  # cols, ops, vals
+    # The pretrained RCRank input has room for 30 predicates per node.  Some
+    # PostgreSQL plans (notably wide TPC-DS filters) contain more; retain the
+    # first 30 instead of constructing a negative-width padding array.
+    max_filters = 30
+    num_filter = min(len(node.filterDict["colId"]), max_filters)
+    pad = np.zeros((2, max_filters - num_filter))
+    filts = np.array(list(node.filterDict.values()))[:, :max_filters]  # cols, ops, vals
     ## 3x3 -> 9, get back with reshape 3,3
     filts = np.concatenate((filts, pad), axis=1).flatten()
     mask = np.zeros(30)
@@ -75,6 +79,15 @@ class PlanEncoder:
         self.encoding = encoding
         self.treeNodes = []
 
+        # PostgreSQL's EXPLAIN (FORMAT JSON) normally returns
+        # ``[{"Plan": ...}]``.  The original DREAM data loader expected an
+        # older double-wrapped form and indexed ``[0][0]`` unconditionally.
+        # Normalize both forms here, and also accept an already decoded value.
+        df = df.copy()
+        df.loc[:, "plan_json"] = df["plan_json"].apply(
+            lambda value: json.dumps(value) if not isinstance(value, str) else value
+        )
+
         df.loc[:, "json_plan_tensor"] = np.nan
 
         df = df[df["plan_json"].str.count("'Plans'") < 500]
@@ -85,10 +98,21 @@ class PlanEncoder:
             # print("plan", df["plan_json"].iloc[i])
             # node = json.loads(df["plan_json"].iloc[i])['Plan']
             s = df["plan_json"].iloc[i]
-            if '"Plan"' in s:
-                node = json.loads(s)[0][0]["Plan"]
-            else:
-                node = ast.literal_eval(f(df["plan_json"].iloc[i]))[0]["Plan"]
+            payload = s
+            for _ in range(4):
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except (TypeError, json.JSONDecodeError):
+                        payload = ast.literal_eval(f(payload))
+                if isinstance(payload, list) and len(payload) == 1:
+                    payload = payload[0]
+                    continue
+                break
+
+            if not isinstance(payload, dict) or "Plan" not in payload:
+                raise ValueError(f"Unsupported PostgreSQL plan JSON shape: {type(payload).__name__}")
+            node = payload["Plan"]
             a = self.js_node2dict(i, node)
             # print(a)
             # df["json_plan_tensor"].iloc[i] = a

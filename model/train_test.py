@@ -195,7 +195,8 @@ def test(
 
             # 每处理几个batch就强制清理一次内存
             if index % 10 == 0:
-                torch.cuda.synchronize()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
                 torch.cuda.empty_cache()
 
     all_right_cnt = 0
@@ -294,14 +295,16 @@ def train(
         os.mkdir(model_path_dir)
 
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
     device = plan_args.device
 
-    tokenizer = BertTokenizer.from_pretrained("./bert-base-uncased")
+    bert_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bert-base-uncased")
+    tokenizer = BertTokenizer.from_pretrained(bert_path)
     mul_label_loss_fn = nn.BCELoss(reduction="mean")
     # 移除opt_label_loss_fn，因为不再需要回归损失
     # loss_margin = margin_loss_types[margin_loss_type](margin=margin_loss_margin)
@@ -309,7 +312,7 @@ def train(
 
     print("start train")
 
-    sql_model = BertModel.from_pretrained("./bert-base-uncased")
+    sql_model = BertModel.from_pretrained(bert_path)
     time_model = CustomConvAutoencoder()
 
     fuse_model = None
@@ -598,7 +601,8 @@ def train(
 
             # 每处理几个batch就强制清理一次内存
             if index % 10 == 0:
-                torch.cuda.synchronize()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
                 torch.cuda.empty_cache()
 
     res_path = model_path_dir + "/res.txt"
