@@ -54,7 +54,7 @@ def build_action_prompt(root_cause, base_info, action_space, mode, positives, ne
     • Database Type: {db_info.get('db_type')}
     • Workload Type: {db_info.get('workload_type')}
     • Database Size: {db_info.get('size')}
-    • Database Schema: TPC-H
+    • Database Schema: {db_info.get('schema', 'public')}
     • CPU: {query_info.external_metrics[0]}
     • Read I/O: {query_info.external_metrics[1]}
     • Write I/O: {query_info.external_metrics[2]}
@@ -133,7 +133,8 @@ def build_rewrite_prompt(origin_sql, rewrite_sql):
     2. Do not include explanations, comments, markdown, or any extra text.
     3. The SQL must be fully executable and self-contained.
     4. Preserve the original intent and structure of the Divergent SQL as much as possible while ensuring the output matches exactly.
-    5. If you cannot rewrite the SQL, output the original SQL.
+    5. Preserve the Reference SQL's output column count, order, names, and compatible types, including explicit aliases when needed.
+    6. If you cannot rewrite the SQL, output the original SQL.
 
     — Output Format —
     <paste only the revised SQL here, exactly as SQL, nothing else>"""
@@ -346,7 +347,7 @@ def build_simple_diagnosis_prompt(query_info, base_info):
     • Database Type: {db_info.get('db_type')}
     • Workload Type: {db_info.get('workload_type')}
     • Database Size: {db_info.get('size')}
-    • Database Schema: TPC-H
+    • Database Schema: {db_info.get('schema', 'public')}
     • CPU: {query_info.external_metrics[0]}
     • Read I/O: {query_info.external_metrics[1]}
     • Write I/O: {query_info.external_metrics[2]}

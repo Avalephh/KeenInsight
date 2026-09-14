@@ -156,7 +156,7 @@ class DBAgent:
         sql_without_hints = " ".join(sql_without_hints.split())
         return sql_without_hints.strip()
 
-    async def run(self, slow_query_path, order, duration, no_improvement_threshold=3):
+    async def run(self, slow_query_path, order, duration, no_improvement_threshold=3, epsilon=None):
         """
         Execute database optimization process
 
@@ -271,7 +271,7 @@ class DBAgent:
                 # Save state backup for exception recovery
                 state_backup = copy.deepcopy(state)
                 try:
-                    predicted_root, state = self.planner.predict(query_info, state, self.memory_manager)
+                    predicted_root, state, _ = await self.planner.predict(query_info, state, self.memory_manager)
                 except Exception as e:
                     logger.error(f"SQL {query_id} error during root cause prediction: {e}", exc_info=True)
                     sql_root_cause_states[query_id] = state_backup
@@ -431,8 +431,11 @@ class DBAgent:
                 if state.get("attempts", {}).get(key, 0) >= no_improvement_threshold:
                     state["root_tried"].add(key)
 
-                # Update best records only if fix is successful and better
-                if new_time < best_sql_times[query_id]:
+                # Update best records only if the fix was accepted as
+                # successful and is better.  An ineffective action may still
+                # be faster due to cache/timing noise, but must not become the
+                # persisted workload best.
+                if evaluation_result.get("status") == 1 and new_time < best_sql_times[query_id]:
                     best_sql_times[query_id] = new_time
                     best_sql_actions[query_id] = fix_action
                     best_sql_texts[query_id] = query_info.query

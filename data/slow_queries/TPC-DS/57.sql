@@ -3,23 +3,23 @@ WITH v1
      AS (
 SELECT          category,
                 brand,
-                name,
+                call_center_name,
                 dyear,
                 dmoy,
                 sum_sales,
                 Avg(sum_sales)
                   OVER (
-                    partition BY category, brand, name, dyear)
+                    partition BY category, brand, call_center_name, dyear)
                 avg_monthly_sales
                    ,
                 Rank()
                   OVER (
-                    partition BY category, brand, name
+                    partition BY category, brand, call_center_name
                     ORDER BY dyear, dmoy)                            rn
 FROM(
 SELECT i.i_category category,
                 i.i_brand brand,
-                cc.cc_name name,
+                cc.cc_name call_center_name,
                 d.d_year dyear,
                 d.d_moy dmoy,
                 Sum(cs.cs_sales_price) sum_sales
@@ -55,8 +55,8 @@ SELECT i.i_category category,
                 AND v1.category = v1_lead.category
                 AND v1.brand = v1_lag.brand
                 AND v1.brand = v1_lead.brand
-                AND v1.name = v1_lag.name
-                AND v1.name = v1_lead.name
+                AND v1.call_center_name = v1_lag.call_center_name
+                AND v1.call_center_name = v1_lead.call_center_name
                 AND v1.rn = v1_lag.rn + 1
                 AND v1.rn = v1_lead.rn - 1)
 SELECT *

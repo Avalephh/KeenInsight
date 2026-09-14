@@ -1,5 +1,7 @@
 import os
 import random
+import hashlib
+import json
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -59,6 +61,17 @@ class SoftQRetriever:
         self.total_experiences = 0
         self.update_count = 0
 
+        # Embeddings are deterministic for a fixed QueryInfo/case.  Retrieval
+        # asks for a Q-value per candidate, so without these caches the same
+        # current query embedding was recomputed once per historical case.
+        self._query_embedding_cache = {}
+        self._case_embedding_cache = {}
+
+    @staticmethod
+    def _embedding_cache_key(value):
+        payload = json.dumps(value, sort_keys=True, default=str, ensure_ascii=True)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
     def _init_networks(self):
         # Main network: two-layer MLP (outputs Q-value, not probability)
         # According to paper: Q^π(s_t, M_t, o_t) is a Q-value, not a probability
@@ -89,19 +102,31 @@ class SoftQRetriever:
         self.target_network.load_state_dict(self.network.state_dict())
 
     def _build_query_embedding(self, query_info) -> torch.Tensor:
-        from utils.types import QueryInfo
+        from dream.utils.types import QueryInfo
+
+        cache_key = self._embedding_cache_key(query_info)
+        cached = self._query_embedding_cache.get(cache_key)
+        if cached is not None:
+            return cached.to(self.device)
 
         query_obj = QueryInfo(**query_info)
         embedding_list = self.memory_manager.build_sql_embedding(query_obj)
 
         embedding = torch.tensor(embedding_list, dtype=torch.float32)
-
+        self._query_embedding_cache[cache_key] = embedding.detach().cpu()
         return embedding.to(self.device)
 
     def _build_case_embedding(self, case_info) -> torch.Tensor:
-        from utils.types import QueryInfo
+        from dream.utils.types import QueryInfo
 
         case_query_info = case_info.get("query_info")
+        cache_key = self._embedding_cache_key(
+            {"query_info": case_query_info, "fix_action": case_info.get("fix_action", "")}
+        )
+        cached = self._case_embedding_cache.get(cache_key)
+        if cached is not None:
+            return cached.to(self.device)
+
         case_query_obj = QueryInfo(**case_query_info)
         query_embedding = self.memory_manager.build_sql_embedding(case_query_obj)
 
@@ -111,7 +136,7 @@ class SoftQRetriever:
         combined_embedding = query_embedding + action_embedding
 
         embedding = torch.tensor(combined_embedding, dtype=torch.float32)
-
+        self._case_embedding_cache[cache_key] = embedding.detach().cpu()
         return embedding.to(self.device)
 
     def _encode_root_causes(self, root_causes) -> torch.Tensor:

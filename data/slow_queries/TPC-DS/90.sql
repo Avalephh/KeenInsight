@@ -1,5 +1,5 @@
 
-SELECT Cast(amc AS DECIMAL(15, 4)) / Cast(pmc AS DECIMAL(15, 4))
+SELECT Cast(amc AS DECIMAL(15, 4)) / NULLIF(Cast(pmc AS DECIMAL(15, 4)), 0)
                am_pm_ratio
 FROM   (SELECT Count(*) amc
         FROM   web_sales,

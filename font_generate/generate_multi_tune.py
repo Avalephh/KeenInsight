@@ -66,7 +66,7 @@ def parse_tuning_actions(fix_action: str, rewrite_sql: str, root_causes: List[st
     if 'SET ' in fix_action.upper():
         param_lines = [line.strip() for line in fix_action.split('\n') 
                        if 'SET ' in line.upper() and any(param in line.upper() 
-                       for param in ['work_mem', 'shared_buffers', 'max_parallel', 'enable_'])]
+                       for param in ['WORK_MEM', 'SHARED_BUFFERS', 'MAX_PARALLEL', 'ENABLE_'])]
         if param_lines:
             suggestions.append({
                 'type': '参数调优',
@@ -127,7 +127,7 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
         }
         
         try:
-            predicted_root, updated_state = await agent.planner.predict(
+            predicted_root, updated_state, _ = await agent.planner.predict(
                 query_info, state, agent.memory_manager
             )
             
@@ -137,6 +137,15 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
             explanation = await agent.planner.llm_predict(
                 query_info, root_causes, state_confidence
             )
+            # Planner.llm_predict returns a structured result.  Keep the
+            # template layer string-only so both offline and API-backed
+            # responses render correctly.
+            if isinstance(explanation, dict):
+                explanation = explanation.get(
+                    'explanation', explanation.get('text', str(explanation))
+                )
+            elif not isinstance(explanation, str):
+                explanation = str(explanation)
             
             # Generate tuning actions
             evaluation_result = await agent.action_manager.step(
@@ -228,7 +237,7 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
     # Update chart in template
     template = re.sub(
         r'(<div class="comparison-chart">)(.*?)(</div>)',
-        r'\1' + chart_bars + r'\3',
+        r'\g<1>' + chart_bars + r'\g<3>',
         template,
         flags=re.DOTALL
     )
@@ -241,7 +250,7 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
     
     template = re.sub(
         r'(<select id="round-select".*?>)(.*?)(</select>)',
-        r'\1' + round_options + r'\3',
+        r'\g<1>' + round_options + r'\g<3>',
         template,
         flags=re.DOTALL
     )
@@ -251,7 +260,7 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
     for round_num, data in rounds_data.items():
         root_causes_js = json.dumps(data['rootCauses'], ensure_ascii=False)
         operations_js = json.dumps(data['operations'], ensure_ascii=False, indent=8)
-        explanation_escaped = data['explanation'].replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
+        explanation_escaped = str(data['explanation']).replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
         
         js_round_data += f"""    {round_num}: {{
       execTime: '{data['execTime']}',
@@ -274,9 +283,48 @@ async def generate_multi_tune_html(agent: DBAgent, query_id: str, slow_query_dat
     # Update current round display
     template = re.sub(
         r'(<span id="current-round">)(.*?)(</span>)',
-        r'\1' + str(max_rounds) + r'\3',
+        r'\g<1>' + str(max_rounds) + r'\g<3>',
         template
     )
+
+    # The current frontend normally receives this shape from the web API.
+    # Embed the locally computed rounds as a fallback so the generated static
+    # page is useful even when no DREAM web server is running.
+    static_rounds = []
+    for round_num, data in rounds_data.items():
+        exec_time = times[round_num] if round_num < len(times) else current_time
+        old_time = times[round_num - 1] if round_num - 1 < len(times) else exec_time
+        static_rounds.append(
+            {
+                "round": round_num,
+                "exec_time": exec_time,
+                "old_time": old_time,
+                "improvement_ratio": (
+                    (initial_time - exec_time) / initial_time if initial_time > 0 else 0.0
+                ),
+                "root_causes": data["rootCauses"],
+                "explanation": data["explanation"],
+                "operations": data["operations"],
+            }
+        )
+    static_payload = {
+        "query_id": query_id,
+        "current_round": max_rounds,
+        "total_rounds": max_rounds,
+        "rounds": static_rounds,
+        "initial_time": initial_time,
+    }
+    static_data_script = f"""
+<script>
+  window.serverRoundData = {json.dumps(static_payload, ensure_ascii=False)};
+  document.addEventListener('DOMContentLoaded', function() {{
+    if (typeof updateProgress === 'function' && window.serverRoundData) {{
+      updateProgress(window.serverRoundData, true);
+    }}
+  }});
+</script>
+"""
+    template = template.replace("</body>", static_data_script + "\n</body>", 1)
     
     # Save
     output_path = BASE_DIR / "results" / "multi-tune.html"

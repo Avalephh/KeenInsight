@@ -81,6 +81,7 @@ class MemoryManager:
         # Track pending experiences (experiences without next_query_info) by query_id
         # Format: {query_id: {"line_number": int, "exp_dict": dict}}
         self.pending_experiences = {}
+        self.current_round = 0
 
         self.root_cause_types = [
             "missing indexes",
@@ -111,6 +112,14 @@ class MemoryManager:
         
         # Load pending experiences from file if it exists
         self._load_pending_experiences()
+
+    def set_current_round(self, round_idx):
+        """Record the current optimization round for experience bookkeeping."""
+        self.current_round = int(round_idx)
+
+    def generate_next_query_info_id(self, query_id):
+        """Return a stable round/query identifier for callers that need one."""
+        return f"round_{self.current_round}_query_{query_id}"
 
     def _cases_to_dataframe(self):
         rows = []
@@ -189,7 +198,7 @@ class MemoryManager:
         train_dataloader, _, _, train_len, _, _, _ = load_dataset_tensor_valid(csv_path, batch_size=batch_size, device=device)
 
         if not hasattr(self, "_rcrank_predictor") or self._rcrank_predictor is None:
-            from agent.plan.online_predict import RCRankPredictor
+            from dream.agent.plan.online_predict import RCRankPredictor
 
             self._rcrank_predictor = RCRankPredictor(device=device, train_data_path=csv_path)
         predictor = self._rcrank_predictor
@@ -541,7 +550,7 @@ class MemoryManager:
 
     def _reload_predictor(self, model_path, stats_data_path, device):
         if not hasattr(self, "_rcrank_predictor") or self._rcrank_predictor is None:
-            from agent.plan.online_predict import RCRankPredictor
+            from dream.agent.plan.online_predict import RCRankPredictor
 
             self._rcrank_predictor = RCRankPredictor(model_path=model_path, train_data_path=stats_data_path, device=device)
             self._rcrank_predictor.model.eval()
@@ -951,13 +960,14 @@ class MemoryManager:
     def build_sql_embedding(self, query_info):
         # use the RCRankPredictor
         if not hasattr(self, "_rcrank_predictor") or self._rcrank_predictor is None:
-            from agent.plan.online_predict import RCRankPredictor
+            from dream.agent.plan.online_predict import RCRankPredictor
 
             if self._planner_config is None:
+                project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
                 self._planner_config = {
                     "device": "cpu",
-                    "model_path": "/root/DREAM/src/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen eta0.07/best_model.pt",
-                    "train_data_path": "/root/DREAM/src/agent/plan/slow_sql_data_gen.csv",
+                    "model_path": os.path.join(project_root, "agent", "plan", "model_res", "GateComDiffPretrainModel slow_sql_data_gen eta0.07", "best_model.pt"),
+                    "train_data_path": os.path.join(project_root, "agent", "plan", "slow_sql_data_gen.csv"),
                     "opt_threshold": 0.5,
                     "num_classes": 4
                 }

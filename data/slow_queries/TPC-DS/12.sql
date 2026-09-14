@@ -2,16 +2,16 @@
 SELECT   item_id ,
          item_desc ,
          category ,
-         class ,
+         item_class ,
          current_price ,
          itemrevenue,
-         itemrevenue*100/sum(itemrevenue) OVER (partition BY class) AS revenueratio
+         itemrevenue*100/sum(itemrevenue) OVER (partition BY item_class) AS revenueratio
 FROM(
 SELECT
          i.i_item_id item_id,
          i.i_item_desc item_desc,
          i.i_category category,
-         i.i_class class,
+         i.i_class item_class,
          i.i_current_price current_price,
          Sum(w.ws_ext_sales_price) AS itemrevenue
 FROM     web_sales w,
@@ -31,7 +31,7 @@ GROUP BY i.i_item_id ,
          i.i_current_price
 ) subq
 ORDER BY category ,
-         class ,
+         item_class ,
          item_id ,
          item_desc ,
          revenueratio

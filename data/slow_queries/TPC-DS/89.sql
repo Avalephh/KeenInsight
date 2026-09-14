@@ -3,7 +3,7 @@ SELECT  *
 FROM  (
 SELECT
               category,
-              class,
+              item_class,
               brand,
               store_name,
               company_name,
@@ -17,7 +17,7 @@ SELECT
 FROM
 (
 SELECT        i.i_category category,
-              i.i_class class,
+              i.i_class item_class,
               i.i_brand brand,
               s.s_store_name store_name,
               s.s_company_name company_name,

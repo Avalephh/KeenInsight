@@ -12,6 +12,7 @@ from dream.agent.prompt import (
 )
 from dream.database.pg_env import PostgresDB
 from dream.database.tidb_env import TiDB
+from dream.runtime_config import configure_openai
 from dream.utils.types import QueryInfo
 
 logger = logging.getLogger(__name__)
@@ -31,13 +32,9 @@ class SimpleDBAgent:
             db_config = configs.get("TiDB_CONFIG")
             self.db = TiDB(db_config)
 
-        self.diagnostic_model = self.agent_config.get("diagnostic_agent_model")
         self.api_settings = self.configs.get("API_SETTINGS")
-
-        if self.api_settings:
-            openai_config = self.api_settings.get("openai")
-            os.environ["OPENAI_API_KEY"] = openai_config.get("api_key")
-            os.environ["OPENAI_BASE_URL"] = openai_config.get("base_url")
+        self.api_runtime = configure_openai(self.api_settings)
+        self.diagnostic_model = self.agent_config.get("diagnostic_agent_model") or self.api_runtime["model"]
 
         self.diagnostic_agent = Agent(
             name="SimpleDiagnosticAgent",

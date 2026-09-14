@@ -4,6 +4,7 @@ Main script to generate diagnosis and tuning HTML pages from slow_query_list.jso
 """
 
 import asyncio
+import argparse
 import json
 import logging
 import os
@@ -29,8 +30,19 @@ logger = logging.getLogger(__name__)
 
 async def main():
     """Main function to generate all HTML pages"""
-    # Load config
-    config_path = sys.argv[1] if len(sys.argv) > 1 else None
+    parser = argparse.ArgumentParser(description="Generate DREAM diagnosis HTML pages")
+    parser.add_argument("config_path", nargs="?", help="Configuration JSON (legacy positional form)")
+    parser.add_argument("--config", dest="config_option", help="Configuration JSON")
+    parser.add_argument(
+        "--slow-query-list",
+        default=None,
+        help="Slow-query JSON (default: results/slow_query_list.json)",
+    )
+    args = parser.parse_args()
+
+    # Load config.  The positional form remains compatible with the original
+    # script, while --help/--config now behave like a normal CLI.
+    config_path = args.config_option or args.config_path
     if config_path is None:
         base_dir = Path(__file__).resolve().parent
         config_path = base_dir / "config" / "tpch_config.json"
@@ -42,7 +54,7 @@ async def main():
         configs = json.load(f)
     
     # Load slow query data
-    json_path = Path(__file__).resolve().parent / "results" / "slow_query_list.json"
+    json_path = Path(args.slow_query_list) if args.slow_query_list else Path(__file__).resolve().parent / "results" / "slow_query_list.json"
     logger.info(f"Loading slow queries from: {json_path}")
     with open(json_path, 'r', encoding='utf-8') as f:
         slow_query_data = json.load(f)

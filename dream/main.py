@@ -49,7 +49,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Slow Query Diagnosis Tool")
     parser.add_argument("--data_path", type=str, required=True, help="Slow query data file path")
     parser.add_argument("--order", type=str, required=True, help="Slow query execution order")
-    parser.add_argument("--duration", type=int, default=30, help="Optimization duration in hours")
+    parser.add_argument("--duration", type=float, default=30, help="Optimization duration in hours")
     parser.add_argument("--config", type=str, required=True, help="Configuration file path")
 
     return parser.parse_args()
@@ -78,7 +78,7 @@ async def main_async():
             order=args.order,
             duration=args.duration,
             no_improvement_threshold=configs["AGENT_CONFIG"]["no_improvement_threshold"],
-            epsilon=configs["AGENT_CONFIG"]["epsilon"],
+            epsilon=configs["AGENT_CONFIG"].get("epsilon"),
         )
 
 

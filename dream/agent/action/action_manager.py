@@ -4,7 +4,6 @@ import re
 
 import nest_asyncio
 from agents import Agent, Runner
-from agents._config import set_default_openai_api
 
 from dream.agent.action.action_evaluation import evaluate_action
 from dream.agent.action.action_space import action_space_collect
@@ -15,6 +14,7 @@ from dream.agent.action.action_utils import (
     parse_query_rewrite,
 )
 from dream.agent.prompt import *
+from dream.runtime_config import configure_openai
 
 nest_asyncio.apply()
 
@@ -45,8 +45,11 @@ class ActionManager:
 
         self.agent = None
 
-        self.fix_model = self.agent_config.get("fix_agent_model")
-        self.diagnostic_model = self.agent_config.get("diagnostic_agent_model")
+        self.api_settings = self.configs.get("API_SETTINGS")
+        self.api_runtime = configure_openai(self.api_settings)
+
+        self.fix_model = self.agent_config.get("fix_agent_model") or self.api_runtime["model"]
+        self.diagnostic_model = self.agent_config.get("diagnostic_agent_model") or self.api_runtime["model"]
         # Get sql_timeout from DATABASE_CONFIG.query_timeout, fallback to AGENT_CONFIG.sql_execution_timeout
         database_config = configs.get("DATABASE_CONFIG", {})
         self.sql_timeout = database_config.get("query_timeout")
@@ -57,19 +60,19 @@ class ActionManager:
         self.enable_action_define = self.agent_config.get("enable_action_define", True)
         self.enable_action_pruning = self.agent_config.get("enable_action_pruning", True)
 
-        self.api_settings = self.configs.get("API_SETTINGS")
-
-        if self.api_settings:
-            openai_config = self.api_settings.get("openai")
-            os.environ["OPENAI_API_KEY"] = openai_config.get("api_key")
-            os.environ["OPENAI_BASE_URL"] = openai_config.get("base_url")
-            set_default_openai_api("chat_completions")
-
         self.fixAgent = Agent(
             name="FixAgent",
             model=self.fix_model,
             instructions=get_fix_agent_instructions(),
         )
+
+    @staticmethod
+    def extract_index_names(sql):
+        return extract_index_names(sql)
+
+    @staticmethod
+    def extract_knob_names(sql):
+        return extract_knob_names(sql)
 
     async def __aenter__(self):
         """Async context manager entry"""
@@ -159,9 +162,6 @@ class ActionManager:
 
         # Save experience (independent of retrieval mode, only based on enable_save_samples)
         if self.memory_manager.enable_save_samples and case:
-            # Generate next_query_info_id: next round, same query_id
-            next_query_info_id = self.memory_manager.generate_next_query_info_id(query_info.query_id)
-            
             for case_info in case:
                 # root_causes should be extracted from case_info or use the root_cause parameter
                 case_root_causes = case_info.get("root_causes", [])
@@ -172,15 +172,11 @@ class ActionManager:
                     case_info, 
                     case_root_causes,
                     reward,
-                    next_query_info_id=next_query_info_id,
                     done=False
                 )
 
         # Only update experience pool and network in dynamic retrieval mode
         if self.memory_manager.retrieval_mode == "dynamic" and case:
-            # Generate next_query_info_id: next round, same query_id
-            next_query_info_id = self.memory_manager.generate_next_query_info_id(query_info.query_id)
-            
             for case_info in case:
                 case_root_causes = case_info.get("root_causes", [])
                 if not case_root_causes and root_cause:
@@ -190,7 +186,8 @@ class ActionManager:
                     case_info,
                     case_root_causes,
                     reward,
-                    next_query_info_id=next_query_info_id,
+                    next_query_info=None,
+                    next_root_causes=None,
                     done=False
                 )
             self.memory_manager.retriever.update_network()
@@ -224,6 +221,29 @@ class ActionManager:
 
     async def action_generate(self, root_cause, base_info, action_space, mode, positives, negatives):
         prompt = build_action_prompt(root_cause, base_info, action_space, mode, positives, negatives)
+        if os.getenv("DREAM_OFFLINE", "").lower() in {"1", "true", "yes"}:
+            # A deterministic local path for reproducing the database/action
+            # chain when the SysInsight-compatible API key is not available.
+            # The SET is session-scoped and is rolled back after evaluation.
+            offline_hint = os.getenv("DREAM_OFFLINE_HINT", "").strip()
+            if offline_hint:
+                if not re.fullmatch(r"/\*\+\s*[A-Za-z][A-Za-z0-9_]*(?:\([^*/;]+\))(?:\s+[A-Za-z][A-Za-z0-9_]*(?:\([^*/;]+\)))*\s*\*/", offline_hint):
+                    raise ValueError("unsafe DREAM_OFFLINE_HINT")
+                return (
+                    "Explanation: Offline reproduction mode; use the supplied "
+                    "plan hint and measure the query.\n"
+                    f"Fix_Action: {offline_hint}\n"
+                    "Query_Rewrite: no"
+                )
+            offline_work_mem = os.getenv("DREAM_OFFLINE_WORK_MEM", "4096").strip()
+            if not re.fullmatch(r"[0-9]+\s*(?:kB|MB|GB)?", offline_work_mem, re.IGNORECASE):
+                offline_work_mem = "4096"
+            return (
+                "Explanation: Offline reproduction mode; apply a harmless "
+                "session-local work_mem candidate and measure the query.\n"
+                f"Fix_Action: SET work_mem = '{offline_work_mem}';\n"
+                "Query_Rewrite: no"
+            )
         result = await Runner.run(starting_agent=self.agent, input=prompt)
         return result.final_output
 

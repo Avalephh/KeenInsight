@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import shutil
 import tempfile
 import time
 from collections import defaultdict
@@ -26,6 +27,27 @@ class PostgresDB:
         self.postgres_data = db_config.get("postgres_data")
         self.log_path = db_config.get("log_path")
         self.query_timeout = db_config.get("query_timeout")
+        self.comparison_timeout = db_config.get("comparison_timeout", self.query_timeout or 20)
+
+        # DREAM originally assumed a public-schema TPC-H database.  SysInsight
+        # keeps its workload tables in a dedicated schema, so make the schema
+        # part of the connection configuration instead of hard-coding public.
+        self.schema = db_config.get("schema") or db_config.get("table_schema") or "public"
+        self.search_path = db_config.get("search_path")
+        if self.search_path is None:
+            search_path = [self.schema, "public"] if self.schema != "public" else ["public"]
+        elif isinstance(self.search_path, str):
+            search_path = [item.strip() for item in self.search_path.split(",") if item.strip()]
+        else:
+            search_path = list(self.search_path)
+
+        identifier_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+        if not identifier_pattern.fullmatch(self.schema):
+            raise ValueError(f"Invalid PostgreSQL schema name: {self.schema!r}")
+        if not search_path or any(not identifier_pattern.fullmatch(str(item)) for item in search_path):
+            raise ValueError(f"Invalid PostgreSQL search_path: {search_path!r}")
+        self.search_path = [str(item) for item in search_path]
+        self._search_path_sql = ", ".join(f'"{item}"' for item in self.search_path)
 
         self.conn_str = self._connect_str()
         self.connection = None
@@ -48,7 +70,16 @@ class PostgresDB:
         """Establish and return a database connection"""
         if self.connection is None or self.connection.closed:
             self.connection = psycopg.connect(self.conn_str, autocommit=True, prepare_threshold=None)
+            with self.connection.cursor() as cur:
+                cur.execute(f"SET search_path TO {self._search_path_sql}")
         return self.connection
+
+    @staticmethod
+    def _timeout_ms(timeout):
+        """Convert seconds to PostgreSQL milliseconds; None means no timeout."""
+        if timeout is None:
+            return 0
+        return max(0, int(float(timeout) * 1000))
 
     def execute(self, sql, conn=None, timeout=None):
         if conn is None:
@@ -59,7 +90,7 @@ class PostgresDB:
 
         with conn.cursor() as cur:
             try:
-                cur.execute(f"SET statement_timeout = {timeout * 1000}")  # Set timeout
+                cur.execute(f"SET statement_timeout = {self._timeout_ms(timeout)}")  # Set timeout
                 start_time = time.time()
                 cur.execute(sql)
                 end_time = time.time()
@@ -90,7 +121,7 @@ class PostgresDB:
 
                 for i, stmt in enumerate(statements):
                     if self.is_select_statement(stmt):
-                        cursor.execute(f"SET statement_timeout = {timeout * 1000}")
+                        cursor.execute(f"SET statement_timeout = {self._timeout_ms(timeout)}")
                         cursor.execute(stmt)
 
                         select_results = cursor.fetchall()
@@ -145,27 +176,27 @@ class PostgresDB:
         return self.fetch_results(sql)
 
     def get_views(self):
-        sql = """
-        SELECT viewname, definition FROM pg_views WHERE schemaname = 'public' AND viewname NOT IN ('pg_stat_statements', 'hypopg_list_indexes', 'hypopg_hidden_indexes', 'pg_stat_statements_info');
+        sql = f"""
+        SELECT viewname, definition FROM pg_views WHERE schemaname = '{self.schema}' AND viewname NOT IN ('pg_stat_statements', 'hypopg_list_indexes', 'hypopg_hidden_indexes', 'pg_stat_statements_info');
         """
         return self.fetch_results(sql)
 
     def get_tables(self):
-        sql = """
-        SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT IN ('pg_stat_statements', 'hypopg_list_indexes', 'hypopg_hidden_indexes', 'pg_stat_statements_info');
+        sql = f"""
+        SELECT table_name FROM information_schema.tables WHERE table_schema = '{self.schema}' AND table_name NOT IN ('pg_stat_statements', 'hypopg_list_indexes', 'hypopg_hidden_indexes', 'pg_stat_statements_info');
         """
         return self.fetch_results(sql)
 
     def get_columns(self):
-        sql = """
-        SELECT column_name FROM information_schema.columns WHERE table_name NOT IN ('pg_stat_statements', 'hypopg_list_indexes', 'hypopg_hidden_indexes', 'pg_stat_statements_info') AND table_schema NOT IN ('information_schema', 'pg_catalog');
+        sql = f"""
+        SELECT column_name FROM information_schema.columns WHERE table_schema = '{self.schema}' AND table_name NOT IN ('pg_stat_statements', 'hypopg_list_indexes', 'hypopg_hidden_indexes', 'pg_stat_statements_info');
         """
         return self.fetch_results(sql)
 
     def get_indexes(self):
-        sql = """
+        sql = f"""
         SELECT indexname FROM pg_indexes 
-        WHERE schemaname = 'public'
+        WHERE schemaname = '{self.schema}'
         AND indexname NOT LIKE 'pg_%';
         """
         return self.fetch_results(sql)
@@ -198,7 +229,7 @@ class PostgresDB:
         return current_values
 
     def fetch_schema_info(self):
-        sql = """
+        sql = f"""
         WITH
         pk_cols AS (
             SELECT kc.table_name, kc.column_name, 'YES' AS is_primary_key
@@ -207,7 +238,7 @@ class PostgresDB:
             ON kc.constraint_name = tc.constraint_name
             AND kc.table_schema = tc.table_schema
             WHERE tc.constraint_type = 'PRIMARY KEY'
-            AND kc.table_schema = 'public'
+            AND kc.table_schema = '{self.schema}'
         ),
         fk_cols AS (
             SELECT tc.table_name, kcu.column_name,
@@ -221,7 +252,7 @@ class PostgresDB:
             ON ccu.constraint_name = tc.constraint_name
             AND ccu.table_schema = tc.table_schema
             WHERE tc.constraint_type = 'FOREIGN KEY'
-            AND tc.table_schema = 'public'
+            AND tc.table_schema = '{self.schema}'
         )
         SELECT c.table_name, c.column_name, c.data_type,
             COALESCE(pk.is_primary_key, 'NO') AS is_primary_key,
@@ -231,7 +262,7 @@ class PostgresDB:
         ON c.table_name = pk.table_name AND c.column_name = pk.column_name
         LEFT JOIN fk_cols fk
         ON c.table_name = fk.table_name AND c.column_name = fk.column_name
-        WHERE c.table_schema = 'public'
+        WHERE c.table_schema = '{self.schema}'
         AND c.table_name NOT IN (
             'hypopg_hidden_indexes', 'hypopg_list_indexes',
             'pg_stat_statements', 'pg_stat_statements_info'
@@ -605,6 +636,10 @@ class PostgresDB:
 
     def check_sql_equivalence(self, sql1, sql2):
 
+        if shutil.which("nix") is None:
+            print("QED unavailable: nix is not installed; falling back to result-set comparison")
+            return self.compare_sql_results(sql1, sql2)
+
         schema_info = self.fetch_schema_info()
 
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sql", delete=False, dir="/tmp", encoding="utf-8") as temp_file:
@@ -713,6 +748,33 @@ class PostgresDB:
         sql = " ".join(sql.split())
         return sql.strip().rstrip(";")
 
+    def _fetch_results_checked(self, sql, timeout=None):
+        """Execute comparison SQL without converting timeout/error into []."""
+        if timeout is None:
+            timeout = self.comparison_timeout
+
+        conn = self.connect()
+        statements = self.extract_sql_statements(self.clean_sql(sql))
+        if not statements:
+            statements = [sql]
+
+        select_results = []
+        select_columns = ()
+        found_select = False
+        with conn.cursor() as cursor:
+            for stmt in statements:
+                if self.is_select_statement(stmt):
+                    cursor.execute(f"SET statement_timeout = {self._timeout_ms(timeout)}")
+                    cursor.execute(stmt)
+                    select_results = cursor.fetchall()
+                    select_columns = tuple(column.name for column in cursor.description)
+                    found_select = True
+                else:
+                    cursor.execute(stmt)
+                    conn.commit()
+
+        return (select_columns, select_results) if found_select else ((), [])
+
     def compare_sql_results(self, sql1, sql2):
         """
         Determine if two SQL statements produce exactly the same output (including content and duplicate rows).
@@ -724,8 +786,12 @@ class PostgresDB:
             sql1 = self.clean_sql(sql1)
             sql2 = self.clean_sql(sql2)
 
-            result1 = self.fetch_results(sql1, timeout=20)
-            result2 = self.fetch_results(sql2, timeout=20)
+            columns1, result1 = self._fetch_results_checked(sql1, timeout=self.comparison_timeout)
+            columns2, result2 = self._fetch_results_checked(sql2, timeout=self.comparison_timeout)
+
+            if columns1 != columns2:
+                print(f"Result column mismatch: {columns1} != {columns2}")
+                return False
 
             # print(f"result1: {result1}")
             # print(f"result2: {result2}")

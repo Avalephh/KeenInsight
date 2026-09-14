@@ -169,7 +169,7 @@ def train_retriever_from_samples(
             td_targets_tensor = torch.stack(td_targets)
 
             # Forward pass: Q_θ(s_t, M_t, o_t)
-            q_predictions = retriever.network(features_tensor).squeeze()
+            q_predictions = retriever.network(features_tensor).squeeze(-1)
 
             # Compute TD loss: L_TD(θ) = E[(Q_θ(s_t, M_t, o_t) - y_t)^2]
             loss = F.mse_loss(q_predictions, td_targets_tensor)

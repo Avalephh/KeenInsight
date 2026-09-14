@@ -19,6 +19,13 @@ logger = logging.getLogger(__name__)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _as_explanation_text(value) -> str:
+    """Normalize the planner's structured response for HTML templates."""
+    if isinstance(value, dict):
+        value = value.get("explanation", value.get("text", str(value)))
+    return value if isinstance(value, str) else str(value)
+
+
 def load_template(template_name: str) -> str:
     """Load HTML template"""
     template_path = BASE_DIR / "font" / template_name
@@ -178,12 +185,22 @@ def generate_diagnosis_results(root_causes: List[str], confidence: Dict, explana
           </tr>
 """
     
-    return rows, explanation
+    return rows, _as_explanation_text(explanation)
 
 
 async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict, config_path: str = None):
     """Generate diagnosis.html from slow query data"""
     logger.info("Generating diagnosis.html...")
+
+    db_config = (getattr(agent, "configs", None) or {}).get("DATABASE_CONFIG", {})
+    database_type = (getattr(agent, "configs", None) or {}).get("DATABASE_TYPE", "postgres").upper()
+    workload_type = db_config.get("workload_type", "unknown")
+    schema_name = db_config.get("schema", "public")
+    try:
+        size_result = agent.db.get_size()
+        database_size = size_result[0][0] if size_result else "unknown"
+    except Exception:
+        database_size = "unknown"
     
     # Load template
     template = load_template('diagnosis.html')
@@ -222,7 +239,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict, config_
         }
         
         try:
-            predicted_root, updated_state = await agent.planner.predict(
+            predicted_root, updated_state, _ = await agent.planner.predict(
                 query_info, state, agent.memory_manager
             )
             
@@ -232,6 +249,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict, config_
             explanation = await agent.planner.llm_predict(
                 query_info, root_causes, state_confidence
             )
+            explanation = _as_explanation_text(explanation)
         except Exception as e:
             logger.error(f"Error diagnosing query {query_id}: {e}")
             root_causes = ["未知"]
@@ -271,19 +289,19 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict, config_
               </tr>
               <tr>
                 <td>数据库类型</td>
-                <td>PostgreSQL</td>
+                <td>{database_type}</td>
               </tr>
               <tr>
                 <td>工作负载类型</td>
-                <td>OLTP</td>
+                <td>{workload_type}</td>
               </tr>
               <tr>
                 <td>数据库大小</td>
-                <td>50 GB</td>
+                <td>{database_size}</td>
               </tr>
               <tr>
                 <td>负载信息</td>
-                <td>TPC-H</td>
+                <td>{schema_name}</td>
               </tr>
             </table>
           </div>
@@ -388,7 +406,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict, config_
     # Count opening and closing divs to find the right section
     # Actually, let's use a simpler approach: find the section div and replace its content
     pattern = r'(<div class="section">\s*<h2>慢SQL列表</h2>\s*)(.*?)(\s*</div>\s*</main>)'
-    replacement = r'\1' + sql_items_html + r'\3'
+    replacement = r'\g<1>' + sql_items_html + r'\g<3>'
     updated_template = re.sub(pattern, replacement, template, flags=re.DOTALL)
     
     save_html(updated_template, 'diagnosis.html')
@@ -431,7 +449,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     }
     
     try:
-        predicted_root, updated_state = await agent.planner.predict(
+        predicted_root, updated_state, _ = await agent.planner.predict(
             query_info, state, agent.memory_manager
         )
         
@@ -441,6 +459,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
         explanation = await agent.planner.llm_predict(
             query_info, root_causes, state_confidence
         )
+        explanation = _as_explanation_text(explanation)
         
         # Generate tuning actions
         evaluation_result = await agent.action_manager.step(
@@ -512,7 +531,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     # Update query
     template = re.sub(
         r'(<div class="query-box">)(.*?)(</div>)',
-        r'\1' + query + r'\3',
+        r'\g<1>' + query + r'\g<3>',
         template,
         flags=re.DOTALL
     )
@@ -521,7 +540,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     plan_formatted = format_plan_json(plan_json)
     template = re.sub(
         r'(<div class="plan-box">)(.*?)(</div>)',
-        r'\1' + plan_formatted + r'\3',
+        r'\g<1>' + plan_formatted + r'\g<3>',
         template,
         flags=re.DOTALL
     )
@@ -529,7 +548,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     # Update diagnosis results
     template = re.sub(
         r'(<div class="diagnosis-left">.*?<table>.*?<tr>.*?<th>异常类型</th>.*?<th>置信度</th>.*?</tr>)(.*?)(</table>.*?</div>)',
-        r'\1' + diagnosis_rows + r'\3',
+        r'\g<1>' + diagnosis_rows + r'\g<3>',
         template,
         flags=re.DOTALL
     )
@@ -537,7 +556,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     # Update explanation
     template = re.sub(
         r'(<div class="explanation-title">解释说明</div>)(.*?)(</div>)',
-        r'\1\n' + explanation + r'\3',
+        r'\g<1>\n' + explanation + r'\g<3>',
         template,
         flags=re.DOTALL
     )
@@ -546,7 +565,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     if suggestions_rows:
         template = re.sub(
             r'(<table>.*?<tr>.*?<th>根因类型</th>.*?<th>调优建议</th>.*?<th>状态</th>.*?</tr>)(.*?)(</table>)',
-            r'\1' + suggestions_rows + r'\3',
+            r'\g<1>' + suggestions_rows + r'\g<3>',
             template,
             flags=re.DOTALL
         )
@@ -563,7 +582,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     time_str = format_execution_time(execution_time)
     template = re.sub(
         r'(<div class="time-label">调优前执行时间</div>.*?<div class="time-value">)(.*?)(</div>)',
-        r'\1' + time_str + r'\3',
+        r'\g<1>' + time_str + r'\g<3>',
         template
     )
     
@@ -609,7 +628,7 @@ def parse_tuning_actions(fix_action: str, rewrite_sql: str, root_causes: List[st
     if 'SET ' in fix_action.upper():
         param_lines = [line.strip() for line in fix_action.split('\n') 
                        if 'SET ' in line.upper() and any(param in line.upper() 
-                       for param in ['work_mem', 'shared_buffers', 'max_parallel', 'enable_'])]
+                       for param in ['WORK_MEM', 'SHARED_BUFFERS', 'MAX_PARALLEL', 'ENABLE_'])]
         if param_lines:
             suggestions.append({
                 'type': '参数调优',

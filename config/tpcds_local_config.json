@@ -1,0 +1,94 @@
+{
+  "DATABASE_TYPE": "postgres",
+  "DATABASE_CONFIG": {
+    "user": "postgres",
+    "password": "",
+    "host": "/var/run/postgresql",
+    "port": 5432,
+    "dbname": "keeninsight",
+    "schema": "tpcds",
+    "search_path": ["tpcds", "public"],
+    "workload_type": "OLAP",
+    "postgres_path": "/usr/lib/postgresql/12/bin",
+    "postgres_data": "/var/lib/postgresql/12/main",
+    "log_path": "/var/log/postgresql",
+    "db_type": "postgres",
+    "query_timeout": 30,
+    "comparison_timeout": 120
+  },
+  "KNOB_CONFIG": {
+    "query_knobs": {
+      "enable_bitmapscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_hashagg": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_hashjoin": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_indexonlyscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_indexscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_material": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_mergejoin": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_nestloop": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_seqscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_sort": {"type": "boolean", "min": 0, "max": 1, "default": 1}
+    },
+    "system_knobs": {
+      "cpu_index_tuple_cost": {"type": "float", "min": 0.0, "max": 10.0, "default": 0.005},
+      "cpu_operator_cost": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.0025},
+      "cpu_tuple_cost": {"type": "float", "min": 0.0, "max": 10.0, "default": 0.01},
+      "cursor_tuple_fraction": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.1},
+      "default_statistics_target": {"type": "integer", "min": 1, "max": 5000, "default": 100},
+      "effective_cache_size": {"type": "integer", "min": 1, "max": 2147483647, "default": 524288},
+      "from_collapse_limit": {"type": "integer", "min": 1, "max": 24, "default": 8},
+      "geqo": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "geqo_threshold": {"type": "integer", "min": 2, "max": 100, "default": 12},
+      "join_collapse_limit": {"type": "integer", "min": 1, "max": 24, "default": 8},
+      "maintenance_work_mem": {"type": "integer", "min": 1024, "max": 2147483647, "default": 65536},
+      "max_parallel_workers": {"type": "integer", "min": 0, "max": 1024, "default": 8},
+      "max_parallel_workers_per_gather": {"type": "integer", "min": 0, "max": 1024, "default": 2},
+      "parallel_setup_cost": {"type": "float", "min": 0.0, "max": 50000.0, "default": 1000.0},
+      "parallel_tuple_cost": {"type": "float", "min": 0.0, "max": 10.0, "default": 0.1},
+      "random_page_cost": {"type": "float", "min": 0.0, "max": 100.0, "default": 4.0},
+      "seq_page_cost": {"type": "float", "min": 0.0, "max": 100.0, "default": 1.0},
+      "work_mem": {"type": "integer", "min": 64, "max": 2147483647, "default": 4096}
+    }
+  },
+  "API_SETTINGS": {
+    "openai": {"api_key": "", "base_url": "http://35.212.195.134:28317/v1", "model": "gpt-5.6-sol"},
+    "anthropic": {"api_key": "", "base_url": "", "model": "GPT5.6-SOL"}
+  },
+  "PLANNER_CONFIG": {
+    "device": "cpu",
+    "model_path": "/root/new/dream/dream/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen eta0.07/best_model.pt",
+    "train_data_path": "/root/new/dream/dream/agent/plan/slow_sql_data_gen.csv",
+    "opt_threshold": 0.5,
+    "num_classes": 4
+  },
+  "MEMORY_MANAGER_CONFIG": {
+    "db_path": "/tmp/dream_tpcds_memory.json",
+    "archive_size": 20,
+    "finetune_threshold": 220,
+    "finetune_epochs": 50,
+    "finetune_batch_size": 8,
+    "finetune_device": "cpu",
+    "model_output_dir": "/tmp/dream_tpcds_model_res",
+    "bce_weight": 0.7,
+    "contrastive_weight": 0.3,
+    "lambda_neg": 1.0,
+    "enable_finetune": false,
+    "retrieval_mode": "dynamic",
+    "enable_save_samples": false,
+    "samples_save_path": "/tmp/dream_tpcds_retriever_samples.jsonl",
+    "retriever_model_path": "/root/new/dream/dream/agent/memory/model/soft_q_retriever.pt",
+    "bert_model_path": "/root/new/dream/dream/agent/plan/RCRank/bert-base-uncased"
+  },
+  "AGENT_CONFIG": {
+    "no_improvement_threshold": 3,
+    "epsilon": 0.1,
+    "fix_timeout": 60,
+        "diagnostic_agent_model": "gpt-5.6-sol",
+        "fix_agent_model": "gpt-5.6-sol",
+        "root_cause_llm_model": "gpt-5.6-sol",
+    "action_server_config": "/root/new/dream/dream/agent/action/mcp_tools/action_server_config.yaml",
+    "enable_retrieval": true,
+    "enable_action_define": true,
+    "enable_action_pruning": true
+  }
+}

@@ -191,6 +191,16 @@ def generate_diagnosis_results(root_causes: List[str], confidence: Dict, explana
 async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
     """Generate diagnosis.html from slow query data"""
     logger.info("Generating diagnosis.html...")
+
+    db_config = (getattr(agent, "configs", None) or {}).get("DATABASE_CONFIG", {})
+    database_type = (getattr(agent, "configs", None) or {}).get("DATABASE_TYPE", "postgres").upper()
+    workload_type = db_config.get("workload_type", "unknown")
+    schema_name = db_config.get("schema", "public")
+    try:
+        size_result = agent.db.get_size()
+        database_size = size_result[0][0] if size_result else "unknown"
+    except Exception:
+        database_size = "unknown"
     
     # Load template
     template_path = BASE_DIR / "font" / "diagnosis.html"
@@ -231,7 +241,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
         }
         
         try:
-            predicted_root, updated_state = await agent.planner.predict(
+            predicted_root, updated_state, _ = await agent.planner.predict(
                 query_info, state, agent.memory_manager
             )
             
@@ -294,19 +304,19 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
             <div class="info-cards">
               <div class="info-card">
                 <div class="info-card-label">数据库类型</div>
-                <div class="info-card-value">PostgreSQL</div>
+                <div class="info-card-value">{database_type}</div>
               </div>
               <div class="info-card">
                 <div class="info-card-label">工作负载类型</div>
-                <div class="info-card-value">OLTP</div>
+                <div class="info-card-value">{workload_type}</div>
               </div>
               <div class="info-card">
                 <div class="info-card-label">数据库大小</div>
-                <div class="info-card-value">50 GB</div>
+                <div class="info-card-value">{database_size}</div>
               </div>
               <div class="info-card">
                 <div class="info-card-label">负载信息</div>
-                <div class="info-card-value">TPC-H</div>
+                <div class="info-card-value">{schema_name}</div>
               </div>
             </div>
           </div>
@@ -389,7 +399,7 @@ async def generate_diagnosis_html(agent: DBAgent, slow_query_data: Dict):
     # Use a more specific pattern that matches the section div
     pattern = r'(<div class="section">\s*<h2>慢SQL列表</h2>\s*)(.*?)(\s*</div>\s*</main>)'
     
-    replacement = r'\1' + sql_items_html + r'\3'
+    replacement = r'\g<1>' + sql_items_html + r'\g<3>'
     updated_template = re.sub(pattern, replacement, template, flags=re.DOTALL)
     
     # Save the updated template
@@ -503,6 +513,13 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
         if tr_count < 5:  # Less than 1 header + 4 data rows means incomplete
             need_generate_diagnosis = True
     
+    # The function is also called directly by run_diagnosis.py, where the
+    # optional diagnosis arguments are intentionally omitted.
+    if root_causes is None:
+        root_causes = []
+    if state_confidence is None:
+        state_confidence = {}
+
     # Generate diagnosis table to ensure all 4 root cause types are shown
     # This ensures consistency even if diagnosis.html doesn't have complete data
     if need_generate_diagnosis or explanation_html is None:
@@ -582,11 +599,6 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
         explanation_html = str(explanation_html) if explanation_html else '暂无解释说明'
     
     # Parse tuning suggestions from fix_action
-    if root_causes is None:
-        root_causes = []
-    if state_confidence is None:
-        state_confidence = {}
-    
     tuning_suggestions = parse_tuning_actions(fix_action, rewrite_sql, root_causes)
     
     # Load handling.html template
@@ -617,7 +629,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     if query_html:
         template = re.sub(
             r'(<div class="query-info">)(.*?)(</div>)',
-            r'\1' + query_html + r'\3',
+            r'\g<1>' + query_html + r'\g<3>',
             template,
             flags=re.DOTALL
         )
@@ -626,7 +638,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     if plan_html:
         template = re.sub(
             r'(<div class="plan-info">)(.*?)(</div>)',
-            r'\1' + plan_html + r'\3',
+            r'\g<1>' + plan_html + r'\g<3>',
             template,
             flags=re.DOTALL
         )
@@ -637,7 +649,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
         # Replace the entire table content inside diagnosis-left
         template = re.sub(
             r'(<div class="diagnosis-left">.*?<table>)(.*?)(</table>.*?</div>)',
-            r'\1' + diagnosis_table_html + r'\3',
+            r'\g<1>' + diagnosis_table_html + r'\g<3>',
             template,
             flags=re.DOTALL
         )
@@ -652,7 +664,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
         explanation_escaped = explanation_html.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
         template = re.sub(
             r'(<div id="explanation-text-handling"[^>]*class="explanation-content"[^>]*>)(.*?)(</div>)',
-            r'\1' + explanation_escaped + r'\3',
+            r'\g<1>' + explanation_escaped + r'\g<3>',
             template,
             flags=re.DOTALL
         )
@@ -668,7 +680,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     if suggestions_rows:
         template = re.sub(
             r'(<table class="tuning-table">.*?<tr>.*?<th>根因类型</th>.*?<th>调优建议</th>.*?</tr>)(.*?)(</table>)',
-            r'\1' + suggestions_rows + r'\3',
+            r'\g<1>' + suggestions_rows + r'\g<3>',
             template,
             flags=re.DOTALL
         )
@@ -693,7 +705,7 @@ async def generate_handling_html(agent: DBAgent, query_id: str, slow_query_data:
     else:
         # Fallback to DOM pattern replacement for older templates
         pattern = r'(<div\s+class="time-value"\s+id="expected-old-time">)([^<]*?)(</div>)'
-        new_template = re.sub(pattern, r'\1' + time_str + r'\3', template, flags=re.DOTALL)
+        new_template = re.sub(pattern, r'\g<1>' + time_str + r'\g<3>', template, flags=re.DOTALL)
         if new_template != template:
             template = new_template
             logger.info("Successfully updated expected-old-time using id selector")

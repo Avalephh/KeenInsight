@@ -53,6 +53,19 @@ class Planner:
 
     def _run_diagnosis_agent_sync(self, prompt):
         """Synchronous helper method to run diagnosis agent in thread pool"""
+        if os.getenv("DREAM_OFFLINE", "").lower() in {"1", "true", "yes"}:
+            return json.dumps(
+                {
+                    "predicted_root_causes": ["inappropriate query knobs"],
+                    "root_causes": [
+                        {"label": "missing indexes", "confidence": 0.1},
+                        {"label": "suboptimal plan optimizer", "confidence": 0.1},
+                        {"label": "inappropriate query knobs", "confidence": 0.6},
+                        {"label": "poorly written queries", "confidence": 0.1},
+                    ],
+                    "explanation": "Offline reproduction mode; use the query-knob action space.",
+                }
+            )
         try:
             return Runner.run_sync(
                 starting_agent=Agent(

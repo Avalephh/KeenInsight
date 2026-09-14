@@ -10,7 +10,8 @@ def base_information_collect(query_info, database_config):
         "db_type": postgres_db.db_type,
         "workload_type": postgres_db.workload_type,
         "size": postgres_db.get_size(),
-        "schema": postgres_db.fetch_schema_info(),
+        "schema": postgres_db.schema,
+        "schema_info": postgres_db.fetch_schema_info(),
     }
 
     base_info = {

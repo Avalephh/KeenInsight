@@ -10,7 +10,7 @@ Source code for the DREAM framework, proposed in "From Anomalies to Actions: An 
 # Clone repository
 git clone https://github.com/HarneyHong/DREAM.git
 cd DREAM
-git submodule update --init --recursive src/agent/plan/RCRank
+git submodule update --init --recursive dream/agent/plan/RCRank
 
 # Create conda environment
 conda create -n DREAM python=3.10
@@ -28,7 +28,10 @@ cp tpch_config.json.example tpch_config.json
 cp tpcds_config.json.example tpcds_config.json
 cp job_config.json.example job_config.json
 
-# In base_config.json, set API keys and models if needed
+# The tpch example is aligned to the local SysInsight PostgreSQL baseline:
+# keeninsight / keeninsight_tpcc / PostgreSQL 12 / Unix socket.
+# Set the API key only in the environment, using the same variable as SysInsight:
+# export SYSINSIGHT_GPT_API_KEY='<your-api-key>'
 ```
 
 3) Install required tools
@@ -46,16 +49,16 @@ cp job_config.json.example job_config.json
 - For the diagnosis tool, we provide both the pre-collected training data and the pre-trained RCRank model, which can be downloaded directly from the [link](https://drive.google.com/drive/folders/1mRkA_CJvKImJeHuaXm-W0h0riVmvB_2w?usp=sharing). You can also retrain the model and recollect data using the modified RCRank [code](https://github.com/HarneyHong/RCRank.git) if needed.
 
 - After downloading, please place the data and model files in the following specified paths:
-    - `DREAM/src/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen eta0.07/best_model.pt`
-    - `DREAM/src/agent/plan/slow_sql_data_gen.csv`
+    - `DREAM/dream/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen eta0.07/best_model.pt`
+    - `DREAM/dream/agent/plan/slow_sql_data_gen.csv`
 
 5) Setup Retriever Model
 
-- For the case retriever, we provide a pre-trained Soft Q Retriever model that can be downloaded directly from the [Google Drive](https://drive.google.com/drive/folders/1mRkA_CJvKImJeHuaXm-W0h0riVmvB_2w?usp=sharing). After downloading, place the model file at the path specified in the `retriever_model_path` configuration parameter (default: `src/agent/memory/model`).
+- For the case retriever, we provide a pre-trained Soft Q Retriever model that can be downloaded directly from the [Google Drive](https://drive.google.com/drive/folders/1mRkA_CJvKImJeHuaXm-W0h0riVmvB_2w?usp=sharing). After downloading, place the model file at the path specified in the `retriever_model_path` configuration parameter (default: `dream/agent/memory/model`).
 
 - Alternatively, you can retrain the retriever model using collected experience samples:
   ```bash
-  cd src/agent/memory/
+  cd dream/agent/memory/
   python train_retriever_offline.py \
       --samples_path experience/retriever_samples.jsonl \
       --model_save_path model/soft_q_retriever.pt \
@@ -65,15 +68,22 @@ cp job_config.json.example job_config.json
       --learning_rate 0.0001
   ```
 
-- To collect new experience data from scratch, `set enable_save_samples = true` in the configuration file. The collected samples will be saved to the path specified by `samples_save_path` (default: `src/agent/memory/experience/retriever_samples.jsonl`).
+- To collect new experience data from scratch, set `enable_save_samples = true` in the configuration file. The collected samples will be saved to the path specified by `samples_save_path` (default: `dream/agent/memory/experience/retriever_samples.jsonl`).
 
 6) Run
 
 ```bash
-cd src
-python main.py \
-  --data_path /root/DREAM/data/slow_queries/TPC-H \
+python -m dream.main \
+  --data_path /root/new/dream/data/slow_queries/SysInsight-TPCC \
   --order qorder.txt \
   --duration 30 \
-  --config /root/DREAM/config/tpch_config.json
+  --config /root/new/dream/config/sysinsight_tpcc_config.json
 ```
+
+For a database-only smoke run without an API key, set `DREAM_OFFLINE=1`; this
+uses a deterministic local diagnosis/action response, applies only a
+session-local `SET`, and exercises collection, evaluation, rollback, and
+experience persistence.  The checked-in helper
+`scripts/bootstrap_sysinsight_runtime.py` creates local smoke artifacts when
+the upstream Google Drive files are unavailable; those artifacts are not the
+trained DREAM/RCRank weights or the paper datasets.

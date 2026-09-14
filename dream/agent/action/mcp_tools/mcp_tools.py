@@ -2,6 +2,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import quote_plus
 
 # from dataclasses import dataclass
 from collections import defaultdict
@@ -33,13 +34,44 @@ from dream.database.pg_env import PostgresDB
 mcp = FastMCP("db_diagnosis")
 
 
+def _default_database_config():
+    """Build the same local PostgreSQL defaults used by SysInsight."""
+    return {
+        "user": os.getenv("DREAM_PGUSER", "postgres"),
+        "password": os.getenv("DREAM_PGPASSWORD", ""),
+        "host": os.getenv("DREAM_PGHOST", "/var/run/postgresql"),
+        "port": int(os.getenv("DREAM_PGPORT", "5432")),
+        "dbname": os.getenv("DREAM_PGDATABASE", "keeninsight"),
+        "schema": os.getenv("DREAM_PGSCHEMA", "keeninsight_tpcc"),
+        "workload_type": "OLTP",
+        "query_timeout": 30,
+    }
+
+
+def _sqlalchemy_url(database_config):
+    """Return a SQLAlchemy URL for TCP or Unix-socket PostgreSQL configs."""
+    user = quote_plus(str(database_config["user"]))
+    password = quote_plus(str(database_config.get("password", "")))
+    dbname = quote_plus(str(database_config["dbname"]))
+    host = str(database_config["host"])
+    port = int(database_config.get("port", 5432))
+    schema = str(database_config.get("schema", "public"))
+    options = quote_plus(f"-csearch_path={schema},public")
+    if host.startswith("/"):
+        return (
+            f"postgresql+psycopg://{user}:{password}@/{dbname}"
+            f"?host={quote_plus(host)}&port={port}&options={options}"
+        )
+    return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{dbname}?options={options}"
+
+
 def clean_sql(sql):
     sql = sql.strip()
     sql = re.sub(r"\s+", " ", sql)
     return sql
 
 
-def extract_tables(parsed, database_config):
+def extract_tables(parsed, database_config=None):
     tables = set()
 
     def _extract(token_list):
@@ -71,23 +103,18 @@ def extract_tables(parsed, database_config):
 
     _extract(parsed)
 
-    postgres_db = PostgresDB(
-        user=database_config["user"],
-        password=database_config["password"],
-        host=database_config["host"],
-        port=database_config["port"],
-        dbname=database_config["dbname"],
-        workload_type=database_config["workload_type"],
-        postgres_path=database_config["postgres_path"],
-        postgres_data=database_config["postgres_data"],
-        log_path=database_config["log_path"],
-    )
-    existing_tables = postgres_db.get_tables()
+    if database_config is None:
+        return sorted(tables)
 
-    return [t for t in tables if t in existing_tables]
+    postgres_db = PostgresDB(database_config)
+    existing_tables = {
+        row[0] if isinstance(row, (tuple, list)) else row
+        for row in postgres_db.get_tables()
+    }
+    return sorted(tables & existing_tables)
 
 
-def extract_columns(parsed, database_config):
+def extract_columns(parsed, database_config=None):
     columns = set()
 
     def _extract_columns(token_list):
@@ -136,20 +163,15 @@ def extract_columns(parsed, database_config):
     _extract_columns(parsed)
 
     # Connect to database to check if columns exist
-    postgres_db = PostgresDB(
-        user=database_config["user"],
-        password=database_config["password"],
-        host=database_config["host"],
-        port=database_config["port"],
-        dbname=database_config["dbname"],
-        workload_type=database_config["workload_type"],
-        postgres_path=database_config["postgres_path"],
-        postgres_data=database_config["postgres_data"],
-        log_path=database_config["log_path"],
-    )
-    existing_columns = postgres_db.get_columns()
+    if database_config is None:
+        return sorted(columns - {"*"})
 
-    return [t for t in columns if t in existing_columns and t != "*"]
+    postgres_db = PostgresDB(database_config)
+    existing_columns = {
+        row[0] if isinstance(row, (tuple, list)) else row
+        for row in postgres_db.get_columns()
+    }
+    return sorted((columns & existing_columns) - {"*"})
 
 
 def is_redundant_comparison(token):
@@ -241,17 +263,7 @@ def find_duplicate_subqueries(sql):
 def find_related_views(sql, database_config):
     from dream.database.pg_env import PostgresDB
 
-    postgres_db = PostgresDB(
-        user=database_config["user"],
-        password=database_config["password"],
-        host=database_config["host"],
-        port=database_config["port"],
-        dbname=database_config["dbname"],
-        workload_type=database_config["workload_type"],
-        postgres_path=database_config["postgres_path"],
-        postgres_data=database_config["postgres_data"],
-        log_path=database_config["log_path"],
-    )
+    postgres_db = PostgresDB(database_config)
 
     views = postgres_db.get_views()
 
@@ -276,21 +288,12 @@ def find_related_views(sql, database_config):
 # info collect
 @mcp.tool()
 async def indexes_info_collect(database_config):
-    postgres_db = PostgresDB(
-        user=database_config["user"],
-        password=database_config["password"],
-        host=database_config["host"],
-        port=database_config["port"],
-        dbname=database_config["dbname"],
-        workload_type=database_config["workload_type"],
-        postgres_path=database_config["postgres_path"],
-        postgres_data=database_config["postgres_data"],
-        log_path=database_config["log_path"],
-    )
+    postgres_db = PostgresDB(database_config)
 
-    sql = "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname = 'public' ORDER BY tablename, indexname;"
+    schema = database_config.get("schema", "public")
+    sql = f"SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname = '{schema}' ORDER BY tablename, indexname;"
 
-    exist_indexs = postgres_db.fetch_results(sql, json=True)
+    exist_indexs = postgres_db.fetch_results(sql, as_json=True)
 
     return exist_indexs
 
@@ -323,7 +326,7 @@ async def system_knobs_info_collect(database_config, knob_config):
 
     system_knobs = tuple(knob_config["system_knobs"].keys())
     sql = f"SELECT name, setting FROM pg_settings WHERE name IN {system_knobs};"
-    system_knobs_info = postgres_db.fetch_results(sql, json=True)
+    system_knobs_info = postgres_db.fetch_results(sql, as_json=True)
 
     return system_knobs_info
 
@@ -336,24 +339,14 @@ async def query_knobs_info_collect(database_config, knob_config):
 
     query_knobs = tuple(knob_config["query_knobs"].keys())
     sql = f"SELECT name, setting FROM pg_settings WHERE name IN {query_knobs};"
-    query_knobs_info = postgres_db.fetch_results(sql, json=True)
+    query_knobs_info = postgres_db.fetch_results(sql, as_json=True)
 
     return query_knobs_info
 
 
 @mcp.tool()
 async def plan_info_collect(query, database_config):
-    postgres_db = PostgresDB(
-        user=database_config["user"],
-        password=database_config["password"],
-        host=database_config["host"],
-        port=database_config["port"],
-        dbname=database_config["dbname"],
-        workload_type=database_config["workload_type"],
-        postgres_path=database_config["postgres_path"],
-        postgres_data=database_config["postgres_data"],
-        log_path=database_config["log_path"],
-    )
+    postgres_db = PostgresDB(database_config)
 
     parsed = sqlparse.parse(query)[0]
     target_tables = extract_tables(parsed, database_config)
@@ -375,7 +368,7 @@ async def plan_info_collect(query, database_config):
 
     # Get table statistics
     table_stats_info = {}
-    table_stats_sql = """
+    table_stats_sql = f"""
         SELECT
         relname AS table_name,
         reltuples::BIGINT AS estimated_rows,
@@ -387,7 +380,7 @@ async def plan_info_collect(query, database_config):
         pg_namespace n ON n.oid = c.relnamespace
     WHERE
         relkind = 'r'
-        AND n.nspname = 'public';
+        AND n.nspname = '{database_config.get("schema", "public")}';
     """
     result = postgres_db.fetch_results(table_stats_sql)
     for row in result:
@@ -414,6 +407,8 @@ async def plan_info_collect(query, database_config):
             FROM
                 pg_stats
             WHERE
+                schemaname = '{database_config.get("schema", "public")}'
+                AND
                 attname = '{column}';
         """
         result = postgres_db.fetch_results(column_stats_sql)
@@ -684,17 +679,21 @@ async def plan_action_space(query, knob_config):
 
 
 # action generate (no use)
-async def update_statistics(query):
+async def update_statistics(query, database_config=None):
+    database_config = database_config or _default_database_config()
     query = clean_sql(query)
     parsed = sqlparse.parse(query)[0]
-    tables = extract_tables(parsed)
+    tables = extract_tables(parsed, database_config)
 
-    engine = create_engine("postgresql://postgres:postgres@localhost:5432/tpch10G")
+    engine = create_engine(_sqlalchemy_url(database_config))
 
     result = {
         "action": "update_statistics",
         "tables_analyzed": [],
         "executed_commands": [],
+        "tables_checked": [],
+        "vacuum_commands": [],
+        "analyze_commands": [],
     }
 
     # execute ANALYZE for each table
@@ -759,7 +758,8 @@ async def update_statistics(query):
     return result
 
 
-async def join_order_optimization(query):
+async def join_order_optimization(query, database_config=None):
+    database_config = database_config or _default_database_config()
     """优化查询的连接顺序，通过测试不同的连接策略找出最优执行计划
 
     Args:
@@ -775,10 +775,10 @@ async def join_order_optimization(query):
     parsed = sqlparse.parse(query)[0]
 
     # 提取涉及的表
-    tables = extract_tables(parsed)
+    tables = extract_tables(parsed, database_config)
 
     # 连接数据库
-    engine = create_engine("postgresql://postgres:postgres@localhost:5432/tpch10G")
+    engine = create_engine(_sqlalchemy_url(database_config))
 
     result = {
         "action": "join_order_optimization",
@@ -928,7 +928,8 @@ async def join_order_optimization(query):
     return result
 
 
-async def optimize_index(query):
+async def optimize_index(query, database_config=None):
+    database_config = database_config or _default_database_config()
     """优化数据库索引
 
     Args:
@@ -944,10 +945,9 @@ async def optimize_index(query):
     parsed = sqlparse.parse(query)[0]
 
     # 提取涉及的表名
-    tables = extract_tables(parsed)
+    tables = extract_tables(parsed, database_config)
 
-    # 连接数据库（这里使用示例连接字符串，实际使用时需要替换）
-    engine = create_engine("postgresql://postgres:postgres@localhost:5432/tpch10G")
+    engine = create_engine(_sqlalchemy_url(database_config))
     inspector = inspect(engine)
 
     result = {
@@ -965,7 +965,7 @@ async def optimize_index(query):
         }
 
         # 获取现有索引
-        existing_indexes = inspector.get_indexes(table)
+        existing_indexes = inspector.get_indexes(table, schema=database_config.get("schema", "public"))
         table_info["existing_indexes"] = existing_indexes
 
         # 分析查询中的WHERE子句和JOIN条件
@@ -1089,7 +1089,7 @@ async def optimize_repeatedly_subqueries(query):
     return result
 
 
-async def optimize_query_knob(query):
+async def optimize_query_knob(query, database_config=None):
     """收集并返回数据库指定knob的当前值和范围信息
 
     Args:
@@ -1159,7 +1159,8 @@ async def optimize_query_knob(query):
     }
 
     # 连接数据库，收集当前knob值
-    engine = create_engine("postgresql://postgres:postgres@localhost:5432/tpch10G")
+    database_config = database_config or _default_database_config()
+    engine = create_engine(_sqlalchemy_url(database_config))
     knob_values = {}
     with engine.connect() as conn:
         for knob, meta in knob_config.items():
