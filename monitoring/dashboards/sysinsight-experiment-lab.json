@@ -16,9 +16,9 @@
       "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "name"}
     },
     {
-      "id": 2, "type": "stat", "title": "TPCC 目标业务 TPS（主指标）", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "id": 2, "type": "stat", "title": "TPCC 目标业务 TPS（稳态/当前）", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps", "instant": true, "format": "time_series", "legendFormat": "{{phase}}"}],
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps_steady", "instant": true, "format": "time_series", "legendFormat": "{{phase}}"}],
       "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
     },
@@ -43,7 +43,7 @@
       "id": 5, "type": "timeseries", "title": "TPCC 基线 / 持续压力调优实时曲线", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
-        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps", "legendFormat": "目标业务 TPS {{phase}}", "range": true},
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps", "legendFormat": "目标业务 TPS（每秒）{{phase}}", "range": true},
         {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_external_tps", "legendFormat": "压力注入 TPS（辅助）{{phase}}", "range": true},
         {"refId": "C", "expr": "sysinsight_dream_lab_tpcc_connections", "legendFormat": "实验连接 {{phase}}", "range": true},
         {"refId": "D", "expr": "sysinsight_dream_lab_tpcc_active_sessions", "legendFormat": "活动连接 {{phase}}", "range": true}
@@ -80,7 +80,7 @@
     },
     {
       "id": 9, "type": "text", "title": "如何触发实验", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
-      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 从已验证的 6 组 TPCC 场景中选择一组，先看基线，再在压力持续期间观察 SysInsight 调优前后的目标业务 TPS；\n3. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL；\n4. 发送原 SQL，等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\nTPCC 的主指标是正常控制负载（tp_normal.sql）的目标业务 TPS；外部 TPS 只是压力注入强度，不作为恢复效果判断。实验不会追加撤压恢复阶段；压力持续时间就是检测、分析和调优观察窗口。这里的 Grafana 面板负责观测，按钮控制和详细结果在实验控制台完成。DREAM 没有返回合法可执行改进时，页面会明确显示原因，不会伪造“已优化”。"}
+      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 从已验证的 6 组 TPCC 场景中选择一组，先看基线，再在压力持续期间观察 SysInsight 调优前后的目标业务 TPS；\n3. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL；\n4. 发送原 SQL，等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\nTPCC 的主指标是正常控制负载（tp_normal.sql）的目标业务 TPS；结果表和稳态/当前卡片会剔除启动升温窗口并显示中位数，CV 表示波动；Grafana 曲线仍展示每秒原始变化。外部 TPS 只是压力注入强度，不作为恢复效果判断。实验不会追加撤压恢复阶段；压力持续时间就是检测、分析和调优观察窗口。这里的 Grafana 面板负责观测，按钮控制和详细结果在实验控制台完成。DREAM 没有返回合法可执行改进时，页面会明确显示原因，不会伪造“已优化”。"}
     }
   ],
   "refresh": "5s",

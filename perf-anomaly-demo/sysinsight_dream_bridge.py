@@ -1996,7 +1996,13 @@ class Bridge:
                         external = metrics.get("pressure", metrics.get("external", {})) if isinstance(metrics, dict) else {}
                         control_tps = control.get("tps_live", control.get("tps", 0))
                         external_tps = external.get("tps_live", external.get("tps", 0))
+                        phase_result = ((row.get("result", {}) or {}).get("phases", {}) or {}).get(str(sample.get("phase") or ""), {}) if isinstance(row, dict) else {}
+                        business_summary = phase_result.get("business_tps_summary", {}) if isinstance(phase_result, dict) else {}
+                        steady_tps = business_summary.get("steady_tps") if isinstance(business_summary, dict) else None
+                        if steady_tps is None:
+                            steady_tps = control_tps
                         emit("sysinsight_dream_lab_tpcc_business_tps", control_tps, labels, "Live target business TPS from the normal TPCC control workload.")
+                        emit("sysinsight_dream_lab_tpcc_business_tps_steady", steady_tps, labels, "Steady target business TPS after the TPCC phase warm-up window, or the current value while the phase is running.")
                         # Keep the old metric for dashboard/API compatibility.
                         emit("sysinsight_dream_lab_tpcc_control_tps", control_tps, labels, "Live TPCC control TPS in the lab.")
                         emit("sysinsight_dream_lab_tpcc_external_tps", external_tps, labels, "Live pressure-injection TPS from the selected external workload.")

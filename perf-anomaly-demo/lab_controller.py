@@ -19,6 +19,7 @@ from pathlib import Path
 import re
 import shutil
 import signal
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -276,6 +277,70 @@ def _pgbench_metrics(path: Path) -> Dict[str, Any]:
         result["latency_ms"] = float(final_latency[-1])
     elif progress_latency:
         result["latency_ms"] = float(progress_latency[-1])
+    return result
+
+
+def _tpcc_tps_summary(
+    samples: Sequence[Mapping[str, Any]],
+    phase: str,
+    metric: str,
+    duration_seconds: int,
+) -> Dict[str, Any]:
+    """Summarize a TPCC TPS series after its short startup/warm-up window."""
+
+    rows: List[Tuple[float, float]] = []
+    for sample in samples:
+        if str(sample.get("phase") or "") != phase:
+            continue
+        metrics = sample.get("metrics") or {}
+        if not isinstance(metrics, Mapping):
+            continue
+        if metric == "business":
+            values = metrics.get("business") or metrics.get("control") or {}
+        else:
+            values = metrics.get("pressure") or metrics.get("external") or {}
+        if not isinstance(values, Mapping):
+            continue
+        value = values.get("tps_live", values.get("tps"))
+        try:
+            tps = float(value)
+            elapsed = float(sample.get("elapsed_seconds") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if tps >= 0:
+            rows.append((elapsed, tps))
+
+    warmup_seconds = min(15.0, max(3.0, float(duration_seconds) * 0.10))
+    steady_rows = [item for item in rows if item[0] >= warmup_seconds]
+    # Very short developer smoke tests should still produce a useful result.
+    if len(steady_rows) < 3:
+        steady_rows = rows
+    values = [item[1] for item in steady_rows]
+    result: Dict[str, Any] = {
+        "metric": "normal_business_tps" if metric == "business" else "pressure_injection_tps",
+        "phase": phase,
+        "warmup_seconds": round(warmup_seconds, 1),
+        "sample_count": len(rows),
+        "steady_sample_count": len(values),
+    }
+    if not values:
+        result["status"] = "insufficient_data"
+        return result
+    mean = statistics.mean(values)
+    stdev = statistics.pstdev(values) if len(values) > 1 else 0.0
+    result.update(
+        {
+            "status": "ok",
+            # Median is the displayed stable TPS: it is less sensitive to a
+            # single overloaded or startup sample than the final value.
+            "steady_tps": round(statistics.median(values), 2),
+            "mean_tps": round(mean, 2),
+            "min_tps": round(min(values), 2),
+            "max_tps": round(max(values), 2),
+            "stdev_tps": round(stdev, 2),
+            "cv_percent": round((stdev / mean) * 100.0, 2) if mean else None,
+        }
+    )
     return result
 
 
@@ -710,11 +775,11 @@ class LabController:
             raise KeyError("unknown TPCC scenario: {}".format(scenario_id))
         normal_clients = _bounded_int(body.get("normal_clients"), "normal_clients", 2, 1, 16)
         pressure_clients = _bounded_int(body.get("pressure_clients"), "pressure_clients", case["clients"], 1, 32)
-        baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 10, 5, 180)
+        baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 60, 5, 300)
         # Keep the external pressure active until the experiment ends.  The
         # pressure window is also the tuning-observation window: a later TPS
         # increase is meaningful only while the same pressure is still on.
-        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 60, 5, 180)
+        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 180, 5, 300)
         config = {
             "normal_clients": normal_clients,
             "pressure_clients": pressure_clients,
@@ -1047,6 +1112,14 @@ class LabController:
                 run_dir,
             )
             samples = self.store.list_lab_samples(run_id, 2000)
+            for phase_name, phase_result in phases.items():
+                duration = int(phase_result.get("duration_seconds") or config.get("pressure_seconds", 0))
+                phase_result["business_tps_summary"] = _tpcc_tps_summary(
+                    samples, phase_name, "business", duration
+                )
+                phase_result["pressure_tps_summary"] = _tpcc_tps_summary(
+                    samples, phase_name, "pressure", duration
+                )
             alert_observed = any(
                 bool((sample.get("metrics") or {}).get("alert_firing"))
                 for sample in samples
