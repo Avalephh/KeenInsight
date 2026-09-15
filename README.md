@@ -59,6 +59,10 @@ monitoring/status.sh
 
 Grafana：<http://127.0.0.1:3000/>；Prometheus：<http://127.0.0.1:9090/>。Grafana 大屏的 JSON 在 `monitoring/dashboards/`，Prometheus 告警规则在 `monitoring/config/prometheus/rules/`。
 
+联动状态大屏：<http://127.0.0.1:3000/d/sysinsight-dream-automation?orgId=1&refresh=15s>；后台动作管理控制台：<http://127.0.0.1:9108/ui>。`monitoring/start.sh` 会自动启动 SysInsight/DREAM bridge，并把其状态作为 Prometheus 指标接入 Grafana。
+
+一页实验控制台：<http://127.0.0.1:9108/lab>；Grafana 实验看板：<http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1&refresh=5s>。控制台可重置实验参数、触发 TPCC 基线→压力→恢复、清空 DREAM 记录并执行 TPC-DS SQL 的优化前后对比。
+
 ## 运行真实 API 的 TPCC 验证
 
 先准备环境变量，不要把 key 写入 Git：

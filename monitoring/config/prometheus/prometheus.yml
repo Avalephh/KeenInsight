@@ -20,3 +20,11 @@ scrape_configs:
     static_configs:
       - targets:
           - 127.0.0.1:9187
+
+  # SysInsight/DREAM exposes the durable automation state as a native
+  # Prometheus target. Grafana can therefore show exactly what the background
+  # control loop observed, queued, validated, published, or rolled back.
+  - job_name: sysinsight_dream_bridge
+    static_configs:
+      - targets:
+          - 127.0.0.1:9108

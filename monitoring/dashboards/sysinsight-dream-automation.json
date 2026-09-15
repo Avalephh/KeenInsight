@@ -1,0 +1,136 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"title": "打开实验控制台（触发 TPCC / DREAM）", "type": "link", "url": "http://127.0.0.1:9108/lab", "targetBlank": true},
+    {"title": "打开联动管理控制台", "type": "link", "url": "http://127.0.0.1:9108/ui", "targetBlank": true},
+    {"title": "查看联动 API 状态 JSON", "type": "link", "url": "http://127.0.0.1:9108/api/v1/status", "targetBlank": true}
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "联动桥接进程", "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_up", "instant": true, "format": "time_series", "legendFormat": "bridge"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 2, "type": "stat", "title": "SysInsight 告警", "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_alert_firing", "instant": true, "format": "time_series", "legendFormat": "alert"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 3, "type": "stat", "title": "慢 SQL", "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_slow_sql_observations", "instant": true, "format": "time_series", "legendFormat": "slow SQL"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 4, "type": "stat", "title": "DREAM 待处理", "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum(sysinsight_dream_bridge_dream_jobs{status=~\"queued|running\"})", "instant": true, "format": "time_series", "legendFormat": "queued/running"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 5, "type": "stat", "title": "活动 Hint", "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_active_hints", "instant": true, "format": "time_series", "legendFormat": "active hints"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 6, "type": "stat", "title": "LLM API", "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_api_configured", "instant": true, "format": "time_series", "legendFormat": "configured"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 7, "type": "stat", "title": "最近采集错误", "gridPos": {"h": 4, "w": 4, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_last_collection_error", "instant": true, "format": "time_series", "legendFormat": "error"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "检测与采集状态", "gridPos": {"h": 7, "w": 12, "x": 4, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_bridge_alert_firing", "legendFormat": "SysInsight alert", "range": true},
+        {"refId": "B", "expr": "sysinsight_dream_bridge_last_collection_error", "legendFormat": "collection error", "range": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "DREAM 任务状态（含历史审计）", "gridPos": {"h": 7, "w": 8, "x": 16, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sum by (status) (sysinsight_dream_bridge_dream_jobs)", "legendFormat": "{{status}}", "range": true}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 10, "type": "table", "title": "慢 SQL 与 DREAM 入口", "gridPos": {"h": 9, "w": 24, "x": 0, "y": 11},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "topk(20, sysinsight_dream_bridge_sql_mean_time_ms)", "instant": true, "format": "table", "legendFormat": "{{queryid}} {{query}}"},
+        {"refId": "B", "expr": "topk(20, sysinsight_dream_bridge_sql_max_time_ms)", "instant": true, "format": "table", "legendFormat": "{{queryid}} {{query}}"},
+        {"refId": "C", "expr": "topk(20, sysinsight_dream_bridge_sql_calls)", "instant": true, "format": "table", "legendFormat": "{{queryid}} {{query}}"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
+    },
+    {
+      "id": 11, "type": "table", "title": "SysInsight 告警事件", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_incident_info", "instant": true, "format": "table", "legendFormat": "{{incident_id}} {{status}}"}],
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
+    },
+    {
+      "id": 12, "type": "table", "title": "DREAM 任务审计（blocked 为历史记录）", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_dream_job_info", "instant": true, "format": "table", "legendFormat": "{{job_id}} {{status}}"}],
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
+    },
+    {
+      "id": 13, "type": "table", "title": "改进方案与自动应用状态", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 28},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_bridge_improvement_info", "instant": true, "format": "table", "legendFormat": "{{improvement_id}} {{status}}"},
+        {"refId": "B", "expr": "sysinsight_dream_bridge_improvement_ratio", "instant": true, "format": "table", "legendFormat": "{{improvement_id}} ratio"},
+        {"refId": "C", "expr": "sysinsight_dream_bridge_improvement_hit_count", "instant": true, "format": "table", "legendFormat": "{{improvement_id}} observed matches"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
+    },
+    {
+      "id": 14, "type": "text", "title": "如何管理后台自动动作", "gridPos": {"h": 7, "w": 24, "x": 0, "y": 36},
+      "options": {"mode": "markdown", "content": "### 自动链路\n\n1. Prometheus 告警进入 firing 后，桥接进程保存事件并异步启动 SysInsight 分析。\n2. 每轮采集 `pg_stat_statements`；超过慢 SQL 阈值的可回放语句进入 DREAM 队列。\n3. DREAM 的结果经过只读、实测提升和合法 `pg_hint_plan` Hint 校验，合格后才自动发布。\n4. 下一次匹配 SQL 的调用会在面板中累计为“命中观测”。\n\n点击仪表盘顶部的“打开联动管理控制台”，可以查看完整 JSON、动作时间线，手动立即检测、重试 DREAM、启用候选 Hint 或回滚活动 Hint。"}
+    },
+    {
+      "id": 15, "type": "stat", "title": "DREAM 调度闸门", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 43},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_dream_gate_blocked", "instant": true, "format": "time_series", "legendFormat": "blocked"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 39,
+  "tags": ["prometheus", "postgresql", "sysinsight", "dream", "automation"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "SysInsight / DREAM 自动联动",
+  "uid": "sysinsight-dream-automation",
+  "version": 1
+}

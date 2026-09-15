@@ -1,0 +1,96 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"title": "打开实验控制台（触发 TPCC / DREAM）", "type": "link", "url": "http://127.0.0.1:9108/lab", "targetBlank": true},
+    {"title": "打开自动联动管理", "type": "link", "url": "http://127.0.0.1:9108/ui", "targetBlank": true}
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "TPCC 实验状态", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_sysinsight_run_info", "instant": true, "format": "time_series", "legendFormat": "{{phase}} / {{status}}"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "gray", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "name"}
+    },
+    {
+      "id": 2, "type": "stat", "title": "TPCC 控制 TPS", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_control_tps", "instant": true, "format": "time_series", "legendFormat": "{{phase}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 3, "type": "stat", "title": "TPCC 外部压力 TPS", "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_external_tps", "instant": true, "format": "time_series", "legendFormat": "{{phase}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 4, "type": "stat", "title": "TPCC / SysInsight 告警", "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_alert_firing", "instant": true, "format": "time_series", "legendFormat": "当前采样 {{phase}}"},
+        {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_alert_observed", "instant": true, "format": "time_series", "legendFormat": "本次曾触发 {{phase}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "TPCC 基线 / 压力 / 恢复实时曲线", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_control_tps", "legendFormat": "控制 TPS {{phase}}", "range": true},
+        {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_external_tps", "legendFormat": "外部 TPS {{phase}}", "range": true},
+        {"refId": "C", "expr": "sysinsight_dream_lab_tpcc_connections", "legendFormat": "实验连接 {{phase}}", "range": true},
+        {"refId": "D", "expr": "sysinsight_dream_lab_tpcc_active_sessions", "legendFormat": "活动连接 {{phase}}", "range": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "DREAM SQL 执行对比", "gridPos": {"h": 8, "w": 8, "x": 16, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_sql_baseline_duration_ms", "legendFormat": "基线 {{scenario_id}}", "range": true},
+        {"refId": "B", "expr": "sysinsight_dream_lab_sql_optimized_duration_ms", "legendFormat": "优化后 {{scenario_id}}", "range": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 7, "type": "stat", "title": "DREAM 实测提升比例", "gridPos": {"h": 4, "w": 8, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_sql_improvement_ratio", "instant": true, "format": "time_series", "legendFormat": "{{scenario_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0.2}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 8, "type": "table", "title": "实验运行状态", "gridPos": {"h": 8, "w": 16, "x": 8, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_sysinsight_run_info", "instant": true, "format": "table", "legendFormat": "TPCC {{scenario_id}}"},
+        {"refId": "B", "expr": "sysinsight_dream_lab_dream_run_info", "instant": true, "format": "table", "legendFormat": "DREAM {{scenario_id}}"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
+    },
+    {
+      "id": 9, "type": "text", "title": "如何触发实验", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
+      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 选择真实回滚保护的 TPCC 外部压力，观察基线、压力和恢复三段；\n3. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL；\n4. 发送原 SQL，等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\n这里的 Grafana 面板负责观测，按钮控制和详细结果在实验控制台完成。DREAM 没有返回合法可执行改进时，页面会明确显示原因，不会伪造“已优化”。"}
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["prometheus", "postgresql", "sysinsight", "dream", "lab", "tpcc", "tpcds"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "SysInsight / DREAM 实验控制台",
+  "uid": "sysinsight-experiment-lab",
+  "version": 1
+}

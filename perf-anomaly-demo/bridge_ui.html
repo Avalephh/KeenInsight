@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SysInsight / DREAM 联动管理</title>
+  <style>
+    :root { color-scheme: light; font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #f5f7fb; color: #202938; }
+    header { padding: 20px 28px; background: #172033; color: white; display: flex; align-items: center; gap: 12px; }
+    header h1 { margin: 0; font-size: 21px; flex: 1; }
+    main { padding: 20px 28px 40px; max-width: 1500px; margin: auto; }
+    button { border: 0; border-radius: 5px; padding: 8px 12px; cursor: pointer; background: #2f6fed; color: white; }
+    button.secondary { background: #536174; } button.warn { background: #c47700; } button.danger { background: #c43d52; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .card, section { background: white; border: 1px solid #e1e6ef; border-radius: 8px; box-shadow: 0 1px 3px #17203312; }
+    .card { padding: 15px; } .card .value { font-size: 25px; font-weight: 650; margin-top: 4px; }
+    .ok { color: #16834c; } .bad { color: #c43d52; } .muted { color: #718096; }
+    section { margin: 16px 0; overflow: hidden; } section h2 { margin: 0; padding: 13px 15px; font-size: 16px; background: #f9fafc; border-bottom: 1px solid #e8ecf2; }
+    .section-body { padding: 12px 15px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 780px; } th, td { border-bottom: 1px solid #edf0f5; padding: 8px; text-align: left; vertical-align: top; } th { color: #5c687a; font-weight: 600; white-space: nowrap; }
+    td.sql { max-width: 520px; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, monospace; font-size: 12px; }
+    .pill { display: inline-block; padding: 2px 7px; border-radius: 10px; background: #e9eef8; font-size: 12px; } .pill.active, .pill.completed { background: #dff5e9; color: #12683e; } .pill.failed, .pill.blocked, .pill.rolled_back { background: #fde5e8; color: #9c263a; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } #updated { margin-left: auto; }
+    pre { white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; background: #f6f8fb; padding: 10px; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <header><h1>SysInsight / DREAM 自动联动管理</h1><button class="secondary" onclick="refresh()">刷新</button><button onclick="collect(false)">立即检测</button></header>
+  <main>
+    <div class="toolbar"><span id="summary" class="muted">正在加载...</span><span id="updated" class="muted"></span></div>
+    <div id="cards" class="cards"></div>
+    <section><h2>后台动作时间线</h2><div class="section-body"><table><thead><tr><th>时间</th><th>组件</th><th>动作</th><th>状态</th><th>对象 / 详情</th></tr></thead><tbody id="events"></tbody></table></div></section>
+    <section><h2>DREAM 队列与任务管理（blocked 为历史审计）</h2><div class="section-body"><table><thead><tr><th>请求时间</th><th>Job</th><th>状态</th><th>SQL</th><th>尝试</th><th>结果 / 阻塞原因</th><th>操作</th></tr></thead><tbody id="jobs"></tbody></table></div></section>
+    <section><h2>改进方案 / pg_hint_plan</h2><div class="section-body"><div class="toolbar"><button class="secondary" onclick="configureHints()">配置 hint table</button><span class="muted">自动发布仍受实测提升、只读和合法 Hint 策略约束；这里的启用/回滚是显式人工操作。</span></div><table><thead><tr><th>创建时间</th><th>ID</th><th>状态</th><th>提升比例</th><th>Hint</th><th>命中观测</th><th>操作</th></tr></thead><tbody id="improvements"></tbody></table></div></section>
+    <section><h2>已观测 SQL（慢 SQL 进入 DREAM）</h2><div class="section-body"><table><thead><tr><th>SQL</th><th>queryid</th><th>平均 ms</th><th>最大 ms</th><th>调用数</th><th>可回放</th><th>改进状态</th></tr></thead><tbody id="sql"></tbody></table></div></section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const text = value => esc(value === undefined || value === null ? '' : value);
+    async function get(path) { const r = await fetch(path); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+    async function post(path, body = {}) { const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); const v = await r.json(); if (!r.ok) throw new Error(v.error || JSON.stringify(v)); return v; }
+    function pill(value) { const s = String(value || 'unknown'); return `<span class="pill ${esc(s)}">${text(s)}</span>`; }
+    function when(value) { return value ? new Date(value).toLocaleString() : '-'; }
+    function showError(error) { $('summary').textContent = '操作失败：' + error.message; $('summary').className = 'bad'; }
+    async function collect(force) { try { await post('/api/v1/actions/collect', {force_alert: !!force}); await refresh(); } catch (e) { showError(e); } }
+    async function configureHints() { try { await post('/api/v1/actions/hint-table/configure'); await refresh(); } catch (e) { showError(e); } }
+    async function action(path) { try { await post(path); await refresh(); } catch (e) { showError(e); } }
+    function renderCards(s) {
+      const c = s.state.counts || {}, svc = s.service || {}, alert = s.alert || {}, gate = s.dream_gate || {};
+      const values = [
+        ['桥接进程', svc.name ? '运行中' : '未知', svc.name ? 'ok' : 'bad'],
+        ['SysInsight 告警', alert.firing ? 'FIRING' : '正常', alert.firing ? 'bad' : 'ok'],
+        ['SQL 观测', c.sql_observations || 0, ''], ['慢 SQL', c.slow_sql_observations || 0, ''],
+        ['DREAM 队列', (c.dream_jobs?.queued || 0) + (c.dream_jobs?.running || 0), ''],
+        ['活动 Hint', c.active_hints || 0, c.active_hints ? 'ok' : ''], ['Hint 命中观测', c.observed_hint_matches || 0, ''],
+        ['DREAM 自动调度', svc.dream_ready ? '可运行' : '已阻塞', svc.dream_ready ? 'ok' : 'bad']
+      ];
+      $('cards').innerHTML = values.map(v => `<div class="card"><div class="muted">${text(v[0])}</div><div class="value ${v[2]}">${text(v[1])}</div></div>`).join('');
+      const gateText = gate.reason ? `；调度状态：${gate.status || '-'}（${gate.reason}）` : '';
+      $('summary').textContent = `数据库 ${s.database?.name || '-'} / schema ${s.database?.schema || '-'}；LLM API ${svc.api_configured ? '已配置' : '未配置'}；自动应用 ${svc.dream_auto_apply ? '开启' : '关闭'}${gateText}`;
+      $('summary').className = 'muted'; $('updated').textContent = '更新于 ' + new Date().toLocaleTimeString();
+    }
+    function renderEvents(rows) { $('events').innerHTML = rows.map(e => `<tr><td>${text(when(e.occurred_at))}</td><td>${text(e.component)}</td><td>${text(e.event_type)}</td><td>${pill(e.status)}</td><td class="sql">${text(JSON.stringify(e.data || {}))}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">暂无动作</td></tr>'; }
+    function renderJobs(rows) { $('jobs').innerHTML = rows.map(j => { const retry = ['failed','blocked','candidate','completed'].includes(String(j.status)); const result = j.result || {}; const reason = j.error || result.reason || result.error || '-'; return `<tr><td>${text(when(j.requested_at))}</td><td>${text(j.job_id)}</td><td>${pill(j.status)}</td><td class="sql">${text(j.canonical_sql || j.query_text || j.sql_key)}</td><td>${text(j.attempts)}</td><td class="sql">${text(reason)}</td><td>${retry ? `<button class="warn" onclick="action('/api/v1/actions/jobs/${encodeURIComponent(j.job_id)}/retry')">重试</button>` : '-'}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">暂无 DREAM 任务</td></tr>'; }
+    function renderImprovements(rows) { $('improvements').innerHTML = rows.map(i => { const status = String(i.status); const activate = ['candidate','rolled_back'].includes(status) && i.hints; const rollback = status === 'active'; return `<tr><td>${text(when(i.created_at))}</td><td>${text(i.improvement_id)}</td><td>${pill(status)}</td><td>${i.improvement_ratio == null ? '-' : text((Number(i.improvement_ratio) * 100).toFixed(1) + '%')}</td><td class="sql">${text(i.hints || i.rewrite_sql || i.fix_action || '-')}</td><td>${text(i.hit_count || 0)}</td><td>${activate ? `<button onclick="action('/api/v1/actions/improvements/${encodeURIComponent(i.improvement_id)}/activate')">启用</button>` : ''} ${rollback ? `<button class="danger" onclick="action('/api/v1/actions/improvements/${encodeURIComponent(i.improvement_id)}/rollback')">回滚</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="muted">暂无改进方案</td></tr>'; }
+    function renderSql(rows) { $('sql').innerHTML = rows.map(q => `<tr><td class="sql">${text(q.query_text || q.canonical_sql)}</td><td>${text(q.queryid)}</td><td>${text(Number(q.mean_time_ms || 0).toFixed(2))}</td><td>${text(Number(q.max_time_ms || 0).toFixed(2))}</td><td>${text(q.calls)}</td><td>${q.replayable ? '是' : '否'}</td><td>${pill(q.improvement_status)}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">暂无 SQL 观测</td></tr>'; }
+    async function refresh() { try { const [s,e,j,i,q] = await Promise.all([get('/api/v1/status?limit=50'),get('/api/v1/events?limit=80'),get('/api/v1/jobs?limit=50'),get('/api/v1/improvements?limit=50'),get('/api/v1/sql?limit=100')]); renderCards(s); renderEvents(e.events || []); renderJobs(j.jobs || []); renderImprovements(i.improvements || []); renderSql(q.sql_observations || []); } catch (e) { showError(e); } }
+    refresh(); setInterval(refresh, 5000);
+  </script>
+</body>
+</html>

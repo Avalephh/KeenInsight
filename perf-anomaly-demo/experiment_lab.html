@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SysInsight / DREAM 实验控制台</title>
+  <style>
+    :root { color-scheme: light; font: 14px/1.45 system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #f3f6fa; color: #202938; }
+    header { padding: 18px 28px; background: #172033; color: white; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    header h1 { margin: 0; font-size: 21px; flex: 1 1 360px; }
+    header a { color: #dce8ff; text-decoration: none; }
+    main { max-width: 1540px; margin: auto; padding: 20px 28px 44px; }
+    button, select, input { font: inherit; }
+    button { border: 0; border-radius: 5px; padding: 8px 12px; cursor: pointer; background: #2f6fed; color: white; }
+    button.secondary { background: #536174; } button.warn { background: #b76c00; } button.danger { background: #bd3a50; }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .muted { color: #718096; } .ok { color: #16834c; } .bad { color: #bd3a50; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 14px 0 18px; }
+    .card, section { background: white; border: 1px solid #dfe6ef; border-radius: 8px; box-shadow: 0 1px 3px #17203312; }
+    .card { padding: 13px 15px; } .card .value { font-size: 23px; font-weight: 650; margin-top: 3px; }
+    section { margin: 16px 0; overflow: hidden; } section h2 { margin: 0; padding: 13px 15px; font-size: 16px; background: #f9fafc; border-bottom: 1px solid #e8edf3; }
+    .section-body { padding: 13px 15px; overflow-x: auto; }
+    .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 12px; }
+    .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; } .span-7 { grid-column: span 7; } .span-8 { grid-column: span 8; } .span-12 { grid-column: span 12; }
+    @media (max-width: 900px) { .span-3,.span-4,.span-5,.span-6,.span-7,.span-8 { grid-column: span 12; } main { padding: 14px; } }
+    label { display: block; color: #5c687a; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+    select, input { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 5px; padding: 8px; background: white; color: #202938; }
+    .field { min-width: 120px; } .hint { padding: 9px 11px; border-radius: 5px; background: #f3f7ff; color: #4b5d78; }
+    .phase-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+    .phase { padding: 12px; border-radius: 6px; background: #edf1f6; color: #6b7789; border: 1px solid transparent; }
+    .phase.active { background: #fff3d8; color: #8a5a00; border-color: #eabf67; } .phase.done { background: #e1f5ea; color: #176b43; }
+    table { border-collapse: collapse; width: 100%; min-width: 720px; } th, td { border-bottom: 1px solid #edf0f5; padding: 8px; text-align: left; vertical-align: top; } th { color: #5c687a; font-weight: 600; white-space: nowrap; }
+    td.sql, pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
+    td.sql { max-width: 620px; } pre { margin: 0; max-height: 360px; overflow: auto; background: #f6f8fb; padding: 11px; border-radius: 5px; }
+    .pill { display: inline-block; padding: 2px 7px; border-radius: 10px; background: #e9eef8; font-size: 12px; white-space: nowrap; }
+    .pill.completed, .pill.active, .pill.ready { background: #dff5e9; color: #12683e; } .pill.failed, .pill.blocked, .pill.stopped { background: #fde5e8; color: #9c263a; } .pill.running, .pill.queued { background: #fff0cd; color: #8a5a00; }
+    .metric-line { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; } .metric-line strong { font-size: 18px; }
+    .notice { border-left: 4px solid #2f6fed; padding: 9px 12px; background: #f3f7ff; margin: 10px 0; }
+    #message { min-height: 20px; margin: 8px 0; } .right { margin-left: auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SysInsight / DREAM 实验控制台</h1>
+    <a href="http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1" target="_blank">Grafana 实验看板</a>
+    <a href="/ui" target="_blank">自动联动管理</a>
+    <button class="secondary" onclick="refreshAll()">刷新</button>
+  </header>
+  <main>
+    <div class="toolbar"><span id="summary" class="muted">正在加载实验目录...</span><span id="updated" class="muted right"></span></div>
+    <div id="cards" class="cards"></div>
+    <div id="message"></div>
+
+    <section>
+      <h2>SysInsight / TPCC 外部压力：基线 → 性能下降 → 恢复</h2>
+      <div class="section-body">
+        <div class="notice">选择的外部压力会与正常 TPCC 控制负载同时运行。事务脚本使用 SAVEPOINT 回滚业务变更；告警、活动连接数、控制 TPS 和每秒采样由后台真实记录。</div>
+        <div class="grid">
+          <div class="span-7"><label for="tpccScenario">TPCC 外部压力场景</label><select id="tpccScenario"></select></div>
+          <div class="span-3"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
+          <div class="span-2"><label for="pressureClients">外部客户端</label><input id="pressureClients" type="number" min="1" max="32" value="6"></div>
+          <div class="span-3 field"><label for="baselineSeconds">基线秒数</label><input id="baselineSeconds" type="number" min="5" max="180" value="10"></div>
+          <div class="span-3 field"><label for="pressureSeconds">压力秒数</label><input id="pressureSeconds" type="number" min="5" max="180" value="20"></div>
+          <div class="span-3 field"><label for="recoverySeconds">恢复秒数</label><input id="recoverySeconds" type="number" min="5" max="180" value="15"></div>
+          <div class="span-3 toolbar" style="align-items:end"><button id="startTpcc" onclick="startTpcc()">开始下降→恢复实验</button><button id="stopTpcc" class="warn" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
+        </div>
+        <div id="tpccDescription" class="hint" style="margin-top:12px"></div>
+        <div id="tpccPhases" class="phase-track"></div>
+        <div id="tpccLive" class="metric-line muted">尚未运行 TPCC 实验</div>
+        <table><thead><tr><th>阶段</th><th>控制 TPS</th><th>控制延迟</th><th>外部 TPS</th><th>返回码</th><th>结论</th></tr></thead><tbody id="tpccResults"></tbody></table>
+      </div>
+    </section>
+
+    <section>
+      <h2>DREAM / TPC-DS 复杂 SQL：执行 → 分析 → 再执行</h2>
+      <div class="section-body">
+        <div class="notice">SQL 来自 DREAM 的 TPC-DS 慢 SQL 目录，只允许单条只读 SELECT/WITH。第一次按钮会真实执行原 SQL并把观测送入异步 DREAM；分析完成后可再次执行 DREAM 的可执行改写、会话建议或已发布 Hint。</div>
+        <div class="grid">
+          <div class="span-8"><label for="sqlCatalog">复杂 SQL</label><select id="sqlCatalog" onchange="loadSqlDetail()"></select></div>
+          <div class="span-4 toolbar" style="align-items:end"><button id="startDream" onclick="startDream()">发送原 SQL并触发 DREAM</button><button id="replayDream" onclick="replayDream()" disabled>再次执行优化 SQL</button></div>
+          <div class="span-8"><pre id="sqlText">请选择一条 TPC-DS SQL</pre></div>
+          <div class="span-4"><div id="sqlMeta" class="hint">-</div><div style="height:8px"></div><label><input id="applyHint" type="checkbox" style="width:auto"> 候选 Hint 允许显式发布后再执行</label><button class="danger" onclick="clearDream()" style="margin-top:12px">清空 DREAM 保存记录</button></div>
+        </div>
+        <div id="dreamState" class="hint" style="margin-top:12px">尚未运行 DREAM 实验</div>
+        <div class="grid" style="margin-top:12px">
+          <div class="span-6"><h3>执行对比</h3><table><thead><tr><th>阶段</th><th>耗时 ms</th><th>方式</th><th>状态</th></tr></thead><tbody id="dreamExecutions"></tbody></table></div>
+          <div class="span-6"><h3>DREAM 分析结果</h3><pre id="dreamAnalysis">暂无结果</pre></div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>数据库参数与实验审计</h2>
+      <div class="section-body">
+        <div class="toolbar"><button class="warn" onclick="resetDatabase()">重置实验白名单参数</button><span class="muted">只处理实验白名单；不会重置 pg_hint_plan 的 session_preload_libraries，也不会自动重启 PostgreSQL。</span></div>
+        <pre id="databaseResult" style="margin-top:10px">尚未执行参数重置</pre>
+        <table><thead><tr><th>请求时间</th><th>类型</th><th>场景 / SQL</th><th>状态</th><th>当前阶段</th><th>错误</th></tr></thead><tbody id="runHistory"></tbody></table>
+      </div>
+    </section>
+  </main>
+  <script>
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const text = value => esc(value === undefined || value === null ? '' : value);
+    const jsonText = value => JSON.stringify(value ?? {}, null, 2);
+    const when = value => value ? new Date(value).toLocaleString() : '-';
+    const pill = value => { const v = String(value || 'unknown'); return `<span class="pill ${esc(v)}">${text(v)}</span>`; };
+    let catalog = null;
+    let selectedSql = null;
+    let selectedRun = {sysinsight: '', dream: ''};
+
+    async function get(path) { const r = await fetch(path, {cache:'no-store'}); if (!r.ok) throw new Error(await r.text()); return r.json(); }
+    async function post(path, body = {}) { const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); const v = await r.json(); if (!r.ok) throw new Error(v.error || JSON.stringify(v)); return v; }
+    function message(value, bad = false) { $('message').textContent = value || ''; $('message').className = bad ? 'bad' : 'ok'; }
+    function selectedScenario() { return (catalog?.tpcc_scenarios || []).find(v => v.scenario_id === $('tpccScenario').value); }
+    function currentRun(status, kind) { return (status.current || []).find(v => v.kind === kind); }
+
+    function loadCatalog() {
+      const tpcc = $('tpccScenario');
+      tpcc.innerHTML = (catalog.tpcc_scenarios || []).map(v => `<option value="${esc(v.scenario_id)}">${text(v.title)}</option>`).join('');
+      tpcc.onchange = () => {
+        const v = selectedScenario();
+        if (v) { $('pressureClients').value = v.clients; $('tpccDescription').textContent = `${v.event}；事务：${(v.transactions || []).join('、')}；证据：${(v.pressure_evidence || []).join('、')}`; }
+      };
+      tpcc.onchange();
+      const sql = $('sqlCatalog');
+      sql.innerHTML = (catalog.sql_catalog || []).map(v => `<option value="${esc(v.sql_id)}"${v.read_only ? '' : ' disabled'}>Q${text(v.query_number)}${v.recommended ? ' · 已验证推荐' : ''}${v.read_only ? '' : ' · 不可单条执行'} · 复杂度 ${text(v.complexity_score)} · ${text(v.line_count)} 行</option>`).join('');
+      const recommended = (catalog.sql_catalog || []).find(v => v.recommended);
+      if (recommended) sql.value = recommended.sql_id;
+      if (sql.value) loadSqlDetail();
+    }
+
+    async function loadSqlDetail() {
+      if (!$('sqlCatalog').value) return;
+      try {
+        selectedSql = await get('/api/v1/lab/sql/' + encodeURIComponent($('sqlCatalog').value));
+        $('sqlText').textContent = selectedSql.query || '';
+        $('sqlMeta').innerHTML = `<b>${text(selectedSql.title)}</b><br>来源：${text(selectedSql.source)}<br>行数：${text(selectedSql.line_count)}；复杂度：${text(selectedSql.complexity_score)}<br>只读校验：${selectedSql.read_only ? '<span class="ok">通过</span>' : '<span class="bad">不通过</span>'}`;
+      } catch (e) { message('SQL 详情加载失败：' + e.message, true); }
+    }
+
+    function renderCards(status) {
+      const current = status.current || [], s = status.latest_sysinsight || {}, d = status.latest_dream || {};
+      const sSample = current.find(v => v.kind === 'sysinsight')?.samples?.slice(-1)[0]?.metrics || {};
+      const dResult = d.result || {};
+      const executions = d.executions || [];
+      const base = executions.find(v => v.phase === 'baseline');
+      const opt = executions.find(v => v.phase === 'optimized');
+      const values = [
+        ['TPCC 当前阶段', current.find(v => v.kind === 'sysinsight')?.phase || s.phase || 'idle', current.find(v => v.kind === 'sysinsight') ? 'ok' : ''],
+        ['TPCC 活动连接', sSample.active_lab ?? '-', ''],
+        ['TPCC 告警', sSample.alert_firing ? 'FIRING' : '正常', sSample.alert_firing ? 'bad' : 'ok'],
+        ['DREAM 状态', current.find(v => v.kind === 'dream')?.phase || d.phase || 'idle', current.find(v => v.kind === 'dream') ? 'ok' : ''],
+        ['DREAM 基线 ms', base ? Number(base.duration_ms || 0).toFixed(1) : '-', ''],
+        ['DREAM 优化 ms', opt ? Number(opt.duration_ms || 0).toFixed(1) : '-', opt ? 'ok' : '']
+      ];
+      $('cards').innerHTML = values.map(v => `<div class="card"><div class="muted">${text(v[0])}</div><div class="value ${v[2]}">${text(v[1])}</div></div>`).join('');
+      $('summary').textContent = `数据库 ${text(catalog?.database?.name || '-')} / schema ${text(catalog?.database?.schema || '-')}；每 2 秒刷新实验状态`;
+      $('updated').textContent = '更新于 ' + new Date().toLocaleTimeString();
+    }
+
+    function phaseClass(name, run) {
+      const phase = String(run?.phase || '');
+      if (phase === name) return 'phase active';
+      const order = ['baseline','pressure','recovery','completed'];
+      return order.indexOf(phase) > order.indexOf(name) || phase === 'completed' ? 'phase done' : 'phase';
+    }
+
+    function phaseResult(run, name) {
+      const p = run?.result?.phases?.[name] || {};
+      const control = (p.workers || []).find(v => v.role === 'control') || {};
+      const external = (p.workers || []).find(v => v.role === 'external') || {};
+      return {control: control.metrics || {}, external: external.metrics || {}, controlCode: control.returncode, externalCode: external.returncode};
+    }
+
+    function renderTpcc(status) {
+      const run = currentRun(status, 'sysinsight') || status.latest_sysinsight;
+      const active = currentRun(status, 'sysinsight');
+      $('startTpcc').disabled = !!active;
+      $('stopTpcc').disabled = !active;
+      $('tpccPhases').innerHTML = ['baseline','pressure','recovery'].map(name => `<div class="${phaseClass(name, run)}"><b>${text(name === 'baseline' ? '1 基线' : name === 'pressure' ? '2 外部压力' : '3 恢复')}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
+      const sample = active?.samples?.slice(-1)[0];
+      const m = sample?.metrics || {};
+      $('tpccLive').innerHTML = active ? `<b>${text(run.phase)}</b> · 已运行 ${text(Number(sample?.elapsed_seconds || 0).toFixed(1))} 秒 · 控制 TPS <strong>${text((m.control?.tps_live ?? m.control?.tps ?? '-'))}</strong> · 外部 TPS <strong>${text((m.external?.tps_live ?? m.external?.tps ?? '-'))}</strong> · 实验连接 <strong>${text(m.lab_sessions ?? m.active_lab ?? '-')}</strong> · 告警 ${m.alert_firing ? pill('FIRING') : pill('normal')}` : `最近运行：${run ? pill(run.status) + ' · ' + text(run.phase) : '尚未运行 TPCC 实验'}`;
+      const rows = ['baseline','pressure','recovery'].map(name => {
+        const p = phaseResult(run, name), c = p.control, e = p.external;
+        const alertState = run?.result?.sysinsight_state || {};
+        const currentAlert = !!(alertState.alert_observed ?? alertState.alert_firing ?? m.alert_firing);
+        const currentIncidents = (run?.result?.sysinsight_state?.current_incidents || []).length > 0;
+        return `<tr><td>${text(name)}</td><td>${text(c.tps ?? '-')}</td><td>${text(c.latency_ms == null ? '-' : Number(c.latency_ms).toFixed(2))}</td><td>${text(e.tps ?? '-')}</td><td>${text(p.controlCode ?? '-')}${p.externalCode == null ? '' : ' / ' + text(p.externalCode)}</td><td>${name === 'pressure' ? (currentAlert || currentIncidents ? '本次已触发/已记录' : '本次未采样到告警') : name === 'recovery' ? '外部压力已停止' : '无外部压力'}</td></tr>`;
+      });
+      $('tpccResults').innerHTML = rows.join('');
+    }
+
+    function renderDream(status) {
+      const run = currentRun(status, 'dream') || status.latest_dream;
+      const active = currentRun(status, 'dream');
+      const result = run?.result || {};
+      const job = run?.job || {};
+      const imp = run?.improvement || result.improvement || {};
+      $('startDream').disabled = !!active || !selectedSql;
+      $('replayDream').disabled = !!active || !run || !result.job_id || ['queued','running'].includes(String(job.status || '')) || !!result.optimized_execution_id;
+      if (!run) {
+        $('dreamState').textContent = '尚未运行 DREAM 实验'; $('dreamExecutions').innerHTML = '<tr><td colspan="4" class="muted">暂无执行记录</td></tr>'; $('dreamAnalysis').textContent = '暂无结果'; return;
+      }
+      $('dreamState').innerHTML = `${pill(run.status)} · 阶段 ${text(run.phase)} · SQL ${text(run.scenario_id)} · Job ${text(result.job_id || '-')} ${job.status ? pill(job.status) : ''}`;
+      const executions = run.executions || [];
+      $('dreamExecutions').innerHTML = executions.slice().reverse().map(v => `<tr><td>${text(v.phase)}</td><td>${v.duration_ms == null ? '-' : text(Number(v.duration_ms).toFixed(2))}</td><td>${text(v.method || '-')}</td><td>${pill(v.status)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">暂无执行记录</td></tr>';
+      const analysis = {
+        job: run.job || result.job || {},
+        improvement: imp,
+        comparison: result.comparison || null,
+        optimized_query: result.optimized_query || null,
+        session_settings: result.session_settings || {}
+      };
+      $('dreamAnalysis').textContent = jsonText(analysis);
+    }
+
+    function renderHistory(status) {
+      $('runHistory').innerHTML = (status.runs || []).map(v => `<tr><td>${text(when(v.requested_at))}</td><td>${text(v.kind)}</td><td>${text(v.scenario_id || v.title || '-')}</td><td>${pill(v.status)}</td><td>${text(v.phase)}</td><td class="sql">${text(v.error || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">暂无审计记录</td></tr>';
+    }
+
+    async function refreshAll() {
+      try {
+        if (!catalog) { catalog = await get('/api/v1/lab/catalog'); loadCatalog(); }
+        const status = await get('/api/v1/lab/status');
+        renderCards(status); renderTpcc(status); renderDream(status); renderHistory(status);
+      } catch (e) { message('刷新失败：' + e.message, true); }
+    }
+
+    async function startTpcc() {
+      try {
+        const v = await post('/api/v1/actions/lab/tpcc/start', {
+          scenario_id: $('tpccScenario').value,
+          normal_clients: $('normalClients').value,
+          pressure_clients: $('pressureClients').value,
+          baseline_seconds: $('baselineSeconds').value,
+          pressure_seconds: $('pressureSeconds').value,
+          recovery_seconds: $('recoverySeconds').value
+        });
+        selectedRun.sysinsight = v.run?.run_id || ''; message('TPCC 实验已排队，页面会持续显示真实采样。'); await refreshAll();
+      } catch (e) { message('启动 TPCC 失败：' + e.message, true); }
+    }
+
+    async function stopCurrent(kind) {
+      try {
+        const status = await get('/api/v1/lab/status'); const run = currentRun(status, kind);
+        if (!run) return;
+        await post('/api/v1/actions/lab/stop', {run_id: run.run_id}); message('已请求停止 ' + kind + ' 实验。'); await refreshAll();
+      } catch (e) { message('停止失败：' + e.message, true); }
+    }
+
+    async function resetDatabase() {
+      if (!confirm('确认重置实验白名单参数？不会自动重启 PostgreSQL。')) return;
+      try { const v = await post('/api/v1/actions/lab/reset-database'); $('databaseResult').textContent = jsonText(v); message('数据库实验参数已处理。'); } catch (e) { message('参数重置失败：' + e.message, true); }
+    }
+
+    async function clearDream() {
+      if (!confirm('确认清空桥接 SQL/DREAM 记录并重置 pg_stat_statements？操作前会自动保存可恢复归档。')) return;
+      try { const v = await post('/api/v1/actions/lab/dream/clear', {reset_pg_stat_statements: true}); $('databaseResult').textContent = jsonText(v); message('DREAM 保存记录已清空，归档路径已返回。'); await refreshAll(); } catch (e) { message('清空 DREAM 记录失败：' + e.message, true); }
+    }
+
+    async function startDream() {
+      try { const v = await post('/api/v1/actions/lab/dream/start', {sql_id: $('sqlCatalog').value}); selectedRun.dream = v.run?.run_id || ''; message('原 SQL 已排队执行，DREAM 分析会在后台异步完成。'); await refreshAll(); } catch (e) { message('启动 DREAM 失败：' + e.message, true); }
+    }
+
+    async function replayDream() {
+      const status = await get('/api/v1/lab/status'); const run = currentRun(status, 'dream') || status.latest_dream;
+      if (!run) return;
+      try { await post('/api/v1/actions/lab/dream/replay', {run_id: run.run_id, apply_hint: $('applyHint').checked}); message('已排队执行 DREAM 优化结果。'); await refreshAll(); } catch (e) { message('再次执行失败：' + e.message, true); }
+    }
+
+    refreshAll(); setInterval(refreshAll, 2000);
+  </script>
+</body>
+</html>

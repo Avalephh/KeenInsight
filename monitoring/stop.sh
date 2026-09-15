@@ -3,7 +3,7 @@ set -euo pipefail
 
 BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-for name in grafana postgres_exporter node_exporter prometheus; do
+for name in sysinsight_dream_bridge grafana postgres_exporter node_exporter prometheus; do
   pid_file="$BASE_DIR/run/$name.pid"
   if [ -f "$pid_file" ]; then
     pid="$(<"$pid_file")"
