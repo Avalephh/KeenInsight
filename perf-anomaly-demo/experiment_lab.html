@@ -68,7 +68,7 @@
         <div id="tpccDescription" class="hint" style="margin-top:12px"></div>
         <div id="tpccPhases" class="phase-track"></div>
         <div id="tpccLive" class="metric-line muted">尚未运行 TPCC 实验</div>
-        <table><thead><tr><th>阶段</th><th>控制 TPS</th><th>控制延迟</th><th>外部 TPS</th><th>返回码</th><th>结论</th></tr></thead><tbody id="tpccResults"></tbody></table>
+        <table><thead><tr><th>阶段</th><th>目标业务 TPS（主指标）</th><th>业务延迟</th><th>压力注入 TPS（辅助）</th><th>返回码</th><th>结论</th></tr></thead><tbody id="tpccResults"></tbody></table>
       </div>
     </section>
 
@@ -113,15 +113,19 @@
     async function get(path) { const r = await fetch(path, {cache:'no-store'}); if (!r.ok) throw new Error(await r.text()); return r.json(); }
     async function post(path, body = {}) { const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); const v = await r.json(); if (!r.ok) throw new Error(v.error || JSON.stringify(v)); return v; }
     function message(value, bad = false) { $('message').textContent = value || ''; $('message').className = bad ? 'bad' : 'ok'; }
-    function selectedScenario() { return (catalog?.tpcc_scenarios || []).find(v => v.scenario_id === $('tpccScenario').value); }
+    function focusScenarios() {
+      const focus = catalog?.tpcc_focus_scenarios;
+      return Array.isArray(focus) && focus.length ? focus : (catalog?.tpcc_scenarios || []);
+    }
+    function selectedScenario() { return focusScenarios().find(v => v.scenario_id === $('tpccScenario').value); }
     function currentRun(status, kind) { return (status.current || []).find(v => v.kind === kind); }
 
     function loadCatalog() {
       const tpcc = $('tpccScenario');
-      tpcc.innerHTML = (catalog.tpcc_scenarios || []).map(v => `<option value="${esc(v.scenario_id)}">${text(v.title)}</option>`).join('');
+      tpcc.innerHTML = focusScenarios().map(v => `<option value="${esc(v.scenario_id)}">${v.focus_order ? '关注场景 ' + text(v.focus_order) + '/6 · ' : ''}${text(v.title)}</option>`).join('');
       tpcc.onchange = () => {
         const v = selectedScenario();
-        if (v) { $('pressureClients').value = v.clients; $('tpccDescription').textContent = `${v.event}；事务：${(v.transactions || []).join('、')}；证据：${(v.pressure_evidence || []).join('、')}`; }
+        if (v) { $('pressureClients').value = v.clients; $('tpccDescription').textContent = `${v.event}；主指标：目标业务 TPS（${v.normal_sql} 控制负载）；外部 TPS 仅表示压力注入强度；事务：${(v.transactions || []).join('、')}；证据：${(v.pressure_evidence || []).join('、')}`; }
       };
       tpcc.onchange();
       const sql = $('sqlCatalog');
@@ -142,13 +146,18 @@
 
     function renderCards(status) {
       const current = status.current || [], s = status.latest_sysinsight || {}, d = status.latest_dream || {};
-      const sSample = current.find(v => v.kind === 'sysinsight')?.samples?.slice(-1)[0]?.metrics || {};
+      const sRun = current.find(v => v.kind === 'sysinsight') || s;
+      const sSample = sRun.samples?.slice(-1)[0]?.metrics || {};
+      const business = sSample.business || sSample.control || {};
+      const pressure = sSample.pressure || sSample.external || {};
       const dResult = d.result || {};
       const executions = d.executions || [];
       const base = executions.find(v => v.phase === 'baseline');
       const opt = executions.find(v => v.phase === 'optimized');
       const values = [
         ['TPCC 当前阶段', current.find(v => v.kind === 'sysinsight')?.phase || s.phase || 'idle', current.find(v => v.kind === 'sysinsight') ? 'ok' : ''],
+        ['TPCC 目标业务 TPS', business.tps_live ?? business.tps ?? '-', ''],
+        ['压力注入 TPS（辅助）', pressure.tps_live ?? pressure.tps ?? '-', ''],
         ['TPCC 活动连接', sSample.active_lab ?? '-', ''],
         ['TPCC 告警', sSample.alert_firing ? 'FIRING' : '正常', sSample.alert_firing ? 'bad' : 'ok'],
         ['DREAM 状态', current.find(v => v.kind === 'dream')?.phase || d.phase || 'idle', current.find(v => v.kind === 'dream') ? 'ok' : ''],
@@ -182,7 +191,9 @@
       $('tpccPhases').innerHTML = ['baseline','pressure'].map(name => `<div class="${phaseClass(name, run)}"><b>${text(name === 'baseline' ? '1 基线' : '2 持续压力调优观察')}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
       const sample = active?.samples?.slice(-1)[0];
       const m = sample?.metrics || {};
-      $('tpccLive').innerHTML = active ? `<b>${text(run.phase)}</b> · 已运行 ${text(Number(sample?.elapsed_seconds || 0).toFixed(1))} 秒 · 控制 TPS <strong>${text((m.control?.tps_live ?? m.control?.tps ?? '-'))}</strong> · 外部 TPS <strong>${text((m.external?.tps_live ?? m.external?.tps ?? '-'))}</strong> · 实验连接 <strong>${text(m.lab_sessions ?? m.active_lab ?? '-')}</strong> · 告警 ${m.alert_firing ? pill('FIRING') : pill('normal')}` : `最近运行：${run ? pill(run.status) + ' · ' + text(run.phase) : '尚未运行 TPCC 实验'}`;
+      const business = m.business || m.control || {};
+      const pressure = m.pressure || m.external || {};
+      $('tpccLive').innerHTML = active ? `<b>${text(run.phase)}</b> · 已运行 ${text(Number(sample?.elapsed_seconds || 0).toFixed(1))} 秒 · 目标业务 TPS <strong>${text((business.tps_live ?? business.tps ?? '-'))}</strong> · 压力注入 TPS（辅助）<strong>${text((pressure.tps_live ?? pressure.tps ?? '-'))}</strong> · 实验连接 <strong>${text(m.lab_sessions ?? m.active_lab ?? '-')}</strong> · 告警 ${m.alert_firing ? pill('FIRING') : pill('normal')}` : `最近运行：${run ? pill(run.status) + ' · ' + text(run.phase) : '尚未运行 TPCC 实验'}`;
       const rows = ['baseline','pressure'].map(name => {
         const p = phaseResult(run, name), c = p.control, e = p.external;
         const alertState = run?.result?.sysinsight_state || {};

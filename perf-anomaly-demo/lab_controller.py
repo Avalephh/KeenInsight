@@ -182,24 +182,29 @@ def _case_catalog() -> List[Dict[str, Any]]:
         import tpcc_transaction_cases  # type: ignore
     except Exception:
         return []
+    focus_ids = tuple(str(value) for value in getattr(tpcc_transaction_cases, "FOCUS_SCENARIO_IDS", ()))
+    focus_order = {value: index for index, value in enumerate(focus_ids, 1)}
     result: List[Dict[str, Any]] = []
     for value in getattr(tpcc_transaction_cases, "CASE_DEFINITIONS", []):
         if not isinstance(value, dict) or value.get("mode") != "pgbench":
             continue
+        scenario_id = str(value.get("id"))
         sql_name = str(value.get("sql", ""))
         normal_name = str(value.get("normal_sql", "tp_normal.sql"))
         if not (TPCC_CASE_ROOT / sql_name).is_file() or not (TPCC_CASE_ROOT / normal_name).is_file():
             continue
         result.append(
             {
-                "scenario_id": str(value.get("id")),
-                "title": str(value.get("title", value.get("id", "TPCC"))),
+                "scenario_id": scenario_id,
+                "title": str(value.get("title", scenario_id or "TPCC")),
                 "event": str(value.get("event", "")),
                 "clients": int(value.get("clients", 1)),
                 "sql": sql_name,
                 "normal_sql": normal_name,
                 "transactions": list(value.get("tpcc_transactions", [])),
                 "pressure_evidence": list(value.get("pressure_evidence", [])),
+                "focus": scenario_id in focus_order,
+                "focus_order": focus_order.get(scenario_id),
                 "source": "tpcc_transaction_cases.CASE_DEFINITIONS",
                 "rollback_protected": True,
             }
@@ -546,9 +551,20 @@ class LabController:
             LOGGER.exception("could not clean TPCC processes for lab run %s", run_id)
 
     def catalog(self) -> Dict[str, Any]:
+        focus_scenarios = [value for value in self.tpcc_cases if value.get("focus")]
+        focus_scenarios.sort(key=lambda value: int(value.get("focus_order") or 999))
         return {
             "status": "ok",
             "tpcc_scenarios": self.tpcc_cases,
+            "tpcc_focus_scenarios": focus_scenarios,
+            "tpcc_metric": {
+                "primary": "normal_business_tps",
+                "primary_label": "目标业务 TPS",
+                "primary_source": "control worker running tp_normal.sql",
+                "secondary": "pressure_injection_tps",
+                "secondary_label": "压力注入 TPS",
+                "secondary_source": "external worker running the selected scenario SQL",
+            },
             "sql_catalog": self.sql_catalog,
             "database": {
                 "name": self.bridge.args.db,
@@ -706,6 +722,9 @@ class LabController:
             "pressure_seconds": pressure_seconds,
             "pressure_hold_until_completion": True,
             "tuning_observation": "pressure remains active while SysInsight detects, analyzes, and tunes",
+            "primary_metric": "normal_business_tps",
+            "primary_metric_source": "control worker running tp_normal.sql",
+            "secondary_metric": "pressure_injection_tps",
             "actual_prometheus_alert": True,
         }
         with self._lock:
@@ -893,8 +912,10 @@ class LabController:
             parsed = _pgbench_metrics(Path(str(item["log_path"])))
             if item.get("role") == "control":
                 metrics["control"] = parsed
+                metrics["business"] = parsed
             elif item.get("role") == "external":
                 metrics["external"] = parsed
+                metrics["pressure"] = parsed
         try:
             alert = self.bridge._current_alert()
             metrics["alert_firing"] = bool(alert)

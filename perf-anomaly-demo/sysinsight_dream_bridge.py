@@ -1992,10 +1992,14 @@ class Bridge:
                     if samples:
                         sample = samples[-1]
                         metrics = sample.get("metrics", {}) if isinstance(sample, dict) else {}
-                        control = metrics.get("control", {}) if isinstance(metrics, dict) else {}
-                        external = metrics.get("external", {}) if isinstance(metrics, dict) else {}
-                        emit("sysinsight_dream_lab_tpcc_control_tps", control.get("tps_live", control.get("tps", 0)), labels, "Live TPCC control TPS in the lab.")
-                        emit("sysinsight_dream_lab_tpcc_external_tps", external.get("tps_live", external.get("tps", 0)), labels, "Live TPCC external-pressure TPS in the lab.")
+                        control = metrics.get("business", metrics.get("control", {})) if isinstance(metrics, dict) else {}
+                        external = metrics.get("pressure", metrics.get("external", {})) if isinstance(metrics, dict) else {}
+                        control_tps = control.get("tps_live", control.get("tps", 0))
+                        external_tps = external.get("tps_live", external.get("tps", 0))
+                        emit("sysinsight_dream_lab_tpcc_business_tps", control_tps, labels, "Live target business TPS from the normal TPCC control workload.")
+                        # Keep the old metric for dashboard/API compatibility.
+                        emit("sysinsight_dream_lab_tpcc_control_tps", control_tps, labels, "Live TPCC control TPS in the lab.")
+                        emit("sysinsight_dream_lab_tpcc_external_tps", external_tps, labels, "Live pressure-injection TPS from the selected external workload.")
                         emit("sysinsight_dream_lab_tpcc_connections", metrics.get("lab_sessions", 0), labels, "Total TPCC lab client connections.")
                         emit("sysinsight_dream_lab_tpcc_active_sessions", metrics.get("active_lab", 0), labels, "Active TPCC lab sessions.")
                         emit("sysinsight_dream_lab_tpcc_alert_firing", 1 if metrics.get("alert_firing") else 0, labels, "Whether the TPCC pressure phase is firing the selected SysInsight alert.")

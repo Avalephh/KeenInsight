@@ -142,8 +142,9 @@ DREAM 任务完成后，只有 DREAM 实测提升至少 10%、只读且输出为
 不会留下永久的 “already queued or running” 锁。
 
 TPCC 实验本身采用两阶段窗口：先运行基线，再保持外部压力直到实验结束。压力窗口同时承担
-告警触发、SysInsight 调优和 TPS 观察；不再追加撤压后的自然恢复阶段，因此只有压力仍在时
-控制 TPS 回升，才作为调优恢复证据。
+告警触发、SysInsight 调优和目标业务 TPS 观察；目标业务 TPS 是 `tp_normal.sql` 控制负载的
+吞吐，外部场景 TPS 只用于表示压力注入强度。不再追加撤压后的自然恢复阶段，因此只有压力
+仍在时目标业务 TPS 回升，才作为调优恢复证据。
 
 如果本机 PostgreSQL 使用 Unix socket peer 认证，DREAM worker 需要以数据库 OS 用户运行，并
 把 DREAM checkout 放在该用户可读取的位置；也可以改用 TCP/密码认证。例如本机验证可额外传入
