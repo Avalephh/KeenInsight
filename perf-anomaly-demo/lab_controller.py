@@ -13,6 +13,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -29,6 +30,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 ROOT = Path(__file__).resolve().parent
 TPCC_CASE_ROOT = ROOT / "tpcc_cases"
 TPCDS_QUERY_ROOT = ROOT.parent / "dream" / "data" / "slow_queries" / "TPC-DS"
+LOGGER = logging.getLogger(__name__)
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SQL_STRING = re.compile(r"'(?:''|[^'])*'")
@@ -287,34 +289,261 @@ class LabController:
         self._active: Dict[str, Dict[str, Any]] = {}
 
         # A bridge restart cannot reattach a Python ThreadPoolExecutor to an
-        # old run. Mark those rows explicitly so the dashboard never presents
-        # stale work as active.
-        for row in self.store.list_lab_runs(200):
-            if row.get("status") in {"queued", "running"}:
-                self.store.update_lab_run(
-                    str(row.get("run_id")),
-                    status="failed",
-                    phase="bridge_restart",
-                    error="bridge restarted before the experiment could be reattached",
-                )
+        # old run. Recover those rows and terminate only the lab connections
+        # belonging to the old run, so the next click starts from a clean
+        # state instead of seeing a permanent queued/running lock.
+        self._recover_stale_runs("sysinsight")
+        self._recover_stale_runs("dream")
 
     def shutdown(self) -> None:
         with self._lock:
+            active_ids = list(self._active)
             active = list(self._active.values())
             for item in active:
                 event = item.get("stop_event")
                 if event is not None:
                     event.set()
                 self._terminate_processes(item.get("processes", []))
+        for run_id in active_ids:
+            self._cleanup_active_processes(run_id)
+            row = self.store.get_lab_run(run_id)
+            if row and row.get("status") in {"queued", "running"}:
+                self._safe_update_run(
+                    run_id,
+                    status="stopped",
+                    phase="bridge_shutdown",
+                    error="bridge shutdown requested before the experiment completed",
+                )
 
     def _run_id(self, kind: str) -> str:
         digest = hashlib.sha1(str(time.time_ns()).encode()).hexdigest()[:10]
         return "lab-{}-{}-{}".format(kind, dt.datetime.now().strftime("%Y%m%d%H%M%S"), digest)
 
-    def _active_kind(self, kind: str) -> None:
+    @staticmethod
+    def _run_marker(run_id: str, length: int = 8) -> str:
+        return str(run_id).rsplit("-", 1)[-1][:length]
+
+    def _application_prefix(self, run_id: str, kind: str) -> str:
+        marker = self._run_marker(run_id)
+        if kind == "dream":
+            return "lab-dream-{}-".format(marker)
+        return "lab-{}-".format(marker)
+
+    def _terminate_orphaned_lab(self, run_id: str, kind: str) -> Dict[str, Any]:
+        """Terminate exact lab backends/process groups left by a lost worker."""
+
+        prefix = self._application_prefix(run_id, kind)
+        cleanup: Dict[str, Any] = {
+            "application_prefix": prefix,
+            "backend_pids": [],
+            "process_groups": [],
+            "force_killed_process_groups": [],
+            "errors": [],
+        }
+        # First close matching PostgreSQL sessions. This is intentionally an
+        # exact generated application_name prefix, never a broad pg_terminate
+        # operation against unrelated user sessions.
+        try:
+            rows = self.db._rows(
+                """
+                SELECT pid::int AS pid, application_name
+                FROM pg_stat_activity
+                WHERE datname=current_database()
+                  AND backend_type='client backend'
+                  AND application_name LIKE {}
+                  AND pid <> pg_backend_pid()
+                """.format(_sql_literal(prefix + "%")),
+                "sysinsight-lab-recovery",
+            )
+            cleanup["backend_pids"] = [int(row["pid"]) for row in rows if row.get("pid") is not None]
+            if cleanup["backend_pids"]:
+                self.db._rows(
+                    """
+                    SELECT pid::int AS pid, pg_terminate_backend(pid) AS terminated
+                    FROM pg_stat_activity
+                    WHERE datname=current_database()
+                      AND backend_type='client backend'
+                      AND application_name LIKE {}
+                      AND pid <> pg_backend_pid()
+                    """.format(_sql_literal(prefix + "%")),
+                    "sysinsight-lab-recovery-terminate",
+                )
+        except Exception as exc:
+            cleanup["errors"].append("database sessions: {}".format(exc))
+
+        # pgbench is launched in its own session. Inspect only processes that
+        # inherited this run's PGAPPNAME and terminate their process groups;
+        # this also handles a bridge killed before it could persist a result.
+        process_groups = set()
+        try:
+            expected = ("PGAPPNAME=" + prefix).encode("utf-8")
+            for process_dir in Path("/proc").iterdir():
+                if not process_dir.name.isdigit():
+                    continue
+                try:
+                    environ = (process_dir / "environ").read_bytes().split(b"\0")
+                    if not any(value.startswith(expected) for value in environ):
+                        continue
+                    pid = int(process_dir.name)
+                    pgid = os.getpgid(pid)
+                    if pgid != os.getpgrp():
+                        process_groups.add(pgid)
+                except (OSError, ValueError, ProcessLookupError):
+                    continue
+            for pgid in sorted(process_groups):
+                try:
+                    os.killpg(pgid, signal.SIGTERM)
+                    cleanup["process_groups"].append(pgid)
+                except (OSError, ProcessLookupError) as exc:
+                    cleanup["errors"].append("process group {}: {}".format(pgid, exc))
+            # SIGTERM is normally enough for pgbench/runuser, but a bridge
+            # crash must not leave a stubborn worker blocking the next lab.
+            # Escalate only for the exact process groups discovered above.
+            for pgid in sorted(process_groups):
+                deadline = time.monotonic() + 2.0
+                while time.monotonic() < deadline:
+                    try:
+                        os.killpg(pgid, 0)
+                    except ProcessLookupError:
+                        break
+                    except OSError:
+                        break
+                    time.sleep(0.05)
+                else:
+                    try:
+                        os.killpg(pgid, signal.SIGKILL)
+                        cleanup["force_killed_process_groups"].append(pgid)
+                    except (OSError, ProcessLookupError) as exc:
+                        cleanup["errors"].append("force kill process group {}: {}".format(pgid, exc))
+        except OSError as exc:
+            cleanup["errors"].append("process scan: {}".format(exc))
+        return cleanup
+
+    def _safe_update_run(
+        self,
+        run_id: str,
+        status: str,
+        phase: str,
+        error: str,
+        result_patch: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        try:
+            self.store.update_lab_run(
+                run_id,
+                status=status,
+                phase=phase,
+                result_patch=result_patch,
+                error=error,
+            )
+        except Exception:
+            # The next start will retry stale-row recovery. Do not let a
+            # secondary SQLite/disk error hide the original worker failure.
+            LOGGER.exception("could not persist lab run %s state", run_id)
+
+    def _recover_stale_runs_locked(self, kind: str) -> List[Dict[str, Any]]:
+        active_rows: List[Dict[str, Any]] = []
         for row in self.store.list_lab_runs(100, kind=kind):
-            if row.get("status") in {"queued", "running"}:
-                raise RuntimeError("a {} lab run is already queued or running".format(kind))
+            if row.get("status") not in {"queued", "running"}:
+                continue
+            run_id = str(row.get("run_id") or "")
+            item = self._active.get(run_id)
+            future = item.get("future") if item else None
+            # The short interval before a future is attached is protected by
+            # this lock in all start paths, so a missing entry here is stale.
+            if item is not None and (future is None or not future.done()):
+                active_rows.append(row)
+                continue
+            self._active.pop(run_id, None)
+            cleanup = self._terminate_orphaned_lab(run_id, kind)
+            error = "recovered stale {} lab run before a new action".format(kind)
+            self._safe_update_run(
+                run_id,
+                status="failed",
+                phase="startup_recovery",
+                error=error,
+                result_patch={
+                    "recovery": {
+                        "status": "completed",
+                        "kind": kind,
+                        "recovered_at": utc_now(),
+                        "cleanup": cleanup,
+                    }
+                },
+            )
+        return active_rows
+
+    def _active_kind(self, kind: str) -> Optional[Dict[str, Any]]:
+        with self._lock:
+            active = self._recover_stale_runs_locked(kind)
+            return active[0] if active else None
+
+    def _recover_stale_runs(self, kind: str) -> List[Dict[str, Any]]:
+        with self._lock:
+            return self._recover_stale_runs_locked(kind)
+
+    def _mark_unhandled_future(self, run_id: str, future: Any) -> None:
+        error = ""
+        try:
+            if future.cancelled():
+                error = "lab worker future was cancelled"
+            else:
+                try:
+                    future.result()
+                except BaseException as exc:
+                    error = "{}: {}".format(type(exc).__name__, exc)
+        except BaseException as exc:
+            # A broken Future implementation or executor callback must not
+            # leave the in-memory active marker behind forever.
+            error = "future callback failed: {}: {}".format(type(exc).__name__, exc)
+        if error:
+            try:
+                self._cleanup_active_processes(run_id)
+                row = self.store.get_lab_run(run_id)
+                if row and row.get("status") in {"queued", "running"}:
+                    self._safe_update_run(run_id, "failed", "worker_exception", error)
+            except BaseException:
+                # State persistence is retried by the next startup/action
+                # recovery pass; always release the local active marker now.
+                LOGGER.exception("could not record failed lab worker %s", run_id)
+        self._clear_active(run_id)
+
+    def _submit_active(
+        self,
+        run_id: str,
+        stop_event: threading.Event,
+        target: Any,
+        *args: Any,
+    ) -> Any:
+        with self._lock:
+            self._active[run_id] = {"stop_event": stop_event, "processes": []}
+            try:
+                future = self.bridge.lab_executor.submit(target, *args)
+            except BaseException as exc:
+                self._active.pop(run_id, None)
+                self._safe_update_run(
+                    run_id,
+                    "failed",
+                    "submit_failed",
+                    "{}: {}".format(type(exc).__name__, exc),
+                )
+                raise
+            self._active[run_id]["future"] = future
+            future.add_done_callback(lambda completed: self._mark_unhandled_future(run_id, completed))
+            return future
+
+    def _cleanup_active_processes(self, run_id: str) -> None:
+        with self._lock:
+            item = self._active.get(run_id)
+            if not item:
+                return
+            processes = list(item.get("processes", []))
+            item["processes"] = []
+        if not processes:
+            return
+        try:
+            self._wait_processes(processes, terminate=True)
+        except BaseException:
+            LOGGER.exception("could not clean TPCC processes for lab run %s", run_id)
 
     def catalog(self) -> Dict[str, Any]:
         return {
@@ -459,7 +688,6 @@ class LabController:
         return result
 
     def start_tpcc(self, body: Mapping[str, Any]) -> Dict[str, Any]:
-        self._active_kind("sysinsight")
         scenario_id = str(body.get("scenario_id") or "tp_order_status_burst")
         case = next((value for value in self.tpcc_cases if value["scenario_id"] == scenario_id), None)
         if case is None:
@@ -469,9 +697,6 @@ class LabController:
         baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 10, 5, 180)
         pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 20, 5, 180)
         recovery_seconds = _bounded_int(body.get("recovery_seconds"), "recovery_seconds", 15, 5, 180)
-        free_bytes = shutil.disk_usage("/").free
-        if free_bytes < 512 * 1024 * 1024:
-            raise RuntimeError("insufficient disk space for TPCC lab: {} bytes free".format(free_bytes))
         config = {
             "normal_clients": normal_clients,
             "pressure_clients": pressure_clients,
@@ -480,14 +705,25 @@ class LabController:
             "recovery_seconds": recovery_seconds,
             "actual_prometheus_alert": True,
         }
-        run_id = self._run_id("sysinsight")
-        self.store.create_lab_run(run_id, "sysinsight", scenario_id, case["title"], config)
-        stop_event = threading.Event()
         with self._lock:
-            self._active[run_id] = {"stop_event": stop_event, "processes": []}
-        future = self.bridge.lab_executor.submit(self._run_tpcc, run_id, case, config, stop_event)
-        future.add_done_callback(lambda _future: self._clear_active(run_id))
-        return {"status": "queued", "run": self.store.get_lab_run(run_id)}
+            existing = self._active_kind("sysinsight")
+            if existing:
+                # A duplicate click or a polling race should not surface as a
+                # 409 to the operator. Keep the one real workload and let the
+                # console continue following it.
+                return {
+                    "status": "already_running",
+                    "message": "a sysinsight lab run is already queued or running",
+                    "run": existing,
+                }
+            free_bytes = shutil.disk_usage("/").free
+            if free_bytes < 512 * 1024 * 1024:
+                raise RuntimeError("insufficient disk space for TPCC lab: {} bytes free".format(free_bytes))
+            run_id = self._run_id("sysinsight")
+            self.store.create_lab_run(run_id, "sysinsight", scenario_id, case["title"], config)
+            stop_event = threading.Event()
+            self._submit_active(run_id, stop_event, self._run_tpcc, run_id, case, config, stop_event)
+            return {"status": "queued", "run": self.store.get_lab_run(run_id)}
 
     def stop(self, run_id: str) -> Dict[str, Any]:
         row = self.store.get_lab_run(run_id)
@@ -495,12 +731,21 @@ class LabController:
             raise KeyError("lab run not found: {}".format(run_id))
         if row.get("status") not in {"queued", "running"}:
             return {"status": "unchanged", "run": row}
+        recovered = False
         with self._lock:
             item = self._active.get(run_id)
             if item:
                 item["stop_event"].set()
                 self._terminate_processes(item.get("processes", []))
-        return {"status": "stop_requested", "run": self.store.get_lab_run(run_id)}
+            else:
+                # A worker lost during a bridge/API failure is recoverable
+                # even when the operator presses Stop first.
+                self._recover_stale_runs_locked(str(row.get("kind") or "sysinsight"))
+                recovered = True
+        return {
+            "status": "recovered" if recovered else "stop_requested",
+            "run": self.store.get_lab_run(run_id),
+        }
 
     def _clear_active(self, run_id: str) -> None:
         with self._lock:
@@ -588,13 +833,17 @@ class LabController:
             "1",
             args.db,
         ]
-        process = subprocess.Popen(
-            command,
-            cwd="/",
-            stdout=log_handle,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd="/",
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        except BaseException:
+            log_handle.close()
+            raise
         return {
             "process": process,
             "log_handle": log_handle,
@@ -668,31 +917,31 @@ class LabController:
         # PostgreSQL truncates application_name at 63 bytes. Keep the
         # experiment prefix short enough that the sampler can identify every
         # control/external backend reliably.
-        prefix = "lab-{}-{}-".format(run_id.rsplit("-", 1)[-1][:8], phase)
+        prefix = self._application_prefix(run_id, "sysinsight") + phase + "-"
         processes: List[Dict[str, Any]] = []
         (run_dir / phase).mkdir(parents=True, exist_ok=True)
-        control = self._start_pgbench(
-            normal_sql,
-            run_dir / phase,
-            prefix + "control",
-            normal_clients,
-            duration,
-            "control",
-        )
-        processes.append(control)
-        if pressure_sql is not None:
-            external = self._start_pgbench(
-                pressure_sql,
-                run_dir / phase,
-                prefix + "external",
-                pressure_clients,
-                duration,
-                "external",
-            )
-            processes.append(external)
-        self._set_processes(run_id, processes)
-        started = time.monotonic()
         try:
+            control = self._start_pgbench(
+                normal_sql,
+                run_dir / phase,
+                prefix + "control",
+                normal_clients,
+                duration,
+                "control",
+            )
+            processes.append(control)
+            if pressure_sql is not None:
+                external = self._start_pgbench(
+                    pressure_sql,
+                    run_dir / phase,
+                    prefix + "external",
+                    pressure_clients,
+                    duration,
+                    "external",
+                )
+                processes.append(external)
+            self._set_processes(run_id, processes)
+            started = time.monotonic()
             while time.monotonic() - started < duration:
                 if stop_event.is_set():
                     raise LabStopped("operator requested stop")
@@ -700,34 +949,38 @@ class LabController:
                 time.sleep(min(1.0, max(0.05, duration - (time.monotonic() - started))))
             if stop_event.is_set():
                 raise LabStopped("operator requested stop")
-        except Exception:
-            self._wait_processes(processes, terminate=True)
-            raise
-        self._wait_processes(processes)
-        failed = [
-            "{} returned {}".format(item.get("role", "worker"), item.get("returncode"))
-            for item in processes
-            if item.get("returncode") not in (0, None)
-        ]
-        if failed:
-            self._set_processes(run_id, [])
-            raise RuntimeError("TPCC phase {} failed: {}".format(phase, "; ".join(failed)))
-        result = {
-            "phase": phase,
-            "duration_seconds": duration,
-            "workers": [
-                {
-                    "role": item.get("role"),
-                    "app_name": item.get("app_name"),
-                    "returncode": item.get("returncode"),
-                    "log_path": str(item.get("log_path")),
-                    "metrics": _pgbench_metrics(Path(str(item["log_path"]))),
-                }
+            self._wait_processes(processes)
+            failed = [
+                "{} returned {}".format(item.get("role", "worker"), item.get("returncode"))
                 for item in processes
-            ],
-        }
-        self._set_processes(run_id, [])
-        return result
+                if item.get("returncode") not in (0, None)
+            ]
+            if failed:
+                raise RuntimeError("TPCC phase {} failed: {}".format(phase, "; ".join(failed)))
+            result = {
+                "phase": phase,
+                "duration_seconds": duration,
+                "workers": [
+                    {
+                        "role": item.get("role"),
+                        "app_name": item.get("app_name"),
+                        "returncode": item.get("returncode"),
+                        "log_path": str(item.get("log_path")),
+                        "metrics": _pgbench_metrics(Path(str(item["log_path"]))),
+                    }
+                    for item in processes
+                ],
+            }
+            self._set_processes(run_id, [])
+            return result
+        except BaseException:
+            try:
+                self._wait_processes(processes, terminate=True)
+            except BaseException:
+                LOGGER.exception("could not clean processes after TPCC phase %s failed", phase)
+            finally:
+                self._set_processes(run_id, [])
+            raise
 
     def _run_tpcc(
         self,
@@ -738,11 +991,12 @@ class LabController:
     ) -> None:
         run_dir = self.root / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        stage_dir = Path(tempfile.mkdtemp(prefix="sysinsight-lab-tpcc-", dir="/tmp"))
-        stage_dir.chmod(0o755)
+        stage_dir: Optional[Path] = None
         phases: Dict[str, Any] = {}
         run_started_at = utc_now()
         try:
+            stage_dir = Path(tempfile.mkdtemp(prefix="sysinsight-lab-tpcc-", dir="/tmp"))
+            stage_dir.chmod(0o755)
             normal_sql = self._stage_sql(TPCC_CASE_ROOT / str(case["normal_sql"]), stage_dir)
             pressure_sql = self._stage_sql(TPCC_CASE_ROOT / str(case["sql"]), stage_dir)
             self.store.update_lab_run(run_id, status="running", phase="baseline")
@@ -813,22 +1067,29 @@ class LabController:
                 "stopped_at": utc_now(),
                 "artifact_directory": str(run_dir),
             }
-            self.store.update_lab_run(run_id, status="stopped", phase="stopped", result_patch=result, error=str(exc))
-        except Exception as exc:
+            self._safe_update_run(run_id, "stopped", "stopped", str(exc), result)
+        except BaseException as exc:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
                 "phases": phases,
                 "artifact_directory": str(run_dir),
             }
-            (run_dir / "error.txt").write_text("{}: {}\n".format(type(exc).__name__, exc), encoding="utf-8")
-            self.store.update_lab_run(run_id, status="failed", phase="failed", result_patch=result, error="{}: {}".format(type(exc).__name__, exc))
+            try:
+                (run_dir / "error.txt").write_text("{}: {}\n".format(type(exc).__name__, exc), encoding="utf-8")
+            except OSError:
+                LOGGER.exception("could not write TPCC error artifact for %s", run_id)
+            self._safe_update_run(
+                run_id,
+                "failed",
+                "failed",
+                "{}: {}".format(type(exc).__name__, exc),
+                result,
+            )
         finally:
-            with self._lock:
-                active = self._active.get(run_id)
-                if active:
-                    self._terminate_processes(active.get("processes", []))
-            shutil.rmtree(str(stage_dir), ignore_errors=True)
+            self._cleanup_active_processes(run_id)
+            if stage_dir is not None:
+                shutil.rmtree(str(stage_dir), ignore_errors=True)
 
     def _memory_paths(self) -> List[Path]:
         paths: List[Path] = []
@@ -844,7 +1105,8 @@ class LabController:
         return paths
 
     def clear_dream(self, reset_pg_stat_statements: bool = True) -> Dict[str, Any]:
-        self._active_kind("dream")
+        if self._active_kind("dream"):
+            raise RuntimeError("a dream lab run is already queued or running")
         stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
         archive_dir = self.root / "archives"
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -881,7 +1143,6 @@ class LabController:
         return result
 
     def start_dream(self, body: Mapping[str, Any]) -> Dict[str, Any]:
-        self._active_kind("dream")
         sql_id = str(body.get("sql_id") or "")
         item = self.get_sql(sql_id)
         run_id = self._run_id("dream")
@@ -892,13 +1153,13 @@ class LabController:
             "query_number": item["query_number"],
             "execution": "baseline_then_real_dream_analysis",
         }
-        self.store.create_lab_run(run_id, "dream", sql_id, item["title"], config)
-        stop_event = threading.Event()
         with self._lock:
-            self._active[run_id] = {"stop_event": stop_event, "processes": []}
-        future = self.bridge.lab_executor.submit(self._run_dream, run_id, item, stop_event)
-        future.add_done_callback(lambda _future: self._clear_active(run_id))
-        return {"status": "queued", "run": self.store.get_lab_run(run_id)}
+            if self._active_kind("dream"):
+                raise RuntimeError("a dream lab run is already queued or running")
+            self.store.create_lab_run(run_id, "dream", sql_id, item["title"], config)
+            stop_event = threading.Event()
+            self._submit_active(run_id, stop_event, self._run_dream, run_id, item, stop_event)
+            return {"status": "queued", "run": self.store.get_lab_run(run_id)}
 
     def _execute_lab_sql(
         self,
@@ -913,10 +1174,9 @@ class LabController:
         # PostgreSQL truncates application_name at NAMEDATALEN-1 (63 bytes).
         # Keep the run/phase marker short so the sampler can always distinguish
         # the lab connections, including DREAM replay sessions.
-        run_marker = str(run_id).rsplit("-", 1)[-1][:12]
         result = self.db.execute_timed(
             query,
-            application_name="lab-dream-{}-{}".format(run_marker, phase),
+            application_name=self._application_prefix(run_id, "dream") + phase,
             search_path=[self.bridge.args.db_schema, "public"] if self.bridge.args.db_schema != "public" else ["public"],
             session_settings=session_settings,
             timeout=max(30.0, min(180.0, float(self.bridge.args.db_timeout) * 6.0)),
@@ -1109,9 +1369,9 @@ class LabController:
             raise ValueError("optimized SQL is not read-only")
         self.store.update_lab_run(run_id, status="running", phase="optimized_execution")
         stop_event = threading.Event()
-        with self._lock:
-            self._active[run_id] = {"stop_event": stop_event, "processes": []}
-        future = self.bridge.lab_executor.submit(
+        self._submit_active(
+            run_id,
+            stop_event,
             self._run_dream_replay,
             run_id,
             str(result.get("sql_id")),
@@ -1121,7 +1381,6 @@ class LabController:
             result,
             stop_event,
         )
-        future.add_done_callback(lambda _future: self._clear_active(run_id))
         return {"status": "queued", "run": self.store.get_lab_run(run_id)}
 
     def _run_dream_replay(

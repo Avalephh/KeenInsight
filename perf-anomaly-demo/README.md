@@ -136,6 +136,11 @@ DREAM 任务完成后，只有 DREAM 实测提升至少 10%、只读且输出为
 已有业务连接需要重连。每轮观测、incident、DREAM job、验证和发布记录都在 state SQLite 及
 `output/incidents/` 中。
 
+实验控制台的 TPCC 启动是幂等的：已有真实任务时重复点击会返回同一个 run 并继续跟踪；桥接
+进程重启后，会把遗留的 `queued/running` run 标记为 `startup_recovery`，并只按该 run 生成的
+`application_name` 精确终止孤儿数据库会话和 pgbench 进程组。这样异常退出后可以直接重新启动，
+不会留下永久的 “already queued or running” 锁。
+
 如果本机 PostgreSQL 使用 Unix socket peer 认证，DREAM worker 需要以数据库 OS 用户运行，并
 把 DREAM checkout 放在该用户可读取的位置；也可以改用 TCP/密码认证。例如本机验证可额外传入
 `--dream-run-as postgres --dream-runtime-root <postgres 可读的 DREAM 根目录>`。捕获不到活动会话

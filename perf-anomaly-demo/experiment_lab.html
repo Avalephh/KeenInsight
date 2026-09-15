@@ -240,7 +240,9 @@
           pressure_seconds: $('pressureSeconds').value,
           recovery_seconds: $('recoverySeconds').value
         });
-        selectedRun.sysinsight = v.run?.run_id || ''; message('TPCC 实验已排队，页面会持续显示真实采样。'); await refreshAll();
+        selectedRun.sysinsight = v.run?.run_id || '';
+        message(v.status === 'already_running' ? '已有 TPCC 实验在运行，已自动接管并继续显示当前采样。' : 'TPCC 实验已排队，页面会持续显示真实采样。');
+        await refreshAll();
       } catch (e) { message('启动 TPCC 失败：' + e.message, true); }
     }
 
