@@ -695,14 +695,17 @@ class LabController:
         normal_clients = _bounded_int(body.get("normal_clients"), "normal_clients", 2, 1, 16)
         pressure_clients = _bounded_int(body.get("pressure_clients"), "pressure_clients", case["clients"], 1, 32)
         baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 10, 5, 180)
-        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 20, 5, 180)
-        recovery_seconds = _bounded_int(body.get("recovery_seconds"), "recovery_seconds", 15, 5, 180)
+        # Keep the external pressure active until the experiment ends.  The
+        # pressure window is also the tuning-observation window: a later TPS
+        # increase is meaningful only while the same pressure is still on.
+        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 60, 5, 180)
         config = {
             "normal_clients": normal_clients,
             "pressure_clients": pressure_clients,
             "baseline_seconds": baseline_seconds,
             "pressure_seconds": pressure_seconds,
-            "recovery_seconds": recovery_seconds,
+            "pressure_hold_until_completion": True,
+            "tuning_observation": "pressure remains active while SysInsight detects, analyzes, and tunes",
             "actual_prometheus_alert": True,
         }
         with self._lock:
@@ -1022,17 +1025,6 @@ class LabController:
                 stop_event,
                 run_dir,
             )
-            phases["recovery"] = self._run_phase(
-                run_id,
-                "recovery",
-                int(config["recovery_seconds"]),
-                normal_sql,
-                None,
-                int(config["normal_clients"]),
-                int(config["pressure_clients"]),
-                stop_event,
-                run_dir,
-            )
             samples = self.store.list_lab_samples(run_id, 2000)
             alert_observed = any(
                 bool((sample.get("metrics") or {}).get("alert_firing"))
@@ -1047,6 +1039,7 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
+                "observation_model": "baseline_then_sustained_pressure",
                 "phases": phases,
                 "sample_count": len(samples),
                 "completed_at": utc_now(),
@@ -1063,6 +1056,7 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
+                "observation_model": "baseline_then_sustained_pressure",
                 "phases": phases,
                 "stopped_at": utc_now(),
                 "artifact_directory": str(run_dir),
@@ -1072,6 +1066,7 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
+                "observation_model": "baseline_then_sustained_pressure",
                 "phases": phases,
                 "artifact_directory": str(run_dir),
             }

@@ -28,7 +28,7 @@
     label { display: block; color: #5c687a; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
     select, input { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 5px; padding: 8px; background: white; color: #202938; }
     .field { min-width: 120px; } .hint { padding: 9px 11px; border-radius: 5px; background: #f3f7ff; color: #4b5d78; }
-    .phase-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+    .phase-track { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
     .phase { padding: 12px; border-radius: 6px; background: #edf1f6; color: #6b7789; border: 1px solid transparent; }
     .phase.active { background: #fff3d8; color: #8a5a00; border-color: #eabf67; } .phase.done { background: #e1f5ea; color: #176b43; }
     table { border-collapse: collapse; width: 100%; min-width: 720px; } th, td { border-bottom: 1px solid #edf0f5; padding: 8px; text-align: left; vertical-align: top; } th { color: #5c687a; font-weight: 600; white-space: nowrap; }
@@ -54,17 +54,16 @@
     <div id="message"></div>
 
     <section>
-      <h2>SysInsight / TPCC 外部压力：基线 → 性能下降 → 恢复</h2>
+      <h2>SysInsight / TPCC 外部压力：基线 → 持续压力调优观察</h2>
       <div class="section-body">
-        <div class="notice">选择的外部压力会与正常 TPCC 控制负载同时运行。事务脚本使用 SAVEPOINT 回滚业务变更；告警、活动连接数、控制 TPS 和每秒采样由后台真实记录。</div>
+        <div class="notice">先运行正常基线，再持续施加外部压力。压力不会在实验结束前撤掉，SysInsight 的检测、分析和调优都在压力持续期间进行；只有压力仍在时控制 TPS 回升，才算观察到有效恢复。事务脚本使用 SAVEPOINT 回滚业务变更；告警、活动连接数、控制 TPS 和每秒采样由后台真实记录。</div>
         <div class="grid">
           <div class="span-7"><label for="tpccScenario">TPCC 外部压力场景</label><select id="tpccScenario"></select></div>
           <div class="span-3"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
           <div class="span-2"><label for="pressureClients">外部客户端</label><input id="pressureClients" type="number" min="1" max="32" value="6"></div>
           <div class="span-3 field"><label for="baselineSeconds">基线秒数</label><input id="baselineSeconds" type="number" min="5" max="180" value="10"></div>
-          <div class="span-3 field"><label for="pressureSeconds">压力秒数</label><input id="pressureSeconds" type="number" min="5" max="180" value="20"></div>
-          <div class="span-3 field"><label for="recoverySeconds">恢复秒数</label><input id="recoverySeconds" type="number" min="5" max="180" value="15"></div>
-          <div class="span-3 toolbar" style="align-items:end"><button id="startTpcc" onclick="startTpcc()">开始下降→恢复实验</button><button id="stopTpcc" class="warn" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
+          <div class="span-3 field"><label for="pressureSeconds">持续压力观察秒数</label><input id="pressureSeconds" type="number" min="5" max="180" value="60"></div>
+          <div class="span-3 toolbar" style="align-items:end"><button id="startTpcc" onclick="startTpcc()">开始基线→持续压力实验</button><button id="stopTpcc" class="warn" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
         </div>
         <div id="tpccDescription" class="hint" style="margin-top:12px"></div>
         <div id="tpccPhases" class="phase-track"></div>
@@ -164,7 +163,7 @@
     function phaseClass(name, run) {
       const phase = String(run?.phase || '');
       if (phase === name) return 'phase active';
-      const order = ['baseline','pressure','recovery','completed'];
+      const order = ['baseline','pressure','completed'];
       return order.indexOf(phase) > order.indexOf(name) || phase === 'completed' ? 'phase done' : 'phase';
     }
 
@@ -180,16 +179,16 @@
       const active = currentRun(status, 'sysinsight');
       $('startTpcc').disabled = !!active;
       $('stopTpcc').disabled = !active;
-      $('tpccPhases').innerHTML = ['baseline','pressure','recovery'].map(name => `<div class="${phaseClass(name, run)}"><b>${text(name === 'baseline' ? '1 基线' : name === 'pressure' ? '2 外部压力' : '3 恢复')}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
+      $('tpccPhases').innerHTML = ['baseline','pressure'].map(name => `<div class="${phaseClass(name, run)}"><b>${text(name === 'baseline' ? '1 基线' : '2 持续压力调优观察')}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
       const sample = active?.samples?.slice(-1)[0];
       const m = sample?.metrics || {};
       $('tpccLive').innerHTML = active ? `<b>${text(run.phase)}</b> · 已运行 ${text(Number(sample?.elapsed_seconds || 0).toFixed(1))} 秒 · 控制 TPS <strong>${text((m.control?.tps_live ?? m.control?.tps ?? '-'))}</strong> · 外部 TPS <strong>${text((m.external?.tps_live ?? m.external?.tps ?? '-'))}</strong> · 实验连接 <strong>${text(m.lab_sessions ?? m.active_lab ?? '-')}</strong> · 告警 ${m.alert_firing ? pill('FIRING') : pill('normal')}` : `最近运行：${run ? pill(run.status) + ' · ' + text(run.phase) : '尚未运行 TPCC 实验'}`;
-      const rows = ['baseline','pressure','recovery'].map(name => {
+      const rows = ['baseline','pressure'].map(name => {
         const p = phaseResult(run, name), c = p.control, e = p.external;
         const alertState = run?.result?.sysinsight_state || {};
         const currentAlert = !!(alertState.alert_observed ?? alertState.alert_firing ?? m.alert_firing);
         const currentIncidents = (run?.result?.sysinsight_state?.current_incidents || []).length > 0;
-        return `<tr><td>${text(name)}</td><td>${text(c.tps ?? '-')}</td><td>${text(c.latency_ms == null ? '-' : Number(c.latency_ms).toFixed(2))}</td><td>${text(e.tps ?? '-')}</td><td>${text(p.controlCode ?? '-')}${p.externalCode == null ? '' : ' / ' + text(p.externalCode)}</td><td>${name === 'pressure' ? (currentAlert || currentIncidents ? '本次已触发/已记录' : '本次未采样到告警') : name === 'recovery' ? '外部压力已停止' : '无外部压力'}</td></tr>`;
+        return `<tr><td>${text(name)}</td><td>${text(c.tps ?? '-')}</td><td>${text(c.latency_ms == null ? '-' : Number(c.latency_ms).toFixed(2))}</td><td>${text(e.tps ?? '-')}</td><td>${text(p.controlCode ?? '-')}${p.externalCode == null ? '' : ' / ' + text(p.externalCode)}</td><td>${name === 'pressure' ? (currentAlert || currentIncidents ? '压力持续，已触发/已记录告警' : '压力持续，暂未采样到告警') : '无外部压力'}</td></tr>`;
       });
       $('tpccResults').innerHTML = rows.join('');
     }
@@ -237,8 +236,7 @@
           normal_clients: $('normalClients').value,
           pressure_clients: $('pressureClients').value,
           baseline_seconds: $('baselineSeconds').value,
-          pressure_seconds: $('pressureSeconds').value,
-          recovery_seconds: $('recoverySeconds').value
+          pressure_seconds: $('pressureSeconds').value
         });
         selectedRun.sysinsight = v.run?.run_id || '';
         message(v.status === 'already_running' ? '已有 TPCC 实验在运行，已自动接管并继续显示当前采样。' : 'TPCC 实验已排队，页面会持续显示真实采样。');

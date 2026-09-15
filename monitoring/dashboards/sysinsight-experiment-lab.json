@@ -40,7 +40,7 @@
       "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
     },
     {
-      "id": 5, "type": "timeseries", "title": "TPCC 基线 / 压力 / 恢复实时曲线", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
+      "id": 5, "type": "timeseries", "title": "TPCC 基线 / 持续压力调优实时曲线", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_control_tps", "legendFormat": "控制 TPS {{phase}}", "range": true},
@@ -80,7 +80,7 @@
     },
     {
       "id": 9, "type": "text", "title": "如何触发实验", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
-      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 选择真实回滚保护的 TPCC 外部压力，观察基线、压力和恢复三段；\n3. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL；\n4. 发送原 SQL，等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\n这里的 Grafana 面板负责观测，按钮控制和详细结果在实验控制台完成。DREAM 没有返回合法可执行改进时，页面会明确显示原因，不会伪造“已优化”。"}
+      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 选择真实回滚保护的 TPCC 外部压力，先看基线，再在压力持续期间观察 SysInsight 调优前后的 TPS；\n3. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL；\n4. 发送原 SQL，等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\nTPCC 实验不会追加撤压恢复阶段；压力持续时间就是检测、分析和调优观察窗口。这里的 Grafana 面板负责观测，按钮控制和详细结果在实验控制台完成。DREAM 没有返回合法可执行改进时，页面会明确显示原因，不会伪造“已优化”。"}
     }
   ],
   "refresh": "5s",
