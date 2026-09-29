@@ -11,6 +11,7 @@ the second execution separately.
 from __future__ import annotations
 
 import datetime as dt
+import copy
 import hashlib
 import json
 import logging
@@ -27,11 +28,24 @@ import threading
 import time
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
+from pg_temporary_config import (  # noqa: E402
+    TemporaryPostgresConfiguration,
+    connection_args_for_configuration,
+)
+
 
 ROOT = Path(__file__).resolve().parent
 TPCC_CASE_ROOT = ROOT / "tpcc_cases"
 TPCDS_QUERY_ROOT = ROOT.parent / "dream" / "data" / "slow_queries" / "TPC-DS"
 LOGGER = logging.getLogger(__name__)
+
+
+def _positive_env_float(name: str, default: float) -> float:
+    try:
+        value = float(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return float(default)
+    return value if value > 0 else float(default)
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SQL_STRING = re.compile(r"'(?:''|[^'])*'")
@@ -118,6 +132,86 @@ SESSION_SETTING_NAMES = {
     "jit",
 }
 
+# The six focus scenarios are backed by the real GPT5.6-SOL selections kept in
+# the repository's structured validation evidence.  The lab uses these exact
+# API-produced candidates as its repeatable demonstration input; it does not
+# invent a repair value when a candidate is unavailable.
+VERIFIED_SYSINSIGHT_CANDIDATE_FILES = {
+    "tp_order_status_burst": ROOT / "results/tpcc_api_validation/20260912_002346/tp_order_status_burst/selected_api_configuration.json",
+    "tp_stock_level_burst": ROOT / "results/tpcc_api_validation/20260912_003154/tp_stock_level_burst/selected_api_configuration.json",
+    "tp_payment_moderate": ROOT / "results/tpcc_api_validation/20260912_023000_tp_payment_moderate_retry/tp_payment_moderate/selected_api_configuration.json",
+    "tp_delivery_burst": ROOT / "results/tpcc_api_validation/20260912_030000_tp_delivery_burst_retry/tp_delivery_burst/selected_api_configuration.json",
+    "tp_order_status_hot": ROOT / "results/tpcc_api_validation/20260912_053000_tp_order_status_hot/tp_order_status_hot/selected_api_configuration.json",
+    "tp_new_order_burst": ROOT / "results/tpcc_api_validation/20260912_031000_tp_new_order_burst_retry/tp_new_order_burst/selected_api_configuration.json",
+    "tp_remote_payment_surge": ROOT / "results/tpcc_api_validation/20260912_055000_tp_remote_payment_surge/tp_remote_payment_surge/selected_api_configuration.json",
+    "tp_read_mix_burst": ROOT / "results/tpcc_api_validation/20260912_014110/tp_read_mix_burst/selected_api_configuration.json",
+    "tp_payment_hot_surge": ROOT / "results/tpcc_api_validation/20260912_044000_tp_payment_hot_surge/tp_payment_hot_surge/selected_api_configuration.json",
+    "tp_full_mix_surge_high": ROOT / "results/tpcc_api_validation/20260912_051000_tp_full_mix_surge_high_replay/tp_full_mix_surge_high/selected_api_configuration.json",
+    "tp_wal_checkpoint": ROOT / "results/tpcc_api_validation/20260912_023500_tp_wal_checkpoint_strict/tp_wal_checkpoint/selected_api_configuration.json",
+    # Current replacements for the two weaker original focus scenarios.  Both
+    # were rechecked by this same lab runner under fixed-rate pressure.
+    "tp_order_status_io_burst": ROOT / "results/tpcc_api_validation/20260912_032000_tp_order_status_io_burst/tp_order_status_io_burst/selected_api_configuration.json",
+    "tp_payment_surge": ROOT / "results/tpcc_api_validation/20260912_040000_tp_payment_surge/tp_payment_surge/selected_api_configuration.json",
+    "tp_stock_level_hot": ROOT / "results/tpcc_api_validation/20260912_052000_tp_stock_level_hot/tp_stock_level_hot/selected_api_configuration.json",
+    "tp_payment_hot": ROOT / "results/tpcc_api_validation/20260912_054000_tp_payment_hot/tp_payment_hot/selected_api_configuration.json",
+}
+
+# The focus and previously exposed console scenarios use fixed-rate pgbench
+# pressure.  Closed-loop pressure changes its observed TPS with database
+# latency, so an apparent business-TPS gain can simply be a different amount
+# of pressure.  These rates are the rounded pre-tuning pressure levels
+# measured on this demo workload.  They are offered through pgbench's
+# open-loop -R mode and are scaled when the operator changes the number of
+# external clients.
+TPCC_PRESSURE_TARGET_TPS = {
+    "tp_order_status_burst": 6600,
+    "tp_stock_level_burst": 3800,
+    "tp_payment_moderate": 2100,
+    "tp_delivery_burst": 2000,
+    "tp_order_status_io_burst": 5600,
+    "tp_payment_surge": 3350,
+    "tp_stock_level_hot": 3800,
+    "tp_payment_hot": 1950,
+    "tp_order_status_hot": 5600,
+    "tp_new_order_burst": 3200,
+    "tp_remote_payment_surge": 3200,
+    "tp_read_mix_burst": 3200,
+    "tp_payment_hot_surge": 3000,
+    "tp_full_mix_surge_high": 2800,
+    "tp_wal_checkpoint": 2500,
+}
+
+# Resource guardrails for the local four-core/no-swap demo host.  The values
+# can be raised explicitly for a larger machine, but the default keeps the
+# monitoring/bridge processes responsive while retaining a visible pressure
+# gap for the SysInsight experiment.
+TPCC_DEFAULT_PRESSURE_TPS = _positive_env_float("SYSINSIGHT_TPCC_DEFAULT_PRESSURE_TPS", 2500.0)
+TPCC_MAX_PRESSURE_TPS = _positive_env_float("SYSINSIGHT_TPCC_MAX_PRESSURE_TPS", 4000.0)
+TPCC_NORMAL_TARGET_TPS = _positive_env_float("SYSINSIGHT_TPCC_NORMAL_TARGET_TPS", 1600.0)
+TPCC_MAX_NORMAL_TPS = _positive_env_float("SYSINSIGHT_TPCC_MAX_NORMAL_TPS", 2000.0)
+TPCC_POSTGRES_CPU_QUOTA = os.environ.get("SYSINSIGHT_PG_CPU_QUOTA", "250%").strip() or "250%"
+TPCC_POSTGRES_MEMORY_LIMIT = os.environ.get("SYSINSIGHT_PG_MEMORY_LIMIT", "24G").strip() or "24G"
+TPCC_POSTGRES_TASKS_MAX = os.environ.get("SYSINSIGHT_PG_TASKS_MAX", "512").strip() or "512"
+
+# These API-selected values either restart the whole cluster, allocate a very
+# large shared memory segment, or weaken durability for the live demo.  A lab
+# must remain online and recoverable, so they are audited but not applied by
+# the one-click experiment.  Session-level planner/JIT candidates are still
+# applied to the tuned control worker.
+LAB_UNSAFE_TUNING_PARAMETERS = frozenset({
+    "autovacuum_max_workers",
+    "fsync",
+    "full_page_writes",
+    "maintenance_work_mem",
+    "max_connections",
+    "max_parallel_workers",
+    "max_parallel_workers_per_gather",
+    "max_worker_processes",
+    "max_wal_size",
+    "shared_buffers",
+    "temp_buffers",
+    "work_mem",
+})
 
 class LabStopped(RuntimeError):
     """Internal signal used to stop a bounded workload cleanly."""
@@ -204,6 +298,10 @@ def _case_catalog() -> List[Dict[str, Any]]:
                 "normal_sql": normal_name,
                 "transactions": list(value.get("tpcc_transactions", [])),
                 "pressure_evidence": list(value.get("pressure_evidence", [])),
+                "pressure_target_tps": TPCC_PRESSURE_TARGET_TPS.get(
+                    scenario_id, TPCC_DEFAULT_PRESSURE_TPS
+                ),
+                "pressure_mode": "open_loop_fixed_rate",
                 "focus": scenario_id in focus_order,
                 "focus_order": focus_order.get(scenario_id),
                 "source": "tpcc_transaction_cases.CASE_DEFINITIONS",
@@ -243,12 +341,12 @@ def _query_catalog() -> List[Dict[str, Any]]:
                 "line_count": len(text.splitlines()),
                 "character_count": len(text),
                 "complexity_score": complexity,
-                # Q4 is the bounded, real-data scenario validated by this
-                # console.  Keep every catalog query selectable, but let a
-                # fresh operator land on a known-good complex SQL instead of
-                # an arbitrary benchmark query that may exceed the lab
-                # timeout on a local-scale dataset.
-                "recommended": query_id == 4,
+                # These are the SQL rewrites that passed three fresh
+                # baseline -> DREAM -> replay runs on the local SF10 data.
+                # Q4 used to be the default entry, but its original SQL
+                # exceeded the lab timeout during the stability audit, so it
+                # must remain selectable without being presented as a demo.
+                "recommended": query_id in {31, 44, 88},
                 "schema": "tpcds",
                 "read_only": _is_read_only(text),
             }
@@ -341,6 +439,117 @@ def _tpcc_tps_summary(
             "cv_percent": round((stdev / mean) * 100.0, 2) if mean else None,
         }
     )
+    return result
+
+
+def _tpcc_comparison(phases: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build the operator-facing before/after comparison from steady TPS.
+
+    The raw before/after values remain visible, but the reported gain is
+    adjusted to the same observed external pressure when the pressure
+    generator is closed-loop.  This prevents a faster external generator from
+    being mistaken for a tuning improvement.  New console runs use a fixed
+    open-loop pressure target as well, so this adjustment should normally be
+    close to one-to-one.
+    """
+
+    def value(phase: str, metric: str = "business_tps_summary") -> Optional[float]:
+        item = phases.get(phase) if isinstance(phases, Mapping) else None
+        summary = item.get(metric, {}) if isinstance(item, Mapping) else {}
+        raw = summary.get("steady_tps") if isinstance(summary, Mapping) else None
+        try:
+            return float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    baseline = value("baseline")
+    before = value("pressure_before")
+    after = value("pressure_after")
+    pressure_before = value("pressure_before", "pressure_tps_summary")
+    pressure_after = value("pressure_after", "pressure_tps_summary")
+    external_delta = pressure_after - pressure_before if pressure_after is not None and pressure_before is not None else None
+    external_delta_ratio = external_delta / pressure_before if external_delta is not None and pressure_before else None
+    same_pressure = abs(external_delta_ratio) <= 0.20 if external_delta_ratio is not None else None
+    pressure_adjusted_after = None
+    raw_gain = after - before if after is not None and before is not None else None
+    raw_gain_ratio = raw_gain / before if raw_gain is not None and before else None
+    after_phase = phases.get("pressure_after") if isinstance(phases, Mapping) else None
+    before_phase = phases.get("pressure_before") if isinstance(phases, Mapping) else None
+    configured_before = None
+    configured_after = None
+    for phase, target_name in (
+        (before_phase, "before"),
+        (after_phase, "after"),
+    ):
+        if isinstance(phase, Mapping) and phase.get("pressure_target_tps") is not None:
+            try:
+                if target_name == "before":
+                    configured_before = float(phase["pressure_target_tps"])
+                else:
+                    configured_after = float(phase["pressure_target_tps"])
+            except (TypeError, ValueError):
+                pass
+    open_loop_pressure = (
+        configured_before is not None
+        and configured_after is not None
+        and abs(configured_before - configured_after) <= 0.01
+    )
+    configured_pressure = configured_after if configured_after is not None else configured_before
+    if open_loop_pressure:
+        # The offered load is already identical by construction.  Do not
+        # scale the business result by completed external TPS: under an
+        # overloaded server, a tuned run can complete more or fewer pressure
+        # transactions while still receiving the same offered request rate.
+        pressure_adjusted_after = after
+        pressure_adjustment_method = "open_loop_fixed_rate_no_scaling"
+    else:
+        pressure_adjustment_method = "closed_loop_observed_rate_scaling"
+        if after is not None and pressure_before and pressure_after:
+            pressure_adjusted_after = after * pressure_before / pressure_after
+    pressure_adjusted_gain = (
+        pressure_adjusted_after - before
+        if pressure_adjusted_after is not None and before is not None
+        else None
+    )
+    pressure_adjusted_ratio = (
+        pressure_adjusted_gain / before
+        if pressure_adjusted_gain is not None and before
+        else None
+    )
+    result: Dict[str, Any] = {
+        "metric": "normal_business_tps",
+        "metric_label": "目标业务 TPS",
+        "baseline_tps": baseline,
+        "pressure_before_tps": before,
+        "pressure_after_tps": after,
+        # Keep the old raw names for compatibility with existing artifacts;
+        # operator-facing gain fields below use the pressure-adjusted value.
+        "raw_tuning_gain_tps": raw_gain,
+        "raw_tuning_gain_ratio": raw_gain_ratio,
+        "pressure_adjusted_after_tps": pressure_adjusted_after,
+        "pressure_adjusted_gain_tps": pressure_adjusted_gain,
+        "pressure_adjusted_gain_ratio": pressure_adjusted_ratio,
+        "tuning_gain_tps": pressure_adjusted_gain if pressure_adjusted_gain is not None else raw_gain,
+        "tuning_gain_ratio": pressure_adjusted_ratio if pressure_adjusted_ratio is not None else raw_gain_ratio,
+        "recovery_ratio": after / baseline if after is not None and baseline else None,
+        "improved_under_pressure": bool(
+            pressure_adjusted_after is not None
+            and before is not None
+            and pressure_adjusted_after > before
+            and same_pressure is not False
+        ),
+        "comparison_valid": bool(after is not None and before is not None and same_pressure is not False),
+        "external_pressure_before_tps": pressure_before,
+        "external_pressure_after_tps": pressure_after,
+        "external_pressure_delta_tps": external_delta,
+        "external_pressure_delta_ratio": external_delta_ratio,
+        "same_pressure_observed": same_pressure,
+        "pressure_target_tps": configured_pressure,
+        "pressure_mode": "open_loop_fixed_rate" if open_loop_pressure else "closed_loop_observed_rate",
+        "pressure_adjustment_method": pressure_adjustment_method,
+    }
+    if before is not None and baseline is not None:
+        result["pressure_drop_ratio"] = (baseline - before) / baseline if baseline else None
     return result
 
 
@@ -629,6 +838,17 @@ class LabController:
                 "secondary": "pressure_injection_tps",
                 "secondary_label": "压力注入 TPS",
                 "secondary_source": "external worker running the selected scenario SQL",
+                "scenario_transaction": "sysinsight_dream_lab_tpcc_scenario_transaction_tps",
+                "scenario_transaction_label": "场景事务 TPS",
+                "scenario_transaction_source": "selected scenario target business control worker; zero when the scenario is not running",
+                "resource_guard": {
+                    "postgres_cpu_quota": TPCC_POSTGRES_CPU_QUOTA,
+                    "postgres_memory_limit": TPCC_POSTGRES_MEMORY_LIMIT,
+                    "postgres_tasks_max": TPCC_POSTGRES_TASKS_MAX,
+                    "normal_target_tps_default": TPCC_NORMAL_TARGET_TPS,
+                    "normal_target_tps_max": TPCC_MAX_NORMAL_TPS,
+                    "pressure_target_tps_max": TPCC_MAX_PRESSURE_TPS,
+                },
             },
             "sql_catalog": self.sql_catalog,
             "database": {
@@ -652,18 +872,24 @@ class LabController:
         return {**item, "query": query}
 
     def status(self) -> Dict[str, Any]:
-        runs = self.store.list_lab_runs(30)
+        # The history table only needs metadata. Returning every completed
+        # TPCC/DREAM result on each two-second browser poll made this endpoint
+        # multi-megabyte and caused overlapping refresh requests. Fetch the
+        # full JSON only for the current and latest run that the console
+        # actually renders.
+        runs = self.store.list_lab_runs(30, include_result=False)
         current = [row for row in runs if row.get("status") in {"queued", "running"}]
         current_details: List[Dict[str, Any]] = []
         for row in current:
-            detail = dict(row)
+            detail = self.store.get_lab_run(str(row["run_id"])) or dict(row)
             detail["samples"] = self.store.list_lab_samples(str(row["run_id"]), 180)
             detail["executions"] = self.store.list_lab_executions(str(row["run_id"]), 20)
             current_details.append(detail)
 
-        latest_dream = next((row for row in runs if row.get("kind") == "dream"), None)
+        latest_dream_summary = next((row for row in runs if row.get("kind") == "dream"), None)
         dream_detail: Optional[Dict[str, Any]] = None
-        if latest_dream:
+        if latest_dream_summary:
+            latest_dream = self.store.get_lab_run(str(latest_dream_summary["run_id"])) or latest_dream_summary
             dream_detail = dict(latest_dream)
             dream_detail["executions"] = self.store.list_lab_executions(str(latest_dream["run_id"]), 20)
             result = latest_dream.get("result") if isinstance(latest_dream.get("result"), dict) else {}
@@ -673,9 +899,10 @@ class LabController:
                 if result.get("sql_key"):
                     dream_detail["improvement"] = self.store.latest_improvement(str(result["sql_key"]))
 
-        latest_sysinsight = next((row for row in runs if row.get("kind") == "sysinsight"), None)
+        latest_sysinsight_summary = next((row for row in runs if row.get("kind") == "sysinsight"), None)
         sysinsight_detail: Optional[Dict[str, Any]] = None
-        if latest_sysinsight:
+        if latest_sysinsight_summary:
+            latest_sysinsight = self.store.get_lab_run(str(latest_sysinsight_summary["run_id"])) or latest_sysinsight_summary
             sysinsight_detail = dict(latest_sysinsight)
             sysinsight_detail["samples"] = self.store.list_lab_samples(str(latest_sysinsight["run_id"]), 180)
         return {
@@ -769,24 +996,47 @@ class LabController:
         return result
 
     def start_tpcc(self, body: Mapping[str, Any]) -> Dict[str, Any]:
-        scenario_id = str(body.get("scenario_id") or "tp_order_status_burst")
+        scenario_id = str(body.get("scenario_id") or "tp_payment_hot")
         case = next((value for value in self.tpcc_cases if value["scenario_id"] == scenario_id), None)
         if case is None:
             raise KeyError("unknown TPCC scenario: {}".format(scenario_id))
         normal_clients = _bounded_int(body.get("normal_clients"), "normal_clients", 2, 1, 16)
         pressure_clients = _bounded_int(body.get("pressure_clients"), "pressure_clients", case["clients"], 1, 32)
         baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 60, 5, 300)
-        # Keep the external pressure active until the experiment ends.  The
-        # pressure window is also the tuning-observation window: a later TPS
-        # increase is meaningful only while the same pressure is still on.
-        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 180, 5, 300)
+        # The single UI value is the total pressure observation window.  Split
+        # it into two equal windows so the same external pressure can be
+        # compared before and after the SysInsight candidate is applied.
+        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 180, 10, 300)
+        pressure_before_seconds = max(5, pressure_seconds // 2)
+        pressure_after_seconds = pressure_seconds - pressure_before_seconds
+        base_pressure_target = TPCC_PRESSURE_TARGET_TPS.get(
+            scenario_id, TPCC_DEFAULT_PRESSURE_TPS
+        )
+        scaled_pressure_target = float(base_pressure_target) * pressure_clients / float(case["clients"])
+        pressure_target_tps = round(min(TPCC_MAX_PRESSURE_TPS, scaled_pressure_target), 1)
+        normal_target_tps = round(
+            min(TPCC_MAX_NORMAL_TPS, TPCC_NORMAL_TARGET_TPS * normal_clients / 2.0),
+            1,
+        )
         config = {
             "normal_clients": normal_clients,
             "pressure_clients": pressure_clients,
             "baseline_seconds": baseline_seconds,
             "pressure_seconds": pressure_seconds,
+            "pressure_before_seconds": pressure_before_seconds,
+            "pressure_after_seconds": pressure_after_seconds,
+            "normal_target_tps": normal_target_tps,
+            "pressure_target_tps": pressure_target_tps,
+            "pressure_mode": "open_loop_fixed_rate",
+            "resource_guard": {
+                "postgres_cpu_quota": TPCC_POSTGRES_CPU_QUOTA,
+                "postgres_memory_limit": TPCC_POSTGRES_MEMORY_LIMIT,
+                "postgres_tasks_max": TPCC_POSTGRES_TASKS_MAX,
+                "normal_target_tps": normal_target_tps,
+                "pressure_target_tps": pressure_target_tps,
+            },
             "pressure_hold_until_completion": True,
-            "tuning_observation": "pressure remains active while SysInsight detects, analyzes, and tunes",
+            "tuning_observation": "same external pressure is replayed before and after SysInsight tuning",
             "primary_metric": "normal_business_tps",
             "primary_metric_source": "control worker running tp_normal.sql",
             "secondary_metric": "pressure_injection_tps",
@@ -875,9 +1125,104 @@ class LabController:
             if handle is not None:
                 handle.close()
 
-    def _stage_sql(self, source: Path, stage_dir: Path) -> Path:
-        destination = stage_dir / source.name
-        shutil.copyfile(str(source), str(destination))
+    @staticmethod
+    def _setting_assignment(name: str, value: Any) -> str:
+        # TemporaryPostgresConfiguration validates the candidate against the
+        # live pg_settings context.  At this point this helper only renders
+        # the already-approved session subset into the staged pgbench script.
+        if not _IDENTIFIER.fullmatch(name):
+            raise ValueError("unsupported lab tuning setting: {}".format(name))
+        return 'SET "{}" = {}'.format(name.replace('"', '""'), _sql_literal(value))
+
+    @staticmethod
+    def _connection_options(settings: Optional[Mapping[str, Any]]) -> Optional[str]:
+        if not settings:
+            return None
+        options: List[str] = []
+        for name, value in settings.items():
+            if not _IDENTIFIER.fullmatch(str(name)):
+                raise ValueError("unsafe connection setting name: {}".format(name))
+            text = str(value)
+            if not re.fullmatch(r"[A-Za-z0-9_./:+%\-* ]+", text):
+                raise ValueError("unsafe connection setting value for {}".format(name))
+            options.append("-c {}={}".format(name, text))
+        return " ".join(options)
+
+    def _load_lab_tuning(self, scenario_id: str) -> Dict[str, Any]:
+        """Load the exact API candidate for TemporaryPostgresConfiguration.
+
+        The applier, rather than this controller, decides whether each field
+        is session, connection, reload, or restart scoped.  It snapshots and
+        restores every global field, which keeps this lab consistent with the
+        standalone TPCC API validation workflow.
+        """
+
+        source = VERIFIED_SYSINSIGHT_CANDIDATE_FILES.get(str(scenario_id))
+        result: Dict[str, Any] = {
+            "status": "candidate_loaded",
+            "scenario_id": str(scenario_id),
+            "source": str(source) if source else None,
+            "source_type": "verified_sysinsight_gpt5.6-sol_selection",
+            "scope": "safe candidate through TemporaryPostgresConfiguration with snapshot/apply/restore",
+            "requested_configuration": {},
+            "applied_configuration": {},
+            "blocked_by_safety": {},
+            "application": {},
+            "safety_policy": {
+                "blocked_parameters": sorted(LAB_UNSAFE_TUNING_PARAMETERS),
+                "restart_parameters": "skipped by the lab applier",
+                "reason": "keep PostgreSQL online and preserve durability while the host is under pressure",
+            },
+        }
+        if source is None or not source.is_file():
+            result["status"] = "unavailable"
+            result["reason"] = "no checked-in verified SysInsight candidate for this scenario"
+            return result
+        try:
+            candidate = json.loads(source.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            result["status"] = "unavailable"
+            result["reason"] = "could not read verified SysInsight candidate: {}".format(exc)
+            return result
+        if not isinstance(candidate, dict) or not candidate:
+            result["status"] = "unavailable"
+            result["reason"] = "verified SysInsight candidate is empty"
+            return result
+        blocked = {
+            name: value
+            for name, value in candidate.items()
+            if name in LAB_UNSAFE_TUNING_PARAMETERS
+        }
+        applied = {
+            name: value
+            for name, value in candidate.items()
+            if name not in LAB_UNSAFE_TUNING_PARAMETERS
+        }
+        result["requested_configuration"] = candidate
+        result["applied_configuration"] = applied
+        result["blocked_by_safety"] = blocked
+        if not applied:
+            result["status"] = "no_safe_candidate"
+            result["reason"] = "all API-selected settings were blocked by the lab safety policy"
+            return result
+        result["validated_at"] = utc_now()
+        result["reason"] = "safe subset loaded; blocked global settings remain in the audit record"
+        return result
+
+    def _stage_sql(
+        self,
+        source: Path,
+        stage_dir: Path,
+        session_settings: Optional[Mapping[str, Any]] = None,
+        destination_name: Optional[str] = None,
+    ) -> Path:
+        destination = stage_dir / (destination_name or source.name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        content = source.read_text(encoding="utf-8")
+        prefix = ""
+        for name, value in (session_settings or {}).items():
+            prefix += self._setting_assignment(str(name), value) + ";\n"
+        destination.write_text(prefix + content, encoding="utf-8")
         destination.chmod(0o644)
         return destination
 
@@ -889,10 +1234,14 @@ class LabController:
         clients: int,
         duration: int,
         role: str,
+        connection_args: Optional[Any] = None,
+        connection_config: Optional[Mapping[str, Any]] = None,
+        rate: Optional[float] = None,
     ) -> Dict[str, Any]:
         log_path = run_dir / "{}.log".format(role)
         log_handle = log_path.open("w", encoding="utf-8")
-        args = self.bridge.args
+        args = connection_args or self.bridge.args
+        options = self._connection_options(connection_config)
         command = [
             "runuser",
             "-u",
@@ -900,6 +1249,7 @@ class LabController:
             "--",
             "env",
             "PGAPPNAME={}".format(app_name),
+            *(["PGOPTIONS={}".format(options)] if options else []),
             "pgbench",
             "-h",
             args.host,
@@ -914,6 +1264,7 @@ class LabController:
             str(clients),
             "-T",
             str(duration),
+            *( ["-R", str(rate)] if rate is not None and rate > 0 else [] ),
             "-f",
             str(sql_path),
             "-P",
@@ -948,6 +1299,7 @@ class LabController:
         elapsed: float,
         app_prefix: str,
         processes: Sequence[Mapping[str, Any]],
+        database_client: Optional[Any] = None,
     ) -> None:
         metrics: Dict[str, Any] = {
             "phase": phase,
@@ -955,9 +1307,10 @@ class LabController:
             "control": {},
             "external": {},
         }
+        db = database_client or self.db
         try:
-            metrics["database"] = self.db.database_snapshot()
-            rows = self.db._rows(
+            metrics["database"] = db.database_snapshot()
+            rows = db._rows(
                 """
                 SELECT
                   COUNT(*) FILTER (WHERE state='active')::int AS active_total,
@@ -1001,6 +1354,12 @@ class LabController:
         pressure_clients: int,
         stop_event: threading.Event,
         run_dir: Path,
+        connection_args: Optional[Any] = None,
+        connection_config: Optional[Mapping[str, Any]] = None,
+        pressure_connection_args: Optional[Any] = None,
+        pressure_connection_config: Optional[Mapping[str, Any]] = None,
+        normal_rate: Optional[float] = None,
+        pressure_rate: Optional[float] = None,
     ) -> Dict[str, Any]:
         self.store.update_lab_run(run_id, status="running", phase=phase)
         # PostgreSQL truncates application_name at 63 bytes. Keep the
@@ -1017,6 +1376,9 @@ class LabController:
                 normal_clients,
                 duration,
                 "control",
+                connection_args=connection_args,
+                connection_config=connection_config,
+                rate=normal_rate,
             )
             processes.append(control)
             if pressure_sql is not None:
@@ -1027,6 +1389,13 @@ class LabController:
                     pressure_clients,
                     duration,
                     "external",
+                    connection_args=pressure_connection_args or connection_args,
+                    connection_config=(
+                        pressure_connection_config
+                        if pressure_connection_config is not None
+                        else connection_config
+                    ),
+                    rate=pressure_rate,
                 )
                 processes.append(external)
             self._set_processes(run_id, processes)
@@ -1034,7 +1403,14 @@ class LabController:
             while time.monotonic() - started < duration:
                 if stop_event.is_set():
                     raise LabStopped("operator requested stop")
-                self._sample_tpcc(run_id, phase, time.monotonic() - started, prefix, processes)
+                self._sample_tpcc(
+                    run_id,
+                    phase,
+                    time.monotonic() - started,
+                    prefix,
+                    processes,
+                    database_client=self.db,
+                )
                 time.sleep(min(1.0, max(0.05, duration - (time.monotonic() - started))))
             if stop_event.is_set():
                 raise LabStopped("operator requested stop")
@@ -1049,6 +1425,9 @@ class LabController:
             result = {
                 "phase": phase,
                 "duration_seconds": duration,
+                "normal_target_tps": normal_rate,
+                "pressure_target_tps": pressure_rate,
+                "pressure_mode": "open_loop_fixed_rate" if pressure_rate else "closed_loop_observed_rate",
                 "workers": [
                     {
                         "role": item.get("role"),
@@ -1082,6 +1461,19 @@ class LabController:
         run_dir.mkdir(parents=True, exist_ok=True)
         stage_dir: Optional[Path] = None
         phases: Dict[str, Any] = {}
+        tuning: Dict[str, Any] = {}
+        normal_rate = None
+        pressure_rate = None
+        try:
+            if config.get("normal_target_tps") is not None:
+                normal_rate = float(config["normal_target_tps"])
+        except (TypeError, ValueError):
+            normal_rate = None
+        try:
+            if config.get("pressure_target_tps") is not None:
+                pressure_rate = float(config["pressure_target_tps"])
+        except (TypeError, ValueError):
+            pressure_rate = None
         run_started_at = utc_now()
         try:
             stage_dir = Path(tempfile.mkdtemp(prefix="sysinsight-lab-tpcc-", dir="/tmp"))
@@ -1099,18 +1491,126 @@ class LabController:
                 int(config["pressure_clients"]),
                 stop_event,
                 run_dir,
+                normal_rate=normal_rate,
             )
-            phases["pressure"] = self._run_phase(
+            phases["pressure_before"] = self._run_phase(
                 run_id,
-                "pressure",
-                int(config["pressure_seconds"]),
+                "pressure_before",
+                int(config["pressure_before_seconds"]),
                 normal_sql,
                 pressure_sql,
                 int(config["normal_clients"]),
                 int(config["pressure_clients"]),
                 stop_event,
                 run_dir,
+                normal_rate=normal_rate,
+                pressure_rate=pressure_rate,
             )
+            tuning = self._load_lab_tuning(str(case["scenario_id"]))
+            tuned_normal_sql = normal_sql
+            tuned_pressure_sql = pressure_sql
+            tuned_connection_args: Any = self.bridge.args
+            tuned_normal_connection_config: Mapping[str, Any] = {}
+            tuned_pressure_connection_config: Mapping[str, Any] = {}
+            if tuning.get("status") == "candidate_loaded" and tuning.get("applied_configuration"):
+                config_applier = TemporaryPostgresConfiguration(
+                    self.bridge.args,
+                    dict(tuning.get("applied_configuration") or {}),
+                    "sysinsight-lab-{}".format(self._run_marker(run_id)),
+                    allow_restart=False,
+                )
+                tuning["status"] = "applying"
+                try:
+                    with config_applier as applied:
+                        tuning["application"] = applied
+                        tuning["status"] = "applied"
+                        # TemporaryPostgresConfiguration exposes the endpoint
+                        # that was actually activated.  Its raw normalized
+                        # candidate also contains postmaster values such as
+                        # port/unix_socket_directories that are intentionally
+                        # skipped when allow_restart=False; using that raw
+                        # mapping here would send the tuned workers to an
+                        # inactive endpoint (for example port 5543).
+                        tuned_connection_args = copy.copy(self.bridge.args)
+                        endpoint = applied.get("connection_endpoint") or {}
+                        if endpoint.get("host"):
+                            tuned_connection_args.host = str(endpoint["host"])
+                        if endpoint.get("port") is not None:
+                            tuned_connection_args.port = int(endpoint["port"])
+                        # Connection-startup options are applied once when
+                        # pgbench opens a backend.  Do not prepend SET
+                        # statements to the script: pgbench would execute
+                        # those statements on every transaction and distort
+                        # the business TPS being measured.
+                        tuned_normal_connection_config = dict(
+                            applied.get("connection_configuration", {})
+                        )
+                        tuned_normal_connection_config.update(
+                            applied.get("session_configuration", {})
+                        )
+                        # Keep the external pressure recipe unchanged.  The
+                        # candidate's connection-scoped settings are harmless
+                        # bookkeeping for this lab (currently log settings),
+                        # but session planner/commit settings must not alter
+                        # the load generator's work.
+                        tuned_pressure_connection_config = dict(
+                            applied.get("connection_configuration", {})
+                        )
+                        tuned_stage_dir = stage_dir / "tuned"
+                        # Keep a separate staged path for auditability, while
+                        # passing the session candidate through PGOPTIONS at
+                        # connection startup instead of executing SET per
+                        # transaction.
+                        tuned_normal_sql = self._stage_sql(
+                            TPCC_CASE_ROOT / str(case["normal_sql"]),
+                            tuned_stage_dir,
+                            destination_name="tp_normal_tuned.sql",
+                        )
+                        old_host, old_port = self.db.host, self.db.port
+                        self.db.host = str(getattr(tuned_connection_args, "host", old_host))
+                        self.db.port = int(getattr(tuned_connection_args, "port", old_port))
+                        try:
+                            phases["pressure_after"] = self._run_phase(
+                                run_id,
+                                "pressure_after",
+                                int(config["pressure_after_seconds"]),
+                                tuned_normal_sql,
+                                tuned_pressure_sql,
+                                int(config["normal_clients"]),
+                                int(config["pressure_clients"]),
+                                stop_event,
+                                run_dir,
+                                connection_args=tuned_connection_args,
+                                connection_config=tuned_normal_connection_config,
+                                pressure_connection_args=tuned_connection_args,
+                                pressure_connection_config=tuned_pressure_connection_config,
+                                normal_rate=normal_rate,
+                                pressure_rate=pressure_rate,
+                            )
+                        finally:
+                            self.db.host, self.db.port = old_host, old_port
+                    tuning["application"] = applied
+                    tuning["status"] = applied.get("status", "applied_and_restored")
+                    tuning["reason"] = "safe SysInsight candidate applied and restored; blocked settings were not activated"
+                except BaseException as exc:
+                    tuning["application"] = getattr(config_applier, "state", {})
+                    tuning["status"] = "apply_failed"
+                    tuning["reason"] = "safe candidate application or tuned phase failed: {}".format(exc)
+                    raise
+            else:
+                phases["pressure_after"] = self._run_phase(
+                    run_id,
+                    "pressure_after",
+                    int(config["pressure_after_seconds"]),
+                    tuned_normal_sql,
+                    tuned_pressure_sql,
+                    int(config["normal_clients"]),
+                    int(config["pressure_clients"]),
+                    stop_event,
+                    run_dir,
+                    normal_rate=normal_rate,
+                    pressure_rate=pressure_rate,
+                )
             samples = self.store.list_lab_samples(run_id, 2000)
             for phase_name, phase_result in phases.items():
                 duration = int(phase_result.get("duration_seconds") or config.get("pressure_seconds", 0))
@@ -1125,6 +1625,9 @@ class LabController:
                 for sample in samples
                 if isinstance(sample, dict)
             )
+            comparison = _tpcc_comparison(phases)
+            comparison["tuning_status"] = tuning.get("status")
+            comparison["tuning_source"] = tuning.get("source")
             current_incidents = [
                 incident
                 for incident in self.store.list_incidents(50)
@@ -1133,8 +1636,10 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
-                "observation_model": "baseline_then_sustained_pressure",
+                "observation_model": "baseline_then_pressure_before_and_after_tuning",
                 "phases": phases,
+                "tuning": tuning,
+                "comparison": comparison,
                 "sample_count": len(samples),
                 "completed_at": utc_now(),
                 "sysinsight_state": {
@@ -1150,8 +1655,10 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
-                "observation_model": "baseline_then_sustained_pressure",
+                "observation_model": "baseline_then_pressure_before_and_after_tuning",
                 "phases": phases,
+                "tuning": tuning,
+                "comparison": _tpcc_comparison(phases),
                 "stopped_at": utc_now(),
                 "artifact_directory": str(run_dir),
             }
@@ -1160,8 +1667,10 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
-                "observation_model": "baseline_then_sustained_pressure",
+                "observation_model": "baseline_then_pressure_before_and_after_tuning",
                 "phases": phases,
+                "tuning": tuning,
+                "comparison": _tpcc_comparison(phases),
                 "artifact_directory": str(run_dir),
             }
             try:
@@ -1234,7 +1743,25 @@ class LabController:
     def start_dream(self, body: Mapping[str, Any]) -> Dict[str, Any]:
         sql_id = str(body.get("sql_id") or "")
         item = self.get_sql(sql_id)
+        # A manual lab action should fail before creating a run/job when the
+        # worker cannot call the shared DREAM/SysInsight endpoint.  Previously
+        # the request was accepted, the baseline ran, and the asynchronous
+        # worker immediately produced a misleading ``completed /
+        # analysis_completed / blocked`` record.
+        dream_offline = bool(getattr(self.bridge.args, "dream_offline", False))
+        api_configured = any(
+            bool(os.environ.get(name))
+            for name in ("SYSINSIGHT_GPT_API_KEY", "SYSINSIGHT_API_KEY", "OPENAI_API_KEY")
+        )
+        if not dream_offline and not api_configured:
+            raise RuntimeError(
+                "DREAM is not ready: shared API key is not configured; "
+                "set SYSINSIGHT_GPT_API_KEY and restart the bridge"
+            )
         run_id = self._run_id("dream")
+        request_id = str(body.get("request_id") or "").strip()
+        if len(request_id) > 160:
+            raise ValueError("request_id is too long")
         config = {
             "sql_id": sql_id,
             "title": item["title"],
@@ -1242,9 +1769,55 @@ class LabController:
             "query_number": item["query_number"],
             "execution": "baseline_then_real_dream_analysis",
         }
+        if request_id:
+            config["request_id"] = request_id
         with self._lock:
-            if self._active_kind("dream"):
+            # Make browser retries idempotent even when the first worker has
+            # already finished its very short baseline before the second HTTP
+            # request arrives.  The request id is persisted in config_json,
+            # so this also works across a page refresh within the same bridge
+            # lifetime.
+            if request_id:
+                for previous in self.store.list_lab_runs(200, kind="dream"):
+                    previous_config = previous.get("config") if isinstance(previous.get("config"), dict) else {}
+                    if previous_config.get("request_id") == request_id:
+                        return {
+                            "status": "already_submitted",
+                            "message": "this DREAM request was already submitted",
+                            "run": previous,
+                        }
+            existing = self._active_kind("dream")
+            if existing:
+                if existing.get("scenario_id") == sql_id:
+                    return {
+                        "status": "already_running",
+                        "message": "this SQL already has a DREAM run queued or running",
+                        "run": existing,
+                    }
                 raise RuntimeError("a dream lab run is already queued or running")
+            # A successful analysis already has a separate replay button. Do
+            # not let a second click on the original-SQL button create a new
+            # baseline/job for the same SQL; clear DREAM records explicitly
+            # when a fresh run is intended.  Blocked/failed runs remain
+            # retryable after the configuration problem is fixed.
+            previous = next(
+                (
+                    value
+                    for value in self.store.list_lab_runs(200, kind="dream")
+                    if value.get("scenario_id") == sql_id
+                    and value.get("status") == "completed"
+                    and isinstance(value.get("result"), dict)
+                    and isinstance(value["result"].get("job"), dict)
+                    and value["result"]["job"].get("status") in {"completed", "candidate"}
+                ),
+                None,
+            )
+            if previous is not None:
+                return {
+                    "status": "already_completed",
+                    "message": "this SQL already has a completed DREAM analysis; use replay or clear records first",
+                    "run": previous,
+                }
             self.store.create_lab_run(run_id, "dream", sql_id, item["title"], config)
             stop_event = threading.Event()
             self._submit_active(run_id, stop_event, self._run_dream, run_id, item, stop_event)
@@ -1409,68 +1982,78 @@ class LabController:
 
     def replay_dream(self, body: Mapping[str, Any]) -> Dict[str, Any]:
         run_id = str(body.get("run_id") or "")
-        row = self.store.get_lab_run(run_id)
-        if row is None or row.get("kind") != "dream":
-            raise KeyError("DREAM lab run not found: {}".format(run_id))
-        if row.get("status") not in {"completed", "failed"}:
-            raise RuntimeError("DREAM analysis is not finished")
-        result = row.get("result") if isinstance(row.get("result"), dict) else {}
-        if result.get("optimized_execution_id"):
-            return {"status": "already_completed", "run": row}
-        job = self.store.get_job(str(result.get("job_id", ""))) if result.get("job_id") else None
-        improvement = self.store.latest_improvement(str(result.get("sql_key", ""))) if result.get("sql_key") else None
-        if not job or str(job.get("status")) not in {"completed", "candidate"}:
-            raise RuntimeError("DREAM job has not completed successfully")
-        if not improvement:
-            raise RuntimeError("DREAM did not produce an improvement candidate")
-        apply_hint = bool(body.get("apply_hint", False))
-        query = str(result.get("query") or "")
-        settings: Dict[str, str] = {}
-        method = ""
-        if str(improvement.get("status")) == "active" and improvement.get("hints"):
-            method = "pg_hint_plan active hint; original SQL"
-        else:
-            rewrite = str(improvement.get("rewrite_sql") or "").strip()
-            action = str(improvement.get("fix_action") or "").strip()
-            if rewrite:
-                settings, rewritten = self._parse_rewrite(rewrite)
-                if rewritten:
-                    query = rewritten
-                    method = "DREAM rewrite_sql"
-                elif not settings:
-                    raise RuntimeError("DREAM rewrite is empty")
-            if not method and action:
-                action_settings, action_query = self._parse_rewrite(action)
-                if action_query:
-                    settings.update(action_settings)
-                    query = action_query
-                else:
-                    settings.update(action_settings)
-                if settings:
-                    method = "DREAM session setting"
-            if not method and improvement.get("hints") and apply_hint:
-                self.bridge.activate_improvement(str(improvement["improvement_id"]))
-                query = str(result.get("query") or "")
-                method = "pg_hint_plan explicit activation; original SQL"
-            if not method:
-                raise RuntimeError("DREAM has no executable rewrite; for a Hint candidate enable apply_hint")
-        if not _is_read_only(query):
-            raise ValueError("optimized SQL is not read-only")
-        self.store.update_lab_run(run_id, status="running", phase="optimized_execution")
-        stop_event = threading.Event()
-        self._submit_active(
-            run_id,
-            stop_event,
-            self._run_dream_replay,
-            run_id,
-            str(result.get("sql_id")),
-            query,
-            method,
-            settings,
-            result,
-            stop_event,
-        )
-        return {"status": "queued", "run": self.store.get_lab_run(run_id)}
+        with self._lock:
+            row = self.store.get_lab_run(run_id)
+            if row is None or row.get("kind") != "dream":
+                raise KeyError("DREAM lab run not found: {}".format(run_id))
+            result = row.get("result") if isinstance(row.get("result"), dict) else {}
+            if result.get("optimized_execution_id"):
+                return {"status": "already_completed", "run": row}
+            # This is the critical idempotency guard.  It is held while the
+            # row changes to optimized_execution and the future is attached,
+            # so a rapid double-click cannot submit two replay workers.
+            if row.get("status") == "running" and row.get("phase") == "optimized_execution":
+                return {
+                    "status": "already_queued",
+                    "message": "optimized SQL replay is already queued or running",
+                    "run": row,
+                }
+            if row.get("status") not in {"completed", "failed"}:
+                raise RuntimeError("DREAM analysis is not finished")
+            job = self.store.get_job(str(result.get("job_id", ""))) if result.get("job_id") else None
+            improvement = self.store.latest_improvement(str(result.get("sql_key", ""))) if result.get("sql_key") else None
+            if not job or str(job.get("status")) not in {"completed", "candidate"}:
+                raise RuntimeError("DREAM job has not completed successfully")
+            if not improvement:
+                raise RuntimeError("DREAM did not produce an improvement candidate")
+            apply_hint = bool(body.get("apply_hint", False))
+            query = str(result.get("query") or "")
+            settings: Dict[str, str] = {}
+            method = ""
+            if str(improvement.get("status")) == "active" and improvement.get("hints"):
+                method = "pg_hint_plan active hint; original SQL"
+            else:
+                rewrite = str(improvement.get("rewrite_sql") or "").strip()
+                action = str(improvement.get("fix_action") or "").strip()
+                if rewrite:
+                    settings, rewritten = self._parse_rewrite(rewrite)
+                    if rewritten:
+                        query = rewritten
+                        method = "DREAM rewrite_sql"
+                    elif not settings:
+                        raise RuntimeError("DREAM rewrite is empty")
+                if not method and action:
+                    action_settings, action_query = self._parse_rewrite(action)
+                    if action_query:
+                        settings.update(action_settings)
+                        query = action_query
+                    else:
+                        settings.update(action_settings)
+                    if settings:
+                        method = "DREAM session setting"
+                if not method and improvement.get("hints") and apply_hint:
+                    self.bridge.activate_improvement(str(improvement["improvement_id"]))
+                    query = str(result.get("query") or "")
+                    method = "pg_hint_plan explicit activation; original SQL"
+                if not method:
+                    raise RuntimeError("DREAM has no executable rewrite; for a Hint candidate enable apply_hint")
+            if not _is_read_only(query):
+                raise ValueError("optimized SQL is not read-only")
+            self.store.update_lab_run(run_id, status="running", phase="optimized_execution")
+            stop_event = threading.Event()
+            self._submit_active(
+                run_id,
+                stop_event,
+                self._run_dream_replay,
+                run_id,
+                str(result.get("sql_id")),
+                query,
+                method,
+                settings,
+                result,
+                stop_event,
+            )
+            return {"status": "queued", "run": self.store.get_lab_run(run_id)}
 
     def _run_dream_replay(
         self,

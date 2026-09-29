@@ -2,6 +2,20 @@
 set -euo pipefail
 
 BASE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load operator-local secrets/configuration when present.  The file is
+# ignored by git and is intentionally never copied into SQLite, logs, or
+# Grafana.  Keeping this in the startup path makes repeated service starts
+# use the same SysInsight/DREAM API configuration instead of silently
+# launching the bridge without its key.
+SYSINSIGHT_ENV_FILE="${SYSINSIGHT_ENV_FILE:-$BASE_DIR/.env.local}"
+if [ -f "$SYSINSIGHT_ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$SYSINSIGHT_ENV_FILE"
+  set +a
+fi
+
 BIN_DIR="${MONITORING_BIN_DIR:-$BASE_DIR/vendor/usr/bin}"
 PROMETHEUS_BIN="${PROMETHEUS_BIN:-$BIN_DIR/prometheus}"
 NODE_EXPORTER_BIN="${NODE_EXPORTER_BIN:-$BIN_DIR/prometheus-node-exporter}"
@@ -27,6 +41,33 @@ BRIDGE_DB_SCHEMA="${SYSINSIGHT_DB_SCHEMA:-tpcds}"
 BRIDGE_ALERT_NAME="${SYSINSIGHT_ALERT_NAME:-SysInsightDemoAnomaly}"
 BRIDGE_DREAM_CONFIG="${SYSINSIGHT_DREAM_CONFIG:-$BASE_DIR/../dream/config/tpcds_local_config.json}"
 BRIDGE_DREAM_RUN_AS="${SYSINSIGHT_DREAM_RUN_AS:-postgres}"
+# Keep active-query sampling below the 10 s DREAM trigger threshold.  This is
+# needed because pg_stat_statements stores normalized ($1/$2) text after a
+# statement finishes; the active sample is what preserves a replayable SQL
+# statement for automatic DREAM scheduling.
+BRIDGE_POLL_INTERVAL="${SYSINSIGHT_POLL_INTERVAL:-5}"
+BRIDGE_STATS_LIMIT="${SYSINSIGHT_STATS_LIMIT:-300}"
+BRIDGE_ACTIVE_LIMIT="${SYSINSIGHT_ACTIVE_LIMIT:-100}"
+BRIDGE_SLOW_LIMIT="${SYSINSIGHT_SLOW_LIMIT:-10}"
+BRIDGE_SLOW_MEAN_MS="${SYSINSIGHT_SLOW_MEAN_MS:-10000}"
+BRIDGE_SLOW_MAX_MS="${SYSINSIGHT_SLOW_MAX_MS:-10000}"
+BRIDGE_DREAM_TRIGGER_MS="${SYSINSIGHT_DREAM_TRIGGER_MS:-10000}"
+BRIDGE_SAMPLE_RETENTION_DAYS="${SYSINSIGHT_SQL_SAMPLE_RETENTION_DAYS:-7}"
+BRIDGE_SAMPLE_MAX_ROWS="${SYSINSIGHT_SQL_SAMPLE_MAX_ROWS:-500000}"
+BRIDGE_SAMPLE_MAINTENANCE_INTERVAL="${SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_INTERVAL:-900}"
+BRIDGE_SAMPLE_MAINTENANCE_BATCH="${SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_BATCH:-50000}"
+BRIDGE_TUNE_WITHOUT_ALERT="${SYSINSIGHT_TUNE_WITHOUT_ALERT:-0}"
+
+# Keep the local PostgreSQL demo from taking all four host CPUs or all
+# available memory while a TPCC pressure experiment is running.  These are
+# runtime systemd limits and are reapplied after a reboot/start; set
+# SYSINSIGHT_PG_RESOURCE_GUARD=0 only on a host where the operator explicitly
+# wants an unrestricted database service.
+PG_RESOURCE_GUARD_ENABLED="${SYSINSIGHT_PG_RESOURCE_GUARD:-1}"
+PG_SERVICE="${SYSINSIGHT_PG_SERVICE:-postgresql@${SYSINSIGHT_DB_VERSION:-12}-${SYSINSIGHT_PG_CLUSTER:-main}.service}"
+PG_CPU_QUOTA="${SYSINSIGHT_PG_CPU_QUOTA:-250%}"
+PG_MEMORY_LIMIT="${SYSINSIGHT_PG_MEMORY_LIMIT:-24G}"
+PG_TASKS_MAX="${SYSINSIGHT_PG_TASKS_MAX:-512}"
 
 # A peer-authenticated PostgreSQL worker cannot traverse /root. Previous
 # reproducibility runs create a readable runtime view under /tmp; use the
@@ -44,6 +85,21 @@ if [ -z "$BRIDGE_DREAM_RUNTIME_ROOT" ]; then
 fi
 
 mkdir -p "$BASE_DIR/run" "$BASE_DIR/logs" "$BASE_DIR/data/prometheus" "$BASE_DIR/data/grafana"
+
+if [ "$PG_RESOURCE_GUARD_ENABLED" != "0" ]; then
+  if command -v systemctl >/dev/null 2>&1 && systemctl show "$PG_SERVICE" >/dev/null 2>&1; then
+    if systemctl set-property --runtime "$PG_SERVICE" \
+      "CPUQuota=$PG_CPU_QUOTA" \
+      "MemoryLimit=$PG_MEMORY_LIMIT" \
+      "TasksMax=$PG_TASKS_MAX" >/dev/null; then
+      echo "applied PostgreSQL resource guard: service=$PG_SERVICE cpu=$PG_CPU_QUOTA memory=$PG_MEMORY_LIMIT tasks=$PG_TASKS_MAX"
+    else
+      echo "warning: could not apply PostgreSQL resource guard to $PG_SERVICE; workload rate limits remain active" >&2
+    fi
+  else
+    echo "warning: PostgreSQL systemd service $PG_SERVICE is unavailable; workload rate limits remain active" >&2
+  fi
+fi
 
 start_process() {
   local name="$1"
@@ -121,7 +177,7 @@ start_process grafana \
   --homepath="$GRAFANA_HOME"
 
 if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
-  start_process sysinsight_dream_bridge \
+  bridge_args=(
     "$BRIDGE_PYTHON" \
     "$BRIDGE_SCRIPT" \
     --db "$BRIDGE_DB" \
@@ -137,7 +193,24 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
     --output "$BRIDGE_OUTPUT" \
     --http-listen "$BRIDGE_HTTP_LISTEN" \
     --http-port "$BRIDGE_HTTP_PORT" \
-    --tune-without-alert
+    --poll-interval "$BRIDGE_POLL_INTERVAL" \
+    --stats-limit "$BRIDGE_STATS_LIMIT" \
+    --active-limit "$BRIDGE_ACTIVE_LIMIT" \
+    --slow-limit "$BRIDGE_SLOW_LIMIT" \
+    --slow-mean-ms "$BRIDGE_SLOW_MEAN_MS" \
+    --slow-max-ms "$BRIDGE_SLOW_MAX_MS" \
+    --dream-trigger-ms "$BRIDGE_DREAM_TRIGGER_MS" \
+    --sample-retention-days "$BRIDGE_SAMPLE_RETENTION_DAYS" \
+    --sample-max-rows "$BRIDGE_SAMPLE_MAX_ROWS" \
+    --sample-maintenance-interval "$BRIDGE_SAMPLE_MAINTENANCE_INTERVAL" \
+    --sample-maintenance-batch "$BRIDGE_SAMPLE_MAINTENANCE_BATCH"
+  )
+  case "$BRIDGE_TUNE_WITHOUT_ALERT" in
+    1|true|TRUE|yes|YES|on|ON)
+      bridge_args+=(--tune-without-alert)
+      ;;
+  esac
+  start_process sysinsight_dream_bridge "${bridge_args[@]}"
 fi
 
 # Apply a changed scrape configuration when Prometheus was already running.

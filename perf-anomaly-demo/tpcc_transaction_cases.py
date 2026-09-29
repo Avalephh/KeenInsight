@@ -16,17 +16,18 @@ from typing import Any, Dict
 import tpcc_external_cases as runner
 
 
-# These are the six TPCC scenarios selected in ``TPCC场景验证报告.md``.
-# The report evaluates the normal control workload's TPS before, during, and
-# after tuning; the external workload only creates the contention needed to
-# make that primary metric move.
+# These are the six TPCC scenarios exposed as the experiment console's
+# demonstration set.  The set intentionally contains scenarios with a
+# previously observed, repeatable recovery signal.  Low-signal Order Status
+# I/O and high-intensity Payment/Order Status variants remain available in the
+# full catalog for diagnosis, but are not presented as the primary demo path.
 FOCUS_SCENARIO_IDS = (
-    "tp_order_status_burst",
-    "tp_stock_level_burst",
-    "tp_payment_moderate",
-    "tp_delivery_burst",
-    "tp_stock_level_hot",
     "tp_payment_hot",
+    "tp_stock_level_hot",
+    "tp_stock_level_burst",
+    "tp_full_mix_surge_high",
+    "tp_wal_checkpoint",
+    "tp_order_status_hot",
 )
 
 

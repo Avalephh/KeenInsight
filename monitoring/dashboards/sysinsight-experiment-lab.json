@@ -40,7 +40,7 @@
       "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
     },
     {
-      "id": 5, "type": "timeseries", "title": "TPCC 基线 / 持续压力调优实时曲线", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
+      "id": 5, "type": "timeseries", "title": "TPCC 目标业务 TPS 原始曲线（基线 / 压力前 / 压力后）", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps", "legendFormat": "目标业务 TPS（每秒）{{phase}}", "range": true},
@@ -62,14 +62,39 @@
       "options": {"legend": {"calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
     },
     {
-      "id": 7, "type": "stat", "title": "DREAM 实测提升比例", "gridPos": {"h": 4, "w": 8, "x": 0, "y": 12},
+      "id": 10, "type": "stat", "title": "压力下目标业务 TPS 对比（基线 / 调优前 / 调优后）", "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_baseline_business_tps", "instant": true, "format": "time_series", "legendFormat": "无压力基线"},
+        {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_pressure_before_business_tps", "instant": true, "format": "time_series", "legendFormat": "压力调优前"},
+        {"refId": "C", "expr": "sysinsight_dream_lab_tpcc_pressure_after_business_tps", "instant": true, "format": "time_series", "legendFormat": "压力调优后"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 11, "type": "stat", "title": "压力下 TPS 调优提升（同等压力口径）", "gridPos": {"h": 6, "w": 6, "x": 12, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_tuning_gain_tps", "instant": true, "format": "time_series", "legendFormat": "提升 TPS {{scenario_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 12, "type": "stat", "title": "压力下 TPS 调优提升比例（同等压力口径）", "gridPos": {"h": 6, "w": 6, "x": 18, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_tuning_gain_ratio", "instant": true, "format": "time_series", "legendFormat": "提升比例 {{scenario_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 7, "type": "stat", "title": "DREAM 实测提升比例", "gridPos": {"h": 4, "w": 8, "x": 0, "y": 18},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_sql_improvement_ratio", "instant": true, "format": "time_series", "legendFormat": "{{scenario_id}}"}],
       "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0.2}]}}, "overrides": []},
       "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
     },
     {
-      "id": 8, "type": "table", "title": "实验运行状态", "gridPos": {"h": 8, "w": 16, "x": 8, "y": 12},
+      "id": 8, "type": "table", "title": "实验运行状态", "gridPos": {"h": 8, "w": 16, "x": 8, "y": 18},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "targets": [
         {"refId": "A", "expr": "sysinsight_dream_lab_sysinsight_run_info", "instant": true, "format": "table", "legendFormat": "TPCC {{scenario_id}}"},
@@ -79,8 +104,8 @@
       "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
     },
     {
-      "id": 9, "type": "text", "title": "如何触发实验", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 20},
-      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 从已验证的 6 组 TPCC 场景中选择一组，先看基线，再在压力持续期间观察 SysInsight 调优前后的目标业务 TPS；\n3. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL；\n4. 发送原 SQL，等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\nTPCC 的主指标是正常控制负载（tp_normal.sql）的目标业务 TPS；结果表和稳态/当前卡片会剔除启动升温窗口并显示中位数，CV 表示波动；Grafana 曲线仍展示每秒原始变化。外部 TPS 只是压力注入强度，不作为恢复效果判断。实验不会追加撤压恢复阶段；压力持续时间就是检测、分析和调优观察窗口。这里的 Grafana 面板负责观测，按钮控制和详细结果在实验控制台完成。DREAM 没有返回合法可执行改进时，页面会明确显示原因，不会伪造“已优化”。"}
+      "id": 9, "type": "text", "title": "如何触发实验", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 26},
+      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 从已验证的 6 组 TPCC 场景中选择一组，运行“基线 → 压力调优前 → 压力调优后”；\n3. 在“压力下目标业务 TPS 对比”面板查看三组稳态中位数，在“调优提升”面板查看按同等外部压力折算后的绝对/相对提升；\n4. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL，发送原 SQL并等待真实 DREAM 异步分析；\n5. 点击再次执行，比较基线和优化 SQL 的实际耗时。\n\nTPCC 的主指标是正常控制负载（tp_normal.sql）的目标业务 TPS；压力前后都运行同一外部场景和固定 pgbench 速率目标，外部 TPS 只用于验证实际施压强度，不作为业务恢复指标。结果中的稳态值剔除启动升温窗口后取中位数，CV 表示波动，原始变化仍可在曲线中查看；闭环旧结果还会按实际压力做折算。压力总观察秒数会在调优前后平分，不追加撤压恢复阶段；调优阶段通过 TemporaryPostgresConfiguration 完整应用 API 候选，并在结束后自动恢复原配置，可能触发一次受控 PostgreSQL 重启。候选未通过校验或恢复失败时，系统会明确显示原因，不会伪造“已优化”。"}
     }
   ],
   "refresh": "5s",

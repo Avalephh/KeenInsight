@@ -52,6 +52,21 @@
 
 所有失败组仍保留完整的压力样本、perf 数据、原始 API `result.json`、应用/还原状态和 TPS 日志，不能把“检测到了”误报成“修复成功”。
 
+## 实验控制台收益优先场景复测（2026-09-28）
+
+实验控制台现在只把在当前资源上限、禁止重启和同压力校验下实际通过的场景列为 6 组关注场景。压力总观察 180 秒，调优前后各 90 秒；有效性要求外部压力前后偏差不超过 20%。
+
+| 关注场景 | 压力前目标 TPS | 压力后目标 TPS | 提升 | 外部压力变化 | 候选状态 |
+|---|---:|---:|---:|---:|---|
+| 热点 Payment | 1317.0 | 1595.9 | +21.18% | -2.64% | applied_and_restored |
+| 热点 Stock Level | 611.0 | 852.0 | +39.44% | -9.91% | session_only_applied_and_ended |
+| Stock Level 突发 | 608.0 | 834.5 | +37.25% | -10.52% | session_only_applied_and_ended |
+| 五类 TPCC 高强度混合 | 570.0 | 913.5 | +60.26% | -17.62% | applied_and_restored |
+| WAL/checkpoint 写入压力 | 460.0 | 697.0 | +51.52% | -12.03% | applied_and_restored |
+| 热点 Order Status | 1289.0 | 1595.0 | +23.74% | +0.17% | session_only_applied_and_ended |
+
+以上六组均由固定 `pgbench -R` 压力复测并通过 `comparison_valid=true`；Payment 中等突发、Delivery 突发、混合读、高强度 Payment 和普通/随机读 Order Status 只保留在完整场景目录中，不作为主要演示入口。
+
 ## 结果证据
 
 达标组的完整结果：

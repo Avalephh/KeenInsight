@@ -34,7 +34,7 @@
     <section><h2>后台动作时间线</h2><div class="section-body"><table><thead><tr><th>时间</th><th>组件</th><th>动作</th><th>状态</th><th>对象 / 详情</th></tr></thead><tbody id="events"></tbody></table></div></section>
     <section><h2>DREAM 队列与任务管理（blocked 为历史审计）</h2><div class="section-body"><table><thead><tr><th>请求时间</th><th>Job</th><th>状态</th><th>SQL</th><th>尝试</th><th>结果 / 阻塞原因</th><th>操作</th></tr></thead><tbody id="jobs"></tbody></table></div></section>
     <section><h2>改进方案 / pg_hint_plan</h2><div class="section-body"><div class="toolbar"><button class="secondary" onclick="configureHints()">配置 hint table</button><span class="muted">自动发布仍受实测提升、只读和合法 Hint 策略约束；这里的启用/回滚是显式人工操作。</span></div><table><thead><tr><th>创建时间</th><th>ID</th><th>状态</th><th>提升比例</th><th>Hint</th><th>命中观测</th><th>操作</th></tr></thead><tbody id="improvements"></tbody></table></div></section>
-    <section><h2>已观测 SQL（慢 SQL 进入 DREAM）</h2><div class="section-body"><table><thead><tr><th>SQL</th><th>queryid</th><th>平均 ms</th><th>最大 ms</th><th>调用数</th><th>可回放</th><th>改进状态</th></tr></thead><tbody id="sql"></tbody></table></div></section>
+    <section><h2>已观测 SQL（结束且只读、达到 10 秒才进入 DREAM）</h2><div class="section-body"><table><thead><tr><th>SQL</th><th>queryid</th><th>平均 ms</th><th>最大 ms</th><th>调用数</th><th>可回放</th><th>改进状态</th></tr></thead><tbody id="sql"></tbody></table></div></section>
   </main>
   <script>
     const $ = id => document.getElementById(id);
@@ -60,7 +60,8 @@
       ];
       $('cards').innerHTML = values.map(v => `<div class="card"><div class="muted">${text(v[0])}</div><div class="value ${v[2]}">${text(v[1])}</div></div>`).join('');
       const gateText = gate.reason ? `；调度状态：${gate.status || '-'}（${gate.reason}）` : '';
-      $('summary').textContent = `数据库 ${s.database?.name || '-'} / schema ${s.database?.schema || '-'}；LLM API ${svc.api_configured ? '已配置' : '未配置'}；自动应用 ${svc.dream_auto_apply ? '开启' : '关闭'}${gateText}`;
+      const triggerText = svc.dream_trigger_ms ? `；DREAM 条件：结束后的只读 SQL ≥${(Number(svc.dream_trigger_ms) / 1000).toFixed(0)}秒` : '';
+      $('summary').textContent = `数据库 ${s.database?.name || '-'} / schema ${s.database?.schema || '-'}；LLM API ${svc.api_configured ? '已配置' : '未配置'}；自动应用 ${svc.dream_auto_apply ? '开启' : '关闭'}${triggerText}${gateText}`;
       $('summary').className = 'muted'; $('updated').textContent = '更新于 ' + new Date().toLocaleTimeString();
     }
     function renderEvents(rows) { $('events').innerHTML = rows.map(e => `<tr><td>${text(when(e.occurred_at))}</td><td>${text(e.component)}</td><td>${text(e.event_type)}</td><td>${pill(e.status)}</td><td class="sql">${text(JSON.stringify(e.data || {}))}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">暂无动作</td></tr>'; }

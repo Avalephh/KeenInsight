@@ -28,14 +28,14 @@
     label { display: block; color: #5c687a; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
     select, input { width: 100%; box-sizing: border-box; border: 1px solid #cbd5e1; border-radius: 5px; padding: 8px; background: white; color: #202938; }
     .field { min-width: 120px; } .hint { padding: 9px 11px; border-radius: 5px; background: #f3f7ff; color: #4b5d78; }
-    .phase-track { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0; }
+    .phase-track { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
     .phase { padding: 12px; border-radius: 6px; background: #edf1f6; color: #6b7789; border: 1px solid transparent; }
     .phase.active { background: #fff3d8; color: #8a5a00; border-color: #eabf67; } .phase.done { background: #e1f5ea; color: #176b43; }
     table { border-collapse: collapse; width: 100%; min-width: 720px; } th, td { border-bottom: 1px solid #edf0f5; padding: 8px; text-align: left; vertical-align: top; } th { color: #5c687a; font-weight: 600; white-space: nowrap; }
     td.sql, pre { white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
     td.sql { max-width: 620px; } pre { margin: 0; max-height: 360px; overflow: auto; background: #f6f8fb; padding: 11px; border-radius: 5px; }
     .pill { display: inline-block; padding: 2px 7px; border-radius: 10px; background: #e9eef8; font-size: 12px; white-space: nowrap; }
-    .pill.completed, .pill.active, .pill.ready { background: #dff5e9; color: #12683e; } .pill.failed, .pill.blocked, .pill.stopped { background: #fde5e8; color: #9c263a; } .pill.running, .pill.queued { background: #fff0cd; color: #8a5a00; }
+    .pill.completed, .pill.active, .pill.ready, .pill.applied, .pill.applied_and_restored, .pill.session_only_applied_and_ended { background: #dff5e9; color: #12683e; } .pill.failed, .pill.blocked, .pill.stopped, .pill.apply_failed { background: #fde5e8; color: #9c263a; } .pill.running, .pill.queued, .pill.applying { background: #fff0cd; color: #8a5a00; }
     .metric-line { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; } .metric-line strong { font-size: 18px; }
     .notice { border-left: 4px solid #2f6fed; padding: 9px 12px; background: #f3f7ff; margin: 10px 0; }
     #message { min-height: 20px; margin: 8px 0; } .right { margin-left: auto; }
@@ -46,7 +46,7 @@
     <h1>SysInsight / DREAM 实验控制台</h1>
     <a href="http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1" target="_blank">Grafana 实验看板</a>
     <a href="/ui" target="_blank">自动联动管理</a>
-    <button class="secondary" onclick="refreshAll()">刷新</button>
+    <button id="refreshButton" class="secondary" onclick="refreshAll(true)">刷新</button>
   </header>
   <main>
     <div class="toolbar"><span id="summary" class="muted">正在加载实验目录...</span><span id="updated" class="muted right"></span></div>
@@ -54,21 +54,22 @@
     <div id="message"></div>
 
     <section>
-      <h2>SysInsight / TPCC 外部压力：基线 → 持续压力调优观察</h2>
+      <h2>SysInsight / TPCC 外部压力：基线 → 压力调优前 → 压力调优后</h2>
       <div class="section-body">
-        <div class="notice">先运行正常基线，再持续施加外部压力。默认基线 60 秒、持续观察 180 秒；压力不会在实验结束前撤掉。结果表中的目标业务 TPS 是剔除启动升温窗口后的稳态中位数，CV 用于显示波动，实时行和 Grafana 曲线仍保留每秒原始值。SysInsight 的检测、分析和调优都在压力持续期间进行；只有压力仍在时目标业务 TPS 回升，才算观察到有效恢复。</div>
+        <div class="notice">先运行正常基线，再以固定速率施加同一 TPCC 外部压力，并把“压力总观察秒数”平均分成调优前和调优后两段。实验默认限制正常控制约 1600 TPS、外部压力最高 4000 TPS，同时给 PostgreSQL 设置 CPU/内存/任务数护栏，避免压测拖垮整机。调优阶段通过 TemporaryPostgresConfiguration 应用安全的 session/连接级 SysInsight 候选；synchronous_commit=off 也只通过 PGOPTIONS 进入调优控制连接；会审计并跳过 shared_buffers、work_mem、maintenance_work_mem、并行 worker、max_connections、fsync、max_wal_size 等会重启集群、占满内存或改变全局持久性语义的危险项，因此不会在实验中重启 PostgreSQL。会话级参数在目标连接建立时通过 PGOPTIONS 注入，不会在每笔事务重复执行 SET；外部压力连接保持原始 SQL 和客户端数，并使用同一个 pgbench 固定速率目标。阶段结束后自动恢复临时配置，不增加撤压恢复阶段。因此对比的是有压力时目标业务 TPS 是否回升。结果表中的 TPS 是剔除启动升温窗口后的稳态中位数，提升值按同等压力口径计算；CV 用于显示波动，实时行和 Grafana 曲线仍保留每秒原始值。</div>
         <div class="grid">
           <div class="span-7"><label for="tpccScenario">TPCC 外部压力场景</label><select id="tpccScenario"></select></div>
           <div class="span-3"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
           <div class="span-2"><label for="pressureClients">外部客户端</label><input id="pressureClients" type="number" min="1" max="32" value="6"></div>
           <div class="span-3 field"><label for="baselineSeconds">基线秒数</label><input id="baselineSeconds" type="number" min="5" max="300" value="60"></div>
-          <div class="span-3 field"><label for="pressureSeconds">持续压力观察秒数</label><input id="pressureSeconds" type="number" min="5" max="300" value="180"></div>
-          <div class="span-3 toolbar" style="align-items:end"><button id="startTpcc" onclick="startTpcc()">开始基线→持续压力实验</button><button id="stopTpcc" class="warn" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
+          <div class="span-3 field"><label for="pressureSeconds">压力总观察秒数（前后各半）</label><input id="pressureSeconds" type="number" min="10" max="300" value="180"></div>
+          <div class="span-3 toolbar" style="align-items:end"><button id="startTpcc" onclick="startTpcc()">开始基线→压力前→压力后</button><button id="stopTpcc" class="warn" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
         </div>
         <div id="tpccDescription" class="hint" style="margin-top:12px"></div>
         <div id="tpccPhases" class="phase-track"></div>
         <div id="tpccLive" class="metric-line muted">尚未运行 TPCC 实验</div>
-        <table><thead><tr><th>阶段</th><th>目标业务 TPS（稳态中位数）</th><th>业务延迟</th><th>压力注入 TPS（辅助中位数）</th><th>主指标波动</th><th>返回码</th><th>结论</th></tr></thead><tbody id="tpccResults"></tbody></table>
+        <div id="tpccComparison" class="notice">完成一次三阶段实验后，这里会显示压力下调优前后的目标业务 TPS、提升幅度，以及两段外部压力是否保持在相近水平。</div>
+        <table><thead><tr><th>阶段</th><th>目标业务 TPS（稳态中位数）</th><th>相对压力调优前（同等压力口径）</th><th>业务延迟</th><th>压力注入 TPS（辅助中位数）</th><th>主指标波动</th><th>返回码</th><th>结论</th></tr></thead><tbody id="tpccResults"></tbody></table>
       </div>
     </section>
 
@@ -109,6 +110,10 @@
     let catalog = null;
     let selectedSql = null;
     let selectedRun = {sysinsight: '', dream: ''};
+    let dreamRequestInFlight = false;
+    let replayRequestInFlight = false;
+    let refreshInFlight = false;
+    let refreshQueued = false;
 
     async function get(path) { const r = await fetch(path, {cache:'no-store'}); if (!r.ok) throw new Error(await r.text()); return r.json(); }
     async function post(path, body = {}) { const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); const v = await r.json(); if (!r.ok) throw new Error(v.error || JSON.stringify(v)); return v; }
@@ -122,10 +127,17 @@
 
     function loadCatalog() {
       const tpcc = $('tpccScenario');
-      tpcc.innerHTML = focusScenarios().map(v => `<option value="${esc(v.scenario_id)}">${v.focus_order ? '关注场景 ' + text(v.focus_order) + '/6 · ' : ''}${text(v.title)}</option>`).join('');
+      const focusTotal = focusScenarios().length || 1;
+      tpcc.innerHTML = focusScenarios().map(v => `<option value="${esc(v.scenario_id)}">${v.focus_order ? '关注场景 ' + text(v.focus_order) + '/' + focusTotal + ' · ' : ''}${text(v.title)}</option>`).join('');
       tpcc.onchange = () => {
         const v = selectedScenario();
-        if (v) { $('pressureClients').value = v.clients; $('tpccDescription').textContent = `${v.event}；主指标：目标业务 TPS（${v.normal_sql} 控制负载）；外部 TPS 仅表示压力注入强度；事务：${(v.transactions || []).join('、')}；证据：${(v.pressure_evidence || []).join('、')}`; }
+        if (v) {
+          $('pressureClients').value = v.clients;
+          const pressure = v.pressure_target_tps
+            ? `默认固定施压目标约 ${metric(v.pressure_target_tps, 0)} TPS`
+            : '闭环施压，按实际外部 TPS 判断';
+          $('tpccDescription').textContent = `${v.event}；主指标：目标业务 TPS（${v.normal_sql} 控制负载）；${pressure}；外部 TPS 仅表示压力注入强度；事务：${(v.transactions || []).join('、')}；证据：${(v.pressure_evidence || []).join('、')}`;
+        }
       };
       tpcc.onchange();
       const sql = $('sqlCatalog');
@@ -144,27 +156,60 @@
       } catch (e) { message('SQL 详情加载失败：' + e.message, true); }
     }
 
+    function metric(value, digits = 2) {
+      if (value === undefined || value === null || value === '') return '-';
+      const n = Number(value);
+      return Number.isFinite(n) ? n.toFixed(digits) : String(value);
+    }
+
+    function signedMetric(value, digits = 2) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) return '-';
+      return `${n >= 0 ? '+' : ''}${n.toFixed(digits)}`;
+    }
+
+    function percent(value, digits = 1) {
+      const n = Number(value);
+      return Number.isFinite(n) ? `${(n * 100).toFixed(digits)}%` : '-';
+    }
+
+    function phaseLabel(name) {
+      return ({baseline: '基线', pressure_before: '压力调优前', pressure_after: '压力调优后', completed: '已完成', failed: '失败', stopped: '已停止'})[name] || name || '空闲';
+    }
+
+    function tuningApplied(status) {
+      return ['applied', 'applied_and_restored', 'session_only_applied_and_ended'].includes(String(status || ''));
+    }
+
     function renderCards(status) {
       const current = status.current || [], s = status.latest_sysinsight || {}, d = status.latest_dream || {};
       const sRun = current.find(v => v.kind === 'sysinsight') || s;
       const sSample = sRun.samples?.slice(-1)[0]?.metrics || {};
       const business = sSample.business || sSample.control || {};
       const pressure = sSample.pressure || sSample.external || {};
-      const summaryPhase = sRun.status === 'completed' ? 'pressure' : sRun.phase;
+      const resultPhases = sRun.result?.phases || {};
+      const phaseCandidates = sRun.status === 'completed' ? ['pressure_after', 'pressure_before', 'baseline'] : [sRun.phase, 'pressure_after', 'pressure_before', 'baseline'];
+      const summaryPhase = phaseCandidates.find(v => resultPhases[v]) || sRun.phase;
       const summary = sRun.result?.phases?.[summaryPhase] || {};
       const businessSummary = summary.business_tps_summary || {};
       const pressureSummary = summary.pressure_tps_summary || {};
+      const comparison = sRun.result?.comparison || {};
+      const gainClass = comparison.improved_under_pressure ? 'ok' : (comparison.tuning_gain_tps == null ? '' : 'bad');
       const dResult = d.result || {};
       const executions = d.executions || [];
       const base = executions.find(v => v.phase === 'baseline');
       const opt = executions.find(v => v.phase === 'optimized');
       const values = [
-        ['TPCC 当前阶段', current.find(v => v.kind === 'sysinsight')?.phase || s.phase || 'idle', current.find(v => v.kind === 'sysinsight') ? 'ok' : ''],
+        ['TPCC 当前阶段', phaseLabel(current.find(v => v.kind === 'sysinsight')?.phase || s.phase || 'idle'), current.find(v => v.kind === 'sysinsight') ? 'ok' : ''],
         ['TPCC 目标业务 TPS（稳态/当前）', businessSummary.steady_tps ?? business.tps_live ?? business.tps ?? '-', ''],
         ['压力注入 TPS（辅助稳态/当前）', pressureSummary.steady_tps ?? pressure.tps_live ?? pressure.tps ?? '-', ''],
+        ['压力调优前目标 TPS', metric(comparison.pressure_before_tps), ''],
+        ['压力调优后目标 TPS', metric(comparison.pressure_after_tps), comparison.improved_under_pressure ? 'ok' : ''],
+        ['调优提升 TPS（同等压力口径）', comparison.tuning_gain_tps == null ? '-' : `${signedMetric(comparison.tuning_gain_tps)} (${percent(comparison.tuning_gain_ratio)})`, gainClass],
+        ['调优后 / 无压基线', percent(comparison.recovery_ratio), ''],
         ['TPCC 活动连接', sSample.active_lab ?? '-', ''],
         ['TPCC 告警', sSample.alert_firing ? 'FIRING' : '正常', sSample.alert_firing ? 'bad' : 'ok'],
-        ['DREAM 状态', current.find(v => v.kind === 'dream')?.phase || d.phase || 'idle', current.find(v => v.kind === 'dream') ? 'ok' : ''],
+        ['DREAM 状态', phaseLabel(current.find(v => v.kind === 'dream')?.phase || d.phase || 'idle'), current.find(v => v.kind === 'dream') ? 'ok' : ''],
         ['DREAM 基线 ms', base ? Number(base.duration_ms || 0).toFixed(1) : '-', ''],
         ['DREAM 优化 ms', opt ? Number(opt.duration_ms || 0).toFixed(1) : '-', opt ? 'ok' : '']
       ];
@@ -174,9 +219,10 @@
     }
 
     function phaseClass(name, run) {
-      const phase = String(run?.phase || '');
+      const rawPhase = String(run?.phase || '');
+      const phase = rawPhase === 'pressure' ? 'pressure_before' : rawPhase;
       if (phase === name) return 'phase active';
-      const order = ['baseline','pressure','completed'];
+      const order = ['baseline','pressure_before','pressure_after','completed'];
       return order.indexOf(phase) > order.indexOf(name) || phase === 'completed' ? 'phase done' : 'phase';
     }
 
@@ -192,13 +238,33 @@
       const active = currentRun(status, 'sysinsight');
       $('startTpcc').disabled = !!active;
       $('stopTpcc').disabled = !active;
-      $('tpccPhases').innerHTML = ['baseline','pressure'].map(name => `<div class="${phaseClass(name, run)}"><b>${text(name === 'baseline' ? '1 基线' : '2 持续压力调优观察')}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
+      const phaseNames = ['baseline','pressure_before','pressure_after'];
+      $('tpccPhases').innerHTML = phaseNames.map((name, index) => `<div class="${phaseClass(name, run)}"><b>${text(`${index + 1} ${phaseLabel(name)}`)}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
       const sample = active?.samples?.slice(-1)[0];
       const m = sample?.metrics || {};
       const business = m.business || m.control || {};
       const pressure = m.pressure || m.external || {};
-      $('tpccLive').innerHTML = active ? `<b>${text(run.phase)}</b> · 已运行 ${text(Number(sample?.elapsed_seconds || 0).toFixed(1))} 秒 · 目标业务 TPS <strong>${text((business.tps_live ?? business.tps ?? '-'))}</strong> · 压力注入 TPS（辅助）<strong>${text((pressure.tps_live ?? pressure.tps ?? '-'))}</strong> · 实验连接 <strong>${text(m.lab_sessions ?? m.active_lab ?? '-')}</strong> · 告警 ${m.alert_firing ? pill('FIRING') : pill('normal')}` : `最近运行：${run ? pill(run.status) + ' · ' + text(run.phase) : '尚未运行 TPCC 实验'}`;
-      const rows = ['baseline','pressure'].map(name => {
+      $('tpccLive').innerHTML = active ? `<b>${text(phaseLabel(run.phase))}</b> · 已运行 ${text(Number(sample?.elapsed_seconds || 0).toFixed(1))} 秒 · 目标业务 TPS <strong>${text((business.tps_live ?? business.tps ?? '-'))}</strong> · 压力注入 TPS（辅助）<strong>${text((pressure.tps_live ?? pressure.tps ?? '-'))}</strong> · 实验连接 <strong>${text(m.lab_sessions ?? m.active_lab ?? '-')}</strong> · 告警 ${m.alert_firing ? pill('FIRING') : pill('normal')}` : `最近运行：${run ? pill(run.status) + ' · ' + text(phaseLabel(run.phase)) : '尚未运行 TPCC 实验'}`;
+      const comparison = run?.result?.comparison || {};
+      const tuning = run?.result?.tuning || {};
+      if (comparison.pressure_before_tps != null && comparison.pressure_after_tps != null) {
+        const pressureComparable = comparison.same_pressure_observed !== false;
+        const improved = !!comparison.improved_under_pressure && pressureComparable;
+        const gain = comparison.tuning_gain_tps == null ? '-' : `${signedMetric(comparison.tuning_gain_tps)} TPS（${percent(comparison.tuning_gain_ratio)}）`;
+        const rawGain = comparison.raw_tuning_gain_tps == null ? '' : `（实际观测原始变化 ${signedMetric(comparison.raw_tuning_gain_tps)} TPS）`;
+        const external = comparison.external_pressure_before_tps != null && comparison.external_pressure_after_tps != null
+          ? `；外部压力 ${metric(comparison.external_pressure_before_tps)} → ${metric(comparison.external_pressure_after_tps)} TPS`
+          : '';
+        const pressureNote = comparison.same_pressure_observed === false
+          ? '两段外部压力差异超过 20%，本次对比无效。'
+          : (comparison.same_pressure_observed === true ? '两段外部压力在允许偏差内。' : '外部压力一致性未能确认。');
+        $('tpccComparison').innerHTML = `<b>压力下调优对比</b>：目标业务 TPS ${text(metric(comparison.pressure_before_tps))} → <span class="${improved ? 'ok' : 'bad'}"><strong>${text(metric(comparison.pressure_after_tps))}</strong></span>，同等外部压力口径下调优提升 <span class="${improved ? 'ok' : 'bad'}"><strong>${text(gain)}</strong></span>${text(rawGain)}${text(external)}；${text(pressureNote)} 候选状态 ${pill(tuning.status || comparison.tuning_status || 'unknown')}。${improved ? '压力仍在，调优后目标业务 TPS 更高。' : (comparison.same_pressure_observed === false ? '请重新运行更长的压力窗口后再判断。' : '本次压力下未观察到可归因于调优的目标业务 TPS 提升。')}`;
+      } else if (run?.status === 'completed' || run?.status === 'failed' || run?.status === 'stopped') {
+        $('tpccComparison').textContent = `本次实验没有形成完整的压力调优前后对比（调优候选状态：${tuning.status || 'unknown'}）。`;
+      } else {
+        $('tpccComparison').textContent = '完成一次三阶段实验后，这里会显示压力下调优前后的目标业务 TPS、提升幅度，以及两段外部压力是否保持在相近水平。';
+      }
+      const rows = phaseNames.map(name => {
         const p = phaseResult(run, name), c = p.control, e = p.external;
         const businessTps = p.businessSummary.steady_tps ?? c.tps ?? '-';
         const pressureTps = p.pressureSummary.steady_tps ?? e.tps ?? '-';
@@ -206,7 +272,19 @@
         const alertState = run?.result?.sysinsight_state || {};
         const currentAlert = !!(alertState.alert_observed ?? alertState.alert_firing ?? m.alert_firing);
         const currentIncidents = (run?.result?.sysinsight_state?.current_incidents || []).length > 0;
-        return `<tr><td>${text(name)}</td><td>${text(businessTps)}</td><td>${text(c.latency_ms == null ? '-' : Number(c.latency_ms).toFixed(2))}</td><td>${text(pressureTps)}</td><td>${text(stability)}</td><td>${text(p.controlCode ?? '-')}${p.externalCode == null ? '' : ' / ' + text(p.externalCode)}</td><td>${name === 'pressure' ? (currentAlert || currentIncidents ? '压力持续，已触发/已记录告警' : '压力持续，暂未采样到告警') : '无外部压力'}</td></tr>`;
+        let delta = '-';
+        if (name === 'pressure_after' && comparison.tuning_gain_tps != null) {
+          delta = `${signedMetric(comparison.tuning_gain_tps)} TPS（${percent(comparison.tuning_gain_ratio)}）`;
+        }
+        let conclusion = '无外部压力';
+        if (name === 'pressure_before') {
+          conclusion = currentAlert || currentIncidents ? '压力持续，已触发/已记录告警' : '压力持续，暂未采样到告警';
+        } else if (name === 'pressure_after') {
+          if (active && run?.phase === name) conclusion = tuningApplied(tuning.status) ? '压力持续，正在观察调优后 TPS' : '压力持续，候选未应用';
+          else if (comparison.tuning_gain_tps != null) conclusion = comparison.improved_under_pressure ? '压力持续，调优后 TPS 更高' : '压力持续，本次未提升';
+          else conclusion = '压力持续，等待完整结果';
+        }
+        return `<tr><td>${text(phaseLabel(name))}</td><td>${text(businessTps)}</td><td class="${name === 'pressure_after' && comparison.improved_under_pressure && comparison.same_pressure_observed !== false ? 'ok' : ''}">${text(delta)}</td><td>${text(c.latency_ms == null ? '-' : Number(c.latency_ms).toFixed(2))}</td><td>${text(pressureTps)}</td><td>${text(stability)}</td><td>${text(p.controlCode ?? '-')}${p.externalCode == null ? '' : ' / ' + text(p.externalCode)}</td><td>${text(conclusion)}</td></tr>`;
       });
       $('tpccResults').innerHTML = rows.join('');
     }
@@ -217,12 +295,14 @@
       const result = run?.result || {};
       const job = run?.job || {};
       const imp = run?.improvement || result.improvement || {};
-      $('startDream').disabled = !!active || !selectedSql;
-      $('replayDream').disabled = !!active || !run || !result.job_id || ['queued','running'].includes(String(job.status || '')) || !!result.optimized_execution_id;
+      $('startDream').disabled = !!active || !selectedSql || dreamRequestInFlight;
+      $('replayDream').disabled = !!active || replayRequestInFlight || !run || !result.job_id || ['queued','running'].includes(String(job.status || '')) || !!result.optimized_execution_id;
       if (!run) {
         $('dreamState').textContent = '尚未运行 DREAM 实验'; $('dreamExecutions').innerHTML = '<tr><td colspan="4" class="muted">暂无执行记录</td></tr>'; $('dreamAnalysis').textContent = '暂无结果'; return;
       }
-      $('dreamState').innerHTML = `${pill(run.status)} · 阶段 ${text(run.phase)} · SQL ${text(run.scenario_id)} · Job ${text(result.job_id || '-')} ${job.status ? pill(job.status) : ''}`;
+      const jobReason = job.reason || job.result?.reason || result.job_result?.reason || result.reason || '';
+      const reasonText = jobReason ? `<br><span class="${String(job.status) === 'blocked' ? 'bad' : 'muted'}">${String(job.status) === 'blocked' ? 'DREAM 未执行：' : ''}${text(jobReason)}</span>` : '';
+      $('dreamState').innerHTML = `${pill(run.status)} · 阶段 ${text(run.phase)} · SQL ${text(run.scenario_id)} · Job ${text(result.job_id || '-')} ${job.status ? pill(job.status) : ''}${reasonText}`;
       const executions = run.executions || [];
       $('dreamExecutions').innerHTML = executions.slice().reverse().map(v => `<tr><td>${text(v.phase)}</td><td>${v.duration_ms == null ? '-' : text(Number(v.duration_ms).toFixed(2))}</td><td>${text(v.method || '-')}</td><td>${pill(v.status)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">暂无执行记录</td></tr>';
       const analysis = {
@@ -239,12 +319,24 @@
       $('runHistory').innerHTML = (status.runs || []).map(v => `<tr><td>${text(when(v.requested_at))}</td><td>${text(v.kind)}</td><td>${text(v.scenario_id || v.title || '-')}</td><td>${pill(v.status)}</td><td>${text(v.phase)}</td><td class="sql">${text(v.error || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">暂无审计记录</td></tr>';
     }
 
-    async function refreshAll() {
+    async function refreshAll(manual = false) {
+      if (refreshInFlight) {
+        if (manual) refreshQueued = true;
+        return;
+      }
+      refreshInFlight = true;
+      const refreshButton = $('refreshButton');
+      if (manual && refreshButton) { refreshButton.disabled = true; refreshButton.textContent = '刷新中...'; }
       try {
         if (!catalog) { catalog = await get('/api/v1/lab/catalog'); loadCatalog(); }
         const status = await get('/api/v1/lab/status');
         renderCards(status); renderTpcc(status); renderDream(status); renderHistory(status);
       } catch (e) { message('刷新失败：' + e.message, true); }
+      finally {
+        refreshInFlight = false;
+        if (manual && refreshButton) { refreshButton.disabled = false; refreshButton.textContent = '刷新'; }
+        if (refreshQueued) { refreshQueued = false; refreshAll(false); }
+      }
     }
 
     async function startTpcc() {
@@ -281,13 +373,56 @@
     }
 
     async function startDream() {
-      try { const v = await post('/api/v1/actions/lab/dream/start', {sql_id: $('sqlCatalog').value}); selectedRun.dream = v.run?.run_id || ''; message('原 SQL 已排队执行，DREAM 分析会在后台异步完成。'); await refreshAll(); } catch (e) { message('启动 DREAM 失败：' + e.message, true); }
+      if (!selectedSql || !$('sqlCatalog').value) { message('请先选择一条可执行的只读 TPC-DS SQL。', true); return; }
+      dreamRequestInFlight = true;
+      $('startDream').disabled = true;
+      $('dreamState').textContent = '正在提交原 SQL，等待 DREAM 后台分析...';
+      message('正在发送原 SQL并触发 DREAM...');
+      try {
+        const v = await post('/api/v1/actions/lab/dream/start', {
+          sql_id: $('sqlCatalog').value,
+          request_id: `dream-start-${Date.now()}-${Math.random().toString(16).slice(2)}`
+        });
+        selectedRun.dream = v.run?.run_id || '';
+        if (v.status === 'already_completed') {
+          message('这条 SQL 已经完成过 DREAM 分析，请使用“再次执行优化 SQL”，或先清空记录。');
+        } else if (v.status === 'already_submitted') {
+          message('这次 DREAM 请求已经提交过，没有重复发送。');
+        } else if (v.status === 'already_running') {
+          message('这条 SQL 的 DREAM 任务已经在运行，本次没有重复发送。');
+        } else {
+          message(`原 SQL 已提交（${selectedRun.dream || '已进入队列'}），页面每 2 秒刷新分析状态。`);
+        }
+      } catch (e) {
+        message('启动 DREAM 失败：' + e.message, true);
+      } finally {
+        dreamRequestInFlight = false;
+        await refreshAll();
+      }
     }
 
     async function replayDream() {
+      if (replayRequestInFlight) return;
       const status = await get('/api/v1/lab/status'); const run = currentRun(status, 'dream') || status.latest_dream;
       if (!run) return;
-      try { await post('/api/v1/actions/lab/dream/replay', {run_id: run.run_id, apply_hint: $('applyHint').checked}); message('已排队执行 DREAM 优化结果。'); await refreshAll(); } catch (e) { message('再次执行失败：' + e.message, true); }
+      replayRequestInFlight = true;
+      $('replayDream').disabled = true;
+      $('dreamState').textContent = '正在提交优化 SQL，防重复锁已生效...';
+      message('正在提交优化 SQL，只允许一次执行...');
+      try {
+        const v = await post('/api/v1/actions/lab/dream/replay', {run_id: run.run_id, apply_hint: $('applyHint').checked});
+        if (v.status === 'already_completed') {
+          message('优化 SQL 已经执行过，本次没有重复执行。');
+        } else if (v.status === 'already_queued') {
+          message('优化 SQL 已经在执行，本次没有重复提交。');
+        } else {
+          message('已排队执行 DREAM 优化结果，只会执行一次。');
+        }
+      } catch (e) { message('再次执行失败：' + e.message, true); }
+      finally {
+        replayRequestInFlight = false;
+        await refreshAll();
+      }
     }
 
     refreshAll(); setInterval(refreshAll, 2000);

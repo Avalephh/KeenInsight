@@ -31,6 +31,18 @@
       "type": "link",
       "url": "http://127.0.0.1:9108/ui",
       "targetBlank": true
+    },
+    {
+      "title": "查看 TPCC / DREAM 实验看板",
+      "type": "link",
+      "url": "/d/sysinsight-experiment-lab?orgId=1&refresh=5s",
+      "targetBlank": false
+    },
+    {
+      "title": "打开实验控制台",
+      "type": "link",
+      "url": "http://127.0.0.1:9108/lab",
+      "targetBlank": true
     }
   ],
   "liveNow": false,
@@ -98,13 +110,23 @@
       "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
       "pluginVersion": "13.2.1",
       "targets": [{"editorMode": "code", "expr": "sum(rate(pg_stat_database_xact_commit{datname=\"keeninsight\"}[5m])) + sum(rate(pg_stat_database_xact_rollback{datname=\"keeninsight\"}[5m]))", "legendFormat": "transactions/s", "range": true, "refId": "A"}],
-      "title": "事务速率",
+      "title": "数据库全局事务速率（参考，非 TPCC 场景 TPS）",
       "type": "stat"
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "TPCC 各场景目标业务 TPS（三阶段，未运行 = 0）",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_scenario_transaction_tps", "range": true, "format": "time_series", "legendFormat": "{{scenario}} · {{transaction}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
     },
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "percent"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 4},
+      "gridPos": {"h": 7, "w": 8, "x": 0, "y": 14},
       "id": 7,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -115,7 +137,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "percent"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 4},
+      "gridPos": {"h": 7, "w": 8, "x": 8, "y": 14},
       "id": 8,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -126,7 +148,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "percent"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 4},
+      "gridPos": {"h": 7, "w": 8, "x": 16, "y": 14},
       "id": 9,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -137,7 +159,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 11},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 21},
       "id": 10,
       "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -148,7 +170,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "ops"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 11},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 21},
       "id": 11,
       "options": {"legend": {"calcs": ["lastNotNull"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -159,7 +181,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "Bps"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 18},
+      "gridPos": {"h": 7, "w": 12, "x": 0, "y": 28},
       "id": 12,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -170,7 +192,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 18},
+      "gridPos": {"h": 7, "w": 12, "x": 12, "y": 28},
       "id": 13,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -181,7 +203,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "ops"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 25},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 35},
       "id": 14,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -192,7 +214,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "s"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 25},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 35},
       "id": 15,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -203,7 +225,7 @@
     {
       "datasource": {"type": "prometheus", "uid": "prometheus"},
       "fieldConfig": {"defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "short"}, "overrides": []},
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 33},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 43},
       "id": 16,
       "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
       "pluginVersion": "13.2.1",
@@ -214,12 +236,12 @@
   ],
   "refresh": "15s",
   "schemaVersion": 39,
-  "tags": ["prometheus", "postgresql", "local", "demo"],
+  "tags": ["prometheus", "postgresql", "tpcc", "sysinsight", "local", "demo"],
   "templating": {"list": []},
   "time": {"from": "now-6h", "to": "now"},
   "timepicker": {},
   "timezone": "",
   "title": "本机 PostgreSQL 监控大屏",
   "uid": "local-postgresql-demo",
-  "version": 1
+  "version": 3
 }

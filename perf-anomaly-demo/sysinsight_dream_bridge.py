@@ -4,7 +4,7 @@
 The bridge has four deliberately separate responsibilities:
 
 * poll Prometheus and PostgreSQL without changing the workload;
-* persist every ``pg_stat_statements`` observation, not only slow statements;
+* persist a bounded rolling window of ``pg_stat_statements`` observations;
 * start one SysInsight incident analysis when an alert fires;
 * send slow, replayable read-only SQL to DREAM in a worker and publish only a
   validated PostgreSQL plan hint to ``hint_plan.hints``.
@@ -126,6 +126,21 @@ def _hint_table_pattern(sql: str) -> str:
     if text and not text.endswith(";"):
         text += ";"
     return text
+
+
+def _is_read_only_sql(sql: str) -> bool:
+    """Conservatively identify replayable analytical SQL before DREAM.
+
+    DREAM can validate this again, but filtering before queueing avoids
+    spending an API/worker slot on TP/WAL-changing statements.  A WITH query
+    containing a modifying keyword is rejected deliberately.
+    """
+
+    stripped = _SQL_COMMENT.sub(" ", str(sql or "")).lstrip().lower()
+    return stripped.startswith(("select", "with", "explain", "values")) and not any(
+        token in stripped[:200]
+        for token in ("insert ", "update ", "delete ", "merge ", "create ", "drop ", "alter ")
+    )
 
 
 def _hint_inner(value: str) -> str:
@@ -631,7 +646,7 @@ class StateStore:
                     directory TEXT,
                     sysinsight_json TEXT
                 );
-                CREATE TABLE IF NOT EXISTS sql_observations (
+                    CREATE TABLE IF NOT EXISTS sql_observations (
                     sql_key TEXT PRIMARY KEY,
                     database_name TEXT NOT NULL,
                     username TEXT,
@@ -650,9 +665,13 @@ class StateStore:
                     shared_blks_read INTEGER NOT NULL DEFAULT 0,
                     first_seen TEXT NOT NULL,
                     last_seen TEXT NOT NULL,
-                    observation_count INTEGER NOT NULL DEFAULT 0,
-                    active_sample_count INTEGER NOT NULL DEFAULT 0,
-                    last_sample_json TEXT
+                        observation_count INTEGER NOT NULL DEFAULT 0,
+                        active_sample_count INTEGER NOT NULL DEFAULT 0,
+                        last_sample_json TEXT,
+                        last_interval_calls INTEGER NOT NULL DEFAULT 0,
+                        last_interval_time_ms REAL NOT NULL DEFAULT 0,
+                        last_interval_max_ms REAL NOT NULL DEFAULT 0,
+                        last_interval_max_changed INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS sql_observations_slow_idx
                     ON sql_observations(mean_time_ms, max_time_ms, calls);
@@ -770,6 +789,10 @@ class StateStore:
                 "ALTER TABLE dream_jobs ADD COLUMN retry_of TEXT",
                 "ALTER TABLE improvements ADD COLUMN last_action_at TEXT",
                 "ALTER TABLE improvements ADD COLUMN last_action TEXT",
+                "ALTER TABLE sql_observations ADD COLUMN last_interval_calls INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE sql_observations ADD COLUMN last_interval_time_ms REAL NOT NULL DEFAULT 0",
+                "ALTER TABLE sql_observations ADD COLUMN last_interval_max_ms REAL NOT NULL DEFAULT 0",
+                "ALTER TABLE sql_observations ADD COLUMN last_interval_max_changed INTEGER NOT NULL DEFAULT 0",
             ):
                 try:
                     conn.execute(statement)
@@ -1181,21 +1204,31 @@ class StateStore:
                     active_sample_count = 1
                 existing = conn.execute("SELECT replay_sql, active_sample_count FROM sql_observations WHERE sql_key=?", (key,)).fetchone()
                 previous = conn.execute(
-                    "SELECT calls, total_time_ms FROM sql_observations WHERE sql_key=?",
+                    "SELECT calls, total_time_ms, max_time_ms FROM sql_observations WHERE sql_key=?",
                     (key,),
                 ).fetchone()
                 if replay_sql is None and existing is not None:
                     replay_sql = existing["replay_sql"]
                 if existing is not None:
                     active_sample_count += int(existing["active_sample_count"] or 0)
+                previous_calls = int(previous["calls"] or 0) if previous is not None else 0
+                previous_total = float(previous["total_time_ms"] or 0) if previous is not None else 0.0
+                previous_max = float(previous["max_time_ms"] or 0) if previous is not None else 0.0
+                current_calls = int(row.get("calls", 0) or 0)
+                current_total = float(row.get("total_time_ms", 0) or 0)
+                current_max = float(row.get("max_time_ms", 0) or 0)
+                interval_calls = max(0, current_calls - previous_calls)
+                interval_time_ms = max(0.0, current_total - previous_total)
+                max_changed = 1 if interval_calls > 0 and current_max > previous_max else 0
                 conn.execute(
                     """
                     INSERT INTO sql_observations(
                         sql_key,database_name,username,queryid,query_text,canonical_sql,hint_pattern,
                         replay_sql,calls,total_time_ms,min_time_ms,max_time_ms,mean_time_ms,rows_count,
                         shared_blks_hit,shared_blks_read,first_seen,last_seen,observation_count,
-                        active_sample_count,last_sample_json
-                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        active_sample_count,last_sample_json,last_interval_calls,last_interval_time_ms,
+                        last_interval_max_ms,last_interval_max_changed
+                    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(sql_key) DO UPDATE SET
                         query_text=excluded.query_text,
                         hint_pattern=excluded.hint_pattern,
@@ -1211,7 +1244,11 @@ class StateStore:
                         last_seen=excluded.last_seen,
                         observation_count=sql_observations.observation_count + 1,
                         active_sample_count=excluded.active_sample_count,
-                        last_sample_json=excluded.last_sample_json
+                        last_sample_json=excluded.last_sample_json,
+                        last_interval_calls=excluded.last_interval_calls,
+                        last_interval_time_ms=excluded.last_interval_time_ms,
+                        last_interval_max_ms=excluded.last_interval_max_ms,
+                        last_interval_max_changed=excluded.last_interval_max_changed
                     """,
                     (
                         key,
@@ -1235,14 +1272,12 @@ class StateStore:
                         1,
                         active_sample_count,
                         _json(active) if active else None,
+                        interval_calls,
+                        interval_time_ms,
+                        current_max,
+                        max_changed,
                     ),
                 )
-                previous_calls = int(previous["calls"] or 0) if previous is not None else 0
-                previous_total = float(previous["total_time_ms"] or 0) if previous is not None else 0.0
-                current_calls = int(row.get("calls", 0) or 0)
-                current_total = float(row.get("total_time_ms", 0) or 0)
-                interval_calls = max(0, current_calls - previous_calls)
-                interval_time_ms = max(0.0, current_total - previous_total)
                 conn.execute(
                     """
                     INSERT INTO sql_observation_samples(
@@ -1275,18 +1310,110 @@ class StateStore:
                 keys.append(key)
         return keys
 
-    def slow_observations(self, mean_ms: float, max_ms: float, min_calls: int, limit: int) -> List[Dict[str, Any]]:
+    def prune_observation_samples(
+        self,
+        retention_days: float,
+        max_rows: int,
+        batch_size: int = 50000,
+    ) -> Dict[str, Any]:
+        """Delete a small batch of expired/high-water-mark samples.
+
+        ``sql_observation_samples`` is an audit time series, not the durable
+        SQL summary used by the dashboard or DREAM queue. Keeping it bounded
+        prevents a long-running demo from turning the SQLite state database
+        into the main disk consumer. Work is deliberately incremental: a
+        bridge restart must never spend minutes deleting millions of rows in
+        one transaction, and this method never runs VACUUM.
+        """
+
+        days = max(0.25, float(retention_days))
+        high_water_mark = max(1000, int(max_rows))
+        batch = max(1000, min(int(batch_size), 250000))
+        cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)).isoformat()
+        with self._lock, self._connection() as conn:
+            before = int(conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0])
+            deleted = 0
+
+            conn.execute(
+                """
+                DELETE FROM sql_observation_samples
+                WHERE sample_id IN (
+                    SELECT sample_id
+                    FROM sql_observation_samples
+                    WHERE observed_at < ?
+                    ORDER BY sample_id ASC
+                    LIMIT ?
+                )
+                """,
+                (cutoff, batch),
+            )
+            deleted += int(conn.execute("SELECT changes()").fetchone()[0])
+
+            remaining = int(conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0])
+            if remaining > high_water_mark and deleted < batch:
+                extra = min(batch - deleted, remaining - high_water_mark)
+                conn.execute(
+                    """
+                    DELETE FROM sql_observation_samples
+                    WHERE sample_id IN (
+                        SELECT sample_id
+                        FROM sql_observation_samples
+                        ORDER BY sample_id ASC
+                        LIMIT ?
+                    )
+                    """,
+                    (extra,),
+                )
+                deleted += int(conn.execute("SELECT changes()").fetchone()[0])
+
+            remaining = int(conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0])
+        return {
+            "status": "completed",
+            "before": before,
+            "deleted": deleted,
+            "remaining": remaining,
+            "retention_days": days,
+            "max_rows": high_water_mark,
+            "cutoff": cutoff,
+        }
+
+    def slow_observations(
+        self,
+        mean_ms: float,
+        max_ms: float,
+        min_calls: int,
+        limit: int,
+        exclude_canonical_sql: Sequence[str] = (),
+        completed_only: bool = False,
+        completion_threshold_ms: float = 10000.0,
+    ) -> List[Dict[str, Any]]:
+        excluded = {str(value) for value in exclude_canonical_sql if str(value)}
+        query_limit = max(int(limit), int(limit) + len(excluded)) if excluded else int(limit)
+        where = [
+            "calls >= ?",
+            "(mean_time_ms >= ? OR max_time_ms >= ?)",
+        ]
+        params: List[Any] = [int(min_calls), float(mean_ms), float(max_ms)]
+        if completed_only:
+            where.append(
+                "last_interval_calls > 0 AND "
+                "(last_interval_time_ms / NULLIF(last_interval_calls, 0) >= ? "
+                "OR (last_interval_max_changed = 1 AND last_interval_max_ms >= ?))"
+            )
+            params.extend([float(completion_threshold_ms), float(completion_threshold_ms)])
+        params.append(query_limit)
         with self._lock, self._connection() as conn:
             rows = conn.execute(
                 """
                 SELECT * FROM sql_observations
-                WHERE calls >= ? AND (mean_time_ms >= ? OR max_time_ms >= ?)
+                WHERE {where}
                 ORDER BY CASE WHEN mean_time_ms >= ? THEN mean_time_ms ELSE max_time_ms END DESC
                 LIMIT ?
-                """,
-                (int(min_calls), float(mean_ms), float(max_ms), float(mean_ms), int(limit)),
+                """.format(where=" AND ".join(where)),
+                tuple(params[:-1] + [float(mean_ms), params[-1]]),
             ).fetchall()
-            return [dict(row) for row in rows]
+            result = [dict(row) for row in rows if str(row["canonical_sql"] or "") not in excluded]
+            return result[: int(limit)]
 
     def get_observation(self, sql_key: str) -> Optional[Dict[str, Any]]:
         with self._lock, self._connection() as conn:
@@ -1372,16 +1499,25 @@ class StateStore:
             row = conn.execute("SELECT * FROM lab_runs WHERE run_id=?", (run_id,)).fetchone()
             return self._decode_row(row, ("config_json", "result_json"))
 
-    def list_lab_runs(self, limit: int = 30, kind: str = "") -> List[Dict[str, Any]]:
+    def list_lab_runs(
+        self,
+        limit: int = 30,
+        kind: str = "",
+        include_result: bool = True,
+    ) -> List[Dict[str, Any]]:
         limit = self._bounded_limit(limit, 200)
         where = "WHERE kind=?" if kind else ""
         params: Tuple[Any, ...] = (kind, limit) if kind else (limit,)
+        columns = "*" if include_result else (
+            "run_id,kind,scenario_id,title,status,phase,requested_at,started_at,finished_at,error"
+        )
+        json_fields: Sequence[str] = ("config_json", "result_json") if include_result else ()
         with self._lock, self._connection() as conn:
             rows = conn.execute(
-                "SELECT * FROM lab_runs {} ORDER BY requested_at DESC LIMIT ?".format(where),
+                "SELECT {} FROM lab_runs {} ORDER BY requested_at DESC LIMIT ?".format(columns, where),
                 params,
             ).fetchall()
-            return [self._decode_row(row, ("config_json", "result_json")) or {} for row in rows]
+            return [self._decode_row(row, json_fields) or {} for row in rows]
 
     def add_lab_sample(
         self,
@@ -1731,9 +1867,14 @@ class Bridge:
         self.last_collection: Dict[str, Any] = self.store.get_meta("latest_collection", {}) or {}
         self.last_collection_error = self.store.get_meta("last_collection_error", "") or ""
         self.last_dream_gate: Dict[str, Any] = self.store.get_meta("last_dream_gate", {}) or {}
+        self.last_sample_maintenance: Dict[str, Any] = self.store.get_meta("last_sample_maintenance", {}) or {}
         self.last_extension_status: Dict[str, Any] = self.store.get_meta("hint_runtime", {}) or {}
         self._cycle_lock = threading.Lock()
         self._sysinsight_lock = threading.Lock()
+        # Do not make bridge startup contend with the existing state DB. The
+        # first bounded maintenance pass happens after the configured grace
+        # period and subsequent passes are incremental.
+        self._next_sample_maintenance = time.time() + max(60.0, self.args.sample_maintenance_interval)
         self._closed = False
         self.lab = LabController(self)
         self.http_server: Optional[ThreadingHTTPServer] = None
@@ -1811,6 +1952,8 @@ class Bridge:
                 "sysinsight_api_enabled": not bool(self.args.no_api),
                 "dream_auto_apply": bool(self.args.auto_apply),
                 "tune_without_alert": bool(self.args.tune_without_alert),
+                "dream_long_sql_auto_trigger": True,
+                "dream_trigger_ms": self.args.dream_trigger_ms,
                 "dream_ready": bool(self.args.dream_offline or _read_api_key()),
                 "dream_offline": bool(self.args.dream_offline),
             },
@@ -1828,6 +1971,7 @@ class Bridge:
             },
             "last_collection": self.last_collection,
             "last_collection_error": self.last_collection_error,
+            "sample_maintenance": self.last_sample_maintenance,
             "dream_gate": self.last_dream_gate,
             "lab": self.lab.status(),
             "state": state,
@@ -1960,7 +2104,9 @@ class Bridge:
             emit("sysinsight_dream_bridge_dream_ready", 1 if snapshot["service"].get("dream_ready") else 0, help_text="Whether DREAM can run automatically with offline mode or a shared LLM API key.")
             emit("sysinsight_dream_bridge_dream_gate_blocked", 1 if snapshot.get("dream_gate", {}).get("status") == "blocked" else 0, help_text="Whether automatic DREAM scheduling is currently blocked by configuration.")
             emit("sysinsight_dream_bridge_auto_apply_enabled", 1 if snapshot["service"]["dream_auto_apply"] else 0, help_text="Whether validated DREAM hints may be auto-applied.")
-            emit("sysinsight_dream_bridge_tune_without_alert", 1 if snapshot["service"]["tune_without_alert"] else 0, help_text="Whether slow SQL may enqueue DREAM without a SysInsight alert.")
+            emit("sysinsight_dream_bridge_tune_without_alert", 1 if snapshot["service"]["tune_without_alert"] else 0, help_text="Whether the legacy no-alert tuning override is enabled.")
+            emit("sysinsight_dream_bridge_dream_long_sql_auto_trigger", 1 if snapshot["service"].get("dream_long_sql_auto_trigger") else 0, help_text="Whether completed SQL at or above the DREAM runtime threshold can enqueue without a SysInsight alert.")
+            emit("sysinsight_dream_bridge_dream_trigger_ms", snapshot["service"].get("dream_trigger_ms", 10000), help_text="Minimum completed SQL runtime that can trigger DREAM, in milliseconds.")
             last_collection = snapshot.get("last_collection", {})
             emit("sysinsight_dream_bridge_last_collection_timestamp_seconds", _prometheus_timestamp(last_collection.get("collected_at")) or 0, help_text="Timestamp of the last successful collection attempt.")
             emit("sysinsight_dream_bridge_last_collection_error", 1 if snapshot.get("last_collection_error") else 0, help_text="Whether the last collection cycle failed.")
@@ -2009,6 +2155,57 @@ class Bridge:
                         emit("sysinsight_dream_lab_tpcc_connections", metrics.get("lab_sessions", 0), labels, "Total TPCC lab client connections.")
                         emit("sysinsight_dream_lab_tpcc_active_sessions", metrics.get("active_lab", 0), labels, "Active TPCC lab sessions.")
                         emit("sysinsight_dream_lab_tpcc_alert_firing", 1 if metrics.get("alert_firing") else 0, labels, "Whether the TPCC pressure phase is firing the selected SysInsight alert.")
+                    comparison = (row.get("result", {}) or {}).get("comparison", {}) if isinstance(row, dict) else {}
+                    if isinstance(comparison, dict):
+                        # These are durable phase summaries, so they remain
+                        # visible after the workload has stopped.  Use a
+                        # separate phase label: the values are comparisons,
+                        # not a fourth TPCC workload phase.
+                        comparison_labels = dict(labels)
+                        comparison_labels["phase"] = "comparison"
+                        comparison_metrics = (
+                            ("baseline_business_tps", "baseline_tps", "Baseline target business TPS."),
+                            ("pressure_before_business_tps", "pressure_before_tps", "Target business TPS under pressure before tuning."),
+                            ("pressure_after_business_tps", "pressure_after_tps", "Target business TPS under pressure after tuning."),
+                            ("raw_tuning_gain_tps", "raw_tuning_gain_tps", "Raw target business TPS difference before pressure normalization."),
+                            ("raw_tuning_gain_ratio", "raw_tuning_gain_ratio", "Raw target business TPS ratio before pressure normalization."),
+                            ("pressure_adjusted_after_tps", "pressure_adjusted_after_tps", "After-tuning target TPS adjusted to the before-tuning observed external pressure."),
+                            ("pressure_adjusted_gain_tps", "pressure_adjusted_gain_tps", "Target business TPS gain after adjusting to the same observed external pressure."),
+                            ("pressure_adjusted_gain_ratio", "pressure_adjusted_gain_ratio", "Relative target business TPS gain after adjusting to the same observed external pressure."),
+                            ("tuning_gain_tps", "tuning_gain_tps", "Target business TPS gain after tuning under the same pressure."),
+                            ("tuning_gain_ratio", "tuning_gain_ratio", "Relative target business TPS gain after tuning."),
+                            ("recovery_ratio", "recovery_ratio", "After-tuning target TPS divided by the no-pressure baseline TPS."),
+                            ("external_pressure_before_tps", "external_pressure_before_tps", "External pressure TPS before tuning."),
+                            ("external_pressure_after_tps", "external_pressure_after_tps", "External pressure TPS after tuning."),
+                            ("external_pressure_delta_tps", "external_pressure_delta_tps", "Difference in external pressure TPS between before and after tuning."),
+                            ("external_pressure_delta_ratio", "external_pressure_delta_ratio", "Relative difference in external pressure TPS between before and after tuning."),
+                            ("pressure_drop_ratio", "pressure_drop_ratio", "Target business TPS drop from baseline to pressure before tuning."),
+                        )
+                        for metric_name, key, help_text in comparison_metrics:
+                            value = comparison.get(key)
+                            if value is not None:
+                                emit("sysinsight_dream_lab_tpcc_{}".format(metric_name), value, comparison_labels, help_text)
+                        if "same_pressure_observed" in comparison:
+                            emit(
+                                "sysinsight_dream_lab_tpcc_same_pressure_observed",
+                                1 if comparison.get("same_pressure_observed") else 0,
+                                comparison_labels,
+                                "Whether external pressure TPS stayed within the comparison tolerance.",
+                            )
+                        if "comparison_valid" in comparison:
+                            emit(
+                                "sysinsight_dream_lab_tpcc_comparison_valid",
+                                1 if comparison.get("comparison_valid") else 0,
+                                comparison_labels,
+                                "Whether the TPCC before/after comparison has both business values and comparable pressure.",
+                            )
+                        if "improved_under_pressure" in comparison:
+                            emit(
+                                "sysinsight_dream_lab_tpcc_tuning_improved",
+                                1 if comparison.get("improved_under_pressure") else 0,
+                                comparison_labels,
+                                "Whether target business TPS increased after tuning while pressure remained applied.",
+                            )
                     state = (row.get("result", {}) or {}).get("sysinsight_state", {}) if isinstance(row, dict) else {}
                     if isinstance(state, dict):
                         observed = state.get("alert_observed", state.get("alert_firing", False))
@@ -2027,6 +2224,53 @@ class Bridge:
                     comparison = (row.get("result", {}) or {}).get("comparison", {}) if isinstance(row, dict) else {}
                     if isinstance(comparison, dict):
                         emit("sysinsight_dream_lab_sql_improvement_ratio", comparison.get("improvement_ratio", 0) or 0, labels, "Measured DREAM lab SQL improvement ratio.")
+
+            # Keep one simple, stable gauge for every defined TPCC scenario.
+            # The value is the selected scenario's target business worker TPS;
+            # it is deliberately zero during queued/finished states
+            # and for every scenario that is not the one currently running.
+            # This makes the Grafana chart a direct scenario-to-TPS view,
+            # instead of asking the operator to combine phase and comparison
+            # gauges by hand.
+            active_tpcc = next(
+                (row for row in current_lab if row.get("kind") == "sysinsight"),
+                None,
+            )
+            active_scenario_id = ""
+            active_scenario_tps = 0.0
+            if isinstance(active_tpcc, dict):
+                active_scenario_id = str(active_tpcc.get("scenario_id") or "")
+                samples = active_tpcc.get("samples", [])
+                sample = samples[-1] if isinstance(samples, list) and samples else {}
+                if isinstance(sample, dict) and str(sample.get("phase") or "") in {"baseline", "pressure_before", "pressure_after"}:
+                    sample_metrics = sample.get("metrics", {})
+                    if isinstance(sample_metrics, dict):
+                        business = sample_metrics.get("business", sample_metrics.get("control", {}))
+                        if isinstance(business, dict):
+                            value = business.get("tps_live", business.get("tps", 0))
+                            try:
+                                active_scenario_tps = max(0.0, float(value or 0))
+                            except (TypeError, ValueError):
+                                active_scenario_tps = 0.0
+            for case in getattr(self.lab, "tpcc_cases", []):
+                scenario_id = str(case.get("scenario_id") or "")
+                transactions = case.get("transactions", [])
+                if isinstance(transactions, (list, tuple)):
+                    transaction_label = " + ".join(str(value) for value in transactions)
+                else:
+                    transaction_label = str(transactions or "")
+                value = active_scenario_tps if scenario_id and scenario_id == active_scenario_id else 0.0
+                emit(
+                    "sysinsight_dream_lab_tpcc_scenario_transaction_tps",
+                    value,
+                    {
+                        "scenario_id": scenario_id,
+                        "scenario": case.get("title", scenario_id),
+                        "transaction": transaction_label,
+                        "focus": "true" if case.get("focus") else "false",
+                    },
+                    "Current target business transaction TPS for every TPCC scenario; zero when the scenario is not running.",
+                )
 
             for group, metric in (("incidents", "sysinsight_dream_bridge_incidents"), ("dream_jobs", "sysinsight_dream_bridge_dream_jobs"), ("improvements", "sysinsight_dream_bridge_improvements")):
                 values = counts.get(group, {}) if isinstance(counts.get(group, {}), dict) else {}
@@ -2324,6 +2568,11 @@ class Bridge:
             self.store.finish_job(job_id, "blocked", result={"status": "blocked", "reason": error})
             LOGGER.info("DREAM job %s waiting for a literal SQL sample", job_id)
             return {"status": "blocked", "reason": error}
+        if not _is_read_only_sql(replay_sql):
+            error = "SQL is not a read-only AP statement"
+            self.store.finish_job(job_id, "blocked", result={"status": "blocked", "reason": error})
+            LOGGER.info("DREAM job %s skipped non-read-only SQL", job_id)
+            return {"status": "blocked", "reason": error}
         if not self.args.dream_offline and not _read_api_key():
             error = "DREAM/SysInsight API key environment variable is not set"
             self.store.finish_job(job_id, "blocked", result={"status": "blocked", "reason": error})
@@ -2618,11 +2867,34 @@ class Bridge:
         stats = self.db.collect_statements(self.args.stats_limit)
         active = self.db.collect_active(self.args.active_limit)
         keys = self.store.upsert_observations(stats, active)
+        if time.time() >= self._next_sample_maintenance:
+            try:
+                self.last_sample_maintenance = self.store.prune_observation_samples(
+                    self.args.sample_retention_days,
+                    self.args.sample_max_rows,
+                    self.args.sample_maintenance_batch,
+                )
+                self.store.set_meta("last_sample_maintenance", self.last_sample_maintenance)
+                LOGGER.info(
+                    "bounded SQL sample maintenance deleted=%d remaining=%d",
+                    self.last_sample_maintenance.get("deleted", 0),
+                    self.last_sample_maintenance.get("remaining", 0),
+                )
+            except Exception:
+                LOGGER.exception("bounded SQL sample maintenance failed")
+            finally:
+                self._next_sample_maintenance = time.time() + max(60.0, self.args.sample_maintenance_interval)
         slow = self.store.slow_observations(
-            self.args.slow_mean_ms,
-            self.args.slow_max_ms,
+            max(self.args.slow_mean_ms, self.args.dream_trigger_ms),
+            max(self.args.slow_max_ms, self.args.dream_trigger_ms),
             self.args.min_calls,
             max(self.args.slow_limit, self.args.stats_limit) if self.args.query_regex else self.args.slow_limit,
+            exclude_canonical_sql=[
+                str(row.get("canonical_sql") or _canonical_sql(str(row.get("query", ""))))
+                for row in active
+            ],
+            completed_only=True,
+            completion_threshold_ms=self.args.dream_trigger_ms,
         )
         if self.args.query_regex:
             matcher = re.compile(self.args.query_regex, re.IGNORECASE)
@@ -2630,7 +2902,11 @@ class Bridge:
             slow = slow[: self.args.slow_limit]
         self._new_incident_if_needed(alert, self.db.database_snapshot(), slow)
         queued: List[str] = []
-        dream_triggered = bool(alert or self.args.tune_without_alert)
+        # SysInsight is alert-driven, while DREAM is driven by a completed
+        # long AP statement. ``slow`` has already excluded active statements
+        # and applies the hard 10-second DREAM threshold, so an alert is not
+        # required for a qualifying SQL to enter the asynchronous queue.
+        dream_triggered = bool(alert or slow or self.args.tune_without_alert)
         dream_ready = bool(self.args.dream_offline or _read_api_key())
         if dream_triggered and not dream_ready:
             gate = {
@@ -2652,7 +2928,12 @@ class Bridge:
             # do not manufacture a DREAM job that can only finish as
             # ``blocked``.  The operator-facing lab supplies an explicit,
             # read-only SQL statement and remains fully replayable.
-            replayable_slow = [row for row in slow if str(row.get("replay_sql") or "").strip()]
+            replayable_slow = [
+                row
+                for row in slow
+                if str(row.get("replay_sql") or "").strip()
+                and _is_read_only_sql(str(row.get("replay_sql") or ""))
+            ]
             gate = {
                 "status": "ready",
                 "reason": "offline mode" if self.args.dream_offline else "shared LLM API key is configured",
@@ -2674,11 +2955,27 @@ class Bridge:
             "active_count": len(active),
             "persisted_count": len(keys),
             "slow_count": len(slow),
-            "replayable_slow_count": sum(1 for row in slow if str(row.get("replay_sql") or "").strip()),
+            "replayable_slow_count": sum(
+                1
+                for row in slow
+                if str(row.get("replay_sql") or "").strip()
+                and _is_read_only_sql(str(row.get("replay_sql") or ""))
+            ),
             "queued_jobs": queued,
             "alert_firing": bool(alert),
             "dream_ready": dream_ready,
             "dream_gate": self.last_dream_gate,
+            "dream_trigger_policy": {
+                "min_runtime_ms": self.args.dream_trigger_ms,
+                "requires_statement_finished": True,
+                "active_sql_excluded": True,
+            },
+            "sample_maintenance": self.last_sample_maintenance,
+            "sample_policy": {
+                "retention_days": self.args.sample_retention_days,
+                "max_rows": self.args.sample_max_rows,
+                "maintenance_interval_seconds": self.args.sample_maintenance_interval,
+            },
             "store": str(self.store.path),
         }
         self.last_collection = payload
@@ -2984,13 +3281,43 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--prometheus-step", type=float, default=15.0)
     parser.add_argument("--prometheus-timeout", type=float, default=5.0)
     parser.add_argument("--alert-name", default=os.environ.get("SYSINSIGHT_ALERT_NAME", "SysInsightDemoAnomaly"))
-    parser.add_argument("--poll-interval", type=float, default=5.0)
-    parser.add_argument("--stats-limit", type=int, default=500)
-    parser.add_argument("--active-limit", type=int, default=200)
-    parser.add_argument("--slow-mean-ms", type=float, default=float(os.environ.get("SYSINSIGHT_SLOW_MEAN_MS", "1000")))
-    parser.add_argument("--slow-max-ms", type=float, default=float(os.environ.get("SYSINSIGHT_SLOW_MAX_MS", "5000")))
+    parser.add_argument("--poll-interval", type=float, default=float(os.environ.get("SYSINSIGHT_POLL_INTERVAL", "5")))
+    parser.add_argument("--stats-limit", type=int, default=int(os.environ.get("SYSINSIGHT_STATS_LIMIT", "300")))
+    parser.add_argument("--active-limit", type=int, default=int(os.environ.get("SYSINSIGHT_ACTIVE_LIMIT", "100")))
+    parser.add_argument("--slow-mean-ms", type=float, default=float(os.environ.get("SYSINSIGHT_SLOW_MEAN_MS", "10000")))
+    parser.add_argument("--slow-max-ms", type=float, default=float(os.environ.get("SYSINSIGHT_SLOW_MAX_MS", "10000")))
+    parser.add_argument(
+        "--dream-trigger-ms",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_DREAM_TRIGGER_MS", "10000")),
+        help="minimum completed AP SQL runtime that can enqueue DREAM",
+    )
     parser.add_argument("--min-calls", type=int, default=1)
-    parser.add_argument("--slow-limit", type=int, default=10)
+    parser.add_argument("--slow-limit", type=int, default=int(os.environ.get("SYSINSIGHT_SLOW_LIMIT", "10")))
+    parser.add_argument(
+        "--sample-retention-days",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_SQL_SAMPLE_RETENTION_DAYS", "7")),
+        help="rolling retention for high-volume SQL observation samples",
+    )
+    parser.add_argument(
+        "--sample-max-rows",
+        type=int,
+        default=int(os.environ.get("SYSINSIGHT_SQL_SAMPLE_MAX_ROWS", "500000")),
+        help="maximum SQL observation samples retained by incremental maintenance",
+    )
+    parser.add_argument(
+        "--sample-maintenance-interval",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_INTERVAL", "900")),
+        help="seconds between bounded SQL sample maintenance passes",
+    )
+    parser.add_argument(
+        "--sample-maintenance-batch",
+        type=int,
+        default=int(os.environ.get("SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_BATCH", "50000")),
+        help="maximum SQL observation samples deleted in one maintenance pass",
+    )
     parser.add_argument("--query-regex", default="", help="optional SQL text filter; empty means every slow statement")
     parser.add_argument("--job-cooldown", type=float, default=300.0)
     parser.add_argument("--dream-workers", type=int, default=1)
@@ -3031,8 +3358,20 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
     if args.reset_hint_runtime:
         return args
-    if args.port <= 0 or args.poll_interval <= 0 or args.min_calls < 1 or args.slow_limit < 1:
-        parser.error("invalid database/poll/slow-query settings")
+    if (
+        args.port <= 0
+        or args.poll_interval <= 0
+        or args.stats_limit < 1
+        or args.active_limit < 1
+        or args.min_calls < 1
+        or args.slow_limit < 1
+        or args.dream_trigger_ms < 10000
+        or args.sample_retention_days <= 0
+        or args.sample_max_rows < 1000
+        or args.sample_maintenance_interval <= 0
+        or args.sample_maintenance_batch < 1000
+    ):
+        parser.error("invalid database/poll/slow-query/DREAM trigger settings")
     if args.http_port < 0 or args.http_port > 65535 or args.metrics_limit < 1:
         parser.error("invalid bridge HTTP/metrics settings")
     if args.min_improvement < 0 or args.min_improvement >= 1:

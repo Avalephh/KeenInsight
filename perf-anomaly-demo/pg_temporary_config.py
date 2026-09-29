@@ -289,16 +289,24 @@ def _restore_global_state(
 class TemporaryPostgresConfiguration:
     """Context manager for an exact API response configuration."""
 
-    def __init__(self, db_args: Any, config: Dict[str, Any], label: str = "api") -> None:
+    def __init__(
+        self,
+        db_args: Any,
+        config: Dict[str, Any],
+        label: str = "api",
+        allow_restart: bool = True,
+    ) -> None:
         self.db_args = db_args
         self.config = {str(key): value for key, value in config.items()}
         self.label = label
+        self.allow_restart = bool(allow_restart)
         self.state: Dict[str, Any] = {
             "requested_configuration": self.config,
             "status": "not_started",
             "session_configuration": {},
             "connection_configuration": {},
             "global_configuration": {},
+            "skipped_configuration": {},
             "unsupported": {},
             "pre_settings": {},
             "post_settings": {},
@@ -365,12 +373,6 @@ class TemporaryPostgresConfiguration:
             for name, value in self.config.items()
         }
         self.state["normalized_configuration"] = normalized
-        self._connection_args = connection_args_for_configuration(self.db_args, normalized)
-        self.state["connection_endpoint"] = {
-            "host": getattr(self._connection_args, "host", None),
-            "port": getattr(self._connection_args, "port", None),
-        }
-
         for name, value in normalized.items():
             context = str(details[name].get("context") or "")
             if context in {"user", "superuser"}:
@@ -378,6 +380,13 @@ class TemporaryPostgresConfiguration:
             elif context in {"superuser-backend", "backend"}:
                 self.state["connection_configuration"][name] = value
             elif context in {"sighup", "postmaster"}:
+                if context == "postmaster" and not self.allow_restart:
+                    self.state["skipped_configuration"][name] = {
+                        "value": value,
+                        "context": context,
+                        "reason": "restart is disabled for a live experiment",
+                    }
+                    continue
                 self.state["global_configuration"][name] = {
                     "value": value,
                     "context": context,
@@ -395,7 +404,28 @@ class TemporaryPostgresConfiguration:
                 "API returned GUCs that this controlled applier cannot apply: {}".format(
                     sorted(self.state["unsupported"])
                 )
-            )
+                )
+
+        # A live lab deliberately skips postmaster settings because it cannot
+        # restart PostgreSQL in the middle of a comparison.  Do not let a
+        # skipped ``port`` or ``unix_socket_directories`` value redirect the
+        # follow-up probe/restore connection to an endpoint that was never
+        # activated.  When restart is allowed, those settings remain in the
+        # endpoint map and the restarted server can be reached normally.
+        skipped_names = set(self.state["skipped_configuration"])
+        endpoint_configuration = {
+            name: value
+            for name, value in normalized.items()
+            if name not in skipped_names
+        }
+        self._connection_args = connection_args_for_configuration(
+            self.db_args,
+            endpoint_configuration,
+        )
+        self.state["connection_endpoint"] = {
+            "host": getattr(self._connection_args, "host", None),
+            "port": getattr(self._connection_args, "port", None),
+        }
 
         self._file_snapshot = _file_settings_snapshot(self.db_args, self._global_names)
         try:
