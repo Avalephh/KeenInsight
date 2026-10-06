@@ -27,6 +27,7 @@ import argparse
 import concurrent.futures
 import copy
 import datetime as dt
+import gzip
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -638,14 +639,27 @@ class StateStore:
         self._init()
 
     def _connection(self) -> sqlite3.Connection:
+        new_database = not self.path.exists() or self.path.stat().st_size == 0
         conn = sqlite3.connect(str(self.path), timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout = 30000")
+        if new_database:
+            # auto_vacuum has to be selected before WAL/schema pages are
+            # created; setting it later does not migrate an existing file.
+            conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
         conn.execute("PRAGMA journal_mode = WAL")
+        # Keep transient WAL growth bounded.  The rolling retention job also
+        # checkpoints the WAL, but this limit prevents an interrupted demo
+        # from leaving an unexpectedly large sidecar file behind.
+        conn.execute("PRAGMA journal_size_limit = 67108864")
         return conn
 
     def _init(self) -> None:
         with self._lock, self._connection() as conn:
+            # An existing database created with auto_vacuum=NONE needs the
+            # one-time compact_bridge_state.py migration; after that the
+            # periodic maintenance can return deleted pages to the OS.
+            conn.execute("PRAGMA auto_vacuum = INCREMENTAL")
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS meta (
@@ -852,6 +866,10 @@ class StateStore:
         for field in fields:
             decoded_name = field[:-5] if field.endswith("_json") else field
             value[decoded_name] = _decode_json(value.get(field), {})
+            if decoded_name != field:
+                # Do not send both the encoded SQLite column and its decoded
+                # representation through every JSON API response.
+                value.pop(field, None)
         return value
 
     @staticmethod
@@ -920,7 +938,7 @@ class StateStore:
             for row in rows:
                 value = self._row(row) or {}
                 value["replayable"] = bool(value.get("replay_sql")) and "$" not in str(value.get("replay_sql")) and "?" not in str(value.get("replay_sql"))
-                value["last_sample"] = _decode_json(value.get("last_sample_json"), None)
+                value["last_sample"] = _decode_json(value.pop("last_sample_json", None), None)
                 result.append(value)
             return result
 
@@ -1010,6 +1028,7 @@ class StateStore:
         max_ms: float = 5000.0,
         min_calls: int = 1,
         limit: int = 50,
+        include_records: bool = True,
     ) -> Dict[str, Any]:
         limit = self._bounded_limit(limit)
         with self._lock, self._connection() as conn:
@@ -1035,7 +1054,7 @@ class StateStore:
             hint_hits = int(
                 conn.execute("SELECT COALESCE(SUM(hit_count),0) FROM improvements WHERE status='active'").fetchone()[0]
             )
-        return {
+        result: Dict[str, Any] = {
             "database": str(self.path),
             "generated_at": utc_now(),
             "counts": {
@@ -1047,17 +1066,21 @@ class StateStore:
                 "active_hints": active_hints,
                 "observed_hint_matches": hint_hits,
             },
-            "incidents": self.list_incidents(limit),
-            "jobs": self.list_jobs(limit),
-            "improvements": self.list_improvements(limit),
-            "sql_observations": self.list_sql_observations(
-                limit,
-                slow_only=False,
-                mean_ms=mean_ms,
-                max_ms=max_ms,
-                min_calls=min_calls,
-            ),
         }
+        if include_records:
+            result.update({
+                "incidents": self.list_incidents(limit),
+                "jobs": self.list_jobs(limit),
+                "improvements": self.list_improvements(limit),
+                "sql_observations": self.list_sql_observations(
+                    limit,
+                    slow_only=False,
+                    mean_ms=mean_ms,
+                    max_ms=max_ms,
+                    min_calls=min_calls,
+                ),
+            })
+        return result
 
     @staticmethod
     def _status_counts_with_total(_reader: Any, values: Dict[str, int], _limit: int) -> Dict[str, Any]:
@@ -1294,25 +1317,30 @@ class StateStore:
                         max_changed,
                     ),
                 )
-                conn.execute(
-                    """
-                    INSERT INTO sql_observation_samples(
-                        sql_key,observed_at,calls,total_time_ms,min_time_ms,max_time_ms,mean_time_ms,
-                        interval_calls,interval_time_ms
-                    ) VALUES(?,?,?,?,?,?,?,?,?)
-                    """,
-                    (
-                        key,
-                        now,
-                        current_calls,
-                        current_total,
-                        float(row.get("min_time_ms", 0) or 0),
-                        float(row.get("max_time_ms", 0) or 0),
-                        float(row.get("mean_time_ms", 0) or 0),
-                        interval_calls,
-                        interval_time_ms,
-                    ),
-                )
+                # pg_stat_statements returns every retained statement on
+                # every poll, even when it was not executed again.  Persist
+                # only a first/change/active sample; writing an identical row
+                # every five seconds was the main source of state growth.
+                if previous is None or interval_calls > 0 or interval_time_ms > 0 or active:
+                    conn.execute(
+                        """
+                        INSERT INTO sql_observation_samples(
+                            sql_key,observed_at,calls,total_time_ms,min_time_ms,max_time_ms,mean_time_ms,
+                            interval_calls,interval_time_ms
+                        ) VALUES(?,?,?,?,?,?,?,?,?)
+                        """,
+                        (
+                            key,
+                            now,
+                            current_calls,
+                            current_total,
+                            float(row.get("min_time_ms", 0) or 0),
+                            float(row.get("max_time_ms", 0) or 0),
+                            float(row.get("mean_time_ms", 0) or 0),
+                            interval_calls,
+                            interval_time_ms,
+                        ),
+                    )
                 # pg_hint_plan does not expose a portable per-hint counter.
                 # For an active hint, newly observed calls are therefore
                 # recorded as matched executions.  The dashboard labels this
@@ -1391,6 +1419,326 @@ class StateStore:
             "retention_days": days,
             "max_rows": high_water_mark,
             "cutoff": cutoff,
+        }
+
+    def prune_history(
+        self,
+        retention_days: float,
+        max_sample_rows: int,
+        batch_size: int = 50000,
+    ) -> Dict[str, Any]:
+        """Prune terminal history and rolling samples older than retention.
+
+        Operational state is deliberately excluded: queued/running jobs and
+        lab runs, running incidents, and active improvements survive even if
+        their original timestamp is old.  Large SQL samples are removed in a
+        bounded batch so normal polling is not held behind a long delete.
+        """
+
+        days = max(1.0 / 24.0, float(retention_days))
+        high_water_mark = max(1000, int(max_sample_rows))
+        batch = max(1000, min(int(batch_size), 250000))
+        cutoff_datetime = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)
+        cutoff = cutoff_datetime.isoformat()
+        deleted: Dict[str, int] = {}
+        artifact_paths: Dict[str, List[str]] = {
+            "incident_directories": [],
+            "lab_run_ids": [],
+            "job_ids": [],
+            "job_paths": [],
+        }
+
+        with self._lock, self._connection() as conn:
+            def changes(name: str, sql: str, params: Sequence[Any] = ()) -> int:
+                conn.execute(sql, tuple(params))
+                count = int(conn.execute("SELECT changes()").fetchone()[0])
+                deleted[name] = deleted.get(name, 0) + count
+                return count
+
+            before_samples = int(
+                conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0]
+            )
+
+            # Select artifact identities before deleting their audit rows.
+            expired_runs = conn.execute(
+                """
+                SELECT run_id FROM lab_runs
+                WHERE status NOT IN ('queued','running')
+                  AND COALESCE(finished_at, requested_at) < ?
+                """,
+                (cutoff,),
+            ).fetchall()
+            expired_run_ids = [str(row["run_id"]) for row in expired_runs]
+            artifact_paths["lab_run_ids"] = expired_run_ids
+            if expired_run_ids:
+                placeholders = ",".join("?" for _ in expired_run_ids)
+                changes(
+                    "lab_samples",
+                    "DELETE FROM lab_samples WHERE run_id IN ({})".format(placeholders),
+                    expired_run_ids,
+                )
+                changes(
+                    "lab_sql_executions",
+                    "DELETE FROM lab_sql_executions WHERE run_id IN ({})".format(placeholders),
+                    expired_run_ids,
+                )
+                changes(
+                    "lab_runs",
+                    "DELETE FROM lab_runs WHERE run_id IN ({})".format(placeholders),
+                    expired_run_ids,
+                )
+
+            # A lab can run longer than the retention window. Keep the run,
+            # but bound its per-second samples to the same rolling window.
+            changes("lab_samples", "DELETE FROM lab_samples WHERE observed_at < ?", (cutoff,))
+            changes(
+                "lab_sql_executions",
+                """
+                DELETE FROM lab_sql_executions
+                WHERE COALESCE(finished_at, started_at) < ?
+                  AND status NOT IN ('queued','running')
+                  AND NOT EXISTS (
+                      SELECT 1 FROM lab_runs r
+                      WHERE r.run_id=lab_sql_executions.run_id
+                        AND r.status IN ('queued','running')
+                  )
+                """,
+                (cutoff,),
+            )
+            changes(
+                "lab_samples",
+                "DELETE FROM lab_samples WHERE NOT EXISTS (SELECT 1 FROM lab_runs r WHERE r.run_id=lab_samples.run_id)",
+            )
+            changes(
+                "lab_sql_executions",
+                "DELETE FROM lab_sql_executions WHERE NOT EXISTS (SELECT 1 FROM lab_runs r WHERE r.run_id=lab_sql_executions.run_id)",
+            )
+
+            expired_jobs = conn.execute(
+                """
+                SELECT job_id,input_path,output_path FROM dream_jobs
+                WHERE status NOT IN ('queued','running')
+                  AND COALESCE(finished_at, requested_at) < ?
+                """,
+                (cutoff,),
+            ).fetchall()
+            expired_job_ids = [str(row["job_id"]) for row in expired_jobs]
+            artifact_paths["job_ids"] = expired_job_ids
+            artifact_paths["job_paths"] = [
+                str(path)
+                for row in expired_jobs
+                for path in (row["input_path"], row["output_path"])
+                if path
+            ]
+            if expired_job_ids:
+                placeholders = ",".join("?" for _ in expired_job_ids)
+                changes(
+                    "dream_jobs",
+                    "DELETE FROM dream_jobs WHERE job_id IN ({})".format(placeholders),
+                    expired_job_ids,
+                )
+
+            changes(
+                "improvements",
+                """
+                DELETE FROM improvements
+                WHERE status != 'active'
+                  AND COALESCE(last_action_at, created_at) < ?
+                """,
+                (cutoff,),
+            )
+
+            expired_incidents = conn.execute(
+                """
+                SELECT directory FROM incidents i
+                WHERE status != 'running'
+                  AND COALESCE(finished_at, started_at) < ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM dream_jobs j
+                      WHERE j.incident_id=i.incident_id
+                        AND j.status IN ('queued','running')
+                  )
+                """,
+                (cutoff,),
+            ).fetchall()
+            artifact_paths["incident_directories"] = [
+                str(row["directory"]) for row in expired_incidents if row["directory"]
+            ]
+            changes(
+                "incidents",
+                """
+                DELETE FROM incidents
+                WHERE status != 'running'
+                  AND COALESCE(finished_at, started_at) < ?
+                  AND NOT EXISTS (
+                      SELECT 1 FROM dream_jobs j
+                      WHERE j.incident_id=incidents.incident_id
+                        AND j.status IN ('queued','running')
+                  )
+                """,
+                (cutoff,),
+            )
+
+            changes("live_sql_samples", "DELETE FROM live_sql_samples WHERE last_seen < ?", (cutoff,))
+
+            # These meta rows are latest-action audit snapshots rather than
+            # configuration. Drop them once their own completion timestamp is
+            # outside the rolling window.
+            for meta_row in conn.execute(
+                """
+                SELECT key,value FROM meta
+                WHERE key IN ('last_lab_database_reset','last_lab_dream_clear','last_manual_collection')
+                """
+            ).fetchall():
+                value = _decode_json(meta_row["value"], {})
+                if not isinstance(value, dict):
+                    continue
+                timestamp = next(
+                    (
+                        str(value.get(name))
+                        for name in ("completed_at", "finished_at", "requested_at")
+                        if value.get(name)
+                    ),
+                    "",
+                )
+                if timestamp and timestamp < cutoff:
+                    changes("meta", "DELETE FROM meta WHERE key=?", (meta_row["key"],))
+
+            # Remove the oldest sample rows first.  If the database is above
+            # its emergency cap, use any remaining batch budget to bring it
+            # down without a second large transaction.
+            sample_deleted = changes(
+                "sql_observation_samples",
+                """
+                DELETE FROM sql_observation_samples
+                WHERE sample_id IN (
+                    SELECT sample_id FROM sql_observation_samples
+                    WHERE observed_at < ?
+                    ORDER BY sample_id ASC
+                    LIMIT ?
+                )
+                """,
+                (cutoff, batch),
+            )
+            remaining_samples = int(
+                conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0]
+            )
+            if remaining_samples > high_water_mark and sample_deleted < batch:
+                extra = min(batch - sample_deleted, remaining_samples - high_water_mark)
+                changes(
+                    "sql_observation_samples",
+                    """
+                    DELETE FROM sql_observation_samples
+                    WHERE sample_id IN (
+                        SELECT sample_id FROM sql_observation_samples
+                        ORDER BY sample_id ASC
+                        LIMIT ?
+                    )
+                    """,
+                    (extra,),
+                )
+
+            # SQL summaries are small and useful while referenced by any job
+            # or improvement. Unreferenced summaries can age out normally.
+            changes(
+                "sql_observation_samples",
+                """
+                DELETE FROM sql_observation_samples
+                WHERE sql_key IN (
+                    SELECT o.sql_key FROM sql_observations o
+                    WHERE o.last_seen < ?
+                      AND NOT EXISTS (SELECT 1 FROM dream_jobs j WHERE j.sql_key=o.sql_key)
+                      AND NOT EXISTS (SELECT 1 FROM improvements i WHERE i.sql_key=o.sql_key)
+                )
+                """,
+                (cutoff,),
+            )
+            changes(
+                "sql_observations",
+                """
+                DELETE FROM sql_observations
+                WHERE last_seen < ?
+                  AND NOT EXISTS (SELECT 1 FROM dream_jobs j WHERE j.sql_key=sql_observations.sql_key)
+                  AND NOT EXISTS (SELECT 1 FROM improvements i WHERE i.sql_key=sql_observations.sql_key)
+                """,
+                (cutoff,),
+            )
+
+            remaining_samples = int(
+                conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0]
+            )
+            pending_expired_samples = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM sql_observation_samples WHERE observed_at < ?",
+                    (cutoff,),
+                ).fetchone()[0]
+            )
+            pending_excess_samples = max(0, remaining_samples - high_water_mark)
+
+        return {
+            "status": "completed",
+            "cutoff": cutoff,
+            "retention_hours": round(days * 24.0, 3),
+            "sample_max_rows": high_water_mark,
+            "sample_batch_size": batch,
+            "samples_before": before_samples,
+            "samples_remaining": remaining_samples,
+            "pending_expired_samples": pending_expired_samples,
+            "pending_excess_samples": pending_excess_samples,
+            "deleted": deleted,
+            "_artifact_paths": artifact_paths,
+        }
+
+    def artifact_references(self) -> Dict[str, List[str]]:
+        """Return artifact identities that still have durable state rows."""
+
+        with self._lock, self._connection() as conn:
+            return {
+                "incident_directories": [
+                    str(row["directory"])
+                    for row in conn.execute(
+                        "SELECT directory FROM incidents WHERE directory IS NOT NULL AND directory != ''"
+                    ).fetchall()
+                ],
+                "lab_run_ids": [
+                    str(row["run_id"]) for row in conn.execute("SELECT run_id FROM lab_runs").fetchall()
+                ],
+                "job_ids": [
+                    str(row["job_id"]) for row in conn.execute("SELECT job_id FROM dream_jobs").fetchall()
+                ],
+            }
+
+    def reclaim_space(self, max_pages: int = 8192) -> Dict[str, Any]:
+        """Checkpoint WAL and reclaim a bounded number of free pages."""
+
+        pages = max(1, min(int(max_pages), 65536))
+        with self._lock, self._connection() as conn:
+            auto_vacuum = int(conn.execute("PRAGMA auto_vacuum").fetchone()[0])
+            page_size = int(conn.execute("PRAGMA page_size").fetchone()[0])
+            before_pages = int(conn.execute("PRAGMA page_count").fetchone()[0])
+            before_free = int(conn.execute("PRAGMA freelist_count").fetchone()[0])
+            checkpoint_row = conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
+            checkpoint = list(checkpoint_row) if checkpoint_row is not None else []
+            vacuum_steps = 0
+            if auto_vacuum == 2 and before_free:
+                # This PRAGMA yields one row per reclaimed step; consume the
+                # cursor fully or sqlite3 stops after the first page.
+                vacuum_steps = len(
+                    conn.execute("PRAGMA incremental_vacuum({})".format(pages)).fetchall()
+                )
+            after_pages = int(conn.execute("PRAGMA page_count").fetchone()[0])
+            after_free = int(conn.execute("PRAGMA freelist_count").fetchone()[0])
+        return {
+            "status": "completed" if auto_vacuum == 2 else "migration_required",
+            "auto_vacuum": auto_vacuum,
+            "page_size": page_size,
+            "pages_before": before_pages,
+            "pages_after": after_pages,
+            "free_pages_before": before_free,
+            "free_pages_after": after_free,
+            "reclaimed_bytes": max(0, before_pages - after_pages) * page_size,
+            "vacuum_steps": vacuum_steps,
+            "checkpoint": checkpoint,
         }
 
     def slow_observations(
@@ -1628,11 +1976,13 @@ class StateStore:
             counts["lab_dream_runs"] = int(
                 conn.execute("SELECT COUNT(*) FROM lab_runs WHERE kind='dream'").fetchone()[0]
             )
-            backup = sqlite3.connect(str(archive_path))
-            try:
-                conn.backup(backup)
-            finally:
-                backup.close()
+            # sqlite3.Connection.backup copies freelist pages as well. After
+            # months of churn that turned a small logical workspace into a
+            # multi-gigabyte archive. VACUUM INTO produces the same restorable
+            # SQLite snapshot while writing only live pages.
+            if archive_path.exists():
+                raise RuntimeError("DREAM archive already exists: {}".format(archive_path))
+            conn.execute("VACUUM INTO ?", (str(archive_path),))
             for table in (
                 "sql_observation_samples",
                 "live_sql_samples",
@@ -1791,6 +2141,233 @@ class StateStore:
             }
 
 
+def prune_output_artifacts(
+    output_root: Path,
+    cutoff: str,
+    expired: Optional[Mapping[str, Sequence[str]]] = None,
+    retained: Optional[Mapping[str, Sequence[str]]] = None,
+) -> Dict[str, Any]:
+    """Remove expired bridge artifacts without escaping the output root."""
+
+    root = Path(output_root).resolve()
+    expired = expired or {}
+    retained = retained or {}
+    cutoff_epoch = dt.datetime.fromisoformat(str(cutoff).replace("Z", "+00:00")).timestamp()
+    incident_root = (root / "incidents").resolve()
+    lab_root = (root / "lab").resolve()
+    job_root = (root / "jobs" / "dream_jobs").resolve()
+    archive_roots = ((root / "archives").resolve(), (lab_root / "archives").resolve())
+    allowed_roots = (root, incident_root, lab_root, job_root, *archive_roots)
+    removed: List[str] = []
+    errors: List[str] = []
+    reclaimed_bytes = 0
+
+    def contained(path: Path, parent: Path) -> bool:
+        return path != parent and parent in path.parents
+
+    def allowed(path: Path) -> bool:
+        return any(contained(path, parent) for parent in allowed_roots)
+
+    def size(path: Path) -> int:
+        try:
+            if path.is_symlink() or path.is_file():
+                return int(path.lstat().st_size)
+            return sum(
+                int(item.lstat().st_size)
+                for item in path.rglob("*")
+                if item.is_file() or item.is_symlink()
+            )
+        except OSError:
+            return 0
+
+    def remove(candidate: Path) -> None:
+        nonlocal reclaimed_bytes
+        try:
+            # Check the lexical path first and never follow a leaf symlink.
+            # Then verify the resolved parent as a second containment check.
+            path = Path(os.path.abspath(str(candidate)))
+            if not allowed(path) or not path.exists():
+                return
+            if path.is_symlink():
+                reclaimed_bytes += int(path.lstat().st_size)
+                path.unlink()
+                removed.append(str(path))
+                return
+            resolved = path.resolve()
+            if not allowed(resolved):
+                return
+            reclaimed_bytes += size(path)
+            if path.is_dir():
+                shutil.rmtree(str(path))
+            else:
+                path.unlink()
+            removed.append(str(path))
+        except OSError as exc:
+            errors.append("{}: {}".format(candidate, exc))
+
+    # Rows selected by prune_history are already known to be past cutoff, so
+    # remove their exact artifact directories even if a copied file changed
+    # the directory mtime more recently.
+    for value in expired.get("incident_directories", ()):
+        remove(Path(str(value)))
+    for run_id in expired.get("lab_run_ids", ()):
+        remove(lab_root / str(run_id))
+    for job_id in expired.get("job_ids", ()):
+        remove(job_root / str(job_id))
+    for value in expired.get("job_paths", ()):
+        remove(Path(str(value)))
+
+    keep_incidents = {str(Path(value).resolve()) for value in retained.get("incident_directories", ())}
+    keep_lab = {str((lab_root / str(value)).resolve()) for value in retained.get("lab_run_ids", ())}
+    keep_jobs = {str((job_root / str(value)).resolve()) for value in retained.get("job_ids", ())}
+
+    # Also collect orphaned run directories and rolling archives.  Only direct
+    # children of known roots are considered, which makes this safe even if a
+    # database row contains an unexpected path.
+    for scan_root, keep, prefix in (
+        (incident_root, keep_incidents, ""),
+        (lab_root, keep_lab, "lab-"),
+        (job_root, keep_jobs, ""),
+    ):
+        if not scan_root.is_dir():
+            continue
+        for child in scan_root.iterdir():
+            if scan_root == lab_root and child.name == "archives":
+                continue
+            if prefix and not child.name.startswith(prefix):
+                continue
+            try:
+                resolved = child.resolve()
+                if str(resolved) in keep or child.stat().st_mtime >= cutoff_epoch:
+                    continue
+            except OSError as exc:
+                errors.append("{}: {}".format(child, exc))
+                continue
+            remove(child)
+
+    for archive_root in archive_roots:
+        if not archive_root.is_dir():
+            continue
+        for child in archive_root.iterdir():
+            try:
+                if child.stat().st_mtime < cutoff_epoch:
+                    remove(child)
+            except OSError as exc:
+                errors.append("{}: {}".format(child, exc))
+
+    # Fixed-name audit snapshots (latest reset/clear/hint setup) are files,
+    # not row-addressed directories. Retain them by mtime using the same
+    # policy. Container directories are never considered here.
+    for scan_root in (root, lab_root):
+        if not scan_root.is_dir():
+            continue
+        for child in scan_root.iterdir():
+            try:
+                if (child.is_file() or child.is_symlink()) and child.stat().st_mtime < cutoff_epoch:
+                    remove(child)
+            except OSError as exc:
+                errors.append("{}: {}".format(child, exc))
+
+    return {
+        "status": "completed" if not errors else "completed_with_errors",
+        "cutoff": cutoff,
+        "removed_count": len(removed),
+        "reclaimed_bytes": reclaimed_bytes,
+        "removed_preview": removed[:10],
+        "errors": errors[:10],
+    }
+
+
+def maintain_monitoring_logs(
+    log_directory: Path,
+    cutoff: str,
+    rotation_seconds: float = 3600.0,
+) -> Dict[str, Any]:
+    """Compress active service logs hourly and delete files past cutoff."""
+
+    root = Path(log_directory).resolve()
+    if not root.is_dir():
+        return {"status": "skipped", "reason": "log directory does not exist"}
+    cutoff_epoch = dt.datetime.fromisoformat(str(cutoff).replace("Z", "+00:00")).timestamp()
+    now_epoch = time.time()
+    active_names = {
+        "prometheus.log",
+        "node_exporter.log",
+        "postgres_exporter.log",
+        "grafana.log",
+        "sysinsight_dream_bridge.log",
+    }
+    deleted: List[str] = []
+    rotated: List[str] = []
+    errors: List[str] = []
+    deleted_bytes = 0
+    archived_source_bytes = 0
+
+    # Active files are never unlinked because each service keeps an open file
+    # descriptor. Old compressed/custom rotations are ordinary direct files
+    # and can be removed safely.
+    for path in root.iterdir():
+        try:
+            if path.name in active_names or not path.is_file() or path.is_symlink():
+                continue
+            is_retained_rotation = ".retained-" in path.name and path.name.endswith(".gz")
+            # Grafana's built-in daily files can receive a recent mtime during
+            # its cleanup/rename cycle even though the date encoded in the
+            # filename is old. They are superseded once the current active
+            # log has been copied to our compressed retained rotation.
+            is_external_rotation = path.name.startswith("grafana.log.") and not is_retained_rotation
+            if path.stat().st_mtime < cutoff_epoch or is_external_rotation:
+                deleted_bytes += int(path.stat().st_size)
+                path.unlink()
+                deleted.append(str(path))
+        except OSError as exc:
+            errors.append("{}: {}".format(path, exc))
+
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    interval = max(900.0, float(rotation_seconds))
+    for name in sorted(active_names):
+        source = root / name
+        try:
+            if not source.is_file() or source.stat().st_size <= 0:
+                continue
+            previous = sorted(root.glob("{}.retained-*.gz".format(name)), key=lambda item: item.stat().st_mtime)
+            if previous and now_epoch - previous[-1].stat().st_mtime < interval:
+                continue
+            target = root / "{}.retained-{}.gz".format(name, stamp)
+            temporary = root / ".{}.{}.tmp".format(target.name, os.getpid())
+            source_bytes = int(source.stat().st_size)
+            with source.open("rb") as input_handle, gzip.open(str(temporary), "wb", compresslevel=6) as output_handle:
+                shutil.copyfileobj(input_handle, output_handle, length=1024 * 1024)
+            os.replace(str(temporary), str(target))
+            # start_process opens logs with O_APPEND, so existing service file
+            # descriptors continue writing correctly after an in-place
+            # truncate (the usual copytruncate behavior).
+            with source.open("r+b") as source_handle:
+                source_handle.truncate(0)
+            archived_source_bytes += source_bytes
+            rotated.append(str(target))
+        except OSError as exc:
+            errors.append("{}: {}".format(source, exc))
+            try:
+                if 'temporary' in locals() and temporary.exists():
+                    temporary.unlink()
+            except OSError:
+                pass
+
+    return {
+        "status": "completed" if not errors else "completed_with_errors",
+        "cutoff": cutoff,
+        "rotation_seconds": interval,
+        "rotated_count": len(rotated),
+        "archived_source_bytes": archived_source_bytes,
+        "deleted_count": len(deleted),
+        "deleted_bytes": deleted_bytes,
+        "rotated_preview": rotated[:10],
+        "deleted_preview": deleted[:10],
+        "errors": errors[:10],
+    }
+
+
 def _profile_for(dbms: str, version: str) -> Dict[str, Any]:
     try:
         return profile_summary(resolve_profile(dbms, version))
@@ -1899,11 +2476,11 @@ class Bridge:
         self.last_sample_maintenance: Dict[str, Any] = self.store.get_meta("last_sample_maintenance", {}) or {}
         self.last_extension_status: Dict[str, Any] = self.store.get_meta("hint_runtime", {}) or {}
         self._cycle_lock = threading.Lock()
+        self._maintenance_lock = threading.Lock()
         self._sysinsight_lock = threading.Lock()
-        # Do not make bridge startup contend with the existing state DB. The
-        # first bounded maintenance pass happens after the configured grace
-        # period and subsequent passes are incremental.
-        self._next_sample_maintenance = time.time() + max(60.0, self.args.sample_maintenance_interval)
+        # Run one bounded retention pass on the first collection after
+        # startup, then continue at the configured interval.
+        self._next_sample_maintenance = time.time()
         self._closed = False
         self.lab = LabController(self)
         self.http_server: Optional[ThreadingHTTPServer] = None
@@ -1964,14 +2541,15 @@ class Bridge:
         self.http_thread.start()
         LOGGER.info("bridge API and metrics listening on http://%s:%s", self.args.http_listen, self.args.http_port)
 
-    def dashboard_snapshot(self, limit: int = 50) -> Dict[str, Any]:
+    def dashboard_snapshot(self, limit: int = 50, include_details: bool = False) -> Dict[str, Any]:
         state = self.store.dashboard_snapshot(
             mean_ms=self.args.slow_mean_ms,
             max_ms=self.args.slow_max_ms,
             min_calls=self.args.min_calls,
             limit=limit,
+            include_records=include_details,
         )
-        return {
+        result: Dict[str, Any] = {
             "service": {
                 "name": "sysinsight-dream-bridge",
                 "started_at": self.started_at,
@@ -2003,9 +2581,11 @@ class Bridge:
             "last_collection_error": self.last_collection_error,
             "sample_maintenance": self.last_sample_maintenance,
             "dream_gate": self.last_dream_gate,
-            "lab": self.lab.status(),
             "state": state,
         }
+        if include_details:
+            result["lab"] = self.lab.status()
+        return result
 
     def _manual_collection(self, request_id: str, alert: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
         try:
@@ -2124,7 +2704,10 @@ class Bridge:
             lines.append("{}{} {}".format(name, label_text, rendered))
 
         try:
-            snapshot = self.dashboard_snapshot(limit=max(20, self.args.metrics_limit))
+            snapshot = self.dashboard_snapshot(
+                limit=max(20, self.args.metrics_limit),
+                include_details=True,
+            )
             state = snapshot["state"]
             counts = state.get("counts", {})
             emit("sysinsight_dream_bridge_up", 1, help_text="Whether the SysInsight DREAM bridge process is alive.")
@@ -3031,29 +3614,77 @@ class Bridge:
         with self._cycle_lock:
             return self._collect_and_schedule(alert)
 
+    def _run_retention_maintenance(self) -> None:
+        if time.time() < self._next_sample_maintenance:
+            return
+        if not self._maintenance_lock.acquire(blocking=False):
+            return
+        try:
+            try:
+                maintenance = self.store.prune_history(
+                    self.args.sample_retention_days,
+                    self.args.sample_max_rows,
+                    self.args.sample_maintenance_batch,
+                )
+                expired_artifacts = maintenance.pop("_artifact_paths", {})
+                maintenance["artifacts"] = prune_output_artifacts(
+                    self.output_root,
+                    str(maintenance["cutoff"]),
+                    expired=expired_artifacts,
+                    retained=self.store.artifact_references(),
+                )
+                maintenance["logs"] = maintain_monitoring_logs(
+                    self.store.path.parent.parent / "logs",
+                    str(maintenance["cutoff"]),
+                )
+                maintenance["space_reclamation"] = self.store.reclaim_space()
+                self.last_sample_maintenance = maintenance
+                self.store.set_meta("last_sample_maintenance", self.last_sample_maintenance)
+                LOGGER.info(
+                    "24h retention maintenance deleted=%d samples_remaining=%d artifacts=%d reclaimed_bytes=%d",
+                    sum(int(value) for value in maintenance.get("deleted", {}).values()),
+                    maintenance.get("samples_remaining", 0),
+                    maintenance.get("artifacts", {}).get("removed_count", 0),
+                    maintenance.get("artifacts", {}).get("reclaimed_bytes", 0)
+                    + maintenance.get("space_reclamation", {}).get("reclaimed_bytes", 0),
+                )
+            except Exception:
+                LOGGER.exception("24h retention maintenance failed")
+            finally:
+                # A legacy database can contain several batches of expired
+                # samples. Drain those once per minute, then return to the
+                # normal 15-minute cadence.
+                pending = (
+                    int(self.last_sample_maintenance.get("pending_expired_samples", 0) or 0)
+                    + int(self.last_sample_maintenance.get("pending_excess_samples", 0) or 0)
+                )
+                delay = 60.0 if pending else max(60.0, self.args.sample_maintenance_interval)
+                self._next_sample_maintenance = time.time() + delay
+        finally:
+            self._maintenance_lock.release()
+
+    def request_retention_maintenance(self) -> None:
+        """Run due maintenance without blocking collection or HTTP polling."""
+
+        if time.time() < self._next_sample_maintenance:
+            return
+        try:
+            self.control_futures = [future for future in self.control_futures if not future.done()]
+            if any(getattr(future, "_sysinsight_retention", False) for future in self.control_futures):
+                return
+            future = self.control_executor.submit(self._run_retention_maintenance)
+            setattr(future, "_sysinsight_retention", True)
+            self.control_futures.append(future)
+        except RuntimeError:
+            if not self._closed:
+                raise
+
     def _collect_and_schedule(self, alert: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
         self.last_extension_status = self.db.extension_status()
         self.store.set_meta("hint_runtime", self.last_extension_status)
         stats = self.db.collect_statements(self.args.stats_limit)
         active = self.db.collect_active(self.args.active_limit)
         keys = self.store.upsert_observations(stats, active)
-        if time.time() >= self._next_sample_maintenance:
-            try:
-                self.last_sample_maintenance = self.store.prune_observation_samples(
-                    self.args.sample_retention_days,
-                    self.args.sample_max_rows,
-                    self.args.sample_maintenance_batch,
-                )
-                self.store.set_meta("last_sample_maintenance", self.last_sample_maintenance)
-                LOGGER.info(
-                    "bounded SQL sample maintenance deleted=%d remaining=%d",
-                    self.last_sample_maintenance.get("deleted", 0),
-                    self.last_sample_maintenance.get("remaining", 0),
-                )
-            except Exception:
-                LOGGER.exception("bounded SQL sample maintenance failed")
-            finally:
-                self._next_sample_maintenance = time.time() + max(60.0, self.args.sample_maintenance_interval)
         slow = self.store.slow_observations(
             max(self.args.slow_mean_ms, self.args.dream_trigger_ms),
             max(self.args.slow_max_ms, self.args.dream_trigger_ms),
@@ -3175,6 +3806,7 @@ class Bridge:
         LOGGER.info("starting SysInsight/DREAM bridge; state=%s output=%s", self.store.path, self.output_root)
         try:
             while True:
+                self.request_retention_maintenance()
                 alert = self._current_alert()
                 try:
                     self.collect_and_schedule(alert)
@@ -3311,7 +3943,15 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
                 self._send_json(self.bridge.lab.status())
                 return
             if path == "/api/v1/status":
-                self._send_json(self.bridge.dashboard_snapshot(self._query_int(query, "limit", 50, 200)))
+                include_details = self._query_value(query, "details", "false").lower() in {
+                    "1", "true", "yes", "on"
+                }
+                self._send_json(
+                    self.bridge.dashboard_snapshot(
+                        self._query_int(query, "limit", 50, 200),
+                        include_details=include_details,
+                    )
+                )
                 return
             if path == "/api/v1/events":
                 self._send_json({"events": self.bridge.store.events(self._query_int(query, "limit", 100, 2000))})
@@ -3357,7 +3997,7 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
                     self._send_error_json(404, "SQL observation not found")
                 else:
                     row["replayable"] = bool(row.get("replay_sql")) and "$" not in str(row.get("replay_sql")) and "?" not in str(row.get("replay_sql"))
-                    row["last_sample"] = _decode_json(row.get("last_sample_json"), None)
+                    row["last_sample"] = _decode_json(row.pop("last_sample_json", None), None)
                     self._send_json(row)
                 return
             if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:
@@ -3468,8 +4108,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sample-retention-days",
         type=float,
-        default=float(os.environ.get("SYSINSIGHT_SQL_SAMPLE_RETENTION_DAYS", "7")),
-        help="rolling retention for high-volume SQL observation samples",
+        default=float(os.environ.get("SYSINSIGHT_SQL_SAMPLE_RETENTION_DAYS", "1")),
+        help="unified rolling retention for bridge history and artifacts (default: 1 day)",
     )
     parser.add_argument(
         "--sample-max-rows",

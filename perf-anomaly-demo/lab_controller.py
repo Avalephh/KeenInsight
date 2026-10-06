@@ -858,7 +858,7 @@ class LabController:
                 "port": self.bridge.args.port,
                 "reset_parameters": list(LAB_RESET_PARAMETERS),
             },
-            "lab": self.status(),
+            "retention_hours": round(float(self.bridge.args.sample_retention_days) * 24.0, 3),
         }
 
     def get_sql(self, sql_id: str) -> Dict[str, Any]:
@@ -876,14 +876,22 @@ class LabController:
         # TPCC/DREAM result on each two-second browser poll made this endpoint
         # multi-megabyte and caused overlapping refresh requests. Fetch the
         # full JSON only for the current and latest run that the console
-        # actually renders.
+        # actually renders. One latest sample is sufficient for the live
+        # cards; phase history is already summarized in result.phases.
         runs = self.store.list_lab_runs(30, include_result=False)
         current = [row for row in runs if row.get("status") in {"queued", "running"}]
         current_details: List[Dict[str, Any]] = []
         for row in current:
             detail = self.store.get_lab_run(str(row["run_id"])) or dict(row)
-            detail["samples"] = self.store.list_lab_samples(str(row["run_id"]), 180)
+            detail["samples"] = self.store.list_lab_samples(str(row["run_id"]), 1)
             detail["executions"] = self.store.list_lab_executions(str(row["run_id"]), 20)
+            if row.get("kind") == "dream":
+                result = detail.get("result") if isinstance(detail.get("result"), dict) else {}
+                job_id = result.get("job_id")
+                if job_id:
+                    detail["job"] = self.store.get_job(str(job_id))
+                    if result.get("sql_key"):
+                        detail["improvement"] = self.store.latest_improvement(str(result["sql_key"]))
             current_details.append(detail)
 
         latest_dream_summary = next((row for row in runs if row.get("kind") == "dream"), None)
@@ -904,7 +912,7 @@ class LabController:
         if latest_sysinsight_summary:
             latest_sysinsight = self.store.get_lab_run(str(latest_sysinsight_summary["run_id"])) or latest_sysinsight_summary
             sysinsight_detail = dict(latest_sysinsight)
-            sysinsight_detail["samples"] = self.store.list_lab_samples(str(latest_sysinsight["run_id"]), 180)
+            sysinsight_detail["samples"] = self.store.list_lab_samples(str(latest_sysinsight["run_id"]), 1)
         return {
             "status": "ok",
             "current": current_details,
