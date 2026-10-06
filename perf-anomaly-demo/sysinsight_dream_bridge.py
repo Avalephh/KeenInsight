@@ -1789,6 +1789,7 @@ def _live_case(
     alert: Mapping[str, Any],
     snapshot: Mapping[str, Any],
     slow_rows: Sequence[Mapping[str, Any]],
+    active_rows: Sequence[Mapping[str, Any]] = (),
 ) -> Dict[str, Any]:
     now = utc_now()
     return {
@@ -1811,10 +1812,22 @@ def _live_case(
             }
             for row in slow_rows
         ],
+        "active_queries": [
+            {
+                "pid": row.get("pid"),
+                "application_name": row.get("application_name"),
+                "username": row.get("username"),
+                "query": row.get("query"),
+                "duration_ms": row.get("duration_ms"),
+                "wait_event_type": row.get("wait_event_type"),
+                "wait_event": row.get("wait_event"),
+            }
+            for row in active_rows
+        ],
         "anomaly": {
             "trigger": alert,
             "samples": {"first": dict(snapshot), "last": dict(snapshot), "trigger": alert},
-            "metrics": {"slow_query_count": len(slow_rows)},
+            "metrics": {"slow_query_count": len(slow_rows), "active_query_count": len(active_rows)},
         },
     }
 
@@ -1950,6 +1963,7 @@ class Bridge:
                 "http_listen": "{}:{}".format(self.args.http_listen, self.args.http_port),
                 "api_configured": bool(_read_api_key()),
                 "sysinsight_api_enabled": not bool(self.args.no_api),
+                "sysinsight_full_chain": bool(getattr(self.args, "sysinsight_full_chain", False)),
                 "dream_auto_apply": bool(self.args.auto_apply),
                 "tune_without_alert": bool(self.args.tune_without_alert),
                 "dream_long_sql_auto_trigger": True,
@@ -2101,6 +2115,7 @@ class Bridge:
             emit("sysinsight_dream_bridge_process_start_time_seconds", _prometheus_timestamp(self.started_at) or 0, help_text="Bridge process start time.")
             emit("sysinsight_dream_bridge_alert_firing", 1 if snapshot["alert"]["firing"] else 0, help_text="Whether the selected Prometheus alert is firing.")
             emit("sysinsight_dream_bridge_api_configured", 1 if snapshot["service"]["api_configured"] else 0, help_text="Whether the shared LLM API key is available through the environment.")
+            emit("sysinsight_dream_bridge_sysinsight_full_chain", 1 if snapshot["service"].get("sysinsight_full_chain") else 0, help_text="Whether alert handling runs the source-aware SysInsight apply/retest/restore chain.")
             emit("sysinsight_dream_bridge_dream_ready", 1 if snapshot["service"].get("dream_ready") else 0, help_text="Whether DREAM can run automatically with offline mode or a shared LLM API key.")
             emit("sysinsight_dream_bridge_dream_gate_blocked", 1 if snapshot.get("dream_gate", {}).get("status") == "blocked" else 0, help_text="Whether automatic DREAM scheduling is currently blocked by configuration.")
             emit("sysinsight_dream_bridge_auto_apply_enabled", 1 if snapshot["service"]["dream_auto_apply"] else 0, help_text="Whether validated DREAM hints may be auto-applied.")
@@ -2404,11 +2419,132 @@ class Bridge:
         future = self.sysinsight_executor.submit(self._run_sysinsight, incident_id, incident_dir, alert, dict(snapshot), list(slow_rows))
         self.futures.append(future)
 
+    def _launch_live_sysinsight_chain(
+        self,
+        incident_dir: Path,
+        case_path: Path,
+        prometheus_path: Path,
+        active_rows: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        """Run the real perf/source/LLM/apply/retest/restore chain."""
+
+        pids: List[int] = []
+        for row in active_rows:
+            try:
+                pid = int(row.get("pid"))
+            except (TypeError, ValueError):
+                continue
+            if pid > 1 and pid not in pids:
+                pids.append(pid)
+        pids_path = incident_dir / "active_pids.json"
+        _write_json(pids_path, pids)
+        command = [
+            sys.executable,
+            str(ROOT / "sysinsight_live_chain.py"),
+            "--case-result",
+            str(case_path),
+            "--prometheus-capture",
+            str(prometheus_path),
+            "--active-pids",
+            str(pids_path),
+            "--incident-dir",
+            str(incident_dir),
+            "--db",
+            self.args.db,
+            "--db-user",
+            self.args.db_user,
+            "--run-as",
+            self.args.run_as,
+            "--host",
+            self.args.host,
+            "--port",
+            str(self.args.port),
+            "--db-schema",
+            self.args.db_schema,
+            "--dbms",
+            self.args.dbms,
+            "--pg-version",
+            self.args.pg_version,
+            "--pg-cluster",
+            getattr(self.args, "pg_cluster", "main"),
+            "--prometheus-url",
+            self.args.prometheus_url,
+            "--alert-name",
+            self.args.alert_name,
+            "--api-base",
+            self.args.api_base,
+            "--model",
+            self.args.model,
+            "--api-timeout",
+            str(self.args.sysinsight_api_timeout),
+            "--perf-seconds",
+            str(self.args.sysinsight_perf_seconds),
+            "--perf-frequency",
+            str(self.args.sysinsight_perf_frequency),
+            "--candidate-count",
+            str(self.args.sysinsight_candidate_count),
+            "--measure-repeats",
+            str(self.args.sysinsight_measure_repeats),
+            "--sql-timeout",
+            str(self.args.sysinsight_sql_timeout),
+        ]
+        if self.args.sysinsight_stackcollapse:
+            command.extend(["--stackcollapse", self.args.sysinsight_stackcollapse])
+        if self.args.sysinsight_normal_profile:
+            command.extend(["--normal-profile", self.args.sysinsight_normal_profile])
+        if self.args.sysinsight_validation_sql:
+            command.extend(["--validation-sql", self.args.sysinsight_validation_sql])
+        env = os.environ.copy()
+        if not env.get("SYSINSIGHT_SOURCE_ROOT"):
+            source_root = ROOT.parent / "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune"
+            if (source_root / "DBTuner" / "utils" / "analyzeException.py").is_file():
+                env["SYSINSIGHT_SOURCE_ROOT"] = str(source_root)
+        if not env.get("POSTGRES_SOURCE_ROOT"):
+            source_root = Path("/root/keeninsight-postgres/third_party/postgresql-12.22")
+            if (source_root / "src" / "backend").is_dir():
+                env["POSTGRES_SOURCE_ROOT"] = str(source_root)
+        log_path = incident_dir / "sysinsight_live_chain.log"
+        LOGGER.info("starting live SysInsight chain: incident=%s pids=%s", incident_dir, pids)
+        try:
+            with log_path.open("w", encoding="utf-8") as log:
+                completed = subprocess.run(
+                    command,
+                    cwd=str(ROOT),
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=float(self.args.sysinsight_chain_timeout),
+                    check=False,
+                )
+        except subprocess.TimeoutExpired:
+            return {
+                "status": "failed",
+                "reason": "live SysInsight chain timed out after {} seconds".format(self.args.sysinsight_chain_timeout),
+                "log": str(log_path),
+                "command": command,
+            }
+        result_path = incident_dir / "live_chain_result.json"
+        chain: Dict[str, Any] = {}
+        if result_path.is_file():
+            try:
+                chain = _decode_json(result_path.read_text(encoding="utf-8"), {})
+            except (OSError, ValueError):
+                chain = {}
+        return {
+            "status": "completed" if completed.returncode == 0 and chain.get("status") == "completed" else "failed",
+            "returncode": completed.returncode,
+            "log": str(log_path),
+            "result": chain,
+            "command": command,
+        }
+
     def _run_sysinsight(self, incident_id: str, incident_dir: Path, alert: Mapping[str, Any], snapshot: Mapping[str, Any], slow_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
         result: Dict[str, Any] = {"status": "running", "incident_id": incident_id, "started_at": utc_now()}
         try:
             prometheus = self._collect_prometheus(self.args.sysinsight_window)
-            case = _live_case(self.args.db, self.args.db_schema, self.args.workload, alert, snapshot, slow_rows)
+            active_rows = self.db.collect_active(self.args.active_limit)
+            case = _live_case(self.args.db, self.args.db_schema, self.args.workload, alert, snapshot, slow_rows, active_rows)
             profile = _profile_for(self.args.dbms, self.args.pg_version)
             input_payload = build_sysinsight_input(
                 case,
@@ -2427,43 +2563,61 @@ class Bridge:
             _write_json(incident_dir / "case_result.json", case)
             _write_json(incident_dir / "sysinsight_input.json", input_payload)
 
-            api_key = _read_api_key()
-            if self.args.no_api:
-                analysis = {"status": "skipped", "reason": "--no-api"}
-            elif not api_key:
-                analysis = {"status": "skipped", "reason": "SysInsight API key environment variable is not set"}
-            else:
-                prompt = (
-                    "你是 SysInsight 的在线告警分析器。只基于下面的真实观测做系统级根因分析，"
-                    "不要执行任何数据库变更。返回 JSON，字段为 severity、root_cause、evidence、"
-                    "recommended_next_checks、confidence。\n\n"
-                    + json.dumps(input_payload, ensure_ascii=False, indent=2, default=str)
+            if self.args.sysinsight_full_chain and not self.args.no_api:
+                live_chain = self._launch_live_sysinsight_chain(
+                    incident_dir,
+                    incident_dir / "case_result.json",
+                    incident_dir / "prometheus_capture.json",
+                    active_rows,
                 )
-                response = _api_json(
-                    self.args.api_base,
-                    api_key,
-                    "/chat/completions",
-                    {
+                result = {
+                    "status": live_chain.get("status", "failed"),
+                    "incident_id": incident_id,
+                    "input": str(incident_dir / "sysinsight_input.json"),
+                    "analysis": {
+                        "status": "completed" if live_chain.get("status") == "completed" else "failed",
+                        "mode": "source-aware-live-chain",
                         "model": self.args.model,
-                        "temperature": 0,
-                        "messages": [
-                            {"role": "system", "content": "你是一个严谨的 PostgreSQL OLAP 性能告警分析器。"},
-                            {"role": "user", "content": prompt},
-                        ],
                     },
-                    timeout=self.args.api_timeout,
-                )
-                content = ""
-                choices = response.get("choices", [])
-                if choices and isinstance(choices[0], dict):
-                    message = choices[0].get("message", {})
-                    content = message.get("content", "") if isinstance(message, dict) else ""
-                analysis = {"status": "completed", "model": self.args.model, "response": response, "content": content}
-            result = {"status": "completed", "incident_id": incident_id, "input": str(incident_dir / "sysinsight_input.json"), "analysis": analysis, "finished_at": utc_now()}
+                    "live_chain": live_chain,
+                    "finished_at": utc_now(),
+                }
+            else:
+                api_key = _read_api_key()
+                if self.args.no_api:
+                    analysis = {"status": "skipped", "reason": "--no-api"}
+                elif not api_key:
+                    analysis = {"status": "skipped", "reason": "SysInsight API key environment variable is not set"}
+                else:
+                    prompt = (
+                        "你是 SysInsight 的在线告警分析器。只基于下面的真实观测做系统级根因分析，"
+                        "不要执行任何数据库变更。返回 JSON，字段为 severity、root_cause、evidence、"
+                        "recommended_next_checks、confidence。\n\n"
+                        + json.dumps(input_payload, ensure_ascii=False, indent=2, default=str)
+                    )
+                    response = _api_json(
+                        self.args.api_base,
+                        api_key,
+                        "/chat/completions",
+                        {
+                            "model": self.args.model,
+                            "temperature": 0,
+                            "messages": [
+                                {"role": "system", "content": "你是一个严谨的 PostgreSQL OLAP 性能告警分析器。"},
+                                {"role": "user", "content": prompt},
+                            ],
+                        },
+                        timeout=self.args.api_timeout,
+                    )
+                    content = ""
+                    choices = response.get("choices", [])
+                    if choices and isinstance(choices[0], dict):
+                        message = choices[0].get("message", {})
+                        content = message.get("content", "") if isinstance(message, dict) else ""
+                    analysis = {"status": "completed", "model": self.args.model, "response": response, "content": content}
+                result = {"status": "completed", "incident_id": incident_id, "input": str(incident_dir / "sysinsight_input.json"), "analysis": analysis, "finished_at": utc_now()}
             _write_json(incident_dir / "sysinsight_analysis.json", result)
-            if self.args.sysinsight_case_result:
-                result["existing_pipeline"] = self._launch_existing_sysinsight(incident_dir)
-            self.store.finish_incident(incident_id, "completed", result)
+            self.store.finish_incident(incident_id, result["status"], result)
             return result
         except Exception as exc:
             result = {"status": "failed", "incident_id": incident_id, "error": "{}: {}".format(type(exc).__name__, exc), "traceback": traceback.format_exc(), "finished_at": utc_now()}
@@ -3275,6 +3429,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-schema", default=os.environ.get("SYSINSIGHT_DB_SCHEMA", "keeninsight_tpcc"))
     parser.add_argument("--dbms", default=os.environ.get("SYSINSIGHT_DBMS", "postgresql"))
     parser.add_argument("--pg-version", default=os.environ.get("SYSINSIGHT_DB_VERSION", "12"))
+    parser.add_argument("--pg-cluster", default=os.environ.get("SYSINSIGHT_PG_CLUSTER", "main"))
     parser.add_argument("--workload", default=os.environ.get("SYSINSIGHT_WORKLOAD", "olap"))
     parser.add_argument("--db-timeout", type=float, default=30.0)
     parser.add_argument("--prometheus-url", default=os.environ.get("SYSINSIGHT_PROMETHEUS_URL", "http://127.0.0.1:9090"))
@@ -3340,6 +3495,72 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--api-timeout", type=float, default=180.0)
     parser.add_argument("--sysinsight-window", type=float, default=300.0)
     parser.add_argument("--sysinsight-case-result", default="", help="optional existing case_result.json for the full source-aware SysInsight pipeline")
+    parser.add_argument(
+        "--sysinsight-full-chain",
+        dest="sysinsight_full_chain",
+        action="store_true",
+        default=os.environ.get("SYSINSIGHT_FULL_CHAIN", "1").lower() in {"1", "true", "yes", "on"},
+        help="on alert, run perf/source detection, original LLM tuning, temporary apply, replay, and restore",
+    )
+    parser.add_argument(
+        "--no-sysinsight-full-chain",
+        dest="sysinsight_full_chain",
+        action="store_false",
+        help="keep the legacy read-only alert diagnosis path",
+    )
+    parser.add_argument(
+        "--sysinsight-chain-timeout",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_CHAIN_TIMEOUT", "1800")),
+        help="maximum seconds for one source-aware live chain",
+    )
+    parser.add_argument(
+        "--sysinsight-api-timeout",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_CHAIN_API_TIMEOUT", "1200")),
+        help="maximum seconds for the original SysInsight LLM wrapper",
+    )
+    parser.add_argument(
+        "--sysinsight-perf-seconds",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_CHAIN_PERF_SECONDS", "15")),
+        help="perf sampling window after the alert is handed to SysInsight",
+    )
+    parser.add_argument(
+        "--sysinsight-perf-frequency",
+        type=int,
+        default=int(os.environ.get("SYSINSIGHT_CHAIN_PERF_FREQUENCY", "300")),
+    )
+    parser.add_argument(
+        "--sysinsight-candidate-count",
+        type=int,
+        default=int(os.environ.get("SYSINSIGHT_CHAIN_CANDIDATES", "1")),
+        help="number of real LLM acquisition candidates requested for the online chain",
+    )
+    parser.add_argument(
+        "--sysinsight-measure-repeats",
+        type=int,
+        default=int(os.environ.get("SYSINSIGHT_CHAIN_MEASURE_REPEATS", "2")),
+    )
+    parser.add_argument(
+        "--sysinsight-sql-timeout",
+        type=float,
+        default=float(os.environ.get("SYSINSIGHT_CHAIN_SQL_TIMEOUT", "90")),
+    )
+    parser.add_argument(
+        "--sysinsight-stackcollapse",
+        default=os.environ.get("SYSINSIGHT_CHAIN_STACKCOLLAPSE", str(ROOT / "vendor" / "FlameGraph" / "stackcollapse-perf.pl")),
+    )
+    parser.add_argument(
+        "--sysinsight-normal-profile",
+        default=os.environ.get("SYSINSIGHT_CHAIN_NORMAL_PROFILE", ""),
+        help="optional normal perf profile; otherwise use the newest recorded baseline profile",
+    )
+    parser.add_argument(
+        "--sysinsight-validation-sql",
+        default=os.environ.get("SYSINSIGHT_CHAIN_VALIDATION_SQL", ""),
+        help="optional safe read-only SQL used for the live candidate replay",
+    )
     parser.add_argument("--no-api", action="store_true", help="skip the live SysInsight API call")
     parser.add_argument("--configure-hint-table", action="store_true", help="enable pg_hint_plan hint-table loading for new DB connections")
     parser.add_argument("--reset-hint-runtime", action="store_true")
@@ -3374,6 +3595,16 @@ def parse_args() -> argparse.Namespace:
         parser.error("invalid database/poll/slow-query/DREAM trigger settings")
     if args.http_port < 0 or args.http_port > 65535 or args.metrics_limit < 1:
         parser.error("invalid bridge HTTP/metrics settings")
+    if (
+        args.sysinsight_chain_timeout <= 0
+        or args.sysinsight_api_timeout <= 0
+        or args.sysinsight_perf_seconds <= 0
+        or args.sysinsight_perf_frequency < 1
+        or args.sysinsight_candidate_count < 1
+        or args.sysinsight_measure_repeats < 1
+        or args.sysinsight_sql_timeout <= 0
+    ):
+        parser.error("invalid SysInsight full-chain settings")
     if args.min_improvement < 0 or args.min_improvement >= 1:
         parser.error("--min-improvement must be in [0,1)")
     return args

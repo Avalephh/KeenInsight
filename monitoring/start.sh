@@ -57,6 +57,16 @@ BRIDGE_SAMPLE_MAX_ROWS="${SYSINSIGHT_SQL_SAMPLE_MAX_ROWS:-500000}"
 BRIDGE_SAMPLE_MAINTENANCE_INTERVAL="${SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_INTERVAL:-900}"
 BRIDGE_SAMPLE_MAINTENANCE_BATCH="${SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_BATCH:-50000}"
 BRIDGE_TUNE_WITHOUT_ALERT="${SYSINSIGHT_TUNE_WITHOUT_ALERT:-0}"
+BRIDGE_SYSINSIGHT_FULL_CHAIN="${SYSINSIGHT_FULL_CHAIN:-1}"
+BRIDGE_SYSINSIGHT_CHAIN_TIMEOUT="${SYSINSIGHT_CHAIN_TIMEOUT:-1800}"
+BRIDGE_SYSINSIGHT_API_TIMEOUT="${SYSINSIGHT_CHAIN_API_TIMEOUT:-1200}"
+BRIDGE_SYSINSIGHT_PERF_SECONDS="${SYSINSIGHT_CHAIN_PERF_SECONDS:-15}"
+BRIDGE_SYSINSIGHT_PERF_FREQUENCY="${SYSINSIGHT_CHAIN_PERF_FREQUENCY:-300}"
+BRIDGE_SYSINSIGHT_CANDIDATES="${SYSINSIGHT_CHAIN_CANDIDATES:-1}"
+BRIDGE_SYSINSIGHT_MEASURE_REPEATS="${SYSINSIGHT_CHAIN_MEASURE_REPEATS:-2}"
+BRIDGE_SYSINSIGHT_SQL_TIMEOUT="${SYSINSIGHT_CHAIN_SQL_TIMEOUT:-90}"
+BRIDGE_SYSINSIGHT_NORMAL_PROFILE="${SYSINSIGHT_CHAIN_NORMAL_PROFILE:-}"
+BRIDGE_SYSINSIGHT_VALIDATION_SQL="${SYSINSIGHT_CHAIN_VALIDATION_SQL:-}"
 
 # Keep the local PostgreSQL demo from taking all four host CPUs or all
 # available memory while a TPCC pressure experiment is running.  These are
@@ -185,6 +195,7 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
     --host "$BRIDGE_DB_HOST" \
     --port "$BRIDGE_DB_PORT" \
     --db-schema "$BRIDGE_DB_SCHEMA" \
+    --pg-cluster "${SYSINSIGHT_PG_CLUSTER:-main}" \
     --alert-name "$BRIDGE_ALERT_NAME" \
     --dream-config "$BRIDGE_DREAM_CONFIG" \
     --dream-runtime-root "$BRIDGE_DREAM_RUNTIME_ROOT" \
@@ -203,8 +214,29 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
     --sample-retention-days "$BRIDGE_SAMPLE_RETENTION_DAYS" \
     --sample-max-rows "$BRIDGE_SAMPLE_MAX_ROWS" \
     --sample-maintenance-interval "$BRIDGE_SAMPLE_MAINTENANCE_INTERVAL" \
-    --sample-maintenance-batch "$BRIDGE_SAMPLE_MAINTENANCE_BATCH"
+    --sample-maintenance-batch "$BRIDGE_SAMPLE_MAINTENANCE_BATCH" \
+    --sysinsight-chain-timeout "$BRIDGE_SYSINSIGHT_CHAIN_TIMEOUT" \
+    --sysinsight-api-timeout "$BRIDGE_SYSINSIGHT_API_TIMEOUT" \
+    --sysinsight-perf-seconds "$BRIDGE_SYSINSIGHT_PERF_SECONDS" \
+    --sysinsight-perf-frequency "$BRIDGE_SYSINSIGHT_PERF_FREQUENCY" \
+    --sysinsight-candidate-count "$BRIDGE_SYSINSIGHT_CANDIDATES" \
+    --sysinsight-measure-repeats "$BRIDGE_SYSINSIGHT_MEASURE_REPEATS" \
+    --sysinsight-sql-timeout "$BRIDGE_SYSINSIGHT_SQL_TIMEOUT"
   )
+  case "$BRIDGE_SYSINSIGHT_FULL_CHAIN" in
+    1|true|TRUE|yes|YES|on|ON)
+      bridge_args+=(--sysinsight-full-chain)
+      ;;
+    *)
+      bridge_args+=(--no-sysinsight-full-chain)
+      ;;
+  esac
+  if [ -n "$BRIDGE_SYSINSIGHT_NORMAL_PROFILE" ]; then
+    bridge_args+=(--sysinsight-normal-profile "$BRIDGE_SYSINSIGHT_NORMAL_PROFILE")
+  fi
+  if [ -n "$BRIDGE_SYSINSIGHT_VALIDATION_SQL" ]; then
+    bridge_args+=(--sysinsight-validation-sql "$BRIDGE_SYSINSIGHT_VALIDATION_SQL")
+  fi
   case "$BRIDGE_TUNE_WITHOUT_ALERT" in
     1|true|TRUE|yes|YES|on|ON)
       bridge_args+=(--tune-without-alert)
