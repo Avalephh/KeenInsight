@@ -442,6 +442,7 @@ def _measure_sql(
     args: argparse.Namespace,
     phase: str,
     session_settings: Optional[Mapping[str, Any]] = None,
+    startup_settings: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     results: List[Dict[str, Any]] = []
     search_path = [args.db_schema, "public"] if args.db_schema and args.db_schema != "public" else ["public"]
@@ -451,6 +452,7 @@ def _measure_sql(
             application_name="sysinsight-live-{}-{}".format(phase, index),
             search_path=search_path,
             session_settings=session_settings,
+            startup_settings=startup_settings,
             timeout=float(args.sql_timeout),
         )
         result["attempt"] = index + 1
@@ -683,9 +685,14 @@ def main() -> int:
         applier = TemporaryPostgresConfiguration(db_args, dict(configuration), "sysinsight-live", allow_restart=False)
         try:
             with applier as applied:
-                query_settings = dict(applied.get("connection_configuration", {}))
-                query_settings.update(applied.get("session_configuration", {}))
-                tuned = _measure_sql(db, sql, args, "tuned", query_settings)
+                tuned = _measure_sql(
+                    db,
+                    sql,
+                    args,
+                    "tuned",
+                    session_settings=dict(applied.get("session_configuration", {})),
+                    startup_settings=dict(applied.get("connection_configuration", {})),
+                )
             # __exit__ records the restore outcome in the same state object;
             # copy it only after leaving the context so the artifact proves
             # the candidate was actually removed.
@@ -726,6 +733,12 @@ def main() -> int:
             "restored_within_20pct_of_baseline": bool(isinstance(baseline_ms, (int, float)) and isinstance(restored_ms, (int, float)) and restored_ms <= baseline_ms * 1.20),
             "configuration_status": apply_state.get("status"),
         }
+        if tuned.get("status") != "completed":
+            raise RuntimeError(
+                "candidate application completed and was restored, but tuned replay failed: {}".format(
+                    tuned.get("attempts")
+                )
+            )
         result["status"] = "completed"
         result["finished_at"] = utc_now()
         _stage(stages, "result_persistence", "completed", str(result_path))

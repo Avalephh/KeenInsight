@@ -35,6 +35,7 @@ import os
 from pathlib import Path
 import pwd
 import re
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -243,7 +244,12 @@ class DatabaseClient:
         self.timeout = float(timeout)
         self._stats_time_column: Optional[str] = None
 
-    def _command(self, sql: str, application_name: str) -> List[str]:
+    def _command(
+        self,
+        sql: str,
+        application_name: str,
+        startup_settings: Optional[Mapping[str, Any]] = None,
+    ) -> List[str]:
         psql = [
             "psql",
             "-X",
@@ -263,6 +269,15 @@ class DatabaseClient:
             "-c",
             sql,
         ]
+        environment = ["PGAPPNAME={}".format(application_name)]
+        if startup_settings:
+            options: List[str] = []
+            for name, value in startup_settings.items():
+                setting_name = str(name)
+                if not _IDENTIFIER.fullmatch(setting_name):
+                    raise ValueError("unsafe PostgreSQL startup parameter: {!r}".format(setting_name))
+                options.extend(["-c", "{}={}".format(setting_name, shlex.quote(str(value)))])
+            environment.append("PGOPTIONS={}".format(" ".join(options)))
         if os.geteuid() == 0 and self.run_as:
             return [
                 "runuser",
@@ -270,9 +285,9 @@ class DatabaseClient:
                 self.run_as,
                 "--",
                 "env",
-                "PGAPPNAME={}".format(application_name),
+                *environment,
             ] + psql
-        return ["env", "PGAPPNAME={}".format(application_name)] + psql
+        return ["env", *environment] + psql
 
     def _psql(self, sql: str, application_name: str = "sysinsight-dream-bridge") -> str:
         completed = subprocess.run(
@@ -302,6 +317,7 @@ class DatabaseClient:
         application_name: str = "sysinsight-dream-bridge-lab",
         search_path: Optional[Sequence[str]] = None,
         session_settings: Optional[Mapping[str, Any]] = None,
+        startup_settings: Optional[Mapping[str, Any]] = None,
         timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
         """Execute one already-validated statement and measure wall time.
@@ -337,7 +353,7 @@ class DatabaseClient:
         command_sql = "; ".join(prefix + [statement.rstrip(";")]) + ";"
         started = time.perf_counter()
         completed = subprocess.run(
-            self._command(command_sql, application_name),
+            self._command(command_sql, application_name, startup_settings=startup_settings),
             cwd="/",
             text=True,
             stdout=subprocess.DEVNULL,
