@@ -57,6 +57,18 @@ PostgreSQL 12.22 源码构建的 276 条文档化 GUC 关联，其中 231 条数
 
 Prometheus 测试规则位于 `../monitoring/config/prometheus/rules/sysinsight-demo.yml`，只用于验证“告警触发 perf”；它不改变 SysInsight 的异常提取逻辑。
 
+## 源码调用链证据
+
+统一入口生成的 `sysinsight_input.json` 现在会保留两类真实证据：一类是异常阶段
+`perf` folded stack 中与异常函数或匹配参数相关的采样调用路径；另一类是固定
+PostgreSQL 12.22 源码中参数绑定变量的直接使用、文件、行号、上下文、源码摘要和
+函数片段。`sysinsight_original_llm.py --dry-run` 会把同一份证据放入原始 LLAMBO
+Prompt，随后真实 API 请求也复用这份 Prompt。
+
+这部分证据表示“运行时采样路径”和“源码直接引用关系”，不是凭扫描结果推导出的完整
+静态调用图，也不直接证明参数调整方向；方向仍必须由候选配置的真实 workload 复测确认。
+如果缺少 perf folded stack，输入会明确记录调用链缺失，不会用预设调用链代替。
+
 ## 统一 SysInsight 主流程
 
 `sysinsight_pipeline.py` 把监控输入、原始检测/匹配、LLAMBO 候选和候选实测串成一个入口：

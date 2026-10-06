@@ -10,6 +10,10 @@ which uses a different, hard-coded endpoint.  That call is disabled here so
 that the supplied API is the only external model endpoint used.  The original
 ParameterLibrary/update(), LLM_ACQ prompt builder, ChatCompletion request,
 response parser, range filter and duplicate filter remain the source methods.
+For the PostgreSQL profile, the source extractor boundary is supplied by a
+local adapter backed by the pinned PostgreSQL source tree; this preserves the
+original replacement shape without depending on fabricated ``*_code.txt``
+files.
 """
 
 from __future__ import annotations
@@ -43,6 +47,11 @@ DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
 
 sys.path.insert(0, str(ROOT))
 from db_profile import DatabaseProfile, profile_summary, resolve_profile, available_profiles  # type: ignore
+from sysinsight_source_evidence import (  # type: ignore
+    build_source_evidence,
+    render_source_evidence,
+    source_code_for_matched_knobs,
+)
 
 
 def api_key_from_environment() -> str:
@@ -224,6 +233,9 @@ def compact_sysinsight_observation(payload: Dict[str, Any]) -> Dict[str, Any]:
     functions = payload.get("function_anomalies", {})
     if not isinstance(functions, dict):
         functions = {}
+    source_evidence = payload.get("source_evidence", {})
+    if not isinstance(source_evidence, dict):
+        source_evidence = {}
     alert = payload.get("alert", {})
     if not isinstance(alert, dict):
         alert = {}
@@ -262,6 +274,12 @@ def compact_sysinsight_observation(payload: Dict[str, Any]) -> Dict[str, Any]:
             "function_count": functions.get("function_count"),
             "key_functions": functions.get("key_functions", [])[:20],
             "matched_knobs": functions.get("matched_knobs", [])[:50],
+        },
+        "source_evidence": {
+            "status": source_evidence.get("status"),
+            "runtime_call_chain_count": len(source_evidence.get("runtime_call_chains", [])),
+            "static_evidence_count": len(source_evidence.get("static_parameter_evidence", [])),
+            "provenance": source_evidence.get("provenance", {}),
         },
         "tuning_context": payload.get("tuning_context", {}),
     }
@@ -306,7 +324,13 @@ def original_context(
     if compact_observation:
         task_context["sysinsight_observation"] = compact_observation
 
-    source_compare = case_result.get("sysinsight_source_detection", {}).get("source_compare", {})
+    source_detection = case_result.get("sysinsight_source_detection", {})
+    if not isinstance(source_detection, dict) or not source_detection:
+        anomaly = case_result.get("anomaly", {})
+        source_detection = anomaly.get("sysinsight_source_detection", {}) if isinstance(anomaly, dict) else {}
+    if not isinstance(source_detection, dict):
+        source_detection = {}
+    source_compare = source_detection.get("source_compare", {})
     key_file = Path(source_compare.get("key_function_file", ""))
     if not key_file.is_absolute():
         key_file = (ROOT / key_file).resolve()
@@ -320,6 +344,28 @@ def original_context(
     promptlib.config = initial_config
     promptlib.keyFunction_file = str(key_file)
     promptlib.resource = resource_snapshot(case_result)
+    source_evidence = {}
+    if sysinsight_input:
+        candidate_evidence = sysinsight_input.get("source_evidence", {})
+        if isinstance(candidate_evidence, dict):
+            source_evidence = candidate_evidence
+    if source_evidence.get("status") != "completed":
+        # Older case artifacts predate the source-evidence section.  Rebuild
+        # it from the same case/perf/source files instead of silently sending
+        # a prompt with only flat function names.
+        source_evidence = build_source_evidence(
+            case_result,
+            case_file,
+            profile_summary(profile),
+        )
+    task_context["sysinsight_source_evidence"] = {
+        "status": source_evidence.get("status"),
+        "runtime_call_chain_count": len(source_evidence.get("runtime_call_chains", [])),
+        "static_evidence_count": len(source_evidence.get("static_parameter_evidence", [])),
+        "provenance": source_evidence.get("provenance", {}),
+    }
+    if source_evidence.get("status") == "completed":
+        promptlib.question_template += "\n\n" + render_source_evidence(source_evidence)
     if compact_observation:
         promptlib.question_template += (
             "\n\n10. Canonical live SysInsight observation captured for this tuning decision "
@@ -443,12 +489,22 @@ def main() -> int:
     promptlib, task_context, initial_config, constraints, defaults = original_context(
         case_result, case_file, profile, sysinsight_input
     )
+    source_evidence_artifact = {}
+    if sysinsight_input and isinstance(sysinsight_input.get("source_evidence"), dict):
+        source_evidence_artifact = sysinsight_input["source_evidence"]
+    if source_evidence_artifact.get("status") != "completed":
+        source_evidence_artifact = build_source_evidence(
+            case_result,
+            case_file,
+            profile_summary(profile),
+        )
 
     # Run the original parameter-to-function/rule matching method.  The source
     # prompt's auxiliary analyzer otherwise calls its own legacy hard-coded API
     # when a cache entry is absent.  Keep the source prompt and all fields, but
     # stop that unrelated endpoint from being contacted.
     original_analyzer = extract_knob.SimpleParameterAnalyzer
+    original_code_extractor = extract_knob.extract_code_for_knob_from_json
 
     class NoLegacyEndpointAnalyzer:
         def __init__(self) -> None:
@@ -456,6 +512,16 @@ def main() -> int:
 
         def extract_instructions_by_param(self, *unused_args: Any, **unused_kwargs: Any) -> str:
             return ""
+
+    def postgres_source_code_extractor(
+        matched_knobs: Any, unused_folder: Any, unused_change_config: Any
+    ) -> Any:
+        """Keep the original replacement shape, backed by pinned PG source."""
+
+        return source_code_for_matched_knobs(
+            matched_knobs,
+            profile_summary(profile),
+        )
 
     link = Path("/home/sysinsight")
     created_link = False
@@ -476,8 +542,15 @@ def main() -> int:
         # useful for a long-running API call.
         source_stdout = io.StringIO()
         with contextlib.redirect_stdout(source_stdout):
-            promptlib.update()
             extract_knob.SimpleParameterAnalyzer = NoLegacyEndpointAnalyzer
+            if profile.dbms == "postgresql":
+                # The acquired PostgreSQL profile has no fabricated
+                # ``<knob>_code.txt`` files.  Route the original extractor
+                # boundary to the deterministic source-backed adapter so
+                # ``ParameterLibrary.replacements['dataflow']`` contains real
+                # function excerpts instead of File-not-found diagnostics.
+                extract_knob.extract_code_for_knob_from_json = postgres_source_code_extractor
+            promptlib.update()
             prompt_text_escaped = promptlib.get_prompt()
         prompt_text = prompt_text_escaped.replace("<hzt<", "{").replace(">hzt>", "}")
 
@@ -644,6 +717,11 @@ def main() -> int:
                 "profile_switch": True,
                 "legacy_analyzer_endpoint_suppressed": True,
                 "legacy_analyzer_reason": "source module contains a separate hard-coded endpoint; it was not the supplied API",
+                "postgresql_code_extractor": (
+                    "pinned_source_association_fallback"
+                    if profile.dbms == "postgresql"
+                    else "original_extract_code_for_knob_from_json"
+                ),
             },
             "input": {
                 "case_result": str(case_file),
@@ -656,6 +734,7 @@ def main() -> int:
                 "resource_for_prompt": promptlib.resource,
                 "canonical_observation": compact_sysinsight_observation(sysinsight_input)
                 if sysinsight_input else None,
+                "source_evidence": source_evidence_artifact,
                 "task_context": task_context,
             },
             "api": {
@@ -704,6 +783,7 @@ def main() -> int:
         return 0
     finally:
         extract_knob.SimpleParameterAnalyzer = original_analyzer
+        extract_knob.extract_code_for_knob_from_json = original_code_extractor
         os.chdir(source_cwd)
         if created_link and link.is_symlink() and link.resolve() == SOURCE_ROOT.resolve():
             link.unlink()

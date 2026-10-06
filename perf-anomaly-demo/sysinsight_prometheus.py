@@ -20,6 +20,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from sysinsight_source_evidence import build_source_evidence
+
 
 class PrometheusError(RuntimeError):
     """An HTTP, transport, or API-level Prometheus error."""
@@ -302,6 +304,7 @@ def build_sysinsight_input(
         source_detection = anomaly.get("sysinsight_source_detection", {})
     source_compare = source_detection.get("source_compare", {}) if isinstance(source_detection, dict) else {}
     source_match = source_detection.get("source_match", {}) if isinstance(source_detection, dict) else {}
+    source_evidence = build_source_evidence(case_result, case_path, profile)
     anomaly_deltas = {
         key: _numeric_delta(first, last, key)
         for key in (
@@ -366,6 +369,12 @@ def build_sysinsight_input(
                 "function_count": source_compare.get("key_function_count"),
                 "key_functions": source_compare.get("key_functions", [])[:50],
                 "matched_knobs": source_match.get("matched_knob", []),
+                "source_evidence": {
+                    "status": source_evidence.get("status"),
+                    "runtime_call_chain_count": len(source_evidence.get("runtime_call_chains", [])),
+                    "static_evidence_count": len(source_evidence.get("static_parameter_evidence", [])),
+                    "reason": source_evidence.get("reason"),
+                },
             },
         },
         {
@@ -398,6 +407,7 @@ def build_sysinsight_input(
         "host_metrics": host_metrics,
         "database_metrics": database_metrics,
         "function_anomalies": steps[6]["data"],
+        "source_evidence": source_evidence,
         "tuning_context": steps[7]["data"],
         "prometheus_capture": prometheus,
         "steps": steps,
