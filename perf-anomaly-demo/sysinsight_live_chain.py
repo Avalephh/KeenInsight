@@ -64,6 +64,61 @@ def _stage(stages: List[Dict[str, Any]], name: str, status: str, detail: Any = N
     stages.append(item)
 
 
+def _counter_rate(prometheus: Mapping[str, Any], query_name: str, lookback_seconds: float = 90.0) -> Optional[float]:
+    """Return a recent rate from one postgres_exporter counter series."""
+
+    queries = prometheus.get("queries", {})
+    record = queries.get(query_name, {}) if isinstance(queries, Mapping) else {}
+    series = record.get("series", []) if isinstance(record, Mapping) else []
+    if not isinstance(series, list) or not series:
+        return None
+    values = series[0].get("values", []) if isinstance(series[0], Mapping) else []
+    if not isinstance(values, list) or len(values) < 2:
+        return None
+    try:
+        end = values[-1]
+        end_ts = float(end["timestamp"])
+        end_value = float(end["value"])
+        start = values[0]
+        for candidate in reversed(values[:-1]):
+            candidate_ts = float(candidate["timestamp"])
+            if end_ts - candidate_ts >= lookback_seconds:
+                start = candidate
+                break
+        elapsed = end_ts - float(start["timestamp"])
+        delta = end_value - float(start["value"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if elapsed <= 0 or delta < 0:
+        return None
+    return delta / elapsed
+
+
+def _live_transaction_metrics(prometheus: Mapping[str, Any]) -> Dict[str, Any]:
+    """Give the original LLM the required measured TPS field for live alerts.
+
+    A generic online alert does not have a benchmark controller's phase score.
+    Use the real PostgreSQL transaction counters collected by Prometheus and
+    label the metric explicitly, rather than inventing a benchmark TPS value.
+    """
+
+    committed = _counter_rate(prometheus, "transactions_committed")
+    rolled_back = _counter_rate(prometheus, "transactions_rolled_back")
+    components = {
+        "committed_tps": round(committed, 6) if committed is not None else None,
+        "rolled_back_tps": round(rolled_back, 6) if rolled_back is not None else None,
+    }
+    values = [value for value in (committed, rolled_back) if value is not None]
+    total = sum(values) if values else 0.0
+    return {
+        "tps": round(total, 6),
+        "metric": "postgres_transactions_per_second",
+        "source": "Prometheus pg_stat_database_xact_commit + pg_stat_database_xact_rollback counter rate",
+        "components": components,
+        "measured": bool(values),
+    }
+
+
 def _source_environment() -> Dict[str, str]:
     """Resolve the checked-out original source without exposing credentials."""
 
@@ -522,6 +577,14 @@ def main() -> int:
         prometheus = _load_json(prometheus_path)
         pids = _read_pids(active_pids_path)
         result["active_pids"] = pids
+        transaction_metrics = _live_transaction_metrics(prometheus)
+        case["baseline_metrics"] = transaction_metrics
+        case.setdefault("anomaly", {})["metrics"] = {
+            **transaction_metrics,
+            "active_backend_count": len(pids),
+        }
+        case["metric_deltas"] = {"tps": 0.0, "source": transaction_metrics.get("source")}
+        _write_json(case_path, case)
         _stage(stages, "alert_handoff", "completed", {"case_result": str(case_path), "active_pid_count": len(pids)})
 
         perf_capture = _capture_perf(
