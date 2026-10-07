@@ -38,9 +38,9 @@
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
     },
     {
-      "id": 5, "type": "stat", "title": "活动 Hint", "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "id": 5, "type": "stat", "title": "活动 DREAM 自动方案", "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
       "datasource": {"type": "prometheus", "uid": "prometheus"},
-      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_active_hints", "instant": true, "format": "time_series", "legendFormat": "active hints"}],
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_bridge_active_improvements", "instant": true, "format": "time_series", "legendFormat": "active improvements"}],
       "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
       "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
     },
@@ -113,7 +113,7 @@
     },
     {
       "id": 14, "type": "text", "title": "如何管理后台自动动作", "gridPos": {"h": 7, "w": 24, "x": 0, "y": 36},
-      "options": {"mode": "markdown", "content": "### 自动链路\n\n1. Prometheus 告警进入 firing 后，桥接进程保存事件并异步启动 SysInsight 分析。\n2. 每轮采集 `pg_stat_statements` 和 `pg_stat_activity`；只有已经结束、只读且本轮新完成调用达到 10 秒的 AP SQL，才进入 DREAM 队列，仍 active 的 SQL 只记录。\n3. DREAM 的结果经过只读、实测提升和合法 `pg_hint_plan` Hint 校验，合格后才自动发布。\n4. 下一次匹配 SQL 的调用会在面板中累计为“命中观测”。\n\n点击仪表盘顶部的“打开联动管理控制台”，可以查看完整 JSON、动作时间线，手动立即检测、重试 DREAM、启用候选 Hint 或回滚活动 Hint。"}
+      "options": {"mode": "markdown", "content": "### 自动链路\n\n1. Prometheus 告警进入 firing 后，桥接进程保存事件并异步启动 SysInsight 分析。\n2. 每轮采集 `pg_stat_statements` 和 `pg_stat_activity`；只有已经结束、只读且本轮新完成调用达到 10 秒的 AP SQL，才进入 DREAM 队列，仍 active 的 SQL 只记录。\n3. DREAM 方案必须通过只读、真实复测和最低收益校验；计划 Hint/规划参数发布到 `pg_hint_plan`，SQL 改写和执行期参数登记到桥接执行路径。\n4. 下一次相同 SQL 经过对应路径时自动应用，并在面板中累计“命中观测”。\n\n点击仪表盘顶部的“打开联动管理控制台”，可查看方案类型、生效范围、动作时间线，并回滚活动方案。直接连 PostgreSQL 的客户端可透明使用 Hint；SQL 改写需要通过桥接/应用集成路径。"}
     },
     {
       "id": 15, "type": "stat", "title": "DREAM 调度闸门", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 43},

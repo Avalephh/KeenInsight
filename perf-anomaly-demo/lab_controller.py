@@ -32,6 +32,7 @@ from pg_temporary_config import (  # noqa: E402
     TemporaryPostgresConfiguration,
     connection_args_for_configuration,
 )
+from dream_auto_apply import is_read_only_statement  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parent
@@ -52,11 +53,6 @@ _SQL_STRING = re.compile(r"'(?:''|[^'])*'")
 _SQL_NUMBER = re.compile(r"(?<![A-Za-z0-9_])[-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?![A-Za-z0-9_])")
 _SQL_COMMENT = re.compile(r"--[^\n]*|/\*(?!\+)[\s\S]*?\*/")
 _HINT_COMMENT = re.compile(r"/\*\+([\s\S]*?)\*/")
-_LEADING_SET = re.compile(
-    r"^\s*SET\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;]+);\s*",
-    re.IGNORECASE,
-)
-
 LAB_RESET_PARAMETERS = (
     "work_mem",
     "maintenance_work_mem",
@@ -101,36 +97,6 @@ LAB_RESTART_RESET_PARAMETERS = frozenset({
     "shared_buffers",
     "max_connections",
 })
-
-SESSION_SETTING_NAMES = {
-    "work_mem",
-    "maintenance_work_mem",
-    "temp_buffers",
-    "max_parallel_workers",
-    "max_parallel_workers_per_gather",
-    "parallel_setup_cost",
-    "parallel_tuple_cost",
-    "random_page_cost",
-    "seq_page_cost",
-    "cpu_tuple_cost",
-    "effective_cache_size",
-    "default_statistics_target",
-    "join_collapse_limit",
-    "from_collapse_limit",
-    "geqo",
-    "geqo_threshold",
-    "enable_bitmapscan",
-    "enable_hashagg",
-    "enable_hashjoin",
-    "enable_indexonlyscan",
-    "enable_indexscan",
-    "enable_material",
-    "enable_mergejoin",
-    "enable_nestloop",
-    "enable_seqscan",
-    "enable_sort",
-    "jit",
-}
 
 # The six focus scenarios are backed by the real GPT5.6-SOL selections kept in
 # the repository's structured validation evidence.  The lab uses these exact
@@ -1720,7 +1686,32 @@ class LabController:
         # Stop the bridge collector from repopulating the rows between the
         # archive and the optional pg_stat_statements reset.
         with self.bridge._cycle_lock:
+            removed_applications: List[Dict[str, Any]] = []
+            seen_hints = set()
+            for improvement in self.store.list_improvements(500):
+                if str(improvement.get("status")) != "active":
+                    continue
+                scope = str(improvement.get("apply_scope") or "")
+                direct = scope == "postgresql_direct" or (
+                    not scope
+                    and bool(improvement.get("hints"))
+                    and not improvement.get("rewrite_sql")
+                )
+                norm_query = str(improvement.get("norm_query_string") or "").strip()
+                application_name = str(improvement.get("application_name") or "")
+                identity = (norm_query, application_name)
+                if not direct or not norm_query or identity in seen_hints:
+                    continue
+                self.db.remove_hint(norm_query, application_name)
+                seen_hints.add(identity)
+                removed_applications.append({
+                    "improvement_id": improvement.get("improvement_id"),
+                    "apply_scope": "postgresql_direct",
+                    "norm_query_string": norm_query,
+                    "application_name": application_name,
+                })
             result = self.store.clear_dream_records(archive_path)
+            result["removed_automatic_applications"] = removed_applications
             if reset_pg_stat_statements:
                 try:
                     result["pg_stat_statements_reset"] = self.db.reset_statement_stats()
@@ -1971,23 +1962,6 @@ class LabController:
             (self.root / run_id / "error.txt").write_text("{}: {}\n".format(type(exc).__name__, exc), encoding="utf-8")
             self.store.update_lab_run(run_id, status="failed", phase="failed", error="{}: {}".format(type(exc).__name__, exc))
 
-    def _parse_rewrite(self, value: str) -> Tuple[Dict[str, str], str]:
-        settings: Dict[str, str] = {}
-        remaining = str(value or "").strip()
-        while remaining:
-            match = _LEADING_SET.match(remaining)
-            if not match:
-                break
-            name = match.group(1).lower()
-            raw_value = match.group(2).strip().strip("'").strip('"')
-            if name not in SESSION_SETTING_NAMES or not raw_value or not re.fullmatch(r"[A-Za-z0-9_.+/%-]+", raw_value):
-                raise ValueError("DREAM rewrite contains an unsupported SET: {}".format(name))
-            settings[name] = raw_value
-            remaining = remaining[match.end():].strip()
-        if remaining and not _is_read_only(remaining):
-            raise ValueError("DREAM rewrite is not a single read-only statement")
-        return settings, remaining
-
     def replay_dream(self, body: Mapping[str, Any]) -> Dict[str, Any]:
         run_id = str(body.get("run_id") or "")
         with self._lock:
@@ -2014,38 +1988,23 @@ class LabController:
                 raise RuntimeError("DREAM job has not completed successfully")
             if not improvement:
                 raise RuntimeError("DREAM did not produce an improvement candidate")
-            apply_hint = bool(body.get("apply_hint", False))
-            query = str(result.get("query") or "")
-            settings: Dict[str, str] = {}
-            method = ""
-            if str(improvement.get("status")) == "active" and improvement.get("hints"):
-                method = "pg_hint_plan active hint; original SQL"
-            else:
-                rewrite = str(improvement.get("rewrite_sql") or "").strip()
-                action = str(improvement.get("fix_action") or "").strip()
-                if rewrite:
-                    settings, rewritten = self._parse_rewrite(rewrite)
-                    if rewritten:
-                        query = rewritten
-                        method = "DREAM rewrite_sql"
-                    elif not settings:
-                        raise RuntimeError("DREAM rewrite is empty")
-                if not method and action:
-                    action_settings, action_query = self._parse_rewrite(action)
-                    if action_query:
-                        settings.update(action_settings)
-                        query = action_query
-                    else:
-                        settings.update(action_settings)
-                    if settings:
-                        method = "DREAM session setting"
-                if not method and improvement.get("hints") and apply_hint:
-                    self.bridge.activate_improvement(str(improvement["improvement_id"]))
-                    query = str(result.get("query") or "")
-                    method = "pg_hint_plan explicit activation; original SQL"
-                if not method:
-                    raise RuntimeError("DREAM has no executable rewrite; for a Hint candidate enable apply_hint")
-            if not _is_read_only(query):
+            original_query = str(result.get("query") or "")
+            application = self.bridge.resolve_dream_application(
+                str(result.get("sql_key") or ""),
+                original_query,
+            )
+            if not application.get("applied"):
+                validation = improvement.get("validation") if isinstance(improvement.get("validation"), dict) else {}
+                raise RuntimeError(
+                    str(validation.get("reason") or "DREAM has no active automatic improvement")
+                )
+            query = str(application.get("query") or "")
+            settings = {
+                str(name): str(value)
+                for name, value in (application.get("session_settings") or {}).items()
+            }
+            method = str(application.get("method") or "DREAM automatic application")
+            if not is_read_only_statement(query):
                 raise ValueError("optimized SQL is not read-only")
             self.store.update_lab_run(run_id, status="running", phase="optimized_execution")
             stop_event = threading.Event()
@@ -2058,6 +2017,7 @@ class LabController:
                 query,
                 method,
                 settings,
+                application,
                 result,
                 stop_event,
             )
@@ -2070,6 +2030,7 @@ class LabController:
         query: str,
         method: str,
         settings: Mapping[str, str],
+        application: Mapping[str, Any],
         previous: Mapping[str, Any],
         stop_event: threading.Event,
     ) -> None:
@@ -2087,12 +2048,22 @@ class LabController:
             baseline_ms = float((previous.get("baseline") or {}).get("duration_ms") or 0.0)
             optimized_ms = float(optimized.get("duration_ms") or 0.0)
             ratio = (baseline_ms - optimized_ms) / baseline_ms if baseline_ms > 0 else 0.0
+            if (
+                optimized.get("status") == "completed"
+                and application.get("improvement_id")
+                and application.get("apply_scope") == "bridge_managed"
+            ):
+                self.store.record_improvement_hit(
+                    str(application["improvement_id"]),
+                    "automatic bridge-managed DREAM replay",
+                )
             patch = {
                 "optimized_execution_id": execution_id,
                 "optimized": optimized,
                 "optimized_query": query,
                 "optimization_method": method,
                 "session_settings": dict(settings),
+                "auto_application": dict(application),
                 "comparison": {
                     "baseline_ms": baseline_ms,
                     "optimized_ms": optimized_ms,

@@ -39,9 +39,9 @@ Grafana 只监听本机回环地址，适合首期本机 Demo。Dashboard 由 `d
 
 ## SysInsight / DREAM 联动
 
-`start.sh` 会同时启动 `perf-anomaly-demo/sysinsight_dream_bridge.py`，默认监听本机 `9108` 端口。它向 Prometheus 暴露 `sysinsight_dream_bridge_*` 指标，并向管理控制台提供动作时间线、SQL 观测、DREAM 队列和 Hint 管理。桥接状态持久化在 `monitoring/data/sysinsight_dream_bridge.sqlite3`，输出凭证在 `monitoring/data/sysinsight_dream_bridge/`。启动时默认给 `postgresql@12-main.service` 加运行时资源护栏：CPU 250%、内存 24GiB、任务数 512；可通过 `SYSINSIGHT_PG_*` 调整，设置 `SYSINSIGHT_PG_RESOURCE_GUARD=0` 才会关闭。
+`start.sh` 会同时启动 `perf-anomaly-demo/sysinsight_dream_bridge.py`，默认监听本机 `9108` 端口。它向 Prometheus 暴露 `sysinsight_dream_bridge_*` 指标，并向管理控制台提供动作时间线、SQL 观测、DREAM 队列及自动应用方案管理。桥接状态持久化在 `monitoring/data/sysinsight_dream_bridge.sqlite3`，输出凭证在 `monitoring/data/sysinsight_dream_bridge/`。启动时默认给 `postgresql@12-main.service` 加运行时资源护栏：CPU 250%、内存 24GiB、任务数 512；可通过 `SYSINSIGHT_PG_*` 调整，设置 `SYSINSIGHT_PG_RESOURCE_GUARD=0` 才会关闭。
 
-联动大屏适合查看趋势和状态；要执行“立即检测、重试 DREAM、启用候选 Hint、回滚活动 Hint”等操作，点击面板链接进入 `http://127.0.0.1:9108/ui`。演示默认每 5 秒采集最多 300 条 SQL、100 条活动 SQL；只有已经结束且观测均值或最大执行时长达到 10 秒的长 AP SQL，才允许进入 DREAM 队列，仍在 `pg_stat_activity` 中运行的 SQL 只记录不调优。5 秒采样间隔用于确保 10 秒以上的长 SQL 能被采到活动态原文，避免 `pg_stat_statements` 完成后只剩参数化文本而无法重放。Prometheus 告警 firing 负责启动 SysInsight 联动；长 AP SQL 即使没有告警，也会在结束后的下一轮采集中异步进入 DREAM，短 SQL不会进入。桥接状态、已完成告警/任务/实验、SQL 样本、运行归档和监控日志统一保留最近 24 小时，默认每 15 分钟清理一次；日志按小时压缩轮转，运行中的任务和生效中的 Hint 不会被清理。未发生调用变化的 `pg_stat_statements` 行不会重复写时间序列，SQLite 使用增量空间回收，样本另有 50 万行安全上限。Prometheus 自身同样配置为 24 小时 TSDB 保留。
+联动大屏适合查看趋势和状态；要执行“立即检测、重试 DREAM、恢复候选方案、回滚活动方案”等操作，点击面板链接进入 `http://127.0.0.1:9108/ui`。演示默认每 5 秒采集最多 300 条 SQL、100 条活动 SQL；只有已经结束且观测均值或最大执行时长达到 10 秒的长 AP SQL，才允许进入 DREAM 队列，仍在 `pg_stat_activity` 中运行的 SQL 只记录不调优。5 秒采样间隔用于确保 10 秒以上的长 SQL 能被采到活动态原文，避免 `pg_stat_statements` 完成后只剩参数化文本而无法重放。Prometheus 告警 firing 负责启动 SysInsight 联动；长 AP SQL 即使没有告警，也会在结束后的下一轮采集中异步进入 DREAM，短 SQL不会进入。DREAM 只有在只读、真实复测和收益阈值均通过后才自动生效：计划 Hint/规划参数走 PostgreSQL hint table，SQL 改写/执行期参数走桥接执行路径。桥接状态、已完成告警/任务/实验、SQL 样本、运行归档和监控日志统一保留最近 24 小时，默认每 15 分钟清理一次；日志按小时压缩轮转，运行中的任务和生效中的方案不会被清理。未发生调用变化的 `pg_stat_statements` 行不会重复写时间序列，SQLite 使用增量空间回收，样本另有 50 万行安全上限。Prometheus 自身同样配置为 24 小时 TSDB 保留。
 
 从旧版本升级、且状态库已经包含大量 SQLite 空闲页时，需要在停止监控服务后执行一次 `python3 monitoring/compact_bridge_state.py --state-db monitoring/data/sysinsight_dream_bridge.sqlite3 --replace`。新建状态库和完成过该迁移的状态库会由后台维护增量回收空间，不需要重复做整库压缩。
 

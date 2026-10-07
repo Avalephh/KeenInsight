@@ -142,11 +142,14 @@ python3 sysinsight_dream_bridge.py \
   --output /tmp/sysinsight-dream-bridge
 ```
 
-DREAM 任务完成后，只有 DREAM 实测提升至少 10%、只读且输出为合法 plan Hint 时，才会发布到
-`hint_plan.hints`；下一次相同规范化 SQL 会由 PostgreSQL 自动套用。SQL 改写、DDL 和仅会话级
-参数会保留为 candidate，不会绕过应用层擅自改写。`pg_hint_plan` 的数据库设置只对新连接生效，
-已有业务连接需要重连。每轮观测、incident、DREAM job、验证和发布记录都在 state SQLite 及
-`output/incidents/` 中。
+DREAM 任务完成后，方案只有同时满足“只读、DREAM 真实复测成功、实测提升至少 10%”才会进入
+active。合法 plan Hint 和只影响规划阶段的会话参数发布到 `hint_plan.hints`，下一次相同规范化
+SQL 可由 PostgreSQL 直接套用；只读 SQL 改写以及 `work_mem` 等执行期参数登记到桥接执行路径，
+实验控制台或接入该路径的应用再次发送相同 SQL 时会自动应用。DDL、未知动作、缺少优化后实测
+耗时或收益不足的结果只保留为 candidate。PostgreSQL 本身不能透明替换任意客户端发来的 SQL，
+所以改写类方案要求客户端经过桥接/应用集成路径；直接连接数据库的客户端只能透明获得 Hint
+类方案。`pg_hint_plan` 的数据库设置只对新连接生效，已有业务连接需要重连。每轮观测、incident、
+DREAM job、验证和应用记录都在 state SQLite 及 `output/incidents/` 中。
 
 实验控制台的 TPCC 启动是幂等的：已有真实任务时重复点击会返回同一个 run 并继续跟踪；桥接
 进程重启后，会把遗留的 `queued/running` run 标记为 `startup_recovery`，并只按该 run 生成的

@@ -123,9 +123,11 @@ API key 只从环境变量读取，优先使用 `SYSINSIGHT_GPT_API_KEY`，也�
 
 在线入口为 `perf-anomaly-demo/sysinsight_dream_bridge.py`：Prometheus firing 告警触发 SysInsight
 观测/分析；同一后台循环持续记录每条 SQL 的 `pg_stat_statements` 时间统计和活动 SQL 样本，
-慢 SQL 异步交给 DREAM。DREAM 通过同一组 `SYSINSIGHT_GPT_*` API 环境变量调用 GPT5.6-SOL，
-验证通过的只读 plan Hint 发布到 PostgreSQL `hint_plan.hints`，下一次相同规范化 SQL 自动命中；
-改写 SQL、DDL 和会话级动作只留作 candidate。
+慢 SQL 异步交给 DREAM。DREAM 通过同一组 `SYSINSIGHT_GPT_*` API 环境变量调用 GPT5.6-SOL。
+只读且真实复测达到最低收益的 plan Hint/规划参数发布到 PostgreSQL `hint_plan.hints`；SQL 改写
+和执行期会话参数登记到桥接执行路径，下一次相同 SQL 经该路径时自动应用。DDL、未知动作、
+缺少优化后耗时或收益不足的结果只留作 candidate。直接连接 PostgreSQL 的客户端可透明获得
+Hint 类方案；改写类方案需要接入桥接/应用执行路径。
 
 这里的统计是 `pg_stat_statements` 的累计值与轮询间隔增量；要获得每次调用的精确耗时，还需同时打开
 应用侧 tracing 或 PostgreSQL `log_min_duration_statement` 日志采集。
