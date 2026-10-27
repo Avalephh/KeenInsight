@@ -1,0 +1,6 @@
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+# Preserve exact git-apply context, including the leading space of blank
+# context lines; treating a patch as ordinary source produces false alarms.
+*.patch -whitespace

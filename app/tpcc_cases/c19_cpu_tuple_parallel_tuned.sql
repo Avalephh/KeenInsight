@@ -1,0 +1,9 @@
+SET cpu_tuple_cost = '0.05';
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;
+SELECT sum(s_quantity) FROM keeninsight_tpcc.stock WHERE s_w_id=1 AND s_i_id BETWEEN 1 AND 100000;

@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - Alert List</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-focus: #ccdbff;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* 主内容区域 */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .filter-section {
+            background: #fff;
+            border-radius: 4px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-size: 14px;
+            color: #4e5969;
+        }
+
+        .filter-select,
+        .filter-input {
+            padding: 6px 12px;
+            border: 1px solid #e5e6eb;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1d2129;
+            background: #fff;
+            outline: none;
+        }
+
+        .filter-select:focus,
+        .filter-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .filter-btn {
+            padding: 6px 20px;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--primary-color-hover);
+        }
+
+        .filter-btn.reset {
+            background: #fff;
+            color: #4e5969;
+            border: 1px solid #e5e6eb;
+        }
+
+        .filter-btn.reset:hover {
+            background: #f7f8fa;
+        }
+
+        .data-container {
+            background: #fff;
+            border-radius: 4px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .data-table th {
+            font-size: 12px;
+            font-weight: 500;
+            color: #86909c;
+            background: #f7f8fa;
+        }
+
+        .data-table td {
+            font-size: 14px;
+            color: #1d2129;
+        }
+
+        .data-table tr:hover td {
+            background: #f7f8fa;
+        }
+
+        .alert-id {
+            font-family: 'Courier New', monospace;
+            color: #4e5969;
+            font-size: 13px;
+        }
+
+        .alert-host {
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+
+        .alert-host:hover {
+            text-decoration: underline;
+        }
+
+        .alert-reason {
+            max-width: 300px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.critical {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .status-badge.warning {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .status-badge.info {
+            background: #e8f7ff;
+            color: #3370ff;
+        }
+
+        .status-badge.resolved {
+            background: #e8fff3;
+            color: #0fbf60;
+        }
+
+        .severity-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .severity-icon.critical {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .severity-icon.warning {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .severity-icon.info {
+            background: #e8f7ff;
+            color: #3370ff;
+        }
+
+        .action-link {
+            color: var(--primary-color);
+            cursor: pointer;
+            margin-right: 12px;
+            font-size: 14px;
+        }
+
+        .action-link:hover {
+            text-decoration: underline;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 16px 20px;
+            gap: 12px;
+        }
+
+        .page-info {
+            font-size: 14px;
+            color: #4e5969;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            border: 1px solid #e5e6eb;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #4e5969;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .page-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .page-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
+        .alert-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .alert-modal.active {
+            display: flex;
+        }
+
+        .alert-modal-content {
+            background: #fff;
+            border-radius: 8px;
+            width: 85%;
+            max-width: 1000px;
+            max-height: 90%;
+            overflow: auto;
+        }
+
+        .alert-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .alert-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert-modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #86909c;
+            line-height: 1;
+        }
+
+        .alert-modal-body {
+            padding: 24px;
+        }
+
+        .alert-detail-section {
+            margin-bottom: 24px;
+        }
+
+        .alert-detail-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .alert-detail-title svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .alert-detail-card {
+            background: #f7f8fa;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .alert-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .alert-info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .alert-info-label {
+            font-size: 12px;
+            color: #86909c;
+        }
+
+        .alert-info-value {
+            font-size: 14px;
+            color: #1d2129;
+            font-weight: 500;
+        }
+
+        .cause-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .cause-item {
+            background: #fff;
+            border-radius: 6px;
+            padding: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .cause-number {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .cause-content {
+            flex: 1;
+        }
+
+        .cause-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 6px;
+        }
+
+        .cause-desc {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        .cause-evidence {
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: #e8f7ff;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #3370ff;
+            font-family: 'Courier New', monospace;
+        }
+
+        .diagnosis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .diagnosis-card {
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 8px;
+            padding: 18px;
+        }
+
+        .diagnosis-card-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .diagnosis-card-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .diagnosis-card-icon.red {
+            background: #ffece8;
+        }
+
+        .diagnosis-card-icon.orange {
+            background: #fff3e8;
+        }
+
+        .diagnosis-card-icon.green {
+            background: #e8fff3;
+        }
+
+        .diagnosis-card-icon.blue {
+            background: #e8f7ff;
+        }
+
+        .diagnosis-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .diagnosis-card-content {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.7;
+        }
+
+        .diagnosis-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 10px;
+        }
+
+        .diagnosis-tag.critical {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .diagnosis-tag.warning {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .diagnosis-tag.normal {
+            background: #e8fff3;
+            color: #0fbf60;
+        }
+
+        .detail-section {
+            margin-bottom: 32px;
+        }
+
+        .detail-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-title svg {
+            width: 20px;
+            height: 20px;
+            color: var(--primary-color);
+        }
+
+        .detail-card {
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+        }
+
+        .info-item {
+            background: #f7f8fa;
+            padding: 16px;
+            border-radius: 6px;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #86909c;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .info-value.highlight {
+            color: #ee4d38;
+        }
+
+        .info-value.success {
+            color: #0fbf60;
+        }
+
+        .differential-profiling-container {
+            background: #f7f8fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .profiling-header {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #e8f7ff;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4e5969;
+        }
+
+        .profiling-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #fff;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            align-items: center;
+            transition: all 0.2s;
+        }
+
+        .profiling-row:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            transform: translateX(4px);
+        }
+
+        .profiling-row.high {
+            border-left: 3px solid #ee4d38;
+        }
+
+        .profiling-row.medium {
+            border-left: 3px solid #ff8b07;
+        }
+
+        .profiling-row.low {
+            border-left: 3px solid #0fbf60;
+        }
+
+        .profiling-function {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .profiling-value {
+            text-align: right;
+            font-size: 13px;
+            color: #4e5969;
+        }
+
+        .profiling-value.normal {
+            color: #86909c;
+        }
+
+        .profiling-value.abnormal {
+            color: #ee4d38;
+            font-weight: 600;
+        }
+
+        .profiling-diff {
+            text-align: right;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .profiling-diff.positive {
+            color: #ee4d38;
+        }
+
+        .profiling-diff.negative {
+            color: #0fbf60;
+        }
+
+        .profiling-diff-percent {
+            text-align: right;
+            font-size: 12px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .profiling-diff-percent.positive {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .profiling-diff-percent.negative {
+            background: #e8fff3;
+            color: #0fbf60;
+        }
+
+        .profiling-status-badge {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 12px;
+        }
+
+        .profiling-status-badge.high {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .profiling-status-badge.medium {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .profiling-status-badge.low {
+            background: #e8fff3;
+            color: #0fbf60;
+        }
+
+        .shap-feature {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .shap-feature:last-child {
+            border-bottom: none;
+        }
+
+        .shap-name {
+            flex: 1;
+            font-weight: 500;
+            color: #1d2129;
+        }
+
+        .shap-value {
+            width: 100px;
+            text-align: right;
+            color: #4e5969;
+        }
+
+        .shap-impact {
+            width: 80px;
+            text-align: center;
+        }
+
+        .shap-bar {
+            flex: 1;
+            height: 8px;
+            background: #e5e6eb;
+            border-radius: 4px;
+            margin: 0 16px;
+            overflow: hidden;
+        }
+
+        .shap-bar-fill {
+            height: 100%;
+            background: var(--primary-color);
+            border-radius: 4px;
+        }
+
+        .shap-bar-fill.high { background: #ee4d38; }
+        .shap-bar-fill.medium { background: #ff8b07; }
+        .shap-bar-fill.low { background: #0fbf60; }
+
+        .function-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .function-item {
+            background: #f7f8fa;
+            padding: 16px;
+            border-radius: 6px;
+        }
+
+        .function-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .function-name {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .function-cpu {
+            background: #ffece8;
+            color: #ee4d38;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .function-meta {
+            font-size: 12px;
+            color: #86909c;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 8px;
+        }
+
+        .function-sources {
+            display: flex;
+            gap: 6px;
+        }
+
+        .source-tag {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: #e8f7ff;
+            color: #3370ff;
+        }
+
+        .flow-diagram {
+            background: #f7f8fa;
+            padding: 16px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #4e5969;
+            word-wrap: break-word;
+        }
+
+        .decision-points {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .decision-point {
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+        }
+
+        .code-example-item {
+            margin-bottom: 16px;
+        }
+
+        .code-example-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .code-example-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: #2d2d2d;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .code-function-name {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            font-weight: 600;
+            color: #f0c674;
+        }
+
+        .code-file-info {
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            color: #808080;
+        }
+
+        .code-block {
+            margin: 0;
+            padding: 16px;
+            background: #1e1e1e;
+            border-radius: 0 0 6px 6px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #d4d4d4;
+        }
+
+        .code-block code {
+            color: #d4d4d4;
+        }
+
+        .knob-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .knob-item {
+            background: #f7f8fa;
+            padding: 16px 20px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .knob-name {
+            font-family: 'Courier New', monospace;
+            font-weight: 600;
+            color: #1d2129;
+            font-size: 14px;
+            word-break: break-all;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .knob-value {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+
+        .knob-current {
+            color: #86909c;
+        }
+
+        .knob-recommended {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .recommendation-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .recommendation-item {
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .recommendation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .recommendation-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .recommendation-priority {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .recommendation-priority.critical {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .recommendation-priority.high {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .recommendation-priority.medium {
+            background: #e8f7ff;
+            color: #3370ff;
+        }
+
+        .recommendation-desc {
+            font-size: 14px;
+            color: #4e5969;
+            margin-bottom: 12px;
+        }
+
+        .recommendation-sql {
+            background: #f7f8fa;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #1d2129;
+            overflow-x: auto;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .comparison-card {
+            background: #f7f8fa;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .comparison-label {
+            font-size: 14px;
+            color: #86909c;
+            margin-bottom: 12px;
+        }
+
+        .comparison-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .comparison-metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .comparison-metric-name {
+            font-size: 13px;
+            color: #4e5969;
+        }
+
+        .comparison-metric-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .improvement-card {
+            background: linear-gradient(135deg, #e8fff3 0%, #e8f7ff 100%);
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 16px;
+        }
+
+        .improvement-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .improvement-item {
+            text-align: center;
+        }
+
+        .improvement-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0fbf60;
+            margin-bottom: 4px;
+        }
+
+        .improvement-label {
+            font-size: 12px;
+            color: #4e5969;
+        }
+
+        .results-summary {
+            background: #e8fff3;
+            border: 1px solid #0fbf60;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 16px;
+        }
+
+        .results-timeline {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 16px;
+        }
+
+        .results-timepoint {
+            flex: 1;
+        }
+
+        .results-time-label {
+            font-size: 12px;
+            color: #86909c;
+            margin-bottom: 4px;
+        }
+
+        .results-time-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1d2129;
+        }
+
+        .results-conclusion {
+            font-size: 14px;
+            color: #0fbf60;
+            font-weight: 500;
+        }
+    </style>
+    <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                        <path d="M23.0072 2.82796C23.6226 2.47593 24.3782 2.47593 24.9936 2.82796L41.994 12.554C42.6166 12.9102 43.0008 13.5726 43.0008 14.29V33.7106C43.0008 34.4279 42.6166 35.0903 41.994 35.4466L24.9936 45.1726C24.3782 45.5246 23.6226 45.5246 23.0072 45.1726L6.00683 35.4466C5.38418 35.0903 5 34.4279 5 33.7106V14.29C5 13.5726 5.38418 12.9102 6.00683 12.554L23.0072 2.82796Z" fill="url(#gradient)"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M24.0001 32.5286C28.7103 32.5286 32.5286 28.7103 32.5286 24.0001C32.5286 19.29 28.7103 15.4717 24.0001 15.4717C19.29 15.4717 15.4717 19.29 15.4717 24.0001C15.4717 28.7103 19.29 32.5286 24.0001 32.5286ZM24.0001 35.5286C30.3671 35.5286 35.5286 30.3671 35.5286 24.0001C35.5286 17.6332 30.3671 12.4717 24.0001 12.4717C17.6332 12.4717 12.4717 17.6332 12.4717 24.0001C12.4717 30.3671 17.6332 35.5286 24.0001 35.5286Z" fill="#fff"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="24" y1="5" x2="24" y2="43" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3370ff"/>
+                                <stop offset="1" stop-color="#165DFF"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    KeenInsight
+                </div>
+
+            </div>
+            <div class="navbar-right">
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <path d="M24 44c11.046 0 20-8.954 20-20S35.046 4 24 4 4 12.954 4 24s8.954 20 20 20Z"/>
+                        <path d="M16 24h16"/>
+                    </svg>
+                    Console
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="18"/>
+                        <path d="M24 14v10l7 7"/>
+                    </svg>
+                    Help
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    User
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <a class="menu-item" href="host-list.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </a>
+
+
+                            <div class="menu-group-title">System level</div>
+                            <a class="menu-item active" href="alert-list.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </a>
+                            <a class="menu-item" href="alert-rules.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </a>
+
+                            <div class="menu-group-title">SQL level</div>
+                            <a class="menu-item" href="sql-log.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </a>
+                            <a class="menu-item" href="dba-rules.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </a>
+
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item" aria-disabled="true" title="Not connected to a management API">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item" aria-disabled="true" title="Not connected to a management API">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <a class="menu-item" href="manual.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </a>
+                            <a class="menu-item" href="code-source.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </a>
+                            <a class="menu-item" href="tuning-knowledge.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </a>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner" id="ki-root">
+                    <div class="page-header">
+                        <h1 class="page-title">Alert List</h1>
+                    </div>
+
+                    <!-- 筛选区域 -->
+                    <div class="filter-section">
+                        <div class="filter-item">
+                            <span class="filter-label">Alert Level:</span>
+                            <select class="filter-select" id="severityFilter">
+                                <option value="">All</option>
+                                <option value="critical">Critical</option>
+                                <option value="warning">Warning</option>
+                                <option value="info">Info</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <span class="filter-label">Status:</span>
+                            <select class="filter-select" id="statusFilter">
+                                <option value="">All</option>
+                                <option value="active">Active</option>
+                                <option value="resolved">Resolved</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <span class="filter-label">Trigger Reason:</span>
+                            <select class="filter-select" id="reasonFilter">
+                                <option value="">All</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <span class="filter-label">Host:</span>
+                            <input type="text" class="filter-input" id="hostFilter" placeholder="Enter host name">
+                        </div>
+                        <button class="filter-btn">Search</button>
+                        <button class="filter-btn reset">Reset</button>
+                    </div>
+
+                    <!-- 告警列表 -->
+                    <div class="data-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 80px;">Level</th>
+                                    <th style="width: 200px;">Alert ID</th>
+                                    <th style="width: 150px;">Detected At</th>
+                                    <th style="width: 180px;">Host</th>
+                                    <th>Trigger Reason</th>
+                                    <th style="width: 100px;">Status</th>
+                                    <th style="width: 280px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertTableBody">
+                            </tbody>
+                        </table>
+
+                        <!-- 分页 -->
+                        <div class="pagination">
+                            <span class="page-info">Total <span id="totalCount">0</span> alerts</span>
+                            <button class="page-btn" id="prevPage" disabled>&lt;</button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn">2</button>
+                            <button class="page-btn">3</button>
+                            <button class="page-btn" id="nextPage">&gt;</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="original-layouts.js" defer></script>
+    <script src="portal.js" defer></script>
+</body>
+</html>

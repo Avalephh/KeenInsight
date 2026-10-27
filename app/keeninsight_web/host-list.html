@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - Host List</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-light: #e8f3ff;
+            --primary-color-focus: #ccdbff;
+            --success-color: #0fbf60;
+            --success-color-light: #e8ffea;
+            --warning-color: #ff8b07;
+            --warning-color-light: #fff7e8;
+            --danger-color: #ee4d38;
+            --danger-color-light: #fff0f0;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* 主内容区域 */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* 页面标题区域 */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .page-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-color-hover);
+            border-color: var(--primary-color-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-default {
+            background: #fff;
+            color: #4e5969;
+            border-color: #e5e6eb;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+        }
+
+        .btn-default:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background: var(--primary-color-light);
+        }
+
+        /* 统计卡片 */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #e5e6eb;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-card.total::before { background: var(--primary-color); }
+        .stat-card.running::before { background: var(--success-color); }
+        .stat-card.warning::before { background: var(--warning-color); }
+        .stat-card.stopped::before { background: #86909c; }
+
+        .stat-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 8px;
+        }
+
+        .stat-card-title {
+            font-size: 14px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .stat-card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .stat-card.total .stat-card-icon { background: var(--primary-color-light); color: var(--primary-color); }
+        .stat-card.running .stat-card-icon { background: var(--success-color-light); color: var(--success-color); }
+        .stat-card.warning .stat-card-icon { background: var(--warning-color-light); color: var(--warning-color); }
+        .stat-card.stopped .stat-card-icon { background: #f2f3f5; color: #86909c; }
+
+        .stat-card-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #1d2129;
+            line-height: 1.2;
+            margin-bottom: 4px;
+        }
+
+        .stat-card-trend {
+            font-size: 12px;
+            color: #86909c;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .stat-card-trend.up { color: var(--success-color); }
+        .stat-card-trend.down { color: var(--danger-color); }
+
+        /* 高级筛选栏 */
+        .search-section {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e6eb;
+        }
+
+        .search-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .search-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .search-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+        }
+
+        .search-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .search-label {
+            font-size: 13px;
+            color: #4e5969;
+            font-weight: 500;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input-wrapper svg {
+            position: absolute;
+            left: 12px;
+            color: #86909c;
+            pointer-events: none;
+        }
+
+        .search-input,
+        .search-select {
+            width: 100%;
+            padding: 10px 12px;
+            padding-left: 36px;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.2s;
+            background: #fff;
+        }
+
+        .search-input:focus,
+        .search-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px var(--primary-color-focus);
+        }
+
+        .search-select {
+            padding-left: 12px;
+            cursor: pointer;
+        }
+
+        .search-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #f2f3f5;
+        }
+
+        /* 表格工具栏 */
+        .table-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .toolbar-right {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: #fff;
+            border-radius: 6px;
+            border: 1px solid #e5e6eb;
+            overflow: hidden;
+        }
+
+        .view-btn {
+            padding: 6px 12px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            color: #4e5969;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+            background: #f2f3f5;
+        }
+
+        .view-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        /* 表格容器 */
+        .table-container {
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e5e6eb;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        /* 表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th {
+            background: linear-gradient(180deg, #fafbfc 0%, #f7f8fa 100%);
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: #4e5969;
+            border-bottom: 1px solid #e5e6eb;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            user-select: none;
+        }
+
+        .data-table th.sortable {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .data-table th.sortable:hover {
+            background: #f0f2f5;
+        }
+
+        .data-table td {
+            padding: 16px;
+            font-size: 14px;
+            color: #1d2129;
+            border-bottom: 1px solid #f2f3f5;
+            vertical-align: middle;
+        }
+
+        .data-table tbody tr {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .data-table tbody tr:hover {
+            background: #f7f8fa;
+        }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* 复选框 */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+        }
+
+        .custom-checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #e5e6eb;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .custom-checkbox:hover {
+            border-color: var(--primary-color);
+        }
+
+        .custom-checkbox.checked {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+
+        .custom-checkbox.checked::after {
+            content: '✓';
+            color: #fff;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* 状态标签 */
+        .status-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-tag::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-running { background: var(--success-color-light); color: var(--success-color); }
+        .status-running::before { background: var(--success-color); }
+
+        .status-warning { background: var(--warning-color-light); color: var(--warning-color); }
+        .status-warning::before { background: var(--warning-color); }
+
+        .status-stopped { background: #f2f3f5; color: #86909c; }
+        .status-stopped::before { background: #86909c; animation: none; }
+
+        /* 数据库类型标签 */
+        .db-tag {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #f2f3f5 0%, #e8f3ff 100%);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--primary-color);
+            border: 1px solid #e5e6eb;
+        }
+
+        .db-tag::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--primary-color);
+            border-radius: 2px;
+            margin-right: 8px;
+        }
+
+        /* 资源使用率进度条 */
+        .usage-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .progress-container {
+            flex: 1;
+            background: #f2f3f5;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.5s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .progress-low { background: linear-gradient(90deg, var(--success-color) 0%, #34d399 100%); }
+        .progress-medium { background: linear-gradient(90deg, var(--warning-color) 0%, #fbbf24 100%); }
+        .progress-high { background: linear-gradient(90deg, var(--danger-color) 0%, #f87171 100%); }
+
+        .usage-value {
+            min-width: 45px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 600;
+            color: #4e5969;
+        }
+
+        /* 主机信息 */
+        .host-name {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .host-name-main {
+            font-weight: 600;
+            color: #1d2129;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .host-name-sub {
+            font-size: 12px;
+            color: #86909c;
+            font-family: 'Courier New', monospace;
+        }
+
+        .host-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            background: var(--primary-color-light);
+            color: var(--primary-color);
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* 操作按钮 */
+        .action-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid #e5e6eb;
+            background: #fff;
+            color: #4e5969;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .action-btn:hover {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background: var(--primary-color-light);
+        }
+
+        .action-btn.primary {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #fff;
+        }
+
+        .action-btn.primary:hover {
+            background: var(--primary-color-hover);
+            border-color: var(--primary-color-hover);
+        }
+
+        .action-btn.danger {
+            color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+
+        .action-btn.danger:hover {
+            background: var(--danger-color-light);
+        }
+
+        /* 分页 */
+        .table-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            border-top: 1px solid #f2f3f5;
+            background: #fafbfc;
+        }
+
+        .pagination-info {
+            font-size: 14px;
+            color: #86909c;
+        }
+
+        .pagination-info strong {
+            color: #1d2129;
+            font-weight: 600;
+        }
+
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .page-btn {
+            min-width: 36px;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid #e5e6eb;
+            background: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #4e5969;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+            background: var(--primary-color-light);
+        }
+
+        .page-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .page-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
+        .page-size-select {
+            padding: 6px 10px;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            font-size: 13px;
+            background: #fff;
+            cursor: pointer;
+        }
+
+        /* 区域标签 */
+        .region-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: #fafbfc;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #4e5969;
+            border: 1px solid #f2f3f5;
+        }
+
+        .region-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary-color);
+            border-radius: 50%;
+        }
+
+        /* IP地址样式 */
+        .ip-address {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #4e5969;
+            background: #f7f8fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid #e5e6eb;
+        }
+    </style>
+    <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                        <path d="M23.0072 2.82796C23.6226 2.47593 24.3782 2.47593 24.9936 2.82796L41.994 12.554C42.6166 12.9102 43.0008 13.5726 43.0008 14.29V33.7106C43.0008 34.4279 42.6166 35.0903 41.994 35.4466L24.9936 45.1726C24.3782 45.5246 23.6226 45.5246 23.0072 45.1726L6.00683 35.4466C5.38418 35.0903 5 34.4279 5 33.7106V14.29C5 13.5726 5.38418 12.9102 6.00683 12.554L23.0072 2.82796Z" fill="url(#gradient)"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M24.0001 32.5286C28.7103 32.5286 32.5286 28.7103 32.5286 24.0001C32.5286 19.29 28.7103 15.4717 24.0001 15.4717C19.29 15.4717 15.4717 19.29 15.4717 24.0001C15.4717 28.7103 19.29 32.5286 24.0001 32.5286ZM24.0001 35.5286C30.3671 35.5286 35.5286 30.3671 35.5286 24.0001C35.5286 17.6332 30.3671 12.4717 24.0001 12.4717C17.6332 12.4717 12.4717 17.6332 12.4717 24.0001C12.4717 30.3671 17.6332 35.5286 24.0001 35.5286Z" fill="#fff"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="24" y1="5" x2="24" y2="43" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3370ff"/>
+                                <stop offset="1" stop-color="#165DFF"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    KeenInsight
+                </div>
+
+            </div>
+            <div class="navbar-right">
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <path d="M24 44c11.046 0 20-8.954 20-20S35.046 4 24 4 4 12.954 4 24s8.954 20 20 20Z"/>
+                        <path d="M18 24h12M24 18v12"/>
+                    </svg>
+                    Console
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="18"/>
+                        <path d="M24 14v10l7 7"/>
+                    </svg>
+                    Help
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    User
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <a class="menu-item active" href="host-list.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </a>
+
+
+                            <div class="menu-group-title">System level</div>
+                            <a class="menu-item" href="alert-list.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </a>
+                            <a class="menu-item" href="alert-rules.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </a>
+
+                            <div class="menu-group-title">SQL level</div>
+                            <a class="menu-item" href="sql-log.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </a>
+                            <a class="menu-item" href="dba-rules.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </a>
+
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item" aria-disabled="true" title="Not connected to a management API">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item" aria-disabled="true" title="Not connected to a management API">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <a class="menu-item" href="manual.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </a>
+                            <a class="menu-item" href="code-source.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </a>
+                            <a class="menu-item" href="tuning-knowledge.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </a>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner" id="ki-root">
+                    <!-- 页面标题 -->
+                    <div class="page-header">
+                        <h1 class="page-title">Host List</h1>
+                        <div class="page-actions">
+                            <button class="btn btn-default">
+                                <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <path d="M21 12v-3h6v3h-6Zm0 27v-3h6v3h-6Z"/>
+                                    <path d="M12 21h-3v6h3v-6Zm27 0h-3v6h3v-6Z"/>
+                                    <circle cx="24" cy="24" r="12"/>
+                                </svg>
+                                Refresh
+                            </button>
+                            <button class="btn btn-primary">
+                                <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <path d="M24 14v20M14 24h20"/>
+                                </svg>
+                                Add Host
+                            </button>
+                        </div>
+                    </div>
+
+
+
+                    <!-- 高级搜索栏 -->
+                    <div class="search-section">
+                        <div class="search-header">
+                            <div class="search-title">Filter Conditions</div>
+                        </div>
+                        <div class="search-grid">
+                            <div class="search-item">
+                                <label class="search-label">Host Name</label>
+                                <div class="search-input-wrapper">
+                                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <circle cx="20" cy="20" r="12"/>
+                                        <path d="M28.5 28.5L38 38"/>
+                                    </svg>
+                                    <input type="text" class="search-input" placeholder="Enter host name or ID">
+                                </div>
+                            </div>
+                            <div class="search-item">
+                                <label class="search-label">IP Address</label>
+                                <div class="search-input-wrapper">
+                                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <rect x="8" y="16" width="32" height="16" rx="2"/>
+                                        <circle cx="16" cy="24" r="2"/>
+                                        <circle cx="24" cy="24" r="2"/>
+                                        <circle cx="32" cy="24" r="2"/>
+                                    </svg>
+                                    <input type="text" class="search-input" placeholder="Enter IP address">
+                                </div>
+                            </div>
+                            <div class="search-item">
+                                <label class="search-label">Status</label>
+                                <select class="search-select">
+                                    <option value="">All Status</option>
+                                    <option value="running">Running</option>
+                                    <option value="warning">Warning</option>
+                                    <option value="stopped">Stopped</option>
+                                </select>
+                            </div>
+                            <div class="search-item">
+                                <label class="search-label">Database Type</label>
+                                <select class="search-select">
+                                    <option value="">All Types</option>
+                                    <option value="mysql">MySQL</option>
+                                    <option value="postgresql">PostgreSQL</option>
+                                    <option value="oracle">Oracle</option>
+                                    <option value="mongodb">MongoDB</option>
+                                    <option value="redis">Redis</option>
+                                </select>
+                            </div>
+                            <div class="search-item">
+                                <label class="search-label">Region</label>
+                                <select class="search-select">
+                                    <option value="">All Regions</option>
+                                    <option value="beijing">North China 2 (Beijing)</option>
+                                    <option value="shanghai">East China 2 (Shanghai)</option>
+                                    <option value="guangzhou">South China 1 (Guangzhou)</option>
+                                </select>
+                            </div>
+                            <div class="search-item">
+                                <label class="search-label">CPU Usage</label>
+                                <select class="search-select">
+                                    <option value="">All</option>
+                                    <option value="0-30">0% - 30%</option>
+                                    <option value="30-70">30% - 70%</option>
+                                    <option value="70-100">70% - 100%</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="search-actions">
+                            <button class="btn btn-default">
+                                <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <path d="M38 24a14 14 0 1 1-4-10l10-10"/>
+                                    <path d="M28 14h10v10"/>
+                                </svg>
+                                Reset
+                            </button>
+                            <button class="btn btn-primary">
+                                <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="20" cy="20" r="12"/>
+                                    <path d="M28.5 28.5L38 38"/>
+                                </svg>
+                                Search
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 表格工具栏 -->
+                    <div class="table-toolbar">
+                        <div class="toolbar-left">
+                            <div class="batch-actions">
+                                <button class="btn btn-default btn-small">
+                                    <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                        <path d="M18 24h12"/>
+                                    </svg>
+                                    Batch Start
+                                </button>
+                                <button class="btn btn-default btn-small">
+                                    <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <rect x="14" y="14" width="20" height="20" rx="2"/>
+                                    </svg>
+                                    Batch Stop
+                                </button>
+                                <button class="btn btn-default btn-small">
+                                    <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <path d="M24 10l10 10-10 10-10-10 10-10Z"/>
+                                        <path d="M24 28l10 10-10 10-10-10 10-10Z"/>
+                                    </svg>
+                                    Batch Export
+                                </button>
+                            </div>
+                        </div>
+                        <div class="toolbar-right">
+                            <div class="view-toggle">
+                                <button class="view-btn active">
+                                    <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                        <line x1="8" y1="18" x2="40" y2="18"/>
+                                        <line x1="8" y1="30" x2="40" y2="30"/>
+                                    </svg>
+                                </button>
+                                <button class="view-btn">
+                                    <svg width="14" height="14" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                        <rect x="8" y="8" width="14" height="14" rx="2"/>
+                                        <rect x="26" y="8" width="14" height="14" rx="2"/>
+                                        <rect x="8" y="26" width="14" height="14" rx="2"/>
+                                        <rect x="26" y="26" width="14" height="14" rx="2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <select class="page-size-select">
+                                <option>10 items/page</option>
+                                <option selected>20 items/page</option>
+                                <option>50 items/page</option>
+                                <option>100 items/page</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- 表格 -->
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">
+                                        <div class="checkbox-wrapper">
+                                            <div class="custom-checkbox"></div>
+                                        </div>
+                                    </th>
+                                    <th class="sortable" style="width: 220px;">Host Name</th>
+                                    <th style="width: 140px;">IP Address</th>
+                                    <th style="width: 100px;">Status</th>
+                                    <th style="width: 140px;">Database</th>
+                                    <th style="width: 140px;">CPU Usage</th>
+                                    <th style="width: 140px;">Memory Usage</th>
+                                    <th style="width: 140px;">Disk Usage</th>
+                                    <th style="width: 160px;">Region</th>
+                                    <th style="width: 170px;">Created At</th>
+                                    <th style="width: 220px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hostTableBody"></tbody>
+                        </table>
+                        <div class="table-footer">
+                            <div class="pagination-info">
+                                Loading live host records…
+                            </div>
+                            <div class="pagination">
+                                <button class="page-btn" disabled>Previous</button>
+                                <button class="page-btn active">1</button>
+                                <button class="page-btn" disabled>Next</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="original-layouts.js" defer></script>
+    <script src="portal.js" defer></script>
+</body>
+</html>

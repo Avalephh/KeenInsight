@@ -1,0 +1,77 @@
+{
+  "DATABASE_TYPE": "postgres",
+  "DATABASE_CONFIG": {
+    "user": "postgres",
+    "host": "/var/run/postgresql",
+    "port": 5432,
+    "dbname": "keeninsight",
+    "schema": "tpcds",
+    "search_path": ["tpcds", "public"],
+    "workload_type": "OLAP",
+    "postgres_path": "/usr/lib/postgresql/12/bin",
+    "postgres_data": "/var/lib/postgresql/12/main",
+    "log_path": "/var/log/postgresql",
+    "db_type": "postgres",
+    "query_timeout": 30,
+    "comparison_timeout": 120
+  },
+  "KNOB_CONFIG": {
+    "query_knobs": {
+      "enable_bitmapscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_hashagg": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_hashjoin": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_indexonlyscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_indexscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_material": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_mergejoin": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_nestloop": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_seqscan": {"type": "boolean", "min": 0, "max": 1, "default": 1},
+      "enable_sort": {"type": "boolean", "min": 0, "max": 1, "default": 1}
+    },
+    "system_knobs": {
+      "work_mem": {"type": "integer", "min": 64, "max": 2147483647, "default": 4096},
+      "random_page_cost": {"type": "float", "min": 0.01, "max": 100.0, "default": 4.0},
+      "seq_page_cost": {"type": "float", "min": 0.01, "max": 100.0, "default": 1.0},
+      "cpu_tuple_cost": {"type": "float", "min": 0.0, "max": 10.0, "default": 0.01},
+      "cpu_index_tuple_cost": {"type": "float", "min": 0.0, "max": 10.0, "default": 0.005},
+      "cpu_operator_cost": {"type": "float", "min": 0.0, "max": 1.0, "default": 0.0025}
+    }
+  },
+  "API_SETTINGS": {
+    "openai": {"base_url": "https://api.example.com/v1", "model": "your-model-name"}
+  },
+  "PLANNER_CONFIG": {
+    "device": "cpu",
+    "model_path": "${DREAM_ROOT}/dream/agent/plan/model_res/GateComDiffPretrainModel slow_sql_data_gen eta0.07/best_model.pt",
+    "train_data_path": "${DREAM_ROOT}/dream/agent/plan/slow_sql_data_gen.csv",
+    "opt_threshold": 0.5,
+    "num_classes": 4
+  },
+  "MEMORY_MANAGER_CONFIG": {
+    "archive_size": 20,
+    "enable_finetune": false,
+    "finetune_threshold": 220,
+    "finetune_epochs": 50,
+    "finetune_batch_size": 8,
+    "finetune_device": "cpu",
+    "bce_weight": 0.7,
+    "contrastive_weight": 0.3,
+    "lambda_neg": 1.0,
+    "retrieval_mode": "dynamic",
+    "enable_save_samples": false,
+    "retriever_model_path": "${DREAM_ROOT}/dream/agent/memory/model/soft_q_retriever.pt",
+    "bert_model_path": "${DREAM_ROOT}/dream/agent/plan/RCRank/bert-base-uncased"
+  },
+  "AGENT_CONFIG": {
+    "no_improvement_threshold": 3,
+    "epsilon": 0.1,
+    "fix_timeout": 60,
+    "diagnostic_agent_model": "your-model-name",
+    "fix_agent_model": "your-model-name",
+    "root_cause_llm_model": "your-model-name",
+    "action_server_config": "${DREAM_ROOT}/dream/agent/action/mcp_tools/action_server_config.yaml",
+    "enable_retrieval": true,
+    "enable_action_define": true,
+    "enable_action_pruning": true
+  }
+}

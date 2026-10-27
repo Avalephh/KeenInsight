@@ -1,0 +1,256 @@
+diff --git a/dream/agent/action/action_evaluation.py b/dream/agent/action/action_evaluation.py
+index e00d114..f70883a 100644
+--- a/dream/agent/action/action_evaluation.py
++++ b/dream/agent/action/action_evaluation.py
+@@ -152,16 +152,27 @@ def _inject_hint_into_sql(hint, sql):
+ 
+ 
+ async def check_sql_rewrite(origin_sql, rewrite_sql, *, db, fix_agent):
++    # Keep the checks already performed by this evaluator as audit evidence;
++    # a result-set match is not promoted to a formal equivalence proof.
++    audit = {'status': 'checking', 'qed_equivalence': None, 'result_set_comparisons': [], 'rewrite_retries': 0}
++    db.last_rewrite_validation = audit
+     print("start QED check")
+     qed_match = db.check_sql_equivalence(origin_sql, rewrite_sql)
++    check = getattr(db, 'last_equivalence_check', {'method':'unknown','status':'not_recorded'})
++    audit['equivalence_check'] = check
++    audit['qed_equivalence'] = bool(qed_match) if check.get('method')=='qed' else None
++    if check.get('method') == 'result_set_comparison':
++        audit['result_set_comparisons'].append(bool(qed_match))
+     print(f"QED equivalence check: {qed_match}")
+ 
+     if qed_match:
++        audit['status'] = 'qed_equivalence_passed' if check.get('formal_proof') else 'result_set_comparison_passed'
+         return rewrite_sql
+ 
+     retry_count = 0
+     max_retry = 5
+     match = db.compare_sql_results(origin_sql, rewrite_sql)
++    audit['result_set_comparisons'].append(bool(match))
+     print(f"Result set comparison match: {match}")
+ 
+     while not match and retry_count < max_retry:
+@@ -172,10 +183,14 @@ async def check_sql_rewrite(origin_sql, rewrite_sql, *, db, fix_agent):
+         rewrite_sql = new_rewrite_sql
+         retry_count += 1
+         match = db.compare_sql_results(origin_sql, rewrite_sql)
++        audit['rewrite_retries'] = retry_count
++        audit['result_set_comparisons'].append(bool(match))
+         print(f"Result set comparison match: {match}")
+ 
+     if not match:
++        audit['status'] = 'rewrite_rejected_returned_original'
+         print("Failed to rewrite SQL, return original SQL")
+         return origin_sql
+ 
++    audit['status'] = 'result_set_comparison_passed'
+     return rewrite_sql
+diff --git a/dream/agent/action/action_manager.py b/dream/agent/action/action_manager.py
+index 31742ed..8e2f6a1 100644
+--- a/dream/agent/action/action_manager.py
++++ b/dream/agent/action/action_manager.py
+@@ -132,8 +132,16 @@ class ActionManager:
+             db=self.db,
+             memory_manager=self.memory_manager,
+         )
++        self.last_action_trace = {
++            'model': self.diagnostic_model, 'action_space': action_space,
++            'retrieval_enabled': self.enable_retrieval,
++            'positive_cases': len(positives), 'negative_cases': len(negatives),
++            'rewrite_rule_candidates': getattr(query_info, 'rewrite_rule_candidates', []),
++            'rule_evidence_kind': 'structural_candidates_provided_to_llm_not_confirmed_transformations',
++        }
+ 
+         action_result = await self.action_generate(root_cause, base_info, action_space, mode, positives, negatives)
++        self.last_action_trace['raw_response'] = action_result
+         explanation, _, _ = self.parse_action_result(action_result)
+ 
+         # Extract fix action and rewrite sql
+@@ -150,6 +158,8 @@ class ActionManager:
+             fix_agent=self.fixAgent,
+         )
+         evaluation_result["explanation"] = explanation
++        evaluation_result['action_trace'] = self.last_action_trace
++        evaluation_result['semantic_validation'] = getattr(self.db, 'last_rewrite_validation', {'status':'not_requested_no_rewrite'})
+         if evaluation_result.get("fix_action"):
+             index_names = extract_index_names(evaluation_result.get("fix_action"))
+             knob_names = extract_knob_names(evaluation_result.get("fix_action"))
+diff --git a/dream/agent/plan/planner.py b/dream/agent/plan/planner.py
+index ffebe31..a27bdfe 100644
+--- a/dream/agent/plan/planner.py
++++ b/dream/agent/plan/planner.py
+@@ -9,6 +9,7 @@ if rcrank_path not in sys.path:
+     sys.path.append(rcrank_path)
+ 
+ import json
++import math
+ 
+ import numpy as np
+ import pandas as pd
+@@ -115,42 +116,53 @@ class Planner:
+         )
+         # print("prompt: ", prompt)
+ 
+-        output = await self.diagnosis_agent(prompt)
+-        parsed = self.parse_and_validate(output)
+-        if parsed is not None:
+-            labels, conf_map, explanation = parsed
+-        else:
+-            labels, conf_map, explanation = None, None, ""
+-        # retry
+-        retry = 0
+-        while labels is None and retry < 5:
+-            output = await self.diagnosis_agent(prompt)
++        self.last_diagnosis = {
++            'model': self.root_cause_model, 'prompt': prompt,
++            'initial_root_causes': root_causes, 'initial_confidence': state_confidence,
++            'attempts': [], 'status': 'running',
++        }
++        for attempt in range(6):
++            try:
++                output = await self.diagnosis_agent(prompt)
++            except Exception as exc:
++                self.last_diagnosis.update(status='failed', error=str(exc))
++                raise
+             parsed = self.parse_and_validate(output)
++            self.last_diagnosis['attempts'].append({
++                'attempt': attempt + 1, 'raw_response': output, 'valid': parsed is not None,
++            })
+             if parsed is not None:
+                 labels, conf_map, explanation = parsed
+-            else:
+-                labels, conf_map, explanation = None, None, ""
+-            retry += 1
+-
+-        if labels is None:
+-            labels = ["normal"]
+-            conf_map = {"normal": 1.0}
+-            explanation = "Unable to diagnose root causes. Defaulting to normal state."
+-
+-        return {"root_causes": labels, "confidence": conf_map, "explanation": explanation}
++                self.last_diagnosis['status'] = 'completed'
++                if not explanation:
++                    explanation = ('All four root-cause confidences are <= 0.5; no optimization action selected.'
++                                   if labels == ['normal'] else 'Selected root causes have confidence > 0.5.')
++                return {"root_causes": labels, "confidence": conf_map, "explanation": explanation}
++        self.last_diagnosis['status'] = 'invalid_response'
++        raise ValueError('DREAM root-cause diagnosis returned invalid JSON/schema in all 6 attempts; not a normal/no_action diagnosis')
+ 
+     def parse_and_validate(self, json_text):
+         try:
+             data = json.loads(json_text)
+-            reported_pred = [str(x).lower().strip() for x in data.get("predicted_root_causes", [])]
+-            items = data.get("root_causes", [])
++            if not isinstance(data, dict) or not isinstance(data.get('predicted_root_causes'), list):
++                return None
++            reported_pred = [str(x).lower().strip() for x in data['predicted_root_causes']]
++            items = data.get("root_causes")
++            allowed = {'missing indexes', 'suboptimal plan optimizer', 'inappropriate query knobs', 'poorly written queries'}
++            if not isinstance(items, list) or len(items) != len(allowed) or len(set(reported_pred)) != len(reported_pred):
++                return None
+             explanation = data.get("explanation", "")
+ 
+             derived_pred = []
+             conf_map = {}
+             for it in items:
+                 label = str(it.get("label", "")).lower().strip()
+-                conf = float(it.get("confidence", 0.0))
++                value = it.get('confidence')
++                if label not in allowed or label in conf_map or isinstance(value, bool) or not isinstance(value, (int, float)):
++                    return None
++                conf = float(value)
++                if not math.isfinite(conf) or not 0.0 <= conf <= 1.0:
++                    return None
+                 if conf > 0.5:
+                     derived_pred.append(label)
+                 conf_map[label] = conf
+@@ -161,7 +173,6 @@ class Planner:
+ 
+             if len(derived_pred) == 0:
+                 derived_pred = ["normal"]
+-                conf_map = {"normal": 1.0}
+ 
+             return derived_pred, conf_map, explanation
+         except Exception:
+diff --git a/dream/agent/prompt.py b/dream/agent/prompt.py
+index f87758a..cf3742d 100644
+--- a/dream/agent/prompt.py
++++ b/dream/agent/prompt.py
+@@ -195,6 +195,8 @@ def build_root_cause_diagnosis_prompt(query_info, root_causes, state_confidence,
+     - Initial model suggested root causes: {root_causes}
+     - Initial model confidence (0-1): {state_confidence}
+     - Historical Tuning Summary (per root cause): {history_text}
++    - The initial model is an advisory prior, not a diagnosis gate. Its calibration may not transfer to this workload. A near-zero initial confidence must not prevent a higher evidence-based final confidence.
++    - Metric provenance: {getattr(query_info, 'metric_provenance', 'Use only measured metrics; unavailable metrics are not evidence of zero load.')}
+ 
+     4. Root Cause Diagnosis Guidance:
+     Use the **Query Information** and the **Initial Suggestion** to infer the root causes and their confidence, as follows:
+@@ -203,7 +205,9 @@ def build_root_cause_diagnosis_prompt(query_info, root_causes, state_confidence,
+     - If a label has success_count > 0 and fail_count > 0, it indicates partial benefit but decreasing returns. CONTINUE using this root cause as a reference, and increase the other root causes confidence for exploraiton. Adjust confidence downward if further attempts do not yield improvements.  
+ 
+     5. Confidence rules Guidance:
+-    - Confidence adjustment of each root cause **MUST** be restricted to the range of [0.1,0.3].  
++    - Assign each FINAL confidence independently in [0,1] based on the SQL, execution plan and available measured evidence. There is no 0.1-0.3 cap on either the final value or its change from the initial model prior.
++    - On the first diagnosis, there is no previous calibrated LLM confidence to increment. Do not treat a near-zero initial model score as an upper bound. Confidences are independent probabilities, not shares that must sum to 1.
++    - A slow query alone does not prove a fix exists. If no root cause has sufficient evidence, keep all confidences <= 0.5 and return an empty predicted_root_causes array.
+     - If a root cause shows no improvement after multiple rounds, reduce its confidence below 0.5 to retire it from active diagnosis. In such cases, select a new candidate root cause for exploration, initializing its confidence slightly above 0.5. 
+     - Confidence values should reflect both historical results and current judgment based on Query Information, Ensure the model makes independent judgments about which root causes to explore next, rather than blindly following previous confidence values.  
+  
+@@ -283,6 +287,9 @@ def build_action_space_prompt(root_causes, db, knob_config, current_knob_values,
+ 
+         matcher = SQLRuleMatcher()
+         rule_descriptions = matcher.get_rule_descriptions(query_info.query)
++        # Persist the actual rule candidates provided to the action LLM.
++        # A structural match is NOT proof the final rewrite used that rule.
++        query_info.rewrite_rule_candidates = matcher.match_rules(query_info.query)
+ 
+         action_space_prompt += f"""
+     • Query Rewrite Space: 
+diff --git a/dream/database/pg_env.py b/dream/database/pg_env.py
+index e1c8589..04a79b6 100644
+--- a/dream/database/pg_env.py
++++ b/dream/database/pg_env.py
+@@ -28,6 +28,7 @@ class PostgresDB:
+         self.log_path = db_config.get("log_path")
+         self.query_timeout = db_config.get("query_timeout")
+         self.comparison_timeout = db_config.get("comparison_timeout", self.query_timeout or 20)
++        self.application_name = db_config.get('application_name') or 'sysinsight-dream-worker'
+ 
+         # DREAM originally assumed a public-schema TPC-H database.  SysInsight
+         # keeps its workload tables in a dedicated schema, so make the schema
+@@ -69,7 +70,8 @@ class PostgresDB:
+     def connect(self):
+         """Establish and return a database connection"""
+         if self.connection is None or self.connection.closed:
+-            self.connection = psycopg.connect(self.conn_str, autocommit=True, prepare_threshold=None)
++            self.connection = psycopg.connect(self.conn_str, autocommit=True, prepare_threshold=None,
++                                             application_name=self.application_name)
+             with self.connection.cursor() as cur:
+                 cur.execute(f"SET search_path TO {self._search_path_sql}")
+         return self.connection
+@@ -635,10 +637,15 @@ class PostgresDB:
+         raise TypeError
+ 
+     def check_sql_equivalence(self, sql1, sql2):
+-
++        self.last_equivalence_check = {'method':'qed','status':'checking','formal_proof':None}
+         if shutil.which("nix") is None:
+             print("QED unavailable: nix is not installed; falling back to result-set comparison")
+-            return self.compare_sql_results(sql1, sql2)
++            match = self.compare_sql_results(sql1, sql2)
++            self.last_equivalence_check = {
++                'method':'result_set_comparison','status':'matched' if match else 'not_matched',
++                'formal_proof':False,'reason':'nix is not installed; formal QED prover was not executed',
++            }
++            return match
+ 
+         schema_info = self.fetch_schema_info()
+ 
+@@ -711,6 +718,7 @@ class PostgresDB:
+                     content = f.read().strip()
+                     result_json = json.loads(content)
+                     if result_json.get("provable", False):
++                        self.last_equivalence_check.update(status='proved',formal_proof=True)
+                         return True
+                     if result_json.get("panicked", False):
+                         if prover_retcode != 0:

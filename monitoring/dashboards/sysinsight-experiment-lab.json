@@ -1,0 +1,121 @@
+{
+  "annotations": {"list": [{"builtIn": 1, "datasource": {"type": "grafana", "uid": "-- Grafana --"}, "enable": true, "hide": true, "iconColor": "rgba(0, 211, 255, 1)", "name": "Annotations & Alerts", "type": "dashboard"}]},
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {"title": "打开实验控制台（触发 TPCC / DREAM）", "type": "link", "url": "http://127.0.0.1:9108/lab", "targetBlank": true},
+    {"title": "打开自动联动管理", "type": "link", "url": "http://127.0.0.1:9108/ui", "targetBlank": true}
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "TPCC 实验状态", "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_sysinsight_run_info", "instant": true, "format": "time_series", "legendFormat": "{{phase}} / {{status}}"}],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "gray", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "name"}
+    },
+    {
+      "id": 2, "type": "stat", "title": "TPCC 目标业务 TPS（稳态/当前）", "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps_steady", "instant": true, "format": "time_series", "legendFormat": "{{phase}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 3, "type": "stat", "title": "TPCC 压力注入 TPS（辅助）", "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_external_tps", "instant": true, "format": "time_series", "legendFormat": "{{phase}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 4, "type": "stat", "title": "TPCC / SysInsight 告警", "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_alert_firing", "instant": true, "format": "time_series", "legendFormat": "当前采样 {{phase}}"},
+        {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_alert_observed", "instant": true, "format": "time_series", "legendFormat": "本次曾触发 {{phase}}"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "TPCC 目标业务 TPS 原始曲线（基线 / 压力前 / 压力后）", "gridPos": {"h": 8, "w": 16, "x": 0, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_business_tps", "legendFormat": "目标业务 TPS（每秒）{{phase}}", "range": true},
+        {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_external_tps", "legendFormat": "压力注入 TPS（辅助）{{phase}}", "range": true},
+        {"refId": "C", "expr": "sysinsight_dream_lab_tpcc_connections", "legendFormat": "实验连接 {{phase}}", "range": true},
+        {"refId": "D", "expr": "sysinsight_dream_lab_tpcc_active_sessions", "legendFormat": "活动连接 {{phase}}", "range": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "DREAM SQL 执行对比", "gridPos": {"h": 8, "w": 8, "x": 16, "y": 4},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_sql_baseline_duration_ms", "legendFormat": "基线 {{scenario_id}}", "range": true},
+        {"refId": "B", "expr": "sysinsight_dream_lab_sql_optimized_duration_ms", "legendFormat": "优化后 {{scenario_id}}", "range": true}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ms", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"legend": {"calcs": ["lastNotNull", "min", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}}
+    },
+    {
+      "id": 10, "type": "stat", "title": "压力下目标业务 TPS 对比（基线 / 调优前 / 调优后）", "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_tpcc_baseline_business_tps", "instant": true, "format": "time_series", "legendFormat": "无压力基线"},
+        {"refId": "B", "expr": "sysinsight_dream_lab_tpcc_pressure_before_business_tps", "instant": true, "format": "time_series", "legendFormat": "压力调优前"},
+        {"refId": "C", "expr": "sysinsight_dream_lab_tpcc_pressure_after_business_tps", "instant": true, "format": "time_series", "legendFormat": "压力调优后"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 11, "type": "stat", "title": "压力下 TPS 调优提升（同等压力口径）", "gridPos": {"h": 6, "w": 6, "x": 12, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_tuning_gain_tps", "instant": true, "format": "time_series", "legendFormat": "提升 TPS {{scenario_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "ops", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 12, "type": "stat", "title": "压力下 TPS 调优提升比例（同等压力口径）", "gridPos": {"h": 6, "w": 6, "x": 18, "y": 12},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_tpcc_tuning_gain_ratio", "instant": true, "format": "time_series", "legendFormat": "提升比例 {{scenario_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 7, "type": "stat", "title": "DREAM 实测提升比例", "gridPos": {"h": 4, "w": 8, "x": 0, "y": 18},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [{"refId": "A", "expr": "sysinsight_dream_lab_sql_improvement_ratio", "instant": true, "format": "time_series", "legendFormat": "{{scenario_id}}"}],
+      "fieldConfig": {"defaults": {"unit": "percentunit", "color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 0.2}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"}
+    },
+    {
+      "id": 8, "type": "table", "title": "实验运行状态", "gridPos": {"h": 8, "w": 16, "x": 8, "y": 18},
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "targets": [
+        {"refId": "A", "expr": "sysinsight_dream_lab_sysinsight_run_info", "instant": true, "format": "table", "legendFormat": "TPCC {{scenario_id}}"},
+        {"refId": "B", "expr": "sysinsight_dream_lab_dream_run_info", "instant": true, "format": "table", "legendFormat": "DREAM {{scenario_id}}"}
+      ],
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "inspect": false}, "mappings": []}, "overrides": []},
+      "options": {"cellHeight": "sm", "footer": {"enablePagination": true, "show": false}, "showHeader": true}
+    },
+    {
+      "id": 9, "type": "text", "title": "如何触发实验", "gridPos": {"h": 8, "w": 24, "x": 0, "y": 26},
+      "options": {"mode": "markdown", "content": "### 单页实验控制台\n\n点击仪表盘顶部的“打开实验控制台”，在同一页完成：\n\n1. 重置实验白名单数据库参数；\n2. 从已验证的 6 组 TPCC 场景中选择一组，运行“基线 → 压力调优前 → 压力调优后”；\n3. 在“压力下目标业务 TPS 对比”面板查看三组稳态中位数，在“调优提升”面板查看按同等外部压力折算后的绝对/相对提升；\n4. 清空 DREAM/桥接 SQL 记录后，选择 TPC-DS 复杂 SQL，发送原 SQL并等待真实 DREAM 异步分析；\n5. 方案真实复测通过后，点击“再次发送同一 SQL（自动应用）”，验证系统自动选择改写、会话参数或 Hint，并比较实际耗时。\n\nTPCC 的主指标是正常控制负载（tp_normal.sql）的目标业务 TPS；压力前后都运行同一外部场景和固定 pgbench 速率目标，外部 TPS 只用于验证实际施压强度，不作为业务恢复指标。结果中的稳态值剔除启动升温窗口后取中位数，CV 表示波动，原始变化仍可在曲线中查看；闭环旧结果还会按实际压力做折算。压力总观察秒数会在调优前后平分，不追加撤压恢复阶段；调优阶段通过 TemporaryPostgresConfiguration 完整应用 API 候选，并在结束后自动恢复原配置，可能触发一次受控 PostgreSQL 重启。候选未通过校验或恢复失败时，系统会明确显示原因，不会伪造“已优化”。"}
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": ["prometheus", "postgresql", "sysinsight", "dream", "lab", "tpcc", "tpcds"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "SysInsight / DREAM 实验控制台",
+  "uid": "sysinsight-experiment-lab",
+  "version": 1
+}

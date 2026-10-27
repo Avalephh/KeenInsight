@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - SQL Detail</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-light: #e8f3ff;
+            --primary-color-focus: #ccdbff;
+            --success-color: #0fbf60;
+            --success-color-light: #e8ffea;
+            --warning-color: #ff8b07;
+            --warning-color-light: #fff7e8;
+            --danger-color: #ee4d38;
+            --danger-color-light: #fff0f0;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* 主内容区域 */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #f7f8fa;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* 详情页面样式 */
+        .detail-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 顶部区域 - 1和2组成一个整体（全宽） */
+        .top-section {
+            width: 100%;
+        }
+
+        /* 中间区域 - 两栏布局 */
+        .middle-section {
+            display: grid;
+            grid-template-columns: 3fr 7fr;
+            gap: 20px;
+        }
+        .middle-section > .detail-section {
+            box-sizing: border-box;
+        }
+
+        /* 底部区域 - 性能对比（全宽） */
+        .bottom-section {
+            width: 100%;
+        }
+
+        /* 详情卡片样式 */
+        .detail-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 顶部区域（1和2）的特殊样式 - 标题和内容在一行 */
+        .detail-section.top-layout {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            align-items: center;
+        }
+
+        .detail-section.top-layout .detail-title {
+            border-bottom: none;
+            border-right: 1px solid #e5e6eb;
+            padding: 16px 20px;
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .detail-section.top-layout .detail-card {
+            border-bottom: none;
+        }
+
+        .detail-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--font-color);
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .detail-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-color);
+        }
+
+        .detail-card {
+            padding: 12px 20px;
+        }
+
+        .detail-card.scrollable {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* 信息网格 - 3列（SQL基本信息） */
+        .info-grid-3col {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        /* 信息网格 - 4列（其他） */
+        .info-grid-4col {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #86909c;
+        }
+
+        .info-value {
+            font-size: 16px;
+            color: var(--font-color);
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .info-value.highlight {
+            color: var(--danger-color);
+        }
+
+        /* SQL语句样式 */
+        .sql-statement {
+            background: #f7f8fa;
+            color: var(--font-color);
+            padding: 10px 14px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        /* 匹配规则样式 */
+        .rule-match-item {
+            padding: 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .rule-match-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .rule-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .rule-principle {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        /* 分类模型预测结果样式 */
+        .root-causes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .root-cause-item {
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+        }
+
+        .root-cause-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 6px;
+        }
+
+        .root-cause-confidence {
+            font-size: 13px;
+            color: #86909c;
+        }
+
+        .confidence-value {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        /* 详细解释样式 */
+        .detail-explanation {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.8;
+        }
+
+        /* 火焰图样式 */
+        .flame-graph {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            min-width: 800px;
+        }
+
+        .flame-level {
+            display: flex;
+            align-items: stretch;
+            margin-bottom: 4px;
+            width: 100%;
+        }
+
+        .flame-bar {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .flame-bar:hover {
+            transform: scaleY(1.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        .flame-bar-text {
+            color: #1d2129;
+            font-weight: 500;
+            white-space: nowrap;
+            padding: 0 8px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        .flame-bar-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1d2129;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+
+        .flame-bar-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1d2129;
+        }
+
+        .flame-bar:hover .flame-bar-tooltip {
+            opacity: 1;
+        }
+
+        .flame-timeline {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding: 0 4px;
+            font-size: 11px;
+            color: #86909c;
+        }
+
+        /* 调优建议样式 */
+        .tuning-suggestion-item {
+            padding: 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .tuning-suggestion-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .suggestion-type {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .suggestion-action {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            margin-bottom: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .suggestion-explanation {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        /* SQL生命周期样式 */
+        .lifecycle-stages {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .lifecycle-stage {
+            padding: 20px 12px;
+            background: #f7f8fa;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .lifecycle-name {
+            font-size: 12px;
+            color: #86909c;
+            margin-bottom: 6px;
+        }
+
+        .lifecycle-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .lifecycle-metric {
+            font-size: 11px;
+            color: #4e5969;
+        }
+
+        .lifecycle-metric strong {
+            color: var(--font-color);
+        }
+
+        /* 火焰图占位样式 */
+        .flame-graph-placeholder {
+            background: #f7f8fa;
+            padding: 24px;
+            border-radius: 6px;
+            text-align: center;
+            color: #86909c;
+        }
+
+        /* 知识库按钮 - 只有带按钮的标题才使用左右布局 */
+        .detail-title-with-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .kb-button {
+            padding: 6px 14px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .kb-button:hover {
+            background: var(--primary-color-hover);
+        }
+
+        /* 知识库弹窗 */
+        .kb-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .kb-modal-overlay.show {
+            display: flex;
+        }
+
+        .kb-modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .kb-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .kb-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .kb-modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f7f8fa;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .kb-modal-close:hover {
+            background: #e5e6eb;
+        }
+
+        .kb-modal-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .kb-section {
+            margin-bottom: 24px;
+        }
+
+        .kb-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kb-section-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-color);
+        }
+
+        .kb-item {
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .kb-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .kb-item-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 6px;
+        }
+
+        .kb-item-desc {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        .kb-item-meta {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #86909c;
+        }
+
+    </style>
+    <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="16"/>
+                        <path d="M16 22h16M16 26h12M16 30h16"/>
+                    </svg>
+                    KeenInsight
+                </div>
+                <nav class="nav-links">
+                    <span class="nav-link">Performance Monitoring</span>
+                    <span class="nav-link">Security Audit</span>
+                    <span class="nav-link">Capacity Planning</span>
+                </nav>
+            </div>
+            <div class="navbar-right">
+                <span class="nav-action">
+                    <svg width="18" height="18" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="16"/>
+                        <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                    </svg>
+                    System Settings
+                </span>
+                <span class="nav-action">
+                    <svg width="18" height="18" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    admin
+                </span>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <a class="menu-item" href="host-list.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </a>
+
+
+                            <div class="menu-group-title">System level</div>
+                            <a class="menu-item" href="alert-list.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </a>
+                            <a class="menu-item" href="alert-rules.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </a>
+
+                            <div class="menu-group-title">SQL level</div>
+                            <a class="menu-item" href="sql-log.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </a>
+                            <a class="menu-item" href="dba-rules.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </a>
+
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item" aria-disabled="true" title="Not connected to a management API">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item" aria-disabled="true" title="Not connected to a management API">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <a class="menu-item" href="manual.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </a>
+                            <a class="menu-item" href="code-source.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </a>
+                            <a class="menu-item" href="tuning-knowledge.html">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </a>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner" id="ki-root">
+                    <!-- 页面标题 -->
+                    <div class="page-header">
+                        <h1 class="page-title" id="pageTitle">SQL Detail</h1>
+                        <button class="back-btn">
+                            <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M28 12l-12 12 12 12"/>
+                            </svg>
+                            Back to List
+                        </button>
+                    </div>
+
+                    <!-- 详情内容 -->
+                    <div class="detail-layout" id="detailContent">
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="original-layouts.js" defer></script>
+    <script src="portal.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "dbms": "mysql",
+  "version": "8.0.36",
+  "display_name": "MySQL",
+  "kernel_info": "MySQL 8.0.36 reference profile (not validated for the online service)",
+  "hardware_info": "Runtime host resources are supplied by the collector; no workstation snapshot is distributed.",
+  "unit_note": "Use the units expected by the original MySQL SysInsight parameter files.",
+  "constraints_key": "MySQL_Parameters",
+  "knowledge_source": {
+    "type": "original repository files",
+    "source_root": "@sysinsight_source",
+    "historical_rules": true
+  },
+  "files": {
+    "association": "@sysinsight_source/DBTuner/utils/paramater_association_library.json",
+    "constraints": "@sysinsight_source/db_configurations/dbtune.json",
+    "defaults": "@sysinsight_source/db_configurations/init/mysql_default_values.json",
+    "initial_config": "@sysinsight_source/db_configurations/init/dbtune.json",
+    "manual": "@sysinsight_source/DBTuner/utils/knob_info_manual.json",
+    "target_knobs": "@sysinsight_source/DBTuner/knobspace/gptuner_target_knobs.json",
+    "rule": "@sysinsight_source/HisRule/mysql_sysbench_update_rule_revision.txt",
+    "code_folder": "@sysinsight_source/library/extractCode"
+  },
+  "defaults_index": 0,
+  "initial_config_index": 0
+}

@@ -1,0 +1,245 @@
+diff --git a/main.py b/main.py
+index fb6511b..550b74b 100644
+--- a/main.py
++++ b/main.py
+@@ -1,10 +1,17 @@
+ import argparse
++import sys
++from pathlib import Path
+ 
+ import torch
+ from model.train_test import train as train_opt_all
+ 
+-from utils.config import Args, ArgsPara, TrainConfig
+-from utils.load_data import load_dataset_valid as load_dataset_tensor_valid
++RCRANK_ROOT = Path(__file__).resolve().parent
++PROJECT_ROOT = RCRANK_ROOT.parents[3]
++if str(PROJECT_ROOT) not in sys.path:
++    sys.path.insert(0, str(PROJECT_ROOT))
++
++from dream.agent.plan.RCRank.utils.config import Args, ArgsPara, TrainConfig
++from dream.agent.plan.RCRank.utils.load_data import load_dataset_valid as load_dataset_tensor_valid
+ 
+ 
+ def train(
+@@ -48,6 +55,8 @@ parser = argparse.ArgumentParser()
+ parser.add_argument("--device", type=str, default="cuda:1")
+ parser.add_argument("--dataset", type=str, default="tpc_h")
+ parser.add_argument("--batch_size", type=int, default=8)
++parser.add_argument("--data_path", type=str, default=None)
++parser.add_argument("--epochs", type=int, default=50)
+ args = parser.parse_args()
+ 
+ if __name__ == "__main__":
+@@ -59,7 +68,8 @@ if __name__ == "__main__":
+     use_valid_dataset = True
+     print(torch.cuda.is_available())
+ 
+-    data_path = f"data/{args.dataset}.csv"
++    rcrank_root = Path(__file__).resolve().parent
++    data_path = args.data_path or str(rcrank_root / "data" / f"{args.dataset}.csv")
+ 
+     (
+         train_dataloader,
+@@ -74,6 +84,7 @@ if __name__ == "__main__":
+     config = TrainConfig()
+     config.batch_size = batch_size
+     config.lr = 1e-4
++    config.epoch = args.epochs
+     config.dataset = args.dataset
+ 
+     plan_args = Args()
+@@ -99,7 +110,7 @@ if __name__ == "__main__":
+     eta = 0.07
+     config.margin_loss_margin = eta
+     seed = 0
+-    config.model_path = f"res/{config.model_name} {args.dataset} eta{eta}/"
++    config.model_path = str(rcrank_root / "res" / f"{config.model_name} {args.dataset} eta{eta}")
+     train(
+         config,
+         train_dataloader,
+diff --git a/model/train_test.py b/model/train_test.py
+index 37bb20c..188713c 100644
+--- a/model/train_test.py
++++ b/model/train_test.py
+@@ -195,7 +195,8 @@ def test(
+ 
+             # 每处理几个batch就强制清理一次内存
+             if index % 10 == 0:
+-                torch.cuda.synchronize()
++                if torch.cuda.is_available():
++                    torch.cuda.synchronize()
+                 torch.cuda.empty_cache()
+ 
+     all_right_cnt = 0
+@@ -294,14 +295,16 @@ def train(
+         os.mkdir(model_path_dir)
+ 
+     torch.manual_seed(seed)
+-    torch.cuda.manual_seed_all(seed)
++    if torch.cuda.is_available():
++        torch.cuda.manual_seed_all(seed)
+     np.random.seed(seed)
+     random.seed(seed)
+     torch.backends.cudnn.deterministic = True
+ 
+     device = plan_args.device
+ 
+-    tokenizer = BertTokenizer.from_pretrained("./bert-base-uncased")
++    bert_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bert-base-uncased")
++    tokenizer = BertTokenizer.from_pretrained(bert_path)
+     mul_label_loss_fn = nn.BCELoss(reduction="mean")
+     # 移除opt_label_loss_fn，因为不再需要回归损失
+     # loss_margin = margin_loss_types[margin_loss_type](margin=margin_loss_margin)
+@@ -309,7 +312,7 @@ def train(
+ 
+     print("start train")
+ 
+-    sql_model = BertModel.from_pretrained("./bert-base-uncased")
++    sql_model = BertModel.from_pretrained(bert_path)
+     time_model = CustomConvAutoencoder()
+ 
+     fuse_model = None
+@@ -598,7 +601,8 @@ def train(
+ 
+             # 每处理几个batch就强制清理一次内存
+             if index % 10 == 0:
+-                torch.cuda.synchronize()
++                if torch.cuda.is_available():
++                    torch.cuda.synchronize()
+                 torch.cuda.empty_cache()
+ 
+     res_path = model_path_dir + "/res.txt"
+diff --git a/pretrain/pretrain.py b/pretrain/pretrain.py
+index 5a38659..355ed42 100644
+--- a/pretrain/pretrain.py
++++ b/pretrain/pretrain.py
+@@ -2,6 +2,7 @@ import json
+ import math
+ import os
+ import sys
++import argparse
+ 
+ import torch.optim as optim
+ 
+@@ -10,6 +11,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
+ rcrank_root = os.path.dirname(current_dir)
+ if rcrank_root not in sys.path:
+     sys.path.append(rcrank_root)
++rcrank_parent = os.path.dirname(rcrank_root)
++if rcrank_parent not in sys.path:
++    sys.path.append(rcrank_parent)
+ 
+ import random
+ 
+@@ -425,13 +429,20 @@ class PretrainDataset(Dataset):
+ 
+ 
+ if __name__ == "__main__":
+-
+-    device = "cpu"
++    parser = argparse.ArgumentParser(description="RCRank multimodal pre-training")
++    parser.add_argument("--data_path", default=os.path.join(rcrank_root, "pretrain", "pretrain_data.pkl"))
++    parser.add_argument("--device", default="cpu")
++    parser.add_argument("--epochs", type=int, default=20)
++    parser.add_argument("--batch_size", type=int, default=128)
++    parser.add_argument("--output_dir", default=os.path.join(rcrank_root, "pretrain", "save"))
++    args = parser.parse_args()
++
++    device = args.device
+     # 使用相对路径，基于当前模块所在目录
+     bert_path = os.path.join(rcrank_root, "bert-base-uncased")
+     tokenizer = BertTokenizer.from_pretrained(bert_path)
+     bert = BertModel.from_pretrained(bert_path).to(device)
+-    dataset = PretrainDataset("pretrain/pretrain_data.pkl", tokenizer, bert, device)
++    dataset = PretrainDataset(args.data_path, tokenizer, bert, device)
+ 
+     encoding = tokenizer(
+         json.dumps(dataset.encoding.idx2table),
+@@ -445,14 +456,14 @@ if __name__ == "__main__":
+ 
+     criterion = {"mask_sql": nn.MSELoss(), "mask_plan": nn.CrossEntropyLoss()}
+     optimizer = optim.Adam(model.parameters(), lr=1e-5)
+-    epochs = 20
++    epochs = args.epochs
+     saved = 0
+     best = 0.0
+     ep = tqdm.tqdm(range(epochs))
+     best_val_loss = float("inf")
+-    batch_size = 128
++    batch_size = args.batch_size
+     batch_loss = {"mask_sql": 0.0, "mask_plan": 0.0}
+-    os.makedirs("pretrain/save", exist_ok=True)
++    os.makedirs(args.output_dir, exist_ok=True)
+     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+ 
+     for epoch in ep:
+@@ -485,4 +496,4 @@ if __name__ == "__main__":
+                 )
+ 
+             if (epoch + 1) % 10 == 0:
+-                torch.save(model.state_dict(), f"pretrain/save/model{(epoch+1)}.pth")
++                torch.save(model.state_dict(), os.path.join(args.output_dir, f"model{(epoch+1)}.pth"))
+diff --git a/utils/plan_encoding.py b/utils/plan_encoding.py
+index c3271b6..7a7f1e4 100644
+--- a/utils/plan_encoding.py
++++ b/utils/plan_encoding.py
+@@ -15,9 +15,13 @@ from ..model.modules.QueryFormer.utils import *
+ def node2feature(node, encoding, hist_file, table_sample):
+     # type, join, filter123, mask123
+     # 1, 1, 3x3 (9), 3
+-    num_filter = len(node.filterDict["colId"])
+-    pad = np.zeros((2, 30 - num_filter))
+-    filts = np.array(list(node.filterDict.values()))  # cols, ops, vals
++    # The pretrained RCRank input has room for 30 predicates per node.  Some
++    # PostgreSQL plans (notably wide TPC-DS filters) contain more; retain the
++    # first 30 instead of constructing a negative-width padding array.
++    max_filters = 30
++    num_filter = min(len(node.filterDict["colId"]), max_filters)
++    pad = np.zeros((2, max_filters - num_filter))
++    filts = np.array(list(node.filterDict.values()))[:, :max_filters]  # cols, ops, vals
+     ## 3x3 -> 9, get back with reshape 3,3
+     filts = np.concatenate((filts, pad), axis=1).flatten()
+     mask = np.zeros(30)
+@@ -75,6 +79,15 @@ class PlanEncoder:
+         self.encoding = encoding
+         self.treeNodes = []
+ 
++        # PostgreSQL's EXPLAIN (FORMAT JSON) normally returns
++        # ``[{"Plan": ...}]``.  The original DREAM data loader expected an
++        # older double-wrapped form and indexed ``[0][0]`` unconditionally.
++        # Normalize both forms here, and also accept an already decoded value.
++        df = df.copy()
++        df.loc[:, "plan_json"] = df["plan_json"].apply(
++            lambda value: json.dumps(value) if not isinstance(value, str) else value
++        )
++
+         df.loc[:, "json_plan_tensor"] = np.nan
+ 
+         df = df[df["plan_json"].str.count("'Plans'") < 500]
+@@ -85,10 +98,21 @@ class PlanEncoder:
+             # print("plan", df["plan_json"].iloc[i])
+             # node = json.loads(df["plan_json"].iloc[i])['Plan']
+             s = df["plan_json"].iloc[i]
+-            if '"Plan"' in s:
+-                node = json.loads(s)[0][0]["Plan"]
+-            else:
+-                node = ast.literal_eval(f(df["plan_json"].iloc[i]))[0]["Plan"]
++            payload = s
++            for _ in range(4):
++                if isinstance(payload, str):
++                    try:
++                        payload = json.loads(payload)
++                    except (TypeError, json.JSONDecodeError):
++                        payload = ast.literal_eval(f(payload))
++                if isinstance(payload, list) and len(payload) == 1:
++                    payload = payload[0]
++                    continue
++                break
++
++            if not isinstance(payload, dict) or "Plan" not in payload:
++                raise ValueError(f"Unsupported PostgreSQL plan JSON shape: {type(payload).__name__}")
++            node = payload["Plan"]
+             a = self.js_node2dict(i, node)
+             # print(a)
+             # df["json_plan_tensor"].iloc[i] = a
