@@ -128,6 +128,7 @@ def check():
             problems.append("Unreferenced workload SQL: "+sql.name)
     required=["README.md","README.en.md","LICENSE","NOTICE","SECURITY.md",
               "docs/DEPLOYMENT.md","docs/ARCHITECTURE.md","docs/DEPENDENCIES.md",
+              "docs/REPRODUCING.md",
               "docs/KNOWN_LIMITATIONS.md","docs/CONFIGURATION.md","docs/FILE_INVENTORY.md"]
     for name in required:
         if Path(name) not in paths:problems.append("Missing release document: "+name)

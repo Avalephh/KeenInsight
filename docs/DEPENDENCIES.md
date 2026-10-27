@@ -14,6 +14,11 @@
 | 监控组件 | `monitoring/versions.lock` 的 SHA256 | Prometheus/exporters/Grafana 的独立发行包 |
 | Python | 两份 requirements；DREAM 使用 CPU torch 2.4.1 | 与旧 SysInsight SDK 分离的两个环境 |
 | 浏览器测试 | package.json / package-lock.json | 固定 Playwright，非产品运行依赖 |
+| pg_hint_plan / TPC-DS generator | `integrations/reproduction-sources.json` 精确 commit | PG12 扩展的本地编译；可重建 AP 输入 |
+
+联网准备、人工下载导入、离线缓存、模型匹配、Python wheelhouse、系统离线包
+和 TP/AP 初始化步骤见 [REPRODUCING.md](REPRODUCING.md)。缓存本身不进入
+源码发行，也不包含操作者的凭据或原实验数据库。
 
 ## 为什么没有把 DREAM 复制进来
 

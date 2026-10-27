@@ -140,10 +140,12 @@
 | `docs/FILE_INVENTORY.md` | Operator/developer documentation or source inventory |
 | `docs/KNOWN_LIMITATIONS.md` | Operator/developer documentation or source inventory |
 | `docs/RELEASE_VALIDATION.md` | Operator/developer documentation or source inventory |
+| `docs/REPRODUCING.md` | Operator/developer documentation or source inventory |
 | `external-sources.lock` | Project documentation, license, dependency lock or development configuration |
 | `integrations/dream/assets.json` | Pinned external-source identity or reviewed compatibility patch |
 | `integrations/dream/local-integration.patch` | Pinned external-source identity or reviewed compatibility patch |
 | `integrations/dream/rcrank-compatibility.patch` | Pinned external-source identity or reviewed compatibility patch |
+| `integrations/reproduction-sources.json` | Pinned external-source identity or reviewed compatibility patch |
 | `integrations/sources.json` | Pinned external-source identity or reviewed compatibility patch |
 | `monitoring/codex_api_launcher.py` | Deployment/runtime lifecycle |
 | `monitoring/config/grafana/grafana.ini` | Prometheus/Grafana/exporter configuration or dashboard |
@@ -169,6 +171,7 @@
 | `requirements-dev.txt` | Project documentation, license, dependency lock or development configuration |
 | `requirements-dream.lock.txt` | Project documentation, license, dependency lock or development configuration |
 | `requirements-sysinsight.txt` | Project documentation, license, dependency lock or development configuration |
+| `scripts/build_external_tools.sh` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/build_profiles.sh` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/check_dream_assets.py` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/deploy.sh` | Dependency setup, profile generation, verification or deployment entry point |
@@ -176,10 +179,14 @@
 | `scripts/fetch_flamegraph.sh` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/fetch_keeninsight_sources.sh` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/fetch_postgresql_source.sh` | Dependency setup, profile generation, verification or deployment entry point |
+| `scripts/prepare_wheelhouses.sh` | Dependency setup, profile generation, verification or deployment entry point |
+| `scripts/prepare_workloads.py` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/release_check.py` | Dependency setup, profile generation, verification or deployment entry point |
+| `scripts/reproduction.py` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/setup_dream_python.sh` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/setup_python.sh` | Dependency setup, profile generation, verification or deployment entry point |
 | `scripts/test.sh` | Dependency setup, profile generation, verification or deployment entry point |
+| `scripts/tpcc_schema.sql` | Dependency setup, profile generation, verification or deployment entry point |
 | `tests/browser.cjs` | Automated contract, security, retention or browser regression |
 | `tests/test_bridge_retention.py` | Automated contract, security, retention or browser regression |
 | `tests/test_codex_api_launcher.py` | Automated contract, security, retention or browser regression |
@@ -187,4 +194,5 @@
 | `tests/test_dream_auto_apply.py` | Automated contract, security, retention or browser regression |
 | `tests/test_keeninsight_portal.py` | Automated contract, security, retention or browser regression |
 | `tests/test_release_contracts.py` | Automated contract, security, retention or browser regression |
+| `tests/test_reproduction.py` | Automated contract, security, retention or browser regression |
 | `tests/test_sql_profiling_and_shap.py` | Automated contract, security, retention or browser regression |

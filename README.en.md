@@ -1,5 +1,10 @@
 # KeenInsight
 
+See [reproduction preparation](docs/REPRODUCING.md) for pinned downloads,
+trusted model import, offline wheelhouses, extension builds and fresh TP/AP
+data generation. Dependency preparation does not resolve the documented
+TP candidate/TPS linkage and DREAM internal-evaluation collection limitations.
+
 Traceable PostgreSQL performance diagnosis, controlled tuning experiments,
 and live result presentation. [中文说明](README.md)
 

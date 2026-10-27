@@ -52,6 +52,10 @@ download_component() {
   local destination="$DOWNLOAD_DIR/$archive"
   if [ ! -f "$destination" ] \
     || ! printf '%s  %s\n' "$sha" "$destination" | sha256sum -c - >/dev/null 2>&1; then
+    if [ "${KEENINSIGHT_OFFLINE:-0}" = 1 ]; then
+      echo "offline mode: missing or corrupt $component archive: $destination" >&2
+      return 1
+    fi
     echo "downloading $component $version" >&2
     curl -fL --retry 3 --connect-timeout 15 "$url" -o "$destination"
   fi

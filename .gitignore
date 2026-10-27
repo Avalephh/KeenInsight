@@ -50,3 +50,8 @@ coverage.xml
 *.egg-info/
 build/
 dist/
+
+# Offline dependency caches are private deployment inputs, never source assets.
+offline-cache/
+*.partial
+*.dat

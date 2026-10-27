@@ -1,0 +1,24 @@
+{
+  "schema": "keeninsight.reproduction-sources.v1",
+  "sources": {
+    "tpcds-kit": {
+      "repository": "https://github.com/gregrahn/tpcds-kit",
+      "commit": "5a3a81796992b725c2a8b216767e142609966752",
+      "destination": "third_party/tpcds-kit",
+      "purpose": "TPC-DS data generator and schema; build locally, no generated data distributed"
+    },
+    "pg_hint_plan": {
+      "repository": "https://github.com/ossc-db/pg_hint_plan",
+      "commit": "dc21d9ba98924d80753194ca4bd8c00aafbdec6e",
+      "destination": "third_party/pg_hint_plan",
+      "version": "REL12_1_3_10",
+      "purpose": "PostgreSQL 12 hint extension source; compile against target pg_config"
+    },
+    "FlameGraph": {
+      "repository": "https://github.com/brendangregg/FlameGraph",
+      "commit": "41fee1f99f9276008b7cd112fca19dc3ea84ac32",
+      "destination": "app/vendor/FlameGraph",
+      "purpose": "Real perf stack folding with upstream license"
+    }
+  }
+}

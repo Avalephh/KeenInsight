@@ -34,3 +34,49 @@
 
 运行数据、可信权重、授权凭据和机器资源属于部署输入；此源码版不会通过
 捆绑旧成绩来掩盖这些输入的缺失。
+
+## 同日追加：联网/离线复现准备工具
+
+以下是准备工具的功能验证，不是新一轮调优成绩：
+
+- 新增 `scripts/reproduction.py`：精确版本依赖下载、人工归档导入、可信
+  模型匹配、cache SHA256 校验、离线源码/补丁安装、wheelhouse 封存及
+  目标解释器无网络依赖解析。缓存、权重、生成数据均不进入 Git。
+- 从真实 GitHub URL 下载 8 份锁定源码归档，导入第二个独立缓存并在新的
+  临时目录展开，SysInsight 三份、DREAM/RCRank、TPC-DS、pg_hint_plan、
+  FlameGraph 均完成；DREAM/RCRank 真实补丁应用成功。
+- PostgreSQL 12.22 官方归档也下载完成，通过分支锁定 SHA256 后离线导入，
+  合计 9 份源码。仅用新目录中的源码生成参数/调用链参考资料：276 条
+  source-backed 关联、231 个候选维度、153 条 manual；未采集本机 PG
+  settings。上游参数文档标为 PG13，源码关联为 PG12，版本来源保留，
+  不把这些参考资料当成跨版本参数有效性证明。
+- 将清单的 8 份真实模型文件通过新工具收录、离线复制到临时目录，再按
+  `check_dream_assets.py` 复核。没有在该目录执行模型推理或 LLM 调用。
+- pg_hint_plan 1.3.10 针对本机 PG12 headers 成功编译；没有执行系统
+  `make install`、更改正式实例 preload 或重启现有演示服务。
+- 固定 TPC-DS kit 2.10.0 的 `dsdgen`/`tpcds.idx` 编译成功；按 seed 42
+  真实生成 SF1 的 25 个 `.dat` 文件及哈希。旧演示机使用过另一个 generator
+  版本；新输入是明确固定版本的重建数据，不承诺逐行相同或收益相同。
+- 另起只监听独立 Unix socket 的临时 PG12 实例，成功装入 TP 五仓库
+  fixture（含 150 万 order_line），混合 workload 100/100 次执行完成，
+  热点 Payment 和 Stock Level 各 20/20 次完成。
+- 同一临时实例成功 COPY 导入 AP 24 个业务表并 ANALYZE；store_sales
+  为 2,880,029 行，inventory 为 11,745,000 行；DREAM 自带 Q3 在
+  新数据上返回 64 行，未将其计为 DREAM 调优/加速。
+- 真实重跑 TP 初始化被已有 schema 检查拒绝，原 150 万 order_line
+  未重置。临时 PG 已停止并清理，本轮临时数据和模型副本已移除
+  （原始数据/模型未改动）；正式服务健康接口仍正常。
+- 隔离单测增加至 **95 项，91 通过、4 项可选资产跳过**，Shell/JS 语法
+  检查通过。该轮源码单测使用系统 Python 3.8，不代替推荐运行环境
+  Python 3.10/3.11 的完整安装验证。
+- 实测发现本机现有自编译 Python 3.10 缺 `_sqlite3`。已给环境安装和
+  wheelhouse 构建入口增加标准库前置检查；没有修改原解释器或服务。
+
+尚未执行：全新 OS 离线包安装、完整三组 wheelhouse 重新构建、推荐
+Python 环境完整重装、SF10 导入、多轮 TP/AP LLM 收益验收。缺少资产的
+cache 不会因 verify 部分通过就被标为完整，`--require-complete` 会拒绝。
+官方 BERT 下载入口有五文件/固定哈希契约测试；本轮模型搬运验证使用
+已有可信实物，不声称再次从 Hugging Face 下载 440 MB 权重已完成。
+本机访问 Hugging Face 的网络探测超时，手册提供了其他联网机器下载后
+按同一清单搬运的路径；没有关闭 TLS、使用随机权重或把超时当成通过。
+操作说明及可复制命令见 [REPRODUCING.md](REPRODUCING.md)。

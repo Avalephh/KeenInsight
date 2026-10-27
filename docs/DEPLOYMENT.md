@@ -1,5 +1,9 @@
 # 部署、启动与故障排查
 
+新的联网/离线依赖缓存、pg_hint_plan 编译、TP 固定种子初始化和 TPC-DS
+生成/导入入口见 [REPRODUCING.md](REPRODUCING.md)。它们都需要显式执行；
+部署服务本身仍不暗自导入或清空数据库。
+
 先读 [安全边界](../SECURITY.md)。所有示例仅针对专用测试数据库；管理接口
 无应用层认证，不能直接公网开放。不要在当前演示机上用新 checkout 的同名
 systemd 服务或端口替换正在运行的服务。
@@ -20,9 +24,9 @@ systemd 服务或端口替换正在运行的服务。
   `https://github.com/ossc-db/pg_hint_plan` 的版本分支与编译说明，
   不把跨版本 `.so` 复制到运行库。
 - 可访问后端 perf 的权限，以及需要时 PostgreSQL 对应符号/source。
-- TP 的 `keeninsight_tpcc` schema 和 TPC-C 表；
-  AP 的 `tpcds` schema、TPC-DS 表与数据。`tpcc_cases/*.sql` 是 workload
-  脚本，不是完整 TPC-C 数据生成器。
+- TP 的 `keeninsight_tpcc` schema 和事务表、AP 的 `tpcds` schema 和数据。
+  可按复现手册执行 `scripts/prepare_workloads.py` 初始化新实验库；
+  TP 是确定性合成 fixture，不是官方完整 TPC-C 数据生成器。
 
 在目标库只读确认：
 
