@@ -183,7 +183,7 @@ def resource_snapshot(case: Dict[str, Any]) -> Dict[str, Any]:
     total_mem = mem.get("MemTotal", 0.0)
     available_mem = mem.get("MemAvailable", 0.0)
     hit_rate = (hits * 100.0 / total_buffers) if total_buffers > 0 else 0.0
-    return {
+    result = {
         "cpu": host_cpu_percent(),
         "readIO": round(max(0.0, read_delta) / elapsed, 4),
         "writeIO": round(max(0.0, temp_delta) / elapsed, 4),
@@ -192,6 +192,24 @@ def resource_snapshot(case: Dict[str, Any]) -> Dict[str, Any]:
         "hit": round(hit_rate, 4),
         "source": "actual /proc and the recorded PostgreSQL anomaly samples",
     }
+    if case.get("collection", {}).get("type") == "ebpf":
+        result.update(readIO=None, writeIO=None, hit=None,
+                      source="host /proc only; uncollected DB IO/cache metrics are unknown")
+    return result
+
+
+class UnknownResource(str):
+    """The legacy prompt uses numeric format specs; missing is never zero."""
+    def __new__(cls):
+        return super().__new__(cls, "unknown (not collected)")
+
+    def __format__(self, specification):
+        return str(self)
+
+
+def prompt_resources(case: Dict[str, Any]) -> Dict[str, Any]:
+    return {name: UnknownResource() if value is None else value
+            for name, value in resource_snapshot(case).items()}
 
 
 def _compact_prometheus_record(record: Any) -> Dict[str, Any]:
@@ -282,6 +300,8 @@ def compact_sysinsight_observation(payload: Dict[str, Any]) -> Dict[str, Any]:
             "provenance": source_evidence.get("provenance", {}),
         },
         "tuning_context": payload.get("tuning_context", {}),
+        "collection": payload.get("collection", {}),
+        "ebpf_observations": payload.get("ebpf_observations", {}),
     }
 
 
@@ -320,19 +340,45 @@ def original_context(
     constraints = profile.constraints()
     defaults = profile.defaults()
     initial_config = profile.initial_config()
+    tuning = (sysinsight_input or {}).get("tuning_context", {})
+    objective = tuning.get("objective", {})
+    sql_objective = objective.get("metric") == "read_only_sql_duration_ms"
+    if tuning.get("allowed_knobs"):
+        allowed = set(tuning["allowed_knobs"])
+        if allowed - set(constraints):
+            raise ValueError("allowed_knobs contains unknown profile dimensions")
+        constraints = {k: v for k, v in constraints.items() if k in allowed}
+        for name, limit in tuning.get("knob_limits", {}).items():
+            if name not in constraints:
+                raise ValueError("knob_limits must be within allowed_knobs")
+            constraint = list(constraints[name])
+            domain = constraint[2]
+            if constraint[0] not in {"int", "float", "real", "integer"} or len(domain) != 2:
+                raise ValueError("numeric safety limits require a numeric knob domain")
+            constraint[2] = [max(domain[0], limit[0]), min(domain[1], limit[1])]
+            if constraint[2][0] > constraint[2][1]:
+                raise ValueError("empty constrained knob domain")
+            constraints[name] = constraint
+        defaults = {k: v for k, v in defaults.items() if k in allowed}
+        initial_config = {k: v for k, v in initial_config.items() if k in allowed}
+        current = tuning.get("current_configuration", {})
+        if set(current) != allowed:
+            raise ValueError("every allowed knob requires an observed current setting")
+        initial_config.update(current)
     with (SOURCE_ROOT / "db_configurations/task/dbtune.json").open(encoding="utf-8") as handle:
         task_context = json.load(handle)
 
     # This is the original main.py task-context mutation for TPCC.
     task_context["workload"] = "tpcc"
     task_context["task"] = ""
-    task_context["lower_is_better"] = False
+    task_context["lower_is_better"] = sql_objective
     profile_context = profile.task_fragment()
     task_context["sysinsight_profile"] = profile_context
     task_context.update(profile_context)
     task_context["dbms"] = profile.dbms
     task_context["model"] = profile.dbms
-    task_context["prompt_metric"] = "transaction per second"
+    task_context["prompt_metric"] = ("read-only SQL duration in milliseconds"
+                                     if sql_objective else "transaction per second")
     task_context["hyperparameter_constraints"] = constraints
     task_context["hyperparameter_default"] = defaults
     compact_observation = compact_sysinsight_observation(sysinsight_input) if sysinsight_input else None
@@ -357,12 +403,22 @@ def original_context(
 
     promptlib = ParameterLibrary(task_context)
     promptlib.question_template = live_workload_template(promptlib.question_template, case_result)
+    if sql_objective:
+        promptlib.question_template += (
+            "\n\nThis incident is evaluated by measured read-only SQL duration (ms), lower is better, "
+            "NOT TPS. Only propose values for these allowed session knobs: "
+            + ", ".join(sorted(constraints))
+            + ". The actual current settings are " + json.dumps(initial_config)
+            + ". Runtime function numbers are eBPF invocation counts, NOT CPU samples or percentages. "
+            "The function file's legacy numeric columns carry calls, call score, direction only. "
+            "Missing resource metrics are unknown. Do not infer zero IO or a complete call graph.\n"
+        )
     if case_result.get('mode') == 'live_alert':
         task_context['source_compatibility_workload'] = task_context['workload']
         task_context['workload'] = str(case_result.get('workload') or 'unknown')
     promptlib.config = initial_config
     promptlib.keyFunction_file = str(key_file)
-    promptlib.resource = resource_snapshot(case_result)
+    promptlib.resource = prompt_resources(case_result)
     source_evidence = {}
     if sysinsight_input:
         candidate_evidence = sysinsight_input.get("source_evidence", {})
@@ -585,9 +641,12 @@ def main() -> int:
             prompt_text_escaped = promptlib.get_prompt()
         prompt_text = prompt_text_escaped.replace("<hzt<", "{").replace(">hzt>", "}")
 
-        baseline_score = case_result.get("baseline_metrics", {}).get("tps")
+        objective = (sysinsight_input or {}).get("tuning_context", {}).get("objective", {})
+        lower_is_better = objective.get("metric") == "read_only_sql_duration_ms"
+        score_name = "duration_ms" if lower_is_better else "tps"
+        baseline_score = case_result.get("baseline_metrics", {}).get(score_name)
         if not isinstance(baseline_score, (int, float)):
-            raise RuntimeError("case result has no measured baseline TPS")
+            raise RuntimeError("case result has no measured baseline " + score_name)
         observed_configs = pd.DataFrame([initial_config])
         observed_fvals = pd.DataFrame([{"score": float(baseline_score)}])
 
@@ -664,7 +723,7 @@ def main() -> int:
                 task_context,
                 n_candidates=args.n_candidates,
                 n_templates=args.n_templates,
-                lower_is_better=False,
+                lower_is_better=lower_is_better,
                 jitter=False,
                 chat_engine=resolved_model,
                 prompt_setting="full_context",
@@ -685,7 +744,7 @@ def main() -> int:
                     selector = LLM_DIS_SM(
                         task_context,
                         n_gens=args.selector_n_gens,
-                        lower_is_better=False,
+                        lower_is_better=lower_is_better,
                         n_templates=1,
                         chat_engine=resolved_model,
                         prompt_setting="full_context",

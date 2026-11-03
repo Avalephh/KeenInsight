@@ -11,6 +11,16 @@ KeenInsight 将告警、数据库运行证据、SysInsight 参数建议、DREAM 
 
 English: [README.en.md](README.en.md)
 
+## 当前实验分支：论文中的 eBPF 采集
+
+`experiment/ebpf-paper-20261103` 新增独立的、无展示依赖的采集实验，
+不修改下面的原有演示流程。入口与实测边界见
+[eBPF 实验说明](experiments/ebpf/README.md)；用它开展采集实验，不要启动监控栈代替论文采集层。
+当前重点是贯通“eBPF 常驻事件 → 按需诊断 → 原 SysInsight → 应用/复测/恢复”，
+入口与范围见 [采集到调优的完整实验链路](experiments/ebpf/PIPELINE.md)。
+早期的 [轻量采集与性能影响](experiments/ebpf/LIGHTWEIGHT.md) 保留为历史实验，
+不将开销测量替代链路验收。
+
 需要在新机器重建，或目标机器不能联网？先读
 [完整复现准备：下载、离线依赖、模型、扩展和 TP/AP 数据生成](docs/REPRODUCING.md)。
 提供可执行缓存校验/导入和数据生成代码，不依赖原演示目录；

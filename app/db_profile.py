@@ -16,7 +16,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 
 ROOT = Path(__file__).resolve().parent
-PROFILE_ROOT = ROOT / "db_profiles"
+PROFILE_ROOT = Path(os.environ.get("SYSINSIGHT_PROFILE_ROOT", str(ROOT / "db_profiles")))
 
 
 def _normalise_dbms(value: str) -> str:

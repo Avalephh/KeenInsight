@@ -58,6 +58,7 @@ def role(path):
     if parts[0]=="monitoring":
         return "Deployment/runtime lifecycle" if len(parts)==2 else "Prometheus/Grafana/exporter configuration or dashboard"
     if parts[0]=="tests":return "Automated contract, security, retention or browser regression"
+    if parts[0]=="experiments":return "Opt-in paper experiment; headless eBPF collector, selection and isolated validation"
     if parts[0]=="scripts":return "Dependency setup, profile generation, verification or deployment entry point"
     if parts[0]=="integrations":return "Pinned external-source identity or reviewed compatibility patch"
     if parts[0]=="config":return "Portable configuration template without credentials"

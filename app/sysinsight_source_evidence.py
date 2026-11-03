@@ -520,6 +520,12 @@ def render_source_evidence(evidence: Mapping[str, Any], max_chars: int = MAX_REN
         "10. Runtime sampled call-chain and PostgreSQL source evidence:",
         "    The call chains below are real perf folded-stack samples. They preserve the observed frame order, but they are not a complete static call graph.",
     ]
+    if evidence.get("semantics", {}).get("runtime_observation") == "ebpf_function_invocations":
+        runtime_lines = [
+            "10. Runtime eBPF observations and PostgreSQL source evidence:",
+            "    Runtime functions were observed by targeted eBPF uprobes. Counts are "
+            "invocations, not CPU samples. No call stack or complete call graph was collected.",
+        ]
     chains = evidence.get("runtime_call_chains", [])
     if isinstance(chains, list) and chains:
         for item in chains:
