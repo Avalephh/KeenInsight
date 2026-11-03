@@ -85,8 +85,10 @@ resident 在模型调用、候选验证和复测期间不退出。
 
 ### 3. 论文中的按需函数/资源观测
 
-异常窗口中临时附着 VFS 读写、实际锁等待、WAL flush/sync、
-checkpoint、临时文件读取、hash spill 等针对性探针。
+异常诊断中临时附着 VFS 读写、实际锁等待、WAL flush/sync、
+checkpoint、临时文件读取、hash spill 等针对性探针。CPU 差分采样时正常/异常
+两侧使用相同的探针配置，CPU/查询关联采样卸载后才启动独立至多 5 秒的资源窗口，
+避免只在异常 profile 中采到额外资源探针的自身开销。
 后台 checkpoint 不能只观察客户端 PID。
 有 PID/出生身份、执行开始时间和可获得的 PG query ID 时做 SQL 级关联；
 执行器外的资源保留 backend scope，不靠 SQL 文本猜测归属。
@@ -122,6 +124,11 @@ business worker 与外部 pressure worker 分开。
 不是 ExecutorRun 完成数，不是压力 TPS，也不是单条 SQL 耗时。
 采样阶段不直接作为收益基线；另做前、后、恢复的无细粒度采样复测，
 各阶段仍保留同样的 resident。
+session 参数通过 PGOPTIONS 在连接启动时设置一次，不在事务 SQL 中重复 SET。
+原压力比较门和 5% 收益门之外，恢复后 TPS 相对 before 漂移超过 5% 的候选
+标记测量不确定，不计成功收益；这不是统计显著性证明。
+已发现的旧复测偏差与当前 resident 的实测影响见
+[未达收益门槛追查](GAIN_FAILURE_AUDIT.md)。
 
 ### 5. 候选必须来自本次原模型
 

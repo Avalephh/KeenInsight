@@ -47,6 +47,30 @@ BOOLS = {"jit", "jit_expressions", "jit_tuple_deforming", "enable_hashjoin", "en
 POLICY = set(LIMITS) | BOOLS
 
 
+def startup_options(settings):
+    """Set bounded experiment GUCs once per connection, never per transaction.
+
+    PGOPTIONS uses PostgreSQL's command-line token syntax, not SQL quoting.
+    The lab only permits the numeric/boolean policy above, so no whitespace,
+    quoting, endpoint options or inherited PGOPTIONS are needed.
+    """
+    options = []
+    for name, value in sorted((settings or {}).items()):
+        if name not in POLICY:
+            raise ValueError("startup setting outside experiment policy: " + name)
+        text = str(value).lower()
+        if name in BOOLS:
+            if text not in ("on", "off", "true", "false"):
+                raise ValueError("invalid boolean startup setting: " + name)
+        else:
+            if not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?", text):
+                raise ValueError("invalid numeric startup setting: " + name)
+            if not math.isfinite(float(text)) or not LIMITS[name][0] <= float(text) <= LIMITS[name][1]:
+                raise ValueError("startup setting outside numeric limits: " + name)
+        options.extend(("-c", name + "=" + text))
+    return " ".join(options)
+
+
 def parse_worker(text, offered, duration=None):
     processed = re.search(r"number of transactions actually processed:\s*(\d+)", text)
     tps = re.findall(r"^tps\s*=\s*([0-9]+(?:\.[0-9]+)?).*$", text, re.M)
@@ -84,10 +108,10 @@ class Workers:
             for role in (("business", "pressure") if pressure else ("business",)):
                 path = directory / (role + ".sql")
                 original = ROOT / "app/tpcc_cases" / case["normal_sql" if role == "business" else "sql"]
-                # SET before the original BEGIN stays session local.
-                prefix = "".join('SET "{}"={};\n'.format(name, sql_literal(value))
-                                 for name, value in (settings or {}).items())
-                path.write_text(prefix + original.read_text())
+                # A pgbench script is repeated for EVERY transaction.  SET
+                # prefixes biased candidates with extra SQL and PortalRun
+                # probe hits.  Pass settings at connection startup instead.
+                path.write_text(original.read_text())
                 application = "ebpf-equivalent-" + role + "-" + directory.name
                 rate = business_rate if role == "business" else pressure_rate
                 clients = 2 if role == "business" else int(case["clients"])
@@ -101,7 +125,8 @@ class Workers:
                 log = (directory / (role + ".log")).open("w")
                 try:
                     process = subprocess.Popen(args + ["postgres"],
-                                               env={**os.environ, "PGAPPNAME": application},
+                                               env={**os.environ, "PGAPPNAME": application,
+                                                    "PGOPTIONS": startup_options(settings)},
                                                stdout=log, stderr=subprocess.STDOUT)
                 except BaseException:
                     log.close()
@@ -194,7 +219,8 @@ def collect_phase(args, case, root, server, connection, admin, name, pressure, j
     directory.mkdir(mode=0o700)
     workers = detail = None
     try:
-        seconds = math.ceil(args.profile_seconds + args.trigger_timeout + 10)
+        resource_seconds = min(5, args.profile_seconds)
+        seconds = math.ceil(args.profile_seconds + args.trigger_timeout + resource_seconds + 15)
         workers = Workers(case, directory, server, connection, admin, seconds,
                           args.business_rate, args.pressure_rate, pressure, resident=args.resident)
         clients = workers.ids["business"] + workers.ids.get("pressure", [])
@@ -214,11 +240,6 @@ def collect_phase(args, case, root, server, connection, admin, name, pressure, j
             if not cause:
                 raise RuntimeError("no generic eBPF anomaly before deadline; no spill-only fallback")
             journal.stage("trigger", **cause)
-            detail = CollectorProcess(directory / "detail", clients + [checkpointer], args.pg_config,
-                                      "query", "diagnostic-system", args.profile_seconds + 5,
-                                      max_mb=64, report_seconds=.5, query_output="aggregate",
-                                      metric_mode="timed")
-            journal.stage("targeted_resource_probes_attached", pids=clients + [checkpointer])
         sampled = sample(clients, server, directory / "profile", args.profile_seconds, args.frequency,
                          on_ready=lambda: journal.stage(name + "_detail_attached", pids=clients),
                          on_stopped=lambda: journal.stage(name + "_sampling_disarmed",
@@ -229,6 +250,28 @@ def collect_phase(args, case, root, server, connection, admin, name, pressure, j
             raise RuntimeError("insufficient profile samples; no synthetic evidence/fallback")
         if not workers.running():
             raise RuntimeError("workload exited during diagnostic capture")
+        sampled["comparison_instrumentation"] = {
+            "resident_hooks": [list(hook) for hook in Resident.HOOKS],
+            "resource_probes_during_CPU_profile": [],
+            "resource_capture_order": "after_CPU_profile_unloaded",
+        }
+        atomic_json(directory / "profile/manifest.json", sampled)
+        if pressure:
+            # Do not profile the collector's own timed resource uprobes only
+            # on the anomaly side. Both differential profiles use the same
+            # instrumentation. Resources are a separate bounded window.
+            detail = CollectorProcess(directory / "detail", clients + [checkpointer], args.pg_config,
+                                      "query", "diagnostic-system", resource_seconds,
+                                      max_mb=64, report_seconds=.5, query_output="aggregate",
+                                      metric_mode="timed")
+            journal.stage("targeted_resource_probes_attached", pids=clients + [checkpointer],
+                          CPU_sampling_already_unloaded=True, window_seconds=resource_seconds)
+            deadline = time.monotonic() + resource_seconds
+            while time.monotonic() < deadline and detail.process.poll() is None:
+                if not workers.running():
+                    raise RuntimeError("workload exited during separate resource capture")
+                args.resident.poll()
+                time.sleep(.025)
         manifest = detail.close() if detail else None
         detail = None
         if manifest and (manifest.get("perf_lost_notifications")
@@ -351,10 +394,24 @@ def measure(args, case, root, server, connection, admin, name, settings=None, pr
         trial["business"]["steady_tps"] for trial in trials), "trials": trials,
         "offered_pressure_tps": args.pressure_rate if pressure else 0,
         "offered_business_tps": args.business_rate, "detailed_profiling_enabled": False,
-        "resident_enabled_identically_in_all_phases": True,
+        "resident_enabled_identically_in_all_phases": bool(args.resident),
+        "session_settings_delivery": "PGOPTIONS_once_per_connection",
         "scope": "original startup-excluded steady business TPS summary, not SQL latency"}
     atomic_json(root / (name + ".json"), result)
     return result
+
+
+def gain_control(baseline, restored, tolerance=.05):
+    """A conservative veto, NOT a statistical test or proof of causality."""
+    before, after = baseline["median_business_tps"], restored["median_business_tps"]
+    if not before or not math.isfinite(before) or not math.isfinite(after):
+        return {"valid": False, "reason": "invalid_control_TPS"}
+    drift = after / before - 1
+    stable = abs(drift) <= tolerance + 1e-12
+    return {"valid": stable, "restored_drift_ratio": drift,
+            "max_abs_restored_drift_ratio": tolerance,
+            "reason": "control_stable" if stable else "baseline_drift",
+            "semantics": "necessary control, not confidence interval or perf/eBPF equivalence"}
 
 
 def tune(args, case, root, server, connection, admin, api, allowed, baseline, journal):
@@ -412,11 +469,14 @@ def tune(args, case, root, server, connection, admin, api, allowed, baseline, jo
                         "pressure_target_tps": row["offered_pressure_tps"]}
             comparison = _tpcc_comparison({"pressure_before": comparison_phase(baseline),
                                            "pressure_after": comparison_phase(tuned)})
-            accepted = equivalent and comparison["comparison_valid"] and gain >= args.min_gain
-            record.update(status="accepted" if accepted else "no_validated_gain",
+            control = gain_control(baseline, restored_trial)
+            accepted = equivalent and comparison["comparison_valid"] and control["valid"] and gain >= args.min_gain
+            record.update(status="accepted" if accepted else
+                          "inconclusive_measurement" if not control["valid"] else "no_validated_gain",
                           business_state_unchanged=equivalent, gain_ratio=gain, tuned=tuned,
                           restored=restored_trial, settings_restored=restored == before,
-                          application=applier.state, original_TPS_comparison=comparison)
+                          application=applier.state, original_TPS_comparison=comparison,
+                          gain_control=control)
             journal.stage("candidate_retest_restore", candidate_id=candidate["candidate_id"],
                           result=record["status"], gain_ratio=gain, settings_restored=True,
                           business_state_unchanged=equivalent)

@@ -144,6 +144,7 @@
 | `experiments/__init__.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/EQUIVALENCE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/EQUIVALENCE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/GAIN_FAILURE_AUDIT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/LIGHTWEIGHT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -162,6 +163,7 @@
 | `experiments/ebpf/equivalent_resident.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/equivalent_sampling.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/evidence.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/gain_audit.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/overhead.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pg_layout.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |

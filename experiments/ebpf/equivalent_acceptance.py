@@ -34,6 +34,12 @@ def verify_case(root):
         "same_capture_event_frequency_window": len({
             (p["sample_event"], p["frequency_hz_per_task"], p["requested_seconds"],
              p["binary_sha256"]) for p in profiles}) == 1,
+        "same_instrumentation_during_CPU_differential": all(
+            isinstance(p.get("comparison_instrumentation"), dict) for p in profiles) and len({
+                json.dumps(p.get("comparison_instrumentation"), sort_keys=True)
+                for p in profiles}) == 1 and all(
+                    p.get("comparison_instrumentation", {}).get(
+                        "resource_probes_during_CPU_profile") == [] for p in profiles),
         "all_task_sampling_FDs_closed": all(p.get("all_probe_FDs_closed") for p in profiles),
         "all_diagnostic_probes_stopped_before_model": bool(detached) and max(detached) < model_started,
         "normal_and_anomaly_targets_not_reduced_to_one_PID": all(len(p["targets"]) >= 2 for p in profiles),

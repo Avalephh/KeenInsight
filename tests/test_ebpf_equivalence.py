@@ -8,7 +8,11 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from experiments.ebpf.equivalence import POLICY, parse_worker, trigger, tune, validate_options
+from experiments.ebpf.equivalence import (
+    POLICY, Workers, collect_phase, gain_control, parse_worker, startup_options,
+    trigger, tune, validate_options,
+)
+from experiments.ebpf.gain_audit import control_order, control_summary, profile_quality
 from experiments.ebpf.equivalent_profiles import compare, normal_profile, rates
 from experiments.ebpf.equivalent_sampling import folded_rows, register_task_fd, validate
 from experiments.ebpf.equivalent_resident import Resident
@@ -135,6 +139,105 @@ class TriggerParity(unittest.TestCase):
 
 
 class TPSParity(unittest.TestCase):
+    def test_startup_options_only_accept_policy_numeric_and_boolean_values(self):
+        self.assertEqual(startup_options({"work_mem": 8192, "jit": "off"}),
+                         "-c jit=off -c work_mem=8192")
+        self.assertEqual(startup_options(None), "")
+        for settings in ({"fsync": "off"}, {"work_mem": "8192 -c fsync=off"},
+                         {"work_mem": 1}, {"work_mem": float("nan")}, {"jit": "maybe"}):
+            with self.assertRaises(ValueError):
+                startup_options(settings)
+
+    def test_candidate_does_not_add_per_transaction_SQL_or_inherit_PGOPTIONS(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            original = root / "original.sql"
+            original.write_text("BEGIN;\nSELECT 1;\nROLLBACK;\n")
+            process = Mock()
+            process.poll.return_value = None
+            case = {"normal_sql": str(original), "clients": 2}
+            for settings in (None, {"work_mem": 8192}):
+                with patch("experiments.ebpf.equivalence.subprocess.Popen", return_value=process) as spawn, \
+                        patch("experiments.ebpf.equivalence.process_ids", return_value=[42, 43]), \
+                        patch.dict(os.environ, {"PGOPTIONS": "-c jit=on"}):
+                    workers = Workers(case, root, {"binary": "/pg/postgres"},
+                                      ["psql", "-h", "/tmp/test", "-p", "55432"], Mock(),
+                                      8, 1600, 2500, False, settings=settings)
+                    try:
+                        self.assertEqual((root / "business.sql").read_bytes(), original.read_bytes())
+                        self.assertEqual(spawn.call_args.kwargs["env"]["PGOPTIONS"],
+                                         startup_options(settings))
+                    finally:
+                        workers.close()
+
+    def test_anomaly_resource_probes_do_not_contaminate_CPU_differential(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            workers = Mock()
+            workers.ids = {"business": [42, 43], "pressure": [44]}
+            workers.policy = {}
+            workers.running.return_value = True
+            detail = Mock()
+            detail.process.poll.return_value = 0
+            detail.close.return_value = {"bpf_health": {}, "perf_lost_notifications": 0}
+            options = SimpleNamespace(profile_seconds=.1, trigger_timeout=.1, business_rate=1600,
+                                      pressure_rate=2500, resident=Mock(), trigger_mode="selected",
+                                      pg_config="pg_config", frequency=300, min_samples=10)
+            with patch("experiments.ebpf.equivalence.Workers", return_value=workers), \
+                    patch("experiments.ebpf.equivalence.CollectorProcess", return_value=detail) as spawn, \
+                    patch("experiments.ebpf.equivalence.sample") as sampler, \
+                    patch("experiments.ebpf.equivalence.function_counts", return_value=root / "counts"):
+                def capture(*args, **kwargs):
+                    spawn.assert_not_called()
+                    (root / "anomaly/profile").mkdir()
+                    return {"sample_count": 111, "all_probe_FDs_closed": True,
+                            "folded_path": str(root / "profile.folded")}
+                sampler.side_effect = capture
+                journal = Journal(root)
+                result = collect_phase(options, {}, root, {}, [], Mock(execute=Mock(return_value="55")),
+                                       "anomaly", True, journal)
+            self.assertEqual(result["profile"]["comparison_instrumentation"][
+                "resource_probes_during_CPU_profile"], [])
+            stages = [row["stage"] for row in journal.entries]
+            self.assertLess(stages.index("anomaly_detail_detached"),
+                            stages.index("targeted_resource_probes_attached"))
+            workers.close.assert_called_once()
+
+    def test_restored_baseline_drift_cannot_be_accepted_as_gain(self):
+        before = {"median_business_tps": 1000}
+        self.assertTrue(gain_control(before, {"median_business_tps": 1000})["valid"])
+        self.assertTrue(gain_control(before, {"median_business_tps": 1050})["valid"])
+        check = gain_control(before, {"median_business_tps": 800})
+        self.assertFalse(check["valid"])
+        self.assertEqual(check["reason"], "baseline_drift")
+        self.assertFalse(gain_control({"median_business_tps": 0}, before)["valid"])
+
+    def test_control_order_balances_all_six_cells_in_forward_and_reverse_rounds(self):
+        self.assertEqual(control_order(1), list(reversed(control_order(0))))
+        self.assertEqual(set(control_order(2)), set(control_order(0)))
+        self.assertNotEqual(control_order(2), control_order(0))
+
+    def test_control_summary_separates_resident_loss_and_repeated_SET_cost(self):
+        trials = [{"repeat": 0, "mode": mode, "resident": enabled,
+                   "business": {"steady_tps": value}, "pressure": {"steady_tps": 2500}}
+                  for mode, value in (("baseline", 1000), ("startup", 1100), ("legacy_SET", 900))
+                  for enabled, value in ((False, value), (True, value * .8))]
+        result = control_summary(trials)
+        comparison = result["within_round_comparisons"][0]
+        self.assertAlmostEqual(comparison["resident_loss_percent_by_mode"]["baseline"], 20)
+        self.assertAlmostEqual(comparison["candidate_gain_percent"]["False"], 10)
+
+    def test_uprobe_path_fraction_is_weighted_samples_not_measured_overhead(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "manifest.json").write_text(json.dumps({"sample_event": "task-clock", "health": {}}))
+            (root / "samples.json").write_text(json.dumps({"rows": [
+                {"sample_count": 3, "user_frames": ["SQL"], "kernel_frames": ["uprobe_dispatcher"]},
+                {"sample_count": 7, "user_frames": ["SQL"], "kernel_frames": []}]}))
+            result = profile_quality(root)
+        self.assertEqual(result["uprobe_path_sample_percent"], 30)
+        self.assertNotIn("overhead_percent", result)
+
     def test_missing_artifacts_cannot_pass_six_case_acceptance(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = verify(tmp)
@@ -234,6 +337,33 @@ class TPSParity(unittest.TestCase):
             self.assertEqual(measure.call_count, 2)
             applier.__exit__.assert_called_once()
             self.assertTrue(result["candidates"][0]["settings_restored"])
+
+    def test_large_apparent_gain_with_drifted_control_is_inconclusive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            candidate = self.fake_candidate({"jit": "off"})
+            applier = Mock()
+            applier.state = {}
+            applier.__enter__ = Mock(return_value={"session_configuration": {"jit": "off"},
+                                                  "skipped_configuration": {}, "connection_configuration": {}})
+            applier.__exit__ = Mock(return_value=False)
+            baseline = {"median_business_tps": 1000, "offered_pressure_tps": 2500,
+                        "trials": [{"pressure": {"steady_tps": 2500}}]}
+            with patch("sysinsight_live_chain._candidate_and_validation",
+                       return_value={"candidates": [candidate], "selected_candidate": candidate}), \
+                    patch("pg_temporary_config.TemporaryPostgresConfiguration", return_value=applier), \
+                    patch("experiments.ebpf.equivalence.native_settings", return_value=({"jit": "off"}, {})), \
+                    patch("experiments.ebpf.equivalence.invariant_state", return_value={}), \
+                    patch("experiments.ebpf.equivalence.measure", side_effect=[
+                        {**baseline, "median_business_tps": tps} for tps in (1600, 800)]):
+                result = tune(SimpleNamespace(max_candidates=1, min_gain=.05), {}, root, {}, [], Mock(),
+                              {}, ["jit"], baseline, Journal(root))
+            self.assertTrue(result["pipeline_completed"])
+            self.assertIsNone(result["best"])
+            record = result["candidates"][0]
+            self.assertEqual(record["status"], "inconclusive_measurement")
+            self.assertEqual(record["gain_control"]["reason"], "baseline_drift")
+            self.assertGreater(record["gain_ratio"], .05)
 
     def test_out_of_allowlist_candidate_is_never_applied_or_retested(self):
         with tempfile.TemporaryDirectory() as tmp:
