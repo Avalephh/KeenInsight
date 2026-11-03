@@ -23,7 +23,9 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 @contextmanager
-def cluster(pg_config):
+def cluster(pg_config, max_connections=12):
+    if not isinstance(max_connections, int) or not 12 <= max_connections <= 32:
+        raise ValueError("disposable cluster max_connections must be 12..32")
     info = inspect_server(pg_config)
     bindir = Path(info["binary"]).parent
     account = pwd.getpwnam("postgres")
@@ -45,7 +47,7 @@ def cluster(pg_config):
             with (data / "postgresql.conf").open("a") as handle:
                 handle.write("\nlisten_addresses = ''\nport = 55432\n")
                 handle.write("unix_socket_directories = '{}'\n".format(socket))
-                handle.write("shared_buffers = '32MB'\nmax_connections = 12\n")
+                handle.write("shared_buffers = '32MB'\nmax_connections = {}\n".format(max_connections))
                 handle.write("max_parallel_workers_per_gather = 0\njit = off\n")
             subprocess.run(base + [str(bindir / "pg_ctl"), "-D", str(data), "-l", str(log),
                                    "-w", "start"], cwd="/", check=True,

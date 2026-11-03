@@ -25,6 +25,9 @@ PROBES = (
     Probe(8, "wal_flush", "user", "XLogFlush", "calls", .8),
     Probe(9, "temp_file_create", "user", "BufFileCreateTemp", "calls", 1.0),
     Probe(10, "temp_file_read", "user", "BufFileRead", "calls", .9),
+    Probe(11, "lock_wait", "user", "ProcSleep", "calls", 1.0),
+    Probe(12, "checkpoint", "user", "CreateCheckPoint", "calls", 1.0),
+    Probe(13, "wal_sync", "user", "pg_fdatasync", "calls", .8),
 )
 BY_NAME = {p.name: p for p in PROBES}
 CORE = ("vfs_read", "vfs_write")
@@ -33,6 +36,13 @@ SCHEMA = "keeninsight.ebpf.v2"
 
 
 def choose_probes(profile, model=None):
+    if profile == "six-resident":
+        return ["temp_file_create", "lock_wait", "checkpoint"], \
+               "semantic_wait_checkpoint_spill_sentinels_not_complete_CPU_detection"
+    if profile == "diagnostic-lock":
+        return ["lock_wait", "wal_flush"], "bounded_actual_lock_wait_and_WAL"
+    if profile == "diagnostic-wal":
+        return ["checkpoint", "wal_flush", "wal_sync"], "bounded_WAL_checkpoint_diagnosis"
     if profile == "resident":
         # The first closed-loop incident is temporary-file materialization.
         # Do not keep commit/WAL or per-tuple paths attached for this incident.

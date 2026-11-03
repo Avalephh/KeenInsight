@@ -15,6 +15,8 @@ DREAM 或 LLM；新加入的闭环入口会显式调用原 SysInsight 的模型 
 临时应用/复测/恢复的独立入口。使用与边界见
 [PIPELINE.md](PIPELINE.md)。下面的开销实验保留，但不作为当前优先工作。
 真实贯通和预算卸载结果见 [PIPELINE_VALIDATION.md](PIPELINE_VALIDATION.md)。
+原控制台六个 TP 场景的采集替换评估与真实 smoke 见
+[SIX_SCENARIOS.md](SIX_SCENARIOS.md)：6/6 采集可运行不等于 6/6 调优成功。
 
 ## 轻量化修订 v2：不把“eBPF”本身当作低开销证明
 

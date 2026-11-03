@@ -29,11 +29,13 @@ class EventTail:
 
 class CollectorProcess:
     def __init__(self, directory, pid, pg_config, scope, profile, seconds,
-                 max_mb=8, capture_sql=False, report_seconds=.1):
+                 max_mb=8, capture_sql=False, report_seconds=.1, metric_mode=None):
         self.directory = Path(directory)
         self.log = self.directory.with_suffix(".log").open("w")
+        pids = pid if isinstance(pid, (list, tuple)) else [pid]
         args = [sys.executable, "-m", "experiments.ebpf", "collect",
-                "--pid", str(pid), "--pg-config", pg_config,
+                *[part for value in pids for part in ("--pid", str(value))],
+                "--pg-config", pg_config,
                 "--output", str(self.directory), "--scope", scope, "--profile", profile,
                 "--detail-level", "lightweight", "--duration", str(seconds),
                 "--max-output-mb", str(max_mb), "--report-seconds", str(report_seconds),
@@ -42,6 +44,8 @@ class CollectorProcess:
             args += ["--query-output", "all"]
         if capture_sql:
             args += ["--capture-sql"]
+        if metric_mode:
+            args += ["--metric-mode", metric_mode]
         self.process = subprocess.Popen(args, cwd=str(REPOSITORY), stdout=self.log,
                                         stderr=subprocess.STDOUT)
         self.events = EventTail(self.directory / "events.jsonl")

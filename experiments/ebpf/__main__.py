@@ -20,7 +20,8 @@ def main():
     collect.add_argument("--output", required=True, help="new private run directory")
     collect.add_argument("--duration", type=float, default=30)
     collect.add_argument("--report-seconds", type=float, default=1)
-    collect.add_argument("--profile", choices=("boundary", "resident", "events", "diagnostic", "core", "selected", "all"),
+    collect.add_argument("--profile", choices=("boundary", "resident", "six-resident", "events",
+                         "diagnostic", "diagnostic-lock", "diagnostic-wal", "core", "selected", "all"),
                          default="events")
     collect.add_argument("--detail-level", choices=("lightweight", "full"), default="lightweight",
                          help="lightweight: aggregate short SQL, entry-only counts, no scheduler hook")

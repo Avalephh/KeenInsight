@@ -20,6 +20,8 @@ English: [README.en.md](README.en.md)
 入口与范围见 [采集到调优的完整实验链路](experiments/ebpf/PIPELINE.md)。
 早期的 [轻量采集与性能影响](experiments/ebpf/LIGHTWEIGHT.md) 保留为历史实验，
 不将开销测量替代链路验收。
+原控制台六个 TP 场景的替换方案、实测和未完成边界见
+[六场景 eBPF 采集评估](experiments/ebpf/SIX_SCENARIOS.md)。
 
 需要在新机器重建，或目标机器不能联网？先读
 [完整复现准备：下载、离线依赖、模型、扩展和 TP/AP 数据生成](docs/REPRODUCING.md)。

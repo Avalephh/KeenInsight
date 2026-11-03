@@ -146,12 +146,14 @@
 | `experiments/ebpf/PIPELINE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/README.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/SIX_SCENARIOS.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/__init__.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/__main__.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/catalog.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/collector.bpf.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/collector.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/cpu_sample.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/evidence.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/overhead.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -160,6 +162,7 @@
 | `experiments/ebpf/pipeline_lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/runtime.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/selection.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/six_scenarios.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `external-sources.lock` | Project documentation, license, dependency lock or development configuration |
 | `integrations/dream/assets.json` | Pinned external-source identity or reviewed compatibility patch |
 | `integrations/dream/local-integration.patch` | Pinned external-source identity or reviewed compatibility patch |
@@ -213,6 +216,7 @@
 | `tests/test_dream_auto_apply.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_experiment.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_pipeline.py` | Automated contract, security, retention or browser regression |
+| `tests/test_ebpf_six_scenarios.py` | Automated contract, security, retention or browser regression |
 | `tests/test_keeninsight_portal.py` | Automated contract, security, retention or browser regression |
 | `tests/test_release_contracts.py` | Automated contract, security, retention or browser regression |
 | `tests/test_reproduction.py` | Automated contract, security, retention or browser regression |

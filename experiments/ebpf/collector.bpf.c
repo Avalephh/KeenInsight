@@ -6,7 +6,7 @@
  */
 #include <uapi/linux/ptrace.h>
 
-#define METRICS 11
+#define METRICS 14
 #define QUERY_DEPTH 4
 #define CALL_DEPTH 4
 #define SQL_BYTES 192
@@ -315,7 +315,8 @@ static __always_inline int metric_count(struct pt_regs *ctx, u32 metric, u64 req
     accumulate(q, metric, 0, requested, 0);
     if (depth) accumulate(backend, metric, 0, requested, 0);
     if (metric >= METRICS) return 0;
-    u32 trigger = metric == 9 || q->metrics[metric].calls == EVENT_CALLS;
+    u32 trigger = metric == 9 || metric == 11 || metric == 12 ||
+                  q->metrics[metric].calls == EVENT_CALLS;
     u64 *observed = probe_counts.lookup(&metric);
     if (observed) (*observed)++;
     notify(ctx, q, depth, metric, 0, requested, trigger);
