@@ -1,5 +1,7 @@
 """Controlled collection/TPS contracts; no DB/BPF/network/model calls."""
+import json
 import unittest
+from unittest.mock import Mock
 from unittest.mock import patch
 
 from experiments.ebpf.equivalent_sampling import folded_rows
@@ -8,6 +10,7 @@ from experiments.ebpf.paired_tps import (
 )
 from experiments.ebpf.buffer_observer import symbol_address
 from experiments.ebpf.paired_report import metric_available, weighted_rate_gap
+from experiments.ebpf.paired_resume import ReloadAwareAdmin
 from sysinsight_original_llm import (
     compact_sysinsight_observation, live_workload_template, resource_snapshot,
 )
@@ -95,6 +98,24 @@ class ModelInputs(unittest.TestCase):
 
 
 class GainComparisons(unittest.TestCase):
+    def test_reload_wait_requires_observed_original_values_not_an_assumed_restore(self):
+        query = "SELECT json_object_agg() FROM pg_settings WHERE name IN ('max_wal_size')"
+        raw = lambda value: json.dumps({"max_wal_size": {"value": str(value), "type": "integer"}})
+        connection = Mock()
+        connection.execute.side_effect = [raw(3079), raw(1024)]
+        admin = ReloadAwareAdmin(connection, {"max_wal_size": 1024})
+        with patch("experiments.ebpf.paired_resume.time.sleep"):
+            self.assertEqual(json.loads(admin.execute(query, value=True))["max_wal_size"]["value"], "1024")
+        self.assertEqual(len(admin.observations), 1)
+        self.assertEqual(connection.execute.call_count, 2)
+
+    def test_reload_wait_never_turns_persistent_mismatch_into_success(self):
+        connection = Mock()
+        connection.execute.return_value = json.dumps({"max_wal_size": {"value": "3079", "type": "integer"}})
+        admin = ReloadAwareAdmin(connection, {"max_wal_size": 1024}, timeout=0)
+        with self.assertRaisesRegex(RuntimeError, "still mismatches"):
+            admin.execute("SELECT json_object_agg() FROM pg_settings WHERE name IN ('max_wal_size')", value=True)
+
     @staticmethod
     def arm(gains, valid=True):
         return {"status": "completed", "retest": {

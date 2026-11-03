@@ -9,9 +9,17 @@
 DREAM 或 LLM；新加入的闭环入口会显式调用原 SysInsight 的模型 API。
 两类实验均不停止本机已经运行的服务，原展示路径保持不变。
 
-## 当前优先目标：贯通原诊断与调优链路
+## 当前验收：同数据、同负载、同权限的实际 TPS 收益
 
-**功能等价优先的新入口：**[EQUIVALENCE.md](EQUIVALENCE.md)。
+双臂方法与入口见 [PAIRED_TPS.md](PAIRED_TPS.md)，实际六场景结果和模型输入缺口见
+[PAIRED_TPS_VALIDATION.md](PAIRED_TPS_VALIDATION.md)。
+原采集参考臂显式使用原 perf，eBPF 臂不运行 perf 命令；
+两路从同一物理快照复制，复测卸载探针，运行原模型与原业务 SQL。
+**本轮未证明六场景 TPS 收益等价，不能把 6/6 流程完成当成收益成功。**
+
+## 历史功能入口：贯通原诊断与调优链路
+
+**功能链路入口：**[EQUIVALENCE.md](EQUIVALENCE.md)。
 使用多 backend 的真实正常/异常 eBPF profile、原差分/模型链和原六场景
 业务 TPS 应用/复测/恢复；不再把 spill-only 规则或六场景采集 smoke 当作等价迁移。
 

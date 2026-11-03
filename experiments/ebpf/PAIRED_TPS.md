@@ -3,6 +3,8 @@
 本入口检验**只替换采集方式后，原诊断/模型生成的候选能否产生接近的业务 TPS
 收益**。不是把六场景“流程跑完”当成六场景收益成功，不预设两路必须相等，
 不回放旧成功候选冒充本次模型生成结果。
+2026-11-03 的实际结果、失败/不确定性和逐项输入缺口见
+[PAIRED_TPS_VALIDATION.md](PAIRED_TPS_VALIDATION.md)，本轮未证明六场景收益等价。
 
 ## 固定的共同条件
 
@@ -135,3 +137,7 @@ python3 -m experiments.ebpf.paired_report \
 - `<case>/<perf|ebpf>/`：正常/异常原始采集、模型输入、API 审计、原候选验证；
 - 各 `block-*-before/tuned/restored/`：实际 SQL 和 pgbench 日志；
 - `input_gap_audit.json`：逐项采集、模型输入和作用范围缺口。
+
+技术性恢复核验中断可用 `paired_resume` 在保留的相同物理快照、相同新候选上
+补完测量，不能用来重跑已完成的低收益结果。该入口明确保存原失败与重试记录，
+不重新调用模型、不改收益/压力/漂移门。

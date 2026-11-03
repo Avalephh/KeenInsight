@@ -56,12 +56,16 @@ def coverage(root):
                                       ("cpu", "readIO", "writeIO", "virtualMem", "physical", "hit")},
         "resource_scope": resource.get("source"),
         "SQL_snapshot_rows": len(case.get("active_queries", [])),
+        "SQL_wait_snapshots_forwarded_to_model": False,
         "SQL_statement_statistics_rows": len(slow),
         "SQL_statistic_fields": sorted(set().union(*(set(row) for row in slow))) if slow else [],
         "full_explain_plans_collected": False,
         "reference_bgwriter_counters_collected": background,
         "bgwriter_fields_in_compact_database_metrics": sorted(set(background) &
                                                              set(compact["database_metrics"])),
+        "collected_but_not_forwarded_note": "the canonical compactor does not include full "
+            "pg_stat_activity wait snapshots or the raw bgwriter snapshot; do not attribute a "
+            "reference advantage to those fields without verifying an actual model input",
         "source_evidence_completed": payload["source_evidence"].get("status") == "completed",
         "source_runtime_chains": len(payload["source_evidence"].get("runtime_call_chains", [])),
         "source_static_records": len(payload["source_evidence"].get("static_parameter_evidence", [])),

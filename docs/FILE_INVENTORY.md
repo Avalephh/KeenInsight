@@ -147,6 +147,7 @@
 | `experiments/ebpf/GAIN_FAILURE_AUDIT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/LIGHTWEIGHT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PAIRED_TPS.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/PAIRED_TPS_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/README.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -169,6 +170,7 @@
 | `experiments/ebpf/lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/overhead.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/paired_report.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/paired_resume.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/paired_tps.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pg_layout.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pipeline.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
