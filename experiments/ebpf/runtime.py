@@ -29,7 +29,8 @@ class EventTail:
 
 class CollectorProcess:
     def __init__(self, directory, pid, pg_config, scope, profile, seconds,
-                 max_mb=8, capture_sql=False, report_seconds=.1, metric_mode=None):
+                 max_mb=8, capture_sql=False, report_seconds=.1, metric_mode=None,
+                 query_output="all"):
         self.directory = Path(directory)
         self.log = self.directory.with_suffix(".log").open("w")
         pids = pid if isinstance(pid, (list, tuple)) else [pid]
@@ -41,7 +42,7 @@ class CollectorProcess:
                 "--max-output-mb", str(max_mb), "--report-seconds", str(report_seconds),
                 "--collector-cpu-budget", "100000"]
         if scope == "query":
-            args += ["--query-output", "all"]
+            args += ["--query-output", query_output]
         if capture_sql:
             args += ["--capture-sql"]
         if metric_mode:

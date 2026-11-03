@@ -142,6 +142,8 @@
 | `docs/RELEASE_VALIDATION.md` | Operator/developer documentation or source inventory |
 | `docs/REPRODUCING.md` | Operator/developer documentation or source inventory |
 | `experiments/__init__.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/EQUIVALENCE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/EQUIVALENCE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/LIGHTWEIGHT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -154,6 +156,11 @@
 | `experiments/ebpf/collector.bpf.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/collector.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/cpu_sample.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/equivalence.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/equivalent_acceptance.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/equivalent_profiles.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/equivalent_resident.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/equivalent_sampling.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/evidence.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/overhead.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -214,6 +221,7 @@
 | `tests/test_codex_api_launcher.py` | Automated contract, security, retention or browser regression |
 | `tests/test_deployment.py` | Automated contract, security, retention or browser regression |
 | `tests/test_dream_auto_apply.py` | Automated contract, security, retention or browser regression |
+| `tests/test_ebpf_equivalence.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_experiment.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_pipeline.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_six_scenarios.py` | Automated contract, security, retention or browser regression |

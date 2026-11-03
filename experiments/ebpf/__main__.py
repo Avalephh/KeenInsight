@@ -4,6 +4,9 @@ import sys
 
 
 def main():
+    if sys.argv[1:2] == ["equivalence-lab"]:
+        from .equivalence import main as entry
+        return entry(sys.argv[2:])
     if sys.argv[1:2] == ["pipeline"]:
         from .pipeline import main as entry
         return entry(sys.argv[2:])
@@ -21,7 +24,8 @@ def main():
     collect.add_argument("--duration", type=float, default=30)
     collect.add_argument("--report-seconds", type=float, default=1)
     collect.add_argument("--profile", choices=("boundary", "resident", "six-resident", "events",
-                         "diagnostic", "diagnostic-lock", "diagnostic-wal", "core", "selected", "all"),
+                         "diagnostic", "diagnostic-lock", "diagnostic-wal", "diagnostic-system",
+                         "core", "selected", "all"),
                          default="events")
     collect.add_argument("--detail-level", choices=("lightweight", "full"), default="lightweight",
                          help="lightweight: aggregate short SQL, entry-only counts, no scheduler hook")
@@ -52,6 +56,7 @@ def main():
     train.add_argument("--alpha", type=float, default=.05)
     commands.add_parser("pipeline", help="resident eBPF -> original SysInsight -> apply/retest/restore")
     commands.add_parser("pipeline-lab", help="real closed loop in a disposable PostgreSQL cluster")
+    commands.add_parser("equivalence-lab", help="original six TP cases: eBPF profiles to business TPS tuning")
     args = parser.parse_args()
     if args.command == "train-selector":
         from .selection import train_file

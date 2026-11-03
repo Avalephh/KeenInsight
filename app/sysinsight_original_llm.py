@@ -324,6 +324,13 @@ def live_workload_template(template: str, case_result: Dict[str, Any]) -> str:
         'data_scale': 'not measured by this alert collector; do not assume 100 warehouses',
         'concurrency_note': 'Snapshot backend sessions are not a claim about total configured client threads.',
     }
+    if case_result.get("collection", {}).get("type") == "ebpf":
+        context["backend_sessions_in_alert_snapshot"] = None
+        context["concurrency_note"] = (
+            "No pg_stat_activity activity snapshot was collected for this input; "
+            "the explicit PID/birth targets and observation windows are in the eBPF artifacts. "
+            "A missing active_queries array does not mean zero active database backends."
+        )
     return template.replace(legacy, 'Live workload context (measured snapshot / declared experiment configuration):\n'+json.dumps(context,ensure_ascii=False,default=str))
 
 
@@ -412,6 +419,19 @@ def original_context(
             + ". Runtime function numbers are eBPF invocation counts, NOT CPU samples or percentages. "
             "The function file's legacy numeric columns carry calls, call score, direction only. "
             "Missing resource metrics are unknown. Do not infer zero IO or a complete call graph.\n"
+        )
+    elif objective.get("metric") == "normal_business_tps":
+        promptlib.question_template += (
+            "\n\nThis incident is evaluated by completed target BUSINESS transactions per second "
+            "under an unchanged offered external pressure rate, higher is better. "
+            "ExecutorRun spans and external-pressure TPS are NOT business TPS. "
+            "The input contains normal/anomaly eBPF on-CPU stack samples processed by the "
+            "original sample-rate differential algorithm, NOT function invocation counts. "
+            "Only propose these allowed parameters: " + ", ".join(sorted(constraints))
+            + ". Current native pg_settings values: " + json.dumps(initial_config)
+            + ". Missing IO/cache metrics are unknown. Never weaken durability, change workload "
+            "SQL, lower the offered pressure, change connection endpoints or propose DDL. "
+            "A static function/parameter match is not itself proof of a useful tuning direction.\n"
         )
     if case_result.get('mode') == 'live_alert':
         task_context['source_compatibility_workload'] = task_context['workload']

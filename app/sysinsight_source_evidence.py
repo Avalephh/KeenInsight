@@ -526,6 +526,13 @@ def render_source_evidence(evidence: Mapping[str, Any], max_chars: int = MAX_REN
             "    Runtime functions were observed by targeted eBPF uprobes. Counts are "
             "invocations, not CPU samples. No call stack or complete call graph was collected.",
         ]
+    elif evidence.get("semantics", {}).get("runtime_observation") == "ebpf_cpu_stack_samples":
+        runtime_lines = [
+            "10. Runtime eBPF CPU stack samples and PostgreSQL source evidence:",
+            "    These are real on-CPU sampled stacks, not function invocation counts. "
+            "Frame order is preserved; they are not a complete static call graph. "
+            "Normal/anomaly sample-rate differences use the original comparator.",
+        ]
     chains = evidence.get("runtime_call_chains", [])
     if isinstance(chains, list) and chains:
         for item in chains:

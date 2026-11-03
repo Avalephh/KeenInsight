@@ -18,6 +18,9 @@ English: [README.en.md](README.en.md)
 [eBPF 实验说明](experiments/ebpf/README.md)；用它开展采集实验，不要启动监控栈代替论文采集层。
 当前重点是贯通“eBPF 常驻事件 → 按需诊断 → 原 SysInsight → 应用/复测/恢复”，
 入口与范围见 [采集到调优的完整实验链路](experiments/ebpf/PIPELINE.md)。
+六个原 TP 场景的**功能等价入口**见
+[eBPF 正常/异常差分到业务 TPS 调优](experiments/ebpf/EQUIVALENCE.md)；
+先保留原诊断能力，不先削减采样预算。
 早期的 [轻量采集与性能影响](experiments/ebpf/LIGHTWEIGHT.md) 保留为历史实验，
 不将开销测量替代链路验收。
 原控制台六个 TP 场景的替换方案、实测和未完成边界见

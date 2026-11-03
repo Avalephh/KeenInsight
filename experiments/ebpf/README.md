@@ -11,6 +11,10 @@ DREAM 或 LLM；新加入的闭环入口会显式调用原 SysInsight 的模型 
 
 ## 当前优先目标：贯通原诊断与调优链路
 
+**功能等价优先的新入口：**[EQUIVALENCE.md](EQUIVALENCE.md)。
+使用多 backend 的真实正常/异常 eBPF profile、原差分/模型链和原六场景
+业务 TPS 应用/复测/恢复；不再把 spill-only 规则或六场景采集 smoke 当作等价迁移。
+
 已新增常驻事件触发、有界诊断、原 SysInsight 模型与候选流程、
 临时应用/复测/恢复的独立入口。使用与边界见
 [PIPELINE.md](PIPELINE.md)。下面的开销实验保留，但不作为当前优先工作。

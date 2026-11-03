@@ -36,6 +36,9 @@ SCHEMA = "keeninsight.ebpf.v2"
 
 
 def choose_probes(profile, model=None):
+    if profile == "diagnostic-system":
+        return ["vfs_read", "vfs_write", "lock_wait", "wal_flush", "wal_sync",
+                "checkpoint", "temp_file_read", "hash_spill"], "bounded_system_parity_diagnosis"
     if profile == "six-resident":
         return ["temp_file_create", "lock_wait", "checkpoint"], \
                "semantic_wait_checkpoint_spill_sentinels_not_complete_CPU_detection"

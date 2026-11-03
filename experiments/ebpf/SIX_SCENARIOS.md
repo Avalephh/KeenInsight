@@ -3,6 +3,10 @@
 日期：2026-11-03。依据 `app/tpcc_transaction_cases.py::FOCUS_SCENARIO_IDS`，
 不是另外挑六个容易成功的排序/落盘查询。
 
+**历史评估页：**下面记录的是早期低预算 smoke 的边界。后续已按
+“先做功能等价”新增 [EQUIVALENCE.md](EQUIVALENCE.md) 所述的多 backend
+正常/异常差分、原模型与 TP 业务复测入口；不要把本页当作新入口的能力说明。
+
 **结论：采集可以按少数几类机制替换，但目前不能宣称六个场景已经完成同等
 调优效果的迁移，更不能承诺“很小代价”已经通过验收。**
 原来的 `BufFileCreateTemp → work_mem → 只读 SQL 复测` 只覆盖首个落盘场景，

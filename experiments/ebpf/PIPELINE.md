@@ -4,6 +4,8 @@
 代码仍在 `experiment/ebpf-paper-20261103`，保留原在线服务，不修改运行中的数据库。
 已完成的真实 PG/eBPF/原模型验证与边界见
 [PIPELINE_VALIDATION.md](PIPELINE_VALIDATION.md)。
+本页描述首个单 SQL 落盘链。六个原 TP 场景的正常/异常差分与业务 TPS
+功能等价入口见 [EQUIVALENCE.md](EQUIVALENCE.md)。
 
 ## 明确采用的流程
 
