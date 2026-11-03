@@ -23,7 +23,7 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 @contextmanager
-def cluster(pg_config, max_connections=12):
+def cluster(pg_config, max_connections=12, statistics=False):
     if not isinstance(max_connections, int) or not 12 <= max_connections <= 32:
         raise ValueError("disposable cluster max_connections must be 12..32")
     info = inspect_server(pg_config)
@@ -49,6 +49,8 @@ def cluster(pg_config, max_connections=12):
                 handle.write("unix_socket_directories = '{}'\n".format(socket))
                 handle.write("shared_buffers = '32MB'\nmax_connections = {}\n".format(max_connections))
                 handle.write("max_parallel_workers_per_gather = 0\njit = off\n")
+                if statistics:
+                    handle.write("shared_preload_libraries = 'pg_stat_statements'\ntrack_io_timing = on\n")
             subprocess.run(base + [str(bindir / "pg_ctl"), "-D", str(data), "-l", str(log),
                                    "-w", "start"], cwd="/", check=True,
                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)

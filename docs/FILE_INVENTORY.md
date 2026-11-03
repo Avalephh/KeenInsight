@@ -146,6 +146,7 @@
 | `experiments/ebpf/EQUIVALENCE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/GAIN_FAILURE_AUDIT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/LIGHTWEIGHT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/PAIRED_TPS.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PIPELINE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/README.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -153,6 +154,7 @@
 | `experiments/ebpf/VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/__init__.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/__main__.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/buffer_observer.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/catalog.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/collector.bpf.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/collector.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -166,6 +168,8 @@
 | `experiments/ebpf/gain_audit.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/overhead.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/paired_report.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/paired_tps.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pg_layout.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pipeline.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pipeline_lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -225,6 +229,7 @@
 | `tests/test_dream_auto_apply.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_equivalence.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_experiment.py` | Automated contract, security, retention or browser regression |
+| `tests/test_ebpf_paired_tps.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_pipeline.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_six_scenarios.py` | Automated contract, security, retention or browser regression |
 | `tests/test_keeninsight_portal.py` | Automated contract, security, retention or browser regression |

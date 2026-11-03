@@ -195,6 +195,14 @@ def resource_snapshot(case: Dict[str, Any]) -> Dict[str, Any]:
     if case.get("collection", {}).get("type") == "ebpf":
         result.update(readIO=None, writeIO=None, hit=None,
                       source="host /proc only; uncollected DB IO/cache metrics are unknown")
+    measured = case.get("resource_metrics", {})
+    if isinstance(measured, dict) and measured.get("schema") == "keeninsight.measured-resources.v1":
+        # Explicit bounded-window observations take precedence over sampling
+        # the host minutes later during a model call. None remains unknown.
+        for name in ("cpu", "readIO", "writeIO", "virtualMem", "physical", "hit"):
+            if name in measured:
+                result[name] = measured[name]
+        result["source"] = measured.get("source", "recorded bounded-window observations")
     return result
 
 
@@ -242,7 +250,9 @@ def compact_sysinsight_observation(payload: Dict[str, Any]) -> Dict[str, Any]:
     database_metrics = payload.get("database_metrics", {})
     if not isinstance(database_metrics, dict):
         database_metrics = {}
-    prometheus_database = database_metrics.get("prometheus", {})
+    # The canonical builder emits flat metric records; older step artifacts
+    # wrapped them in "prometheus". Do not silently discard the canonical form.
+    prometheus_database = database_metrics.get("prometheus", database_metrics)
     if not isinstance(prometheus_database, dict):
         prometheus_database = {}
     host_metrics = payload.get("host_metrics", {})
@@ -301,6 +311,7 @@ def compact_sysinsight_observation(payload: Dict[str, Any]) -> Dict[str, Any]:
         },
         "tuning_context": payload.get("tuning_context", {}),
         "collection": payload.get("collection", {}),
+        "resource_metrics": payload.get("resource_metrics", {}),
         "ebpf_observations": payload.get("ebpf_observations", {}),
     }
 
@@ -324,6 +335,9 @@ def live_workload_template(template: str, case_result: Dict[str, Any]) -> str:
         'data_scale': 'not measured by this alert collector; do not assume 100 warehouses',
         'concurrency_note': 'Snapshot backend sessions are not a claim about total configured client threads.',
     }
+    if isinstance(case_result.get("controlled_workload"), dict):
+        return template.replace(legacy, "Declared controlled experiment (same for both collectors):\n"
+                                + json.dumps(case_result["controlled_workload"], ensure_ascii=False))
     if case_result.get("collection", {}).get("type") == "ebpf":
         context["backend_sessions_in_alert_snapshot"] = None
         context["concurrency_note"] = (
@@ -421,11 +435,12 @@ def original_context(
             "Missing resource metrics are unknown. Do not infer zero IO or a complete call graph.\n"
         )
     elif objective.get("metric") == "normal_business_tps":
+        collector_name = "eBPF" if case_result.get("collection", {}).get("type") == "ebpf" else "perf"
         promptlib.question_template += (
             "\n\nThis incident is evaluated by completed target BUSINESS transactions per second "
             "under an unchanged offered external pressure rate, higher is better. "
             "ExecutorRun spans and external-pressure TPS are NOT business TPS. "
-            "The input contains normal/anomaly eBPF on-CPU stack samples processed by the "
+            "The input contains normal/anomaly " + collector_name + " on-CPU stack samples processed by the "
             "original sample-rate differential algorithm, NOT function invocation counts. "
             "Only propose these allowed parameters: " + ", ".join(sorted(constraints))
             + ". Current native pg_settings values: " + json.dumps(initial_config)

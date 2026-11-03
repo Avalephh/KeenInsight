@@ -23,6 +23,7 @@ BPF_HASH(allowed, u32, u64, 32);
 BPF_HASH(depths, u32, u32, 32);
 BPF_HASH(spans, struct qkey, struct span, 512);
 BPF_HASH(counts, struct sample_key, u64, 65536);
+BPF_HASH(period_weights, struct sample_key, u64, 65536);
 BPF_STACK_TRACE(stacks, 16384);
 BPF_ARRAY(health, u64, 4);
 static inline void problem(u32 index) {
@@ -83,6 +84,9 @@ int sample(struct bpf_perf_event_data *ctx) {
     u64 zero=0, *value=counts.lookup_or_try_init(&key,&zero);
     if (value) __sync_fetch_and_add(value,1);
     else problem(2);
+    u64 *weight=period_weights.lookup_or_try_init(&key,&zero);
+    if (weight) __sync_fetch_and_add(weight,ctx->sample_period);
+    else problem(2);
     return 0;
 }
 """
@@ -98,14 +102,14 @@ def validate(pids, seconds, frequency):
         raise ValueError("equivalence sample frequency must be 1..1000Hz")
 
 
-def folded_rows(rows):
+def folded_rows(rows, weight="sample_count"):
     """Real sampled stacks, root->leaf, preserving repeated recursive frames."""
     counts = Counter()
     for row in rows:
         frames = list(reversed(row["user_frames"])) + list(reversed(row["kernel_frames"]))
         frames = [frame.replace(";", ":").replace("\n", "") for frame in frames if frame]
         if frames:
-            counts[";".join(frames)] += row["sample_count"]
+            counts[";".join(frames)] += row[weight]
     return counts
 
 
@@ -117,24 +121,29 @@ def register_task_fd(bpf, pair, pid, function_fd, frequency):
 
 
 def sample(pids, server, directory, seconds=15, frequency=300, on_ready=None,
-           on_stopped=None, on_tick=None):
+           on_stopped=None, on_tick=None, event="task-clock", query_association=True,
+           period_weighted=False):
     validate(pids, seconds, frequency)
+    if event not in ("task-clock", "cycles"):
+        raise ValueError("supported sampling events: task-clock, cycles")
     directory = Path(directory)
     directory.mkdir(mode=0o700, parents=True, exist_ok=False)
     targets = [process_identity(pid, server["binary"]) for pid in pids]
-    from bcc import BPF, PerfType, PerfSWConfig
+    from bcc import BPF, PerfType, PerfSWConfig, PerfHWConfig
     layout = server["header_layout"]
     flags = ["-D{}={}".format(name, layout[key]) for name, key in
              (("QD_PLAN_OFF", "qd_plan"), ("QD_SOURCE_OFF", "qd_source"),
               ("PS_QUERYID_OFF", "ps_queryid"))]
     bpf = BPF(text=PROGRAM, cflags=flags)
     atexit.unregister(bpf.cleanup)
-    pair = (PerfType.SOFTWARE, PerfSWConfig.TASK_CLOCK)
+    pair = ((PerfType.SOFTWARE, PerfSWConfig.TASK_CLOCK) if event == "task-clock" else
+            (PerfType.HARDWARE, PerfHWConfig.CPU_CYCLES))
     fds = {}
     bpf.open_perf_events[pair] = fds
     manifest = {"schema": "keeninsight.ebpf-equivalent-profile.v1", "status": "attaching",
                 "targets": targets, "frequency_hz_per_task": frequency, "requested_seconds": seconds,
-                "sample_event": "task-clock on-CPU timer; NOT hardware CPU cycle count",
+                "sample_event": ("task-clock on-CPU timer; NOT hardware CPU cycle count"
+                                 if event == "task-clock" else "hardware CPU cycles, frequency sampled"),
                 "binary_sha256": server["binary_sha256"], "kernel": server["kernel"],
                 "semantics": "user+kernel on-CPU stack samples; not function invocation counts"}
     atomic_json(directory / "manifest.json", manifest)
@@ -144,10 +153,11 @@ def sample(pids, server, directory, seconds=15, frequency=300, on_ready=None,
         for target in targets:
             pid = target["pid"]
             bpf["allowed"][ct.c_uint32(pid)] = ct.c_uint64(target["start_ticks"])
-            bpf.attach_uretprobe(name=server["binary"], sym="ExecutorRun", fn_name="query_leave", pid=pid)
-            bpf.attach_uprobe(name=server["binary"], sym="ExecutorRun", fn_name="query_enter", pid=pid)
-            for symbol in ("AbortCurrentTransaction", "RollbackAndReleaseCurrentSubTransaction"):
-                bpf.attach_uprobe(name=server["binary"], sym=symbol, fn_name="query_abort", pid=pid)
+            if query_association:
+                bpf.attach_uretprobe(name=server["binary"], sym="ExecutorRun", fn_name="query_leave", pid=pid)
+                bpf.attach_uprobe(name=server["binary"], sym="ExecutorRun", fn_name="query_enter", pid=pid)
+                for symbol in ("AbortCurrentTransaction", "RollbackAndReleaseCurrentSubTransaction"):
+                    bpf.attach_uprobe(name=server["binary"], sym=symbol, fn_name="query_abort", pid=pid)
             # ONE cpu=-1 task FD follows each PID across CPUs.
             register_task_fd(bpf, pair, pid, function.fd, frequency)
             if process_identity(pid, server["binary"]) != target:
@@ -181,6 +191,7 @@ def sample(pids, server, directory, seconds=15, frequency=300, on_ready=None,
                     result.append(symbols[identity])
                 return result
             rows.append({"pid": int(key.pid), "sample_count": int(value.value),
+                         "sample_period_weight": int(bpf["period_weights"][key].value),
                          "execution_start_ns": int(key.began) or None,
                          "pg_query_id": str(key.qid) if key.qid else None,
                          "user_frames": frames(key.user_stack),
@@ -192,18 +203,23 @@ def sample(pids, server, directory, seconds=15, frequency=300, on_ready=None,
                 raise RuntimeError("profile target exited/reused before symbolization completed")
         if health["map_capacity_errors"]:
             raise RuntimeError("incomplete profile: " + str(health))
-        folded = folded_rows(rows)
+        folded = folded_rows(rows, "sample_period_weight" if period_weighted else "sample_count")
         (directory / "profile.folded").write_text("".join(
             "{} {}\n".format(stack, count) for stack, count in sorted(folded.items())))
         atomic_json(directory / "samples.json", {"rows": rows})
         manifest.update(status="completed", sample_count=sum(row["sample_count"] for row in rows),
                         per_pid_samples={str(pid): sum(r["sample_count"] for r in rows if r["pid"] == pid)
                                          for pid in pids}, health=health,
+                        folded_weight=("sum(sample_period), same as original stackcollapse-perf"
+                                       if period_weighted else "sample count"),
+                        summed_sample_period=sum(row["sample_period_weight"] for row in rows),
                         active_seconds=(manifest["detached_monotonic_ns"] - began) / 1e9,
                         folded_path=str(directory / "profile.folded"),
-                        query_association="PID/birth + ExecutorRun start/queryId when available; "
-                                          "outside-executor samples remain backend scoped",
-                        query_association_complete=not bool(health["query_depth_overflows"]),
+                        query_association=("PID/birth + ExecutorRun start/queryId when available; "
+                                           "outside-executor samples remain backend scoped"
+                                           if query_association else "disabled: backend-scoped perf parity"),
+                        query_association_complete=(query_association and
+                                                    not bool(health["query_depth_overflows"])),
                         output_bytes=sum(p.stat().st_size for p in directory.iterdir() if p.is_file()))
         if not folded:
             raise RuntimeError("no usable CPU stack samples")
