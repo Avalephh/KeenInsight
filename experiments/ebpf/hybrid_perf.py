@@ -169,6 +169,9 @@ def worker(directory):
     result = _capture_perf(directory, request["pids"], request["seconds"], request["frequency"],
                            request["stackcollapse"], os.environ.copy())
     atomic_json(directory / "capture.json", result)
+    for target in request["targets"]:
+        if process_identity(target["pid"], request["binary"]) != target:
+            raise RuntimeError("target exited or identity changed during original perf window")
     if (result["postprocess"].get("status") != "sysinsight_counts_generated"
             or result["perf"].get("returncode") != 0):
         raise RuntimeError("original capture returned incomplete evidence")

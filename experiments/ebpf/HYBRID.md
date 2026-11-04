@@ -174,6 +174,20 @@ PYTHONHASHSEED=0 python3 monitoring/codex_api_launcher.py \
 会写 `hybrid_audit.json`，分别统计采集贯通、模型/TPS 贯通和有效收益，
 不会把三个计数混成一个“成功率”。
 
+### 真实预算中止实验（不要与 TPS 试验并行运行）
+
+```bash
+python3 -m experiments.ebpf.hybrid_safety_lab \
+  --output results/hybrid-budget \
+  --template /path/to/stopped-private-snapshot \
+  --stackcollapse /path/to/FlameGraph/stackcollapse-perf.pl
+```
+
+该入口在真实 eBPF 告警之后，故意把 perf 单文件预算降为 1 MiB。
+必须实际观察到限额/超量、原 perf 失败、模型未调用、进程组无存活成员、
+**同一个** sentinel 在中止后仍收到 PG 消息，才判预算试验通过。
+故障注入的是字节预算，不是伪造告警、perf 数据或成功结果。
+
 ## 验收边界
 
 1. 先验收 eBPF 能自动触发并恢复原证据、原模型与应用/复测/恢复。
@@ -183,3 +197,4 @@ PYTHONHASHSEED=0 python3 monitoring/codex_api_launcher.py \
 不能把 6/6 自动触发叫作 6/6 调优收益成功；也不能因为已经改用原 perf，
 就跳过原模型随机性、权限域、压力可比性或 TPS 漂移门控。
 历史双臂未达收益等价的结果仍见 [PAIRED_TPS_VALIDATION.md](PAIRED_TPS_VALIDATION.md)。
+本次混合链路的真实验收与版本边界见 [HYBRID_VALIDATION.md](HYBRID_VALIDATION.md)。

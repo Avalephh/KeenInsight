@@ -146,6 +146,7 @@
 | `experiments/ebpf/EQUIVALENCE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/GAIN_FAILURE_AUDIT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/HYBRID.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/HYBRID_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/LIGHTWEIGHT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PAIRED_TPS.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PAIRED_TPS_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |

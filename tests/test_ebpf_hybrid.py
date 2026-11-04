@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / "app"))
 
 from experiments.ebpf.equivalence import Workers
 from experiments.ebpf.hybrid_controller import HybridController
-from experiments.ebpf.hybrid_perf import CaptureBudgetExceeded, capture, living_group_members, supervised
+from experiments.ebpf.hybrid_perf import CaptureBudgetExceeded, capture, living_group_members, supervised, worker
 from experiments.ebpf.hybrid_policy import IncidentGate, RATE_FIELDS, RateDetector, rates
 from experiments.ebpf.hybrid_sentinel import PROGRAM, program, stats_layout
 from experiments.ebpf.hybrid_report import report
@@ -258,6 +258,21 @@ class PerfSupervisor(unittest.TestCase):
             with self.assertRaises(ValueError):
                 capture("not-created", pids, {}, seconds, 300, "missing")
         self.assertFalse(Path("not-created").exists())
+
+    def test_PID_reuse_during_completed_perf_window_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            target = {"pid": 123, "start_ticks": 10}
+            (directory / "request.json").write_text(json.dumps({
+                "pids": [123], "targets": [target], "seconds": 15, "frequency": 300,
+                "stackcollapse": "test-only", "binary": "postgres"}))
+            measured = {"perf": {"returncode": 0},
+                        "postprocess": {"status": "sysinsight_counts_generated"}}
+            with patch("sysinsight_live_chain._capture_perf", return_value=measured), \
+                    patch("experiments.ebpf.hybrid_perf.process_identity",
+                          side_effect=[target, {"pid": 123, "start_ticks": 11}]):
+                with self.assertRaisesRegex(RuntimeError, "identity changed"):
+                    worker(directory)
 
 
 class PG12ABIAndScope(unittest.TestCase):

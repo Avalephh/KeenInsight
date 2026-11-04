@@ -36,6 +36,9 @@ def audit_case(directory):
     healthy_seconds = healthy_last["mono"] - healthy_first["mono"]
     row.update(
         automatic_ebpf_alert=result["alert"]["source"] == "ebpf_native_PG12_received_statistics",
+        canonical_alert_source=(payload.get("alert") or {}).get("source"),
+        canonical_alert_matches_real_alarm=(
+            (payload.get("alert") or {}).get("source") == result["alert"]["source"]),
         alert_rules=[signal["rule"] for signal in result["alert"]["signals"]],
         alert_after_workload_transition_seconds=(
             (alert["monotonic_ns"] - transition["monotonic_ns"]) / 1e9 if alert and transition else None),
@@ -43,7 +46,7 @@ def audit_case(directory):
         returns_to_resident=("resident_resumed" in names and "post_incident_resident_verified" in names),
         original_database_metric_records=len(metrics),
         database_metrics_collected=bool(metrics) and all(
-            item.get("status") != "not_collected" for item in metrics.values()),
+            item.get("status") == "completed" and bool(item.get("series")) for item in metrics.values()),
         original_model_slow_SQL_rows=len(payload.get("tuning_context", {}).get("slow_queries", [])),
         original_perf_evidence=bool(chains) and all(chain.get("source") == "perf_folded_stack"
                                                    for chain in chains),
