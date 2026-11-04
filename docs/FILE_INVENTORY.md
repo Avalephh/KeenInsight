@@ -145,6 +145,7 @@
 | `experiments/ebpf/EQUIVALENCE.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/EQUIVALENCE_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/GAIN_FAILURE_AUDIT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/HYBRID.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/LIGHTWEIGHT.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PAIRED_TPS.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/PAIRED_TPS_VALIDATION.md` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -167,12 +168,20 @@
 | `experiments/ebpf/equivalent_sampling.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/evidence.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/gain_audit.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_controller.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_perf.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_policy.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_report.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_safety_lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/hybrid_sentinel.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/overhead.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/paired_report.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/paired_resume.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/paired_tps.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pg_layout.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
+| `experiments/ebpf/pg_stats_layout.c` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pipeline.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/pipeline_lab.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
 | `experiments/ebpf/runtime.py` | Opt-in paper experiment; headless eBPF collector, selection and isolated validation |
@@ -231,6 +240,7 @@
 | `tests/test_dream_auto_apply.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_equivalence.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_experiment.py` | Automated contract, security, retention or browser regression |
+| `tests/test_ebpf_hybrid.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_paired_tps.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_pipeline.py` | Automated contract, security, retention or browser regression |
 | `tests/test_ebpf_six_scenarios.py` | Automated contract, security, retention or browser regression |

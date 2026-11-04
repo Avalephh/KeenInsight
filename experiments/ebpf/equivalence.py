@@ -96,16 +96,21 @@ def parse_worker(text, offered, duration=None):
 
 class Workers:
     def __init__(self, case, directory, server, connection, admin, seconds, business_rate,
-                 pressure_rate, pressure, settings=None, resident=None):
+                 pressure_rate, pressure, settings=None, resident=None, roles=None):
+        roles = tuple(roles) if roles is not None else (
+            ("business", "pressure") if pressure else ("business",))
+        if (not roles or len(set(roles)) != len(roles) or set(roles) - {"business", "pressure"}
+                or ("pressure" in roles and not pressure)):
+            raise ValueError("invalid original-workload role selection")
         self.directory, self.processes, self.ids = directory, [], {}
         self.resident, self.registered = resident, []
         self.seconds = seconds
         self.policy = {"business_offered_tps": business_rate,
                        "pressure_offered_tps": pressure_rate if pressure else 0,
                        "pressure_clients": int(case["clients"]) if pressure else 0,
-                       "business_clients": 2}
+                       "business_clients": 2 if "business" in roles else 0}
         try:
-            for role in (("business", "pressure") if pressure else ("business",)):
+            for role in roles:
                 path = directory / (role + ".sql")
                 original = ROOT / "app/tpcc_cases" / case["normal_sql" if role == "business" else "sql"]
                 # A pgbench script is repeated for EVERY transaction.  SET

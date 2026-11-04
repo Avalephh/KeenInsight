@@ -7,9 +7,20 @@
 这里重建**采集层实验**，不是把原来 Prometheus 的数据换一种方式展示。
 纯采集入口不启动/依赖 bridge、Prometheus、Grafana、postgres_exporter、perf record、
 DREAM 或 LLM；新加入的闭环入口会显式调用原 SysInsight 的模型 API。
-两类实验均不停止本机已经运行的服务，原展示路径保持不变。
+实验均不停止本机已经运行的服务，原展示路径保持不变。
 
-## 当前验收：同数据、同负载、同权限的实际 TPS 收益
+## 当前入口：eBPF 轻量告警 → 按需原 perf / PG / SQL → 原调优
+
+按最新需求实现混合采集，不再强求 eBPF 重造全部原始观测：
+**[HYBRID.md](HYBRID.md)**。
+`python3 -m experiments.ebpf hybrid-lab` 使用 PG12 原生批量统计的 eBPF
+接收端 sentinel，连续异常后自动打开有界的原 perf 和 PG/SQL 观测，
+恢复原差分、源码证据；`--tune` 运行真实原模型、候选、TPS 复测与恢复。
+常驻不挂逐 SQL / 逐元组 / WAL flush 探针，初始健康 perf 校准显式标记。
+此混合入口**明确依赖 perf**，与下面保留的 all-eBPF 历史实验不同。
+目前是隔离集群的有界控制器，不冒充已替换生产守护进程或已证明低开销。
+
+## 已完成的双臂审计：同数据、同负载、同权限的实际 TPS 收益
 
 双臂方法与入口见 [PAIRED_TPS.md](PAIRED_TPS.md)，实际六场景结果和模型输入缺口见
 [PAIRED_TPS_VALIDATION.md](PAIRED_TPS_VALIDATION.md)。

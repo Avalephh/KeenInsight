@@ -4,6 +4,9 @@ import sys
 
 
 def main():
+    if sys.argv[1:2] == ["hybrid-lab"]:
+        from .hybrid_lab import main as entry
+        return entry(sys.argv[2:])
     if sys.argv[1:2] == ["equivalence-lab"]:
         from .equivalence import main as entry
         return entry(sys.argv[2:])
@@ -57,6 +60,7 @@ def main():
     commands.add_parser("pipeline", help="resident eBPF -> original SysInsight -> apply/retest/restore")
     commands.add_parser("pipeline-lab", help="real closed loop in a disposable PostgreSQL cluster")
     commands.add_parser("equivalence-lab", help="original six TP cases: eBPF profiles to business TPS tuning")
+    commands.add_parser("hybrid-lab", help="eBPF alarm -> original bounded perf/PG evidence -> original tuning")
     args = parser.parse_args()
     if args.command == "train-selector":
         from .selection import train_file
