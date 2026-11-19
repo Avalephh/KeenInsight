@@ -459,15 +459,24 @@
       });
     });
   };
-  let scheduled = false;
-  const schedule = () => {
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => { scheduled = false; translate(document.body); });
+  let observer = null;
+  let translating = false;
+  const translateNow = root => {
+    if (translating) return;
+    translating = true;
+    if (observer) observer.disconnect();
+    try {
+      translate(root);
+    } finally {
+      translating = false;
+      if (observer) observer.observe(document.body, {childList:true, subtree:true, characterData:true});
+    }
   };
   const start = () => {
-    translate(document.body);
-    new MutationObserver(schedule).observe(document.body, {childList:true, subtree:true, characterData:true});
+    translateNow(document.body);
+    document.documentElement.classList.remove('zh-pending');
+    observer = new MutationObserver(() => translateNow(document.body));
+    observer.observe(document.body, {childList:true, subtree:true, characterData:true});
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
