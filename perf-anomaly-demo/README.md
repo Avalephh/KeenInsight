@@ -1,3 +1,8 @@
+> **v2 scope note (2026-11-19):** SQL-level tuning (DREAM SQL rewrite/hints,
+> TPC-DS SQL lab, SQL log/detail pages) has been removed from this stack.
+> This document records the pre-v2 artifact; the active product is the
+> SysInsight system-parameter tuning path with the TPCC experiment console.
+
 # PostgreSQL 突发异常与 perf 采样测试
 
 这个目录独立于仓库中的 `monitoring/` 和 `sysinsight-tuning-demo/`。

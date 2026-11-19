@@ -35,9 +35,10 @@ class Headers(HTMLParser):
 @unittest.skipUnless(ARCHIVE.is_file(),"Original operator archive is not installed")
 class ArchivePresentationTests(unittest.TestCase):
     def test_all_retained_inline_styles_are_exact_archive_styles(self):
+        retained={p.name for p in WEB.glob("*.html")}
         with zipfile.ZipFile(ARCHIVE) as archive:
-            names=[n for n in archive.namelist() if n.endswith(".html") and "realtime-monitor" not in n]
-            self.assertEqual(len(names),11)
+            names=[n for n in archive.namelist() if Path(n).name in retained]
+            self.assertEqual(len(names),len(retained))
             for name in names:
                 with self.subTest(page=name):
                     original=archive.read(name).decode("utf-8-sig").replace("\r\n","\n")
@@ -48,7 +49,7 @@ class ArchivePresentationTests(unittest.TestCase):
 
     def test_original_list_headers_are_not_silently_renamed(self):
         with zipfile.ZipFile(ARCHIVE) as archive:
-            for name in ("host-list","alert-list","alert-rules","sql-log","dba-rules","manual","code-source"):
+            for name in ("host-list","alert-list","alert-rules","manual","code-source"):
                 with self.subTest(page=name):
                     original=archive.read("English/"+name+".html").decode("utf-8-sig")
                     current=(WEB/(name+".html")).read_text()

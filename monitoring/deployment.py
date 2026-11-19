@@ -96,11 +96,6 @@ def doctor():
     for command in required:
         if not shutil.which(command):
             errors.append("Missing system command: " + command)
-    for item in (ROOT / "dream/dream/agent/db_agent.py",
-                 Path(os.environ.get("DREAM_SOURCE_VENV", str(ROOT / "dream/.venv"))) / "bin/python",
-                 Path(os.environ.get("DREAM_SOURCE_CONFIG", str(ROOT / "dream/config/tpcds_local_config.json")))):
-        if not item.exists():
-            errors.append("Missing external source/runtime asset: " + str(item))
     source = Path(os.environ.get("SYSINSIGHT_SOURCE_ROOT", str(
         ROOT / "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune")))
     if not (source / "DBTuner/utils/analyzeException.py").is_file():
@@ -255,7 +250,7 @@ def systemd_installed():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["install", "start", "stop", "restart", "status", "health", "doctor", "prepare", "enable", "supervise", "install-components", "install-python", "install-dream-python"])
+    parser.add_argument("action", choices=["install", "start", "stop", "restart", "status", "health", "doctor", "prepare", "enable", "supervise", "install-components", "install-python"])
     parser.add_argument("--wait", type=int, default=0)
     args = parser.parse_args()
     try:
@@ -263,9 +258,7 @@ def main():
             return 0 if health(args.wait) else 1
         if args.action == "doctor":
             return 0 if doctor() else 1
-        if args.action == "prepare":
-            subprocess.run([sys.executable, str(MON / "prepare_runtime.py")], check=True)
-        elif args.action == "install":
+        if args.action == "install":
             if not doctor():
                 raise ValueError("Supply prerequisites first; see monitoring/DEPLOYMENT.md")
             bindir = Path(os.environ.get("MONITORING_BIN_DIR", str(MON / "vendor/usr/bin")))
@@ -277,7 +270,6 @@ def main():
                 if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
                     raise ValueError("Locked monitoring packages require Linux x86_64")
                 run_script("install_open_source.sh")
-            subprocess.run([sys.executable, str(MON / "prepare_runtime.py")], check=True)
             install_service()
             subprocess.run(["systemctl", "start", UNIT], check=True)
             return 0 if health(120) else 1
@@ -289,8 +281,6 @@ def main():
             run_script("install_open_source.sh")
         elif args.action == "install-python":
             subprocess.run(["bash", str(ROOT / "scripts/setup_python.sh")], check=True)
-        elif args.action == "install-dream-python":
-            subprocess.run(["bash", str(ROOT / "scripts/setup_dream_python.sh")], check=True)
         elif args.action == "status":
             if systemd_installed():
                 # Do not dump child argv: a configured exporter DSN can embed

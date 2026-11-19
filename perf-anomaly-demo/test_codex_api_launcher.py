@@ -5,14 +5,12 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from types import SimpleNamespace
 import unittest
 
 ROOT=Path(__file__).resolve().parent
 sys.path.insert(0,str(ROOT.parent/"monitoring"))
 sys.path.insert(0,str(ROOT))
 from codex_api_launcher import load_settings, environment
-from sysinsight_dream_bridge import Bridge
 
 
 class CodexAPIConfigTest(unittest.TestCase):
@@ -40,19 +38,5 @@ class CodexAPIConfigTest(unittest.TestCase):
     def test_oauth_tokens_are_not_reused_as_api_keys(self):
         (self.root/"auth.json").write_text(json.dumps({"tokens":{"access_token":"oauth-fixture"}}))
         with self.assertRaises(ValueError):load_settings(self.root)
-
-    def test_all_dream_agents_follow_shared_selection_without_saving_key(self):
-        config=self.root/"dream.json"
-        config.write_text(json.dumps({"AGENT_CONFIG":{"root_cause_llm_model":"old","fix_agent_model":"old","diagnostic_agent_model":"old"},"API_SETTINGS":{"openai":{"api_key":"fixture-secret-value","model":"old"}}}))
-        bridge=Bridge.__new__(Bridge)
-        bridge.args=SimpleNamespace(dream_config=str(config),dream_runtime_root=str(ROOT.parent/"dream"),
-            api_base="https://provider.invalid/v1",model="gpt-6.1-sol",db="demo",db_user="demo",
-            host="/tmp",port=5432,db_schema="public")
-        output=bridge._job_config(self.root)
-        data=json.loads(output.read_text())
-        for value in data["AGENT_CONFIG"].values():self.assertEqual(value,"gpt-6.1-sol")
-        self.assertNotIn("fixture-secret-value",output.read_text())
-        self.assertEqual(data["API_SETTINGS"]["openai"]["model"],"gpt-6.1-sol")
-
 
 if __name__=="__main__":unittest.main()

@@ -11,65 +11,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from deployment import unit_text, checks
-from prepare_runtime import copy_tree, relocate_config, prepare, make_public_directory
 from process_control import identity, matches
-
-
-class RuntimeTests(unittest.TestCase):
-    def test_new_runtime_parents_traversable_under_private_operator_umask(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            previous = os.umask(0o077)
-            try:
-                make_public_directory(root / "persistent" / ".venv" / "lib")
-            finally:
-                os.umask(previous)
-            for path in (root / "persistent", root / "persistent/.venv", root / "persistent/.venv/lib"):
-                self.assertEqual(path.stat().st_mode & 0o777, 0o755)
-            self.assertEqual(root.stat().st_mode & 0o777, 0o700, "Do not expose an existing private ancestor")
-
-    def test_relocates_old_checkout_and_strips_api_keys(self):
-        original = {"PLANNER_CONFIG": {"model_path": "/root/new/dream/dream/agent/plan/model.pt"},
-                    "API_SETTINGS": {"openai": {"api_key": "secret", "model": "operator-model"}},
-                    "MEMORY_MANAGER_CONFIG": {"db_path": "/tmp/old"}}
-        with patch.dict(os.environ, {"SYSINSIGHT_DB": "newdb", "SYSINSIGHT_DB_SCHEMA": "ap"}):
-            result = relocate_config(original, Path("/var/lib/example"), Path("/opt/new/dream"))
-        self.assertEqual(result["PLANNER_CONFIG"]["model_path"], "/var/lib/example/dream/agent/plan/model.pt")
-        self.assertNotIn("api_key", result["API_SETTINGS"]["openai"])
-        self.assertEqual(original["API_SETTINGS"]["openai"]["api_key"], "secret")
-        self.assertEqual(result["DATABASE_CONFIG"]["dbname"], "newdb")
-        self.assertEqual(result["DATABASE_CONFIG"]["search_path"], ["ap", "public"])
-        self.assertEqual(result["MEMORY_MANAGER_CONFIG"]["db_path"], "/var/lib/example/state/memory.json")
-
-    def test_copy_is_incremental_and_not_a_hardlink_or_secret_copy(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            source, target = Path(tmp) / "source", Path(tmp) / "runtime"
-            source.mkdir()
-            (source / "model.pt").write_bytes(b"genuine local test asset")
-            (source / ".env.local").write_text("private")
-            (source / "auth.json").write_text("private")
-            copy_tree(source, target)
-            self.assertEqual((source / "model.pt").read_bytes(), (target / "model.pt").read_bytes())
-            self.assertNotEqual((source / "model.pt").stat().st_ino, (target / "model.pt").stat().st_ino)
-            self.assertFalse((target / ".env.local").exists())
-            self.assertFalse((target / "auth.json").exists())
-            before = (target / "model.pt").stat().st_mtime_ns
-            copy_tree(source, target)
-            self.assertEqual(before, (target / "model.pt").stat().st_mtime_ns)
-
-    def test_refuses_unmarked_nonempty_runtime_without_touching_it(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "unrelated"; target.mkdir()
-            item = target / "valuable"; item.write_text("preserve")
-            with self.assertRaisesRegex(ValueError, "unmarked"):
-                prepare(target, "/unused/source", "/unused/venv", "/unused/config", "postgres")
-            self.assertEqual(item.read_text(), "preserve")
-
-    def test_refuses_runtime_source_overlap(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            source = Path(tmp) / "source"; source.mkdir()
-            with self.assertRaisesRegex(ValueError, "disjoint"):
-                prepare(source / "runtime", source, "/unused", "/unused", "postgres")
 
 
 class ProcessTests(unittest.TestCase):

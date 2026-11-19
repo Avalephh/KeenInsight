@@ -1,3 +1,8 @@
+> **v2 scope note (2026-11-19):** SQL-level tuning (DREAM SQL rewrite/hints,
+> TPC-DS SQL lab, SQL log/detail pages) has been removed from this stack.
+> This document records the pre-v2 artifact; the active product is the
+> SysInsight system-parameter tuning path with the TPCC experiment console.
+
 # SQL CPU 火焰图与 SHAP 实现、真实验证
 
 > 后续补充与最新结论见 [并行采样与独立验证](ATTRIBUTION_PARALLEL_AND_VALIDATION_20261024.md)。

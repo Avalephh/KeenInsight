@@ -1,3 +1,8 @@
+> **v2 scope note (2026-11-19):** SQL-level tuning (DREAM SQL rewrite/hints,
+> TPC-DS SQL lab, SQL log/detail pages) has been removed from this stack.
+> This document records the pre-v2 artifact; the active product is the
+> SysInsight system-parameter tuning path with the TPCC experiment console.
+
 # KeenInsight 页面与真实运行数据对齐
 
 入口：`http://127.0.0.1:9108/keeninsight/`。HTML 导航、品牌与基础样式来自用户提供的

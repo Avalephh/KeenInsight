@@ -43,24 +43,16 @@ BRIDGE_DB_HOST="${SYSINSIGHT_DB_HOST:-/var/run/postgresql}"
 BRIDGE_DB_PORT="${SYSINSIGHT_DB_PORT:-5432}"
 BRIDGE_DB_SCHEMA="${SYSINSIGHT_DB_SCHEMA:-tpcds}"
 BRIDGE_ALERT_NAME="${SYSINSIGHT_ALERT_NAME:-SysInsightDemoAnomaly}"
-BRIDGE_DREAM_CONFIG="${SYSINSIGHT_DREAM_CONFIG:-$BASE_DIR/../dream/config/tpcds_local_config.json}"
-BRIDGE_DREAM_RUN_AS="${SYSINSIGHT_DREAM_RUN_AS:-postgres}"
-# Keep active-query sampling below the 10 s DREAM trigger threshold.  This is
-# needed because pg_stat_statements stores normalized ($1/$2) text after a
-# statement finishes; the active sample is what preserves a replayable SQL
-# statement for automatic DREAM scheduling.
 BRIDGE_POLL_INTERVAL="${SYSINSIGHT_POLL_INTERVAL:-5}"
 BRIDGE_STATS_LIMIT="${SYSINSIGHT_STATS_LIMIT:-300}"
 BRIDGE_ACTIVE_LIMIT="${SYSINSIGHT_ACTIVE_LIMIT:-100}"
 BRIDGE_SLOW_LIMIT="${SYSINSIGHT_SLOW_LIMIT:-10}"
 BRIDGE_SLOW_MEAN_MS="${SYSINSIGHT_SLOW_MEAN_MS:-10000}"
 BRIDGE_SLOW_MAX_MS="${SYSINSIGHT_SLOW_MAX_MS:-10000}"
-BRIDGE_DREAM_TRIGGER_MS="${SYSINSIGHT_DREAM_TRIGGER_MS:-10000}"
 BRIDGE_SAMPLE_RETENTION_DAYS="${SYSINSIGHT_SQL_SAMPLE_RETENTION_DAYS:-1}"
 BRIDGE_SAMPLE_MAX_ROWS="${SYSINSIGHT_SQL_SAMPLE_MAX_ROWS:-500000}"
 BRIDGE_SAMPLE_MAINTENANCE_INTERVAL="${SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_INTERVAL:-900}"
 BRIDGE_SAMPLE_MAINTENANCE_BATCH="${SYSINSIGHT_SQL_SAMPLE_MAINTENANCE_BATCH:-50000}"
-BRIDGE_TUNE_WITHOUT_ALERT="${SYSINSIGHT_TUNE_WITHOUT_ALERT:-0}"
 BRIDGE_SYSINSIGHT_FULL_CHAIN="${SYSINSIGHT_FULL_CHAIN:-1}"
 BRIDGE_SYSINSIGHT_CHAIN_TIMEOUT="${SYSINSIGHT_CHAIN_TIMEOUT:-1800}"
 BRIDGE_SYSINSIGHT_API_TIMEOUT="${SYSINSIGHT_CHAIN_API_TIMEOUT:-1200}"
@@ -85,13 +77,8 @@ PG_CPU_QUOTA="${SYSINSIGHT_PG_CPU_QUOTA:-$DEFAULT_PG_CPU_QUOTA}"
 PG_MEMORY_LIMIT="${SYSINSIGHT_PG_MEMORY_LIMIT:-$DEFAULT_PG_MEMORY_LIMIT}"
 PG_TASKS_MAX="${SYSINSIGHT_PG_TASKS_MAX:-512}"
 
-# Keep worker code, models and Python off /tmp; never make /root traversable.
-BRIDGE_DREAM_RUNTIME_ROOT="${SYSINSIGHT_DREAM_RUNTIME_ROOT:-/var/lib/keeninsight/dream-runtime}"
 if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
   "$BRIDGE_PYTHON" "$BASE_DIR/deployment.py" doctor
-  python3 "$BASE_DIR/prepare_runtime.py" --runtime "$BRIDGE_DREAM_RUNTIME_ROOT" --verify
-  BRIDGE_DREAM_CONFIG="$BRIDGE_DREAM_RUNTIME_ROOT/config.json"
-  export SYSINSIGHT_DREAM_CACHE="${SYSINSIGHT_DREAM_CACHE:-$BRIDGE_DREAM_RUNTIME_ROOT/state/cache}"
   if [ -z "${POSTGRES_SOURCE_ROOT:-}" ] && [ -d "$BASE_DIR/../third_party/postgresql-12.22/src/backend" ]; then
     export POSTGRES_SOURCE_ROOT="$BASE_DIR/../third_party/postgresql-12.22"
   fi
@@ -205,9 +192,6 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
     --db-schema "$BRIDGE_DB_SCHEMA" \
     --pg-cluster "${SYSINSIGHT_PG_CLUSTER:-main}" \
     --alert-name "$BRIDGE_ALERT_NAME" \
-    --dream-config "$BRIDGE_DREAM_CONFIG" \
-    --dream-runtime-root "$BRIDGE_DREAM_RUNTIME_ROOT" \
-    --dream-run-as "$BRIDGE_DREAM_RUN_AS" \
     --state-db "$BRIDGE_STATE_DB" \
     --output "$BRIDGE_OUTPUT" \
     --http-listen "$BRIDGE_HTTP_LISTEN" \
@@ -218,7 +202,6 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
     --slow-limit "$BRIDGE_SLOW_LIMIT" \
     --slow-mean-ms "$BRIDGE_SLOW_MEAN_MS" \
     --slow-max-ms "$BRIDGE_SLOW_MAX_MS" \
-    --dream-trigger-ms "$BRIDGE_DREAM_TRIGGER_MS" \
     --sample-retention-days "$BRIDGE_SAMPLE_RETENTION_DAYS" \
     --sample-max-rows "$BRIDGE_SAMPLE_MAX_ROWS" \
     --sample-maintenance-interval "$BRIDGE_SAMPLE_MAINTENANCE_INTERVAL" \
@@ -245,11 +228,6 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
   if [ -n "$BRIDGE_SYSINSIGHT_VALIDATION_SQL" ]; then
     bridge_args+=(--sysinsight-validation-sql "$BRIDGE_SYSINSIGHT_VALIDATION_SQL")
   fi
-  case "$BRIDGE_TUNE_WITHOUT_ALERT" in
-    1|true|TRUE|yes|YES|on|ON)
-      bridge_args+=(--tune-without-alert)
-      ;;
-  esac
   if [ -n "${SYSINSIGHT_CODEX_CONFIG_DIR:-}" ]; then
     bridge_args=(
       "$BRIDGE_PYTHON" "$BASE_DIR/codex_api_launcher.py"

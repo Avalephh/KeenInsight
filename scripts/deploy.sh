@@ -13,7 +13,7 @@ fi
 case "${1:---help}" in
   -h|--help)
     echo "Usage: bash scripts/deploy.sh {install|doctor|prepare|enable|start|restart|stop|status}"
-    echo "Explicit dependency setup: install-components | install-python | install-dream-python"
+    echo "Explicit dependency setup: install-components | install-python"
     echo "New machines require existing PostgreSQL/data, upstream sources and real DREAM assets."
     echo "See monitoring/DEPLOYMENT.md. No database is automatically created or overwritten."
     exit 0

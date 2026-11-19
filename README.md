@@ -63,9 +63,9 @@ monitoring/status.sh
 
 Grafana：<http://127.0.0.1:3000/>；Prometheus：<http://127.0.0.1:9090/>。Grafana 大屏的 JSON 在 `monitoring/dashboards/`，Prometheus 告警规则在 `monitoring/config/prometheus/rules/`。
 
-联动状态大屏：<http://127.0.0.1:3000/d/sysinsight-dream-automation?orgId=1&refresh=15s>；后台动作管理控制台：<http://127.0.0.1:9108/ui>。`monitoring/start.sh` 会自动启动 SysInsight/DREAM bridge，并把其状态作为 Prometheus 指标接入 Grafana。
+联动状态大屏：<http://127.0.0.1:3000/d/sysinsight-dream-automation?orgId=1&refresh=15s>；后台动作管理控制台：<http://127.0.0.1:9108/ui>。`monitoring/start.sh` 会自动启动 SysInsight bridge，并把其状态作为 Prometheus 指标接入 Grafana。
 
-一页实验控制台：<http://127.0.0.1:9108/lab>；Grafana 实验看板：<http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1&refresh=5s>。控制台可重置实验参数、触发 TPCC 基线→压力→恢复、清空 DREAM 记录并执行 TPC-DS SQL 的优化前后对比。
+一页实验控制台：<http://127.0.0.1:9108/lab>；Grafana 实验看板：<http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1&refresh=5s>。控制台可重置实验参数、触发 TPCC 基线→压力→恢复，并查看压力下调优前后的目标业务 TPS 对比。
 
 ## 运行真实 API 的 TPCC 验证
 
@@ -123,33 +123,20 @@ python3 perf-anomaly-demo/sysinsight_auto.py \
 
 API key 只从环境变量读取，优先使用 `SYSINSIGHT_GPT_API_KEY`，也兼容 `SYSINSIGHT_API_KEY` 和 `OPENAI_API_KEY`；不会写入结果目录。输出目录中的 `auto_manifest.json` 汇总检测、分析和调优阶段，`pipeline/summary.json` 记录候选实测和最佳候选。
 
-## SysInsight 与 DREAM 在线联动
+## SysInsight 系统调优在线联动
 
-在线入口为 `perf-anomaly-demo/sysinsight_dream_bridge.py`：Prometheus firing 告警触发 SysInsight
-观测/分析；同一后台循环持续记录每条 SQL 的 `pg_stat_statements` 时间统计和活动 SQL 样本，
-慢 SQL 异步交给 DREAM。DREAM 通过同一组 `SYSINSIGHT_GPT_*` API 环境变量调用 GPT5.6-SOL。
-只读且真实复测达到最低收益的 plan Hint/规划参数发布到 PostgreSQL `hint_plan.hints`；SQL 改写
-和执行期会话参数登记到桥接执行路径，下一次相同 SQL 经该路径时自动应用。DDL、未知动作、
-缺少优化后耗时或收益不足的结果只留作 candidate。直接连接 PostgreSQL 的客户端可透明获得
-Hint 类方案；改写类方案需要接入桥接/应用执行路径。
-
-这里的统计是 `pg_stat_statements` 的累计值与轮询间隔增量；要获得每次调用的精确耗时，还需同时打开
-应用侧 tracing 或 PostgreSQL `log_min_duration_statement` 日志采集。
+在线入口为 `perf-anomaly-demo/sysinsight_dream_bridge.py`（文件名保留兼容）：Prometheus firing 告警触发 SysInsight 观测/分析；同一后台循环持续记录 `pg_stat_statements` 时间统计和活动 SQL 样本，作为告警诊断证据。SysInsight 通过真实 perf 窗口、原始函数分析、源码关联、SHAP 和 LLM 生成 PostgreSQL 系统参数候选，经静态/live 校验后临时应用、复测并恢复。
 
 ```bash
 python3 perf-anomaly-demo/sysinsight_dream_bridge.py \
-  --configure-hint-table --db keeninsight --db-schema tpcds \
-  --dream-config dream/config/tpcds_local_config.json \
-  --state-db /tmp/sysinsight-dream-bridge.sqlite3 \
-  --output /tmp/sysinsight-dream-bridge
+  --db keeninsight --db-schema tpcds \
+  --state-db /tmp/sysinsight-bridge.sqlite3 \
+  --output /tmp/sysinsight-bridge
 ```
 
-API key 不写入配置或结果。`--configure-hint-table` 会设置新连接的 `session_preload_libraries`
-和 `pg_hint_plan.enable_hint_table`；已有连接需要重连。
+API key 只从环境变量读取，优先使用 `SYSINSIGHT_GPT_API_KEY`，也兼容 `SYSINSIGHT_API_KEY` 和 `OPENAI_API_KEY`；不会写入结果目录。告警时间线、最近采集状态和系统参数调优证据可在 `/ui` 查看；Grafana 联动大屏展示告警、采集和实验趋势。
 
-如果本机使用 Unix socket `peer` 认证，root 启动时还需让 DREAM worker 使用数据库 OS 用户，
-并把 DREAM checkout 放到该用户可读取的位置：追加
-`--dream-run-as postgres --dream-runtime-root <postgres 可读的 DREAM 根目录>`；或改用 TCP/密码认证。
+这里的统计是 `pg_stat_statements` 的累计值与轮询间隔增量；要获得每次调用的精确耗时，还需同时打开应用侧 tracing 或 PostgreSQL `log_min_duration_statement` 日志采集。
 
 ## 静态检查
 

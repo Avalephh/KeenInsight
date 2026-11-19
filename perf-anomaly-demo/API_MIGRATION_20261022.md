@@ -1,3 +1,8 @@
+> **v2 scope note (2026-11-19):** SQL-level tuning (DREAM SQL rewrite/hints,
+> TPC-DS SQL lab, SQL log/detail pages) has been removed from this stack.
+> This document records the pre-v2 artifact; the active product is the
+> SysInsight system-parameter tuning path with the TPCC experiment console.
+
 # Codex 配置复用与 GPT-6.1-SOL 实测
 
 ## 生效配置

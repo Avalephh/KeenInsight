@@ -11,7 +11,6 @@ import hashlib
 import json
 import math
 from pathlib import Path
-from sql_profiling import digest as sql_digest
 import re
 import socket
 import threading
@@ -23,15 +22,10 @@ VERSION = "keeninsight.ui.v1"
 CATEGORIES = {
     "hosts": ("host-list.html", "Host identity, database, cluster, collection health"),
     "alerts": ("alert-list.html", "Alert trigger, raw state, diagnosis, apply/retest/restore evidence"),
-    "sql": ("sql-log.html", "Fingerprint statistics and separate measured execution records"),
-    "diagnoses": ("sql-detail.html", "Root causes, explanation, rule candidates, model, plan"),
     "profiles": ("alert-detail.html", "Differential profiling, SHAP, hot functions, runtime call chains"),
-    "tuning": ("sql-detail.html", "Candidate action, old/new timings, validation, activation and hits"),
     "alertRules": ("alert-rules.html", "Actual loaded Prometheus alert expression and state"),
-    "diagnosisRules": ("dba-rules.html", "DREAM SQL rewrite rules from the runtime rule library"),
     "code": ("code-source.html", "Versioned PostgreSQL function/parameter/source-line associations"),
     "manual": ("manual.html", "Parameter descriptions, unit, context, defaults and limits"),
-    "knowledge": ("tuning-knowledge.html", "Empirical measured improvements with source and validation"),
 }
 
 
@@ -120,15 +114,10 @@ def duration_ms(start, end):
 
 
 def prune(conn, cutoff):
-    # Active actions and queued/running owners retain their supporting evidence.
+    # Active alert workflows retain their supporting evidence.
     conn.execute("""DELETE FROM keeninsight_evidence WHERE captured_at < ?
         AND NOT (entity_type='alert' AND entity_id IN
             (SELECT incident_id FROM incidents WHERE status IN ('queued','running')))
-        AND NOT (entity_type='sql' AND entity_id IN
-            (SELECT job_id FROM dream_jobs WHERE status IN ('queued','running')))
-        AND NOT (entity_type='sql' AND EXISTS
-            (SELECT 1 FROM improvements WHERE status='active'
-             AND json_extract(validation_json,'$.job_id')=keeninsight_evidence.entity_id))
         """, (cutoff,))
 
 
@@ -144,15 +133,10 @@ class KeenInsightPortal:
     def _backfill(self):
         """Bounded, idempotent migration of retained historical evidence."""
         with self.store._lock, self.store._connection() as conn:
-            jobs = conn.execute("""SELECT job_id,result_json,finished_at,requested_at FROM dream_jobs WHERE result_json IS NOT NULL
-                AND job_id NOT IN (SELECT entity_id FROM keeninsight_evidence WHERE entity_type='sql')
-                ORDER BY requested_at DESC LIMIT 500""").fetchall()
             incidents = conn.execute("""SELECT i.*,e.payload_json AS retained_evidence FROM incidents i
                 LEFT JOIN keeninsight_evidence e ON e.entity_type='alert' AND e.entity_id=i.incident_id
                 WHERE e.entity_id IS NULL OR json_extract(e.payload_json,'$.evidenceVersion') IS NULL
                 ORDER BY i.started_at DESC LIMIT 500""").fetchall()
-            for row in jobs:
-                capture(conn, "sql", row["job_id"], decode(row["result_json"], {}), row["finished_at"] or row["requested_at"])
             for row in incidents:
                 old = decode(row['retained_evidence'], {})
                 fresh = incident_evidence(row["directory"] or ROOT, decode(row["sysinsight_json"], {}))
@@ -172,18 +156,13 @@ class KeenInsightPortal:
         return {"schemaVersion": VERSION, "categories": [
             {"name": key, "page": page, "description": desc,
              "storage": {"profiles": "keeninsight_evidence",
-                         "diagnoses": "dream_jobs + keeninsight_evidence"}.get(key, {
-                             "hosts": "runtime host identity", "alerts": "incidents + keeninsight_evidence",
-                             "sql": "sql_observations + lab_sql_executions", "tuning": "improvements",
-                             "knowledge": "improvements (measured)"}.get(key, "versioned repository assets"))}
+                         "hosts": "runtime host identity",
+                         "alerts": "incidents + keeninsight_evidence"}.get(
+                             key, "versioned repository assets")}
             for key, (page, desc) in CATEGORIES.items()],
             "retention": {"runtimeHours": 24, "activeEvidenceRetained": True,
                           "referenceAssets": "version controlled"},
             "unknownMeasurements": None,
-            "sqlLogKinds": {"observation": "aggregated pg_stat_statements fingerprint; not a single execution",
-                            "execution": "individual measured lab execution, including failed executions"},
-            "sqlFields": ["id", "time", "host", "database", "sql", "type", "executionTime", "hasError",
-                          "result", "lifecycle", "flameGraph", "diagnosis_results", "tuning_results"],
             "alertFields": ["id", "time", "host", "cluster", "reason", "severity", "status", "rawStatus",
                             "rootCause", "diagnosis", "detailAnalysis"],
             "provenanceFields": ["schemaVersion", "source", "availability", "updatedAt"]}
@@ -347,157 +326,6 @@ class KeenInsightPortal:
                                         "profiling": "recorded" if detection else "no profiler artifact retained"}})
         return record
 
-    def sql_logs(self, limit, offset, search, kind="all", filters=None):
-        # SQL observation totals are never represented as per-execution timings.
-        clauses = "WHERE query_text LIKE ? OR sql_key LIKE ?"
-        pattern = "%" + search + "%"
-        observations = self._rows("SELECT sql_key AS id,last_seen AS time,'observation' AS kind,query_text AS sql,"
-                                  "mean_time_ms AS executionTime,'observed' AS result FROM sql_observations "
-                                  + clauses, (pattern, pattern))
-        executions = self._rows("SELECT execution_id AS id,started_at AS time,'execution' AS kind,query_text AS sql,"
-                               "duration_ms AS executionTime,status AS result FROM lab_sql_executions "
-                               "WHERE query_text LIKE ? OR sql_id LIKE ?", (pattern, pattern))
-        if kind not in {"all", "execution", "observation"}:
-            raise ValueError("invalid SQL record kind")
-        identities = sorted((observations if kind != "execution" else []) +
-                            (executions if kind != "observation" else []),
-                            key=lambda row: (row["kind"] == "execution", row["time"] or ""), reverse=True)
-        if filters:
-            for row in identities:
-                row["type"] = (re.sub(r"^\s*(?:/\*.*?\*/\s*|--[^\n]*\n\s*)*", "", row["sql"], flags=re.S).split() or [""])[0].upper()
-            identities = [row for row in identities if self._matches(row, filters)]
-        return {"items": [self.sql_detail(row["id"], brief=True) for row in identities[offset:offset+limit]],
-                "total": len(identities)}
-
-    def sql_detail(self, identity, brief=False, job_id=None):
-        executions = self._rows("SELECT * FROM lab_sql_executions WHERE execution_id=?", (identity,))
-        execution = executions[0] if executions else None
-        if execution:
-            runs = self._rows("SELECT result_json FROM lab_runs WHERE run_id=?", (execution["run_id"],))
-            run = decode(runs[0]["result_json"], {}) if runs else {}
-            key = run.get("sql_key")
-            rows = self._rows("SELECT * FROM sql_observations WHERE sql_key=?", (key,)) if key else []
-        else:
-            rows = self._rows("SELECT * FROM sql_observations WHERE sql_key=?", (identity,))
-        observation = rows[0] if rows else {}
-        if not observation and not execution:
-            raise KeyError("SQL record not found")
-        key = observation.get("sql_key")
-        jobs = (self._rows("SELECT * FROM dream_jobs WHERE sql_key=? AND job_id=?", (key, job_id)) if job_id else
-                self._rows("SELECT * FROM dream_jobs WHERE sql_key=? ORDER BY requested_at DESC LIMIT 1", (key,))) if key else []
-        improvements = self._rows("SELECT * FROM improvements WHERE sql_key=? ORDER BY created_at DESC LIMIT 50", (key,)) if key else []
-        job = jobs[0] if jobs else {}
-        if not job:
-            # Active actions retain their original evidence even when the
-            # 24-hour task history expires. Resolve by this SQL's validated
-            # job ID, never by a global "latest" diagnosis or another SQL.
-            for item in improvements:
-                retained_id = decode(item.get('validation_json'), {}).get('job_id')
-                if item.get('status') != 'active' or not retained_id or (job_id and retained_id != job_id):
-                    continue
-                if not self._evidence("sql", retained_id):
-                    continue
-                job = {'job_id': retained_id, 'status': 'history_expired',
-                       'history_expired': True,
-                       'history_note': '24-hour task history expired; original evidence is retained because its improvement is still active.'}
-                break
-        if job_id and not job:
-            raise KeyError('DREAM job does not belong to this SQL')
-        improvement = next((item for item in improvements if not job or
-            decode(item.get('validation_json'), {}).get('job_id') in {None, job.get('job_id')}), {})
-        # Keep the active published action distinct from a newer failed or
-        # no_action diagnosis, rather than attributing old wins to a new job.
-        active_rows = self._rows("SELECT * FROM improvements WHERE sql_key=? AND status='active' ORDER BY created_at DESC LIMIT 1", (key,)) if key else []
-        active = active_rows[0] if active_rows else {}
-        result = decode(job.get("result_json"), {})
-        timing = execution.get("duration_ms") if execution else observation.get("mean_time_ms")
-        text = execution["query_text"] if execution else observation.get("replay_sql") or observation.get("query_text", "")
-        record = {"id": identity, "sqlKey": key, "kind": "execution" if execution else "observation",
-                  "time": execution["started_at"] if execution else observation.get("last_seen"),
-                  "host": socket.gethostname(), "database": observation.get("database_name") or self.bridge.args.db,
-                  "sql": text, "type": (re.sub(r"^\s*(?:/\*.*?\*/\s*|--[^\n]*\n\s*)*", "", text, flags=re.S).split() or [""])[0].upper(),
-                  "executionTime": timing, "calls": 1 if execution else observation.get("calls"),
-                  "hasError": bool(execution["status"] == "failed") if execution else None,
-                  "result": execution["status"] if execution else "observed",
-                  "jobStatus": job.get("status"), "jobId": job.get("job_id"),
-                  "improvementStatus": improvement.get("status"), "improvementId": improvement.get("improvement_id"),
-                  "phase": execution.get("phase") if execution else None,
-                  'runId': execution.get('run_id') if execution else None,
-                  "source": "lab_sql_executions" if execution else "pg_stat_statements",
-                  "schemaVersion": VERSION}
-        if brief:
-            return record
-        evidence = self._evidence("sql", job.get("job_id", ""))
-        result = evidence or result
-        evaluation = result.get("evaluation") or {}
-        diagnosis = result.get("diagnosis_results") or {
-            "query_id": key, "root_causes": result.get("root_causes") or decode(improvement.get("root_causes"), []) or [], "confidence": {},
-            "explanation": result.get("prediction_explanation") or result.get("explanation") or "",
-            "rule_matches_detail": [],
-        }
-        new_time = improvement.get("new_time", result.get('new_time'))
-        old_time = improvement.get("old_time", result.get('old_time'))
-        lifecycle = []
-        execution_rows = self._rows("SELECT e.* FROM lab_sql_executions e JOIN lab_runs r ON r.run_id=e.run_id WHERE json_extract(r.result_json,'$.sql_key')=? ORDER BY e.started_at DESC LIMIT 50", (key,)) if key else ([execution] if execution else [])
-        for item in reversed(execution_rows):
-            lifecycle.append({'phase': item['phase'], 'status': item['status'],
-                'startedAt': item['started_at'], 'finishedAt': item['finished_at'],
-                'durationMs': item['duration_ms'], 'method': item['method'],
-                'executionId': item['execution_id'], 'runId': item['run_id'], 'source': 'lab_sql_executions'})
-        if job and not job.get('history_expired'):
-            lifecycle.append({'phase': 'DREAM diagnosis and evaluation', 'status': job.get('status'),
-                'startedAt': job.get('started_at'), 'finishedAt': job.get('finished_at'),
-                'durationMs': duration_ms(job.get('started_at'), job.get('finished_at')),
-                'method': result.get('api_model'), 'jobId': job.get('job_id'), 'source': 'dream_jobs'})
-        lifecycle.sort(key=lambda item: item.get('startedAt') or '')
-        profiles = self._rows("SELECT payload_json FROM sql_profiles WHERE execution_id=? ORDER BY started_at DESC LIMIT 5", (identity,)) if execution else self._rows(
-            "SELECT payload_json FROM sql_profiles WHERE database_name=? AND sql_sha256=? ORDER BY started_at DESC LIMIT 5",
-            (record["database"], sql_digest(observation.get("canonical_sql") or text)))
-        profiles = [decode(item['payload_json'], {}) for item in profiles]
-        selected_profile = next((item for item in profiles if item.get('flameGraph')), profiles[0] if profiles else {})
-        flame_graph = selected_profile.get('flameGraph')
-        record.update({"lifecycle": lifecycle or result.get("lifecycle"), "flameGraph": flame_graph,
-                       "sqlProfile": {k: v for k, v in selected_profile.items() if k != 'flameGraph'} or None,
-                       "plan": result.get("plan_json"), "diagnosis_results": diagnosis,
-                       'diagnosisTrace': result.get('diagnosis_trace') or None,
-                       'actionTrace': result.get('action_trace') or evaluation.get('action_trace') or None,
-                       'evaluation': evaluation,
-                       'activeApplication': {'id': active.get('improvement_id'), 'status': active.get('status'),
-                           'applyKind': active.get('apply_kind'), 'applyScope': active.get('apply_scope'),
-                           'hitCount': active.get('hit_count'), 'validation': decode(active.get('validation_json'), {})} if active else None,
-                       'executionHistory': lifecycle,
-                       'jobHistory': [{k: item.get(k) for k in ('job_id', 'status', 'requested_at', 'finished_at', 'error')}
-                                      for item in self._rows('SELECT * FROM dream_jobs WHERE sql_key=? ORDER BY requested_at DESC LIMIT 10', (key,))] if key else [],
-                       "tuning_results": {
-                           "query_id": key, "fix_action": improvement.get("fix_action") or result.get("fix_action"),
-                           "rewrite_sql": improvement.get("rewrite_sql") or result.get("rewrite_sql"),
-                           "action_explanation": evaluation.get("explanation"),
-                           "root_causes": diagnosis.get("root_causes") or [],
-                           "old_time": old_time, "new_time": new_time,
-                           "improvement_ratio": improvement.get("improvement_ratio"),
-                           "validation": decode(improvement.get("validation_json"), {}),
-                           "status": improvement.get("status"), "applyKind": improvement.get("apply_kind"),
-                           "applyScope": improvement.get("apply_scope"), "hitCount": improvement.get("hit_count"),
-                           "sessionSettings": decode(improvement.get("session_settings_json"), {}),
-                           'message': evaluation.get('msg') or (result.get('bridge_publication') or {}).get('reason') or result.get('explanation') or job.get('error'),
-                           'evaluationStatus': result.get('evaluation_status'),
-                           'baselineProvenance': 'Recorded original execution; see timestamps in executionHistory. A reused baseline is not a new paired benchmark.',
-                       }, "job": {"id": job.get("job_id"), "status": job.get("status"),
-                                   "startedAt": job.get("started_at"), "finishedAt": job.get("finished_at"),
-                                   "error": job.get("error"), "model": result.get("api_model"),
-                                   'historyExpired': bool(job.get('history_expired')),
-                                   'historyNote': job.get('history_note'),
-                                   'evidenceSource': 'keeninsight_evidence (active action)' if job.get('history_expired') else 'dream_jobs',
-                                   'triggerSource': job.get('trigger_source'), 'sourceCompletionMs': job.get('source_completion_ms')},
-                       "execution": execution, "statistics": observation,
-                       "availability": {name: "recorded" if record_value is not None else reason for name, record_value, reason in [
-                           ("plan", result.get("plan_json"), "not present in this historical worker result"),
-                           ("lifecycle", lifecycle or result.get("lifecycle"), "no retained execution or job timestamps; SQL-internal CPU/memory stages are not instrumented"),
-                           ("flameGraph", flame_graph, selected_profile.get('reason') or "SQL-scoped stack profile was not collected"),
-                           ("confidence", diagnosis.get("confidence") or None, "planner did not return confidence"),
-                       ]}})
-        return clean(record)
-
     def references(self, category):
         with self._cache_lock:
             if category in self._cache:
@@ -527,29 +355,8 @@ class KeenInsightPortal:
                                        'availability': {'functionFlow': 'Static parameter/function association, not a runtime trace. Actual runtime chains are retained per alert.',
                                                         'dataFlow': 'recorded' if evidence.get('variable') else 'association has no variable-level evidence'},
                                        "provenance": association.get("source_provenance"), "source": "PostgreSQL source association"})
-            elif category == "diagnosisRules":
-                path = REPO / "dream/dream/agent/action/rewrite_rules.jsonl"
-                if path.exists():
-                    for line in path.read_text().splitlines():
-                        if not line.strip():
-                            continue
-                        item = json.loads(line)
-                        values.append({"id": item["name"], "name": item["name"], "category": "SQL rewrite",
-                                       "status": "available", "description": item.get("conditions"),
-                                       "condition": item.get("conditions"), "action": item.get("transformations"),
-                                       "source": "DREAM rewrite_rules.jsonl"})
             self._cache[category] = values
             return values
-
-    def knowledge(self):
-        rows = self._rows("SELECT * FROM improvements ORDER BY created_at DESC LIMIT 500")
-        return [{"id": row["improvement_id"], "condition": row.get("root_causes"),
-                 "content": row.get("rewrite_sql") or row.get("fix_action") or row.get("hints"),
-                 "confidence": None, "measuredImprovement": row.get("improvement_ratio"),
-                 "oldTimeSeconds": row.get("old_time"), "newTimeSeconds": row.get("new_time"),
-                 "status": row["status"], "hitCount": row["hit_count"], "sqlKey": row["sql_key"],
-                 "validation": decode(row.get("validation_json"), {}), "source": "measured DREAM improvement",
-                 "updatedAt": row.get("last_action_at") or row["created_at"]} for row in rows]
 
     def experiment(self, row):
         result = decode(row.get('result_json'), {}) if 'result_json' in row else row.get('result') or {}
@@ -557,57 +364,33 @@ class KeenInsightPortal:
         tuning = result.get('tuning') or {}
         comparison = result.get('comparison') or {}
         ids = [item.get('incident_id') for item in (result.get('sysinsight_state') or {}).get('current_incidents', [])]
-        sql_key = result.get('sql_key')
         return {'run_id': row['run_id'], 'kind': row['kind'], 'scenario_id': row['scenario_id'],
             'title': row.get('title'), 'status': row['status'], 'phase': row.get('phase'),
             'requested_at': row['requested_at'], 'started_at': row.get('started_at'), 'finished_at': row.get('finished_at'),
             'error': row.get('error'), 'config': config, 'comparison': comparison,
             'candidateSource': tuning.get('source'), 'candidateSourceType': tuning.get('source_type'),
             'tuningStatus': tuning.get('status'), 'application': tuning.get('application') or {},
-            'incidentIds': ids, 'sqlKey': sql_key, 'jobId': result.get('job_id'),
-            'baselineExecutionId': result.get('baseline_execution_id'), 'optimizedExecutionId': result.get('optimized_execution_id'),
+            'incidentIds': ids,
             'phases': {name: {k: phase.get(k) for k in ['phase', 'duration_seconds', 'business_tps_summary', 'pressure_tps_summary']}
                        for name, phase in (result.get('phases') or {}).items()},
-            'evidenceNote': ('This experiment replays a previously measured LLM candidate. The separately linked alert workflow makes fresh LLM calls; they are different measurements.'
-                             if row['kind'] == 'sysinsight' else 'Original and optimized executions are separate measured records; analysis completion alone does not mean an action was applied.')}
+            'evidenceNote': 'This experiment replays a previously measured LLM system-parameter candidate. The separately linked alert workflow makes fresh LLM calls; they are different measurements.'}
 
     def overview(self):
         counts = {table: self._rows('SELECT count(*) n FROM ' + table)[0]['n']
-                  for table in ('incidents', 'sql_observations', 'dream_jobs', 'improvements', 'lab_runs')}
-        statuses = {table: {row['status']: row['n'] for row in self._rows('SELECT status,count(*) n FROM '+table+' GROUP BY status')}
-                    for table in ('incidents', 'dream_jobs', 'improvements')}
+                  for table in ('incidents', 'lab_runs')}
+        statuses = {row['status']: row['n'] for row in self._rows('SELECT status,count(*) n FROM incidents GROUP BY status')}
         latest_alerts = [self._alert(row, False) for row in self._rows('SELECT * FROM incidents ORDER BY started_at DESC LIMIT 8')]
-        jobs = self._rows('SELECT j.*,o.queryid FROM dream_jobs j LEFT JOIN sql_observations o ON j.sql_key=o.sql_key ORDER BY j.requested_at DESC LIMIT 12')
-        latest_jobs = []
-        for row in jobs:
-            result = decode(row.get('result_json'), {})
-            publication = result.get('bridge_publication') or {}
-            diagnosis = result.get('diagnosis_results') or {}
-            latest_jobs.append({'id': row['job_id'], 'sqlKey': row['sql_key'], 'queryId': row.get('queryid'),
-                'time': row['requested_at'], 'status': row['status'], 'analysisOutcome': result.get('status'),
-                'triggerSource': row.get('trigger_source'), 'sourceCompletionMs': row.get('source_completion_ms'),
-                'applicationStatus': publication.get('status'), 'model': result.get('api_model'),
-                'rootCauses': diagnosis.get('root_causes') or result.get('root_causes') or [],
-                'oldTimeSeconds': result.get('old_time'), 'newTimeSeconds': result.get('new_time'),
-                'message': row.get('error') or result.get('error') or result.get('explanation'),
-                'validation': publication.get('validation') or {}})
         runs = [self.experiment(row) for row in self._rows('SELECT * FROM lab_runs ORDER BY requested_at DESC LIMIT 12')]
-        gate = getattr(self.bridge, 'last_dream_gate', None) or self.store.get_meta('last_dream_gate', {})
         args = self.bridge.args
-        return {'hosts': self.hosts(), 'counts': counts, 'workflowCounts': statuses,
-            'recentRuns': runs, 'recentAlerts': latest_alerts, 'recentDreamJobs': latest_jobs,
-            'automation': {'model': getattr(args, 'model', None), 'dreamTriggerMs': getattr(args, 'dream_trigger_ms', 10000),
-                'dreamGate': gate, 'autoApplyEnabled': getattr(args, 'auto_apply', None),
+        return {'hosts': self.hosts(), 'counts': counts, 'workflowCounts': {'incidents': statuses},
+            'recentRuns': runs, 'recentAlerts': latest_alerts,
+            'automation': {'model': getattr(args, 'model', None),
                 'sysinsightFullChain': getattr(args, 'sysinsight_full_chain', None),
                 'currentAlertFiring': bool(getattr(self.bridge, 'last_alert_snapshot', None)),
                 'collectionError': self.bridge.last_collection_error},
             'capabilities': [
                 {'name': 'Alert → perf → source → LLM → apply/retest/restore', 'state': 'enabled' if getattr(args,'sysinsight_full_chain',False) else 'disabled', 'detail': 'Open an alert to inspect measured evidence and restoration, not just workflow status.'},
-                {'name': 'Completed long AP SQL → asynchronous DREAM', 'state': 'enabled', 'detail': 'Automatic gate uses the configured completed-query threshold; manual lab diagnosis is explicitly operator-triggered.'},
-                {'name': 'Validated DREAM automatic application', 'state': 'enabled' if getattr(args,'auto_apply',False) else 'disabled', 'detail': 'Rewrites/session actions apply to matching bridge-managed SQL; direct PostgreSQL clients only receive supported pg_hint_plan actions.'},
                 {'name': 'SHAP attribution', 'state': 'experimental' if (ROOT/'models/sysinsight_pg12_tps/manifest.json').is_file() else 'unavailable', 'detail': 'Tree-path-dependent TreeSHAP of a local PG12 foreground-TPS-retention model, trained on measured cases. Prediction explanation, not causality or LLM reasoning. Per-alert version, validation and range warnings retained.'},
-                {'name': 'SQL-specific CPU flame graph', 'state': 'enabled' if getattr(getattr(self.bridge,'sql_profiler',None),'enabled',False) else 'disabled', 'detail': 'Bounded on-CPU samples for the leader and identity-verified PG12 parallel workers, linked to the execution ID. Per-PID validated windows and coverage counts are retained; short-lived workers may be missed. Zero samples are not zero SQL cost.'},
-                {'name': 'SQL-internal CPU/memory and wait phases', 'state': 'not_instrumented', 'detail': 'CPU flame graphs are not wall-clock time axes or off-CPU/memory breakdowns. Execution/job timestamps remain separate.'},
                 {'name': 'Host / database / TPS monitoring', 'state': 'external', 'detail': 'Available in the existing Grafana dashboards; not duplicated here.'},
             ], 'schema': self.schema(), 'links': {'lab': '/lab', 'automation': '/ui'}}
 
@@ -641,8 +424,7 @@ class KeenInsightPortal:
         category = parts[0]
         identity = parts[1] if len(parts)>1 else ""
         allowed_filters = {"hosts": ("status", "dbType", "ip"), "alerts": ("status", "severity", "reason"),
-                           "sql": ("type", "result", "duration"), "code": ("db", "category"),
-                           "diagnosisRules": ("category", "status")}
+                           "code": ("db", "category")}
         filters = {key: str(arg(key, ""))[:500] for key in allowed_filters.get(category, ()) if arg(key, "")}
         if category == "schema":
             data = self.schema()
@@ -660,11 +442,8 @@ class KeenInsightPortal:
                 data = self._alert(rows[0])
             else:
                 data = self.alerts(limit, offset, search, filters)
-        elif category == "sql":
-            data = self.sql_detail(identity, job_id=arg('job_id', None)) if identity else self.sql_logs(limit, offset, search, str(arg("kind", "all")), filters)
-        elif category in {"manual", "code", "diagnosisRules", "knowledge", "alertRules"}:
-            values = self.references(category) if category in {"manual", "code", "diagnosisRules"} else (
-                self.knowledge() if category=="knowledge" else self.alert_rules())
+        elif category in {"manual", "code", "alertRules"}:
+            values = self.references(category) if category in {"manual", "code"} else self.alert_rules()
             if search:
                 values = [v for v in values if search.lower() in json.dumps(v,ensure_ascii=False).lower()]
             values = [v for v in values if self._matches(v, filters)]

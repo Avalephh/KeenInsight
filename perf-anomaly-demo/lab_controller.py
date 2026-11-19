@@ -33,12 +33,10 @@ from pg_temporary_config import (  # noqa: E402
     TemporaryPostgresConfiguration,
     connection_args_for_configuration,
 )
-from dream_auto_apply import is_read_only_statement  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parent
 TPCC_CASE_ROOT = ROOT / "tpcc_cases"
-TPCDS_QUERY_ROOT = ROOT.parent / "dream" / "data" / "slow_queries" / "TPC-DS"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -196,38 +194,6 @@ def _sql_literal(value: Any) -> str:
     return "'{}'".format(str(value).replace("'", "''"))
 
 
-def _canonical_sql(sql: str) -> str:
-    text = _HINT_COMMENT.sub(" ", str(sql or ""))
-    text = _SQL_COMMENT.sub(" ", text)
-    text = _SQL_STRING.sub("?", text)
-    text = _SQL_NUMBER.sub("?", text)
-    return " ".join(text.lower().split()).strip().rstrip(";").strip()
-
-
-def _hint_pattern(sql: str) -> str:
-    text = _HINT_COMMENT.sub("", str(sql or "")).strip()
-    text = _SQL_STRING.sub("?", text)
-    text = _SQL_NUMBER.sub("?", text)
-    if text and not text.endswith(";"):
-        text += ";"
-    return text
-
-
-def _is_read_only(sql: str) -> bool:
-    """Allow exactly one SELECT/WITH statement for the DREAM lab."""
-
-    text = str(sql or "").strip()
-    if text.endswith(";"):
-        text = text[:-1].rstrip()
-    if not text or ";" in text:
-        return False
-    without_strings = _SQL_STRING.sub(" ", text).lower()
-    if not without_strings.startswith(("select", "with", "explain")):
-        return False
-    forbidden = r"\b(insert|update|delete|merge|create|drop|alter|truncate|grant|revoke|copy|call|do|vacuum|refresh|set|reset|begin|commit|rollback|prepare|execute|lock)\b"
-    return re.search(forbidden, without_strings) is None
-
-
 def _bounded_int(value: Any, name: str, default: int, minimum: int, maximum: int) -> int:
     try:
         result = int(value)
@@ -273,51 +239,6 @@ def _case_catalog() -> List[Dict[str, Any]]:
                 "focus_order": focus_order.get(scenario_id),
                 "source": "tpcc_transaction_cases.CASE_DEFINITIONS",
                 "rollback_protected": True,
-            }
-        )
-    return result
-
-
-def _query_catalog() -> List[Dict[str, Any]]:
-    result: List[Dict[str, Any]] = []
-    for path in sorted(
-        TPCDS_QUERY_ROOT.glob("*.sql"),
-        key=lambda item: int(item.stem) if item.stem.isdigit() else item.stem,
-    ):
-        if not path.stem.isdigit():
-            continue
-        query_id = int(path.stem)
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        complexity = 1
-        lower = text.lower()
-        complexity += lower.count(" join ")
-        complexity += lower.count(" union ")
-        complexity += lower.count(" intersect ")
-        complexity += lower.count(" except ")
-        complexity += lower.count(" over (")
-        complexity += lower.count(" with ")
-        result.append(
-            {
-                "sql_id": "tpcds_q{}".format(query_id),
-                "query_number": query_id,
-                "title": "TPC-DS Query {}".format(query_id),
-                "source": str(path.relative_to(ROOT.parent)),
-                "line_count": len(text.splitlines()),
-                "character_count": len(text),
-                "complexity_score": complexity,
-                # These are the SQL rewrites that passed three fresh
-                # baseline -> DREAM -> replay runs on the local SF10 data.
-                # Q4 used to be the default entry, but its original SQL
-                # exceeded the lab timeout during the stability audit, so it
-                # must remain selectable without being presented as a demo.
-                "recommended": query_id in {31, 88},
-                'demo_capability': 'automatic_rewrite' if query_id in {31,88} else 'diagnosis_candidate' if query_id==44 else 'exploratory',
-                'recommendation_note': ('Current LLM may propose index DDL for Q44. Diagnosis/evaluation works, but DDL is not automatically published; use Q31/Q88 for the full automatic-application demo.' if query_id==44 else ''),
-                "schema": "tpcds",
-                "read_only": _is_read_only(text),
             }
         )
     return result
@@ -523,7 +444,7 @@ def _tpcc_comparison(phases: Mapping[str, Any]) -> Dict[str, Any]:
 
 
 class LabController:
-    """Own bounded TPCC processes and single-query DREAM lab runs."""
+    """Own bounded TPCC system-tuning lab runs."""
 
     def __init__(self, bridge: Any) -> None:
         self.bridge = bridge
@@ -532,7 +453,6 @@ class LabController:
         self.root = Path(bridge.output_root).resolve() / "lab"
         self.root.mkdir(parents=True, exist_ok=True)
         self.tpcc_cases = _case_catalog()
-        self.sql_catalog = _query_catalog()
         self._lock = threading.RLock()
         self._active: Dict[str, Dict[str, Any]] = {}
 
@@ -541,7 +461,6 @@ class LabController:
         # belonging to the old run, so the next click starts from a clean
         # state instead of seeing a permanent queued/running lock.
         self._recover_stale_runs("sysinsight")
-        self._recover_stale_runs("dream")
 
     def shutdown(self) -> None:
         with self._lock:
@@ -573,8 +492,6 @@ class LabController:
 
     def _application_prefix(self, run_id: str, kind: str) -> str:
         marker = self._run_marker(run_id)
-        if kind == "dream":
-            return "lab-dream-{}-".format(marker)
         return "lab-{}-".format(marker)
 
     def _terminate_orphaned_lab(self, run_id: str, kind: str) -> Dict[str, Any]:
@@ -819,7 +736,6 @@ class LabController:
                     "pressure_target_tps_max": TPCC_MAX_PRESSURE_TPS,
                 },
             },
-            "sql_catalog": self.sql_catalog,
             "database": {
                 "name": self.bridge.args.db,
                 "schema": self.bridge.args.db_schema,
@@ -829,16 +745,6 @@ class LabController:
             },
             "retention_hours": round(float(self.bridge.args.sample_retention_days) * 24.0, 3),
         }
-
-    def get_sql(self, sql_id: str) -> Dict[str, Any]:
-        item = next((value for value in self.sql_catalog if value["sql_id"] == sql_id), None)
-        if item is None:
-            raise KeyError("unknown SQL catalog id: {}".format(sql_id))
-        path = TPCDS_QUERY_ROOT / "{}.sql".format(item["query_number"])
-        query = path.read_text(encoding="utf-8")
-        if not _is_read_only(query):
-            raise ValueError("catalog SQL is not a single read-only statement")
-        return {**item, "query": query}
 
     def status(self) -> Dict[str, Any]:
         # The history table only needs metadata. Returning every completed
@@ -854,27 +760,7 @@ class LabController:
             detail = self.store.get_lab_run(str(row["run_id"])) or dict(row)
             detail["samples"] = self.store.list_lab_samples(str(row["run_id"]), 1)
             detail["executions"] = self.store.list_lab_executions(str(row["run_id"]), 20)
-            if row.get("kind") == "dream":
-                result = detail.get("result") if isinstance(detail.get("result"), dict) else {}
-                job_id = result.get("job_id")
-                if job_id:
-                    detail["job"] = self.store.get_job(str(job_id))
-                    if result.get("sql_key"):
-                        detail["improvement"] = self.store.latest_improvement(str(result["sql_key"]))
             current_details.append(detail)
-
-        latest_dream_summary = next((row for row in runs if row.get("kind") == "dream"), None)
-        dream_detail: Optional[Dict[str, Any]] = None
-        if latest_dream_summary:
-            latest_dream = self.store.get_lab_run(str(latest_dream_summary["run_id"])) or latest_dream_summary
-            dream_detail = dict(latest_dream)
-            dream_detail["executions"] = self.store.list_lab_executions(str(latest_dream["run_id"]), 20)
-            result = latest_dream.get("result") if isinstance(latest_dream.get("result"), dict) else {}
-            job_id = result.get("job_id")
-            if job_id:
-                dream_detail["job"] = self.store.get_job(str(job_id))
-                if result.get("sql_key"):
-                    dream_detail["improvement"] = self.store.latest_improvement(str(result["sql_key"]))
 
         latest_sysinsight_summary = next((row for row in runs if row.get("kind") == "sysinsight"), None)
         sysinsight_detail: Optional[Dict[str, Any]] = None
@@ -886,31 +772,29 @@ class LabController:
             "status": "ok",
             "current": current_details,
             "latest_sysinsight": sysinsight_detail,
-            "latest_dream": dream_detail,
             "runs": runs,
         }
 
     def metrics_snapshot(self) -> Dict[str, Any]:
         value = self.status()
         result: Dict[str, Any] = {"current": value.get("current", [])}
-        for kind, key in (("sysinsight", "sysinsight"), ("dream", "dream")):
-            current = next((row for row in value.get("current", []) if row.get("kind") == kind), None)
-            latest = value.get("latest_{}".format(kind))
-            row = current or latest or {}
-            result[key] = {
-                "run_id": row.get("run_id", ""),
-                "status": row.get("status", "idle"),
-                "phase": row.get("phase", "idle"),
-                "result": row.get("result", {}),
-            }
-            if current and current.get("samples"):
-                result[key]["sample"] = current["samples"][-1]
-            if latest and latest.get("executions"):
-                result[key]["executions"] = latest["executions"]
+        current = next((row for row in value.get("current", []) if row.get("kind") == "sysinsight"), None)
+        latest = value.get("latest_sysinsight")
+        row = current or latest or {}
+        result["sysinsight"] = {
+            "run_id": row.get("run_id", ""),
+            "status": row.get("status", "idle"),
+            "phase": row.get("phase", "idle"),
+            "result": row.get("result", {}),
+        }
+        if current and current.get("samples"):
+            result["sysinsight"]["sample"] = current["samples"][-1]
+        if latest and latest.get("executions"):
+            result["sysinsight"]["executions"] = latest["executions"]
         return result
 
     def reset_database(self) -> Dict[str, Any]:
-        """Reset only the known demo GUCs and retain pg_hint_plan settings."""
+        """Reset only the known demo system-tuning GUCs."""
 
         before = self.db.settings_snapshot(LAB_RESET_PARAMETERS)
         database = '"{}"'.format(str(self.bridge.args.db).replace('"', '""'))
@@ -918,9 +802,8 @@ class LabController:
         errors: List[Dict[str, str]] = []
 
         # Remove database-local overrides only when one is actually present.
-        # session_preload_libraries and pg_hint_plan.enable_hint_table are
-        # intentionally outside this list, so this button cannot disconnect
-        # the automatic hint-table runtime.
+        # session_preload_libraries is intentionally outside this list, so
+        # this button cannot disconnect the monitoring runtime.
         for name in LAB_RESET_PARAMETERS:
             command = "ALTER DATABASE {} RESET {}".format(database, '"{}"'.format(name))
             try:
@@ -964,7 +847,7 @@ class LabController:
             "reload_output": reload_output,
             "errors": errors,
             "restart_required": restart_required,
-            "note": "仅清理实验白名单中的数据库级/ALTER SYSTEM 覆盖；不自动重启 PostgreSQL，pg_hint_plan 的 session_preload_libraries 保持不变。",
+            "note": "仅清理实验白名单中的数据库级/ALTER SYSTEM 覆盖；不自动重启 PostgreSQL。",
             "completed_at": utc_now(),
         }
         path = self.root / "last_database_reset.json"
@@ -1665,430 +1548,3 @@ class LabController:
             self._cleanup_active_processes(run_id)
             if stage_dir is not None:
                 shutil.rmtree(str(stage_dir), ignore_errors=True)
-
-    def _memory_paths(self) -> List[Path]:
-        paths: List[Path] = []
-        try:
-            config = json.loads(Path(self.bridge.args.dream_config).read_text(encoding="utf-8"))
-            memory = config.get("MEMORY_MANAGER_CONFIG", {})
-            for key in ("db_path", "samples_save_path"):
-                value = memory.get(key)
-                if value:
-                    paths.append(Path(str(value)).expanduser().resolve())
-        except (OSError, ValueError, TypeError):
-            pass
-        return paths
-
-    def clear_dream(self, reset_pg_stat_statements: bool = True) -> Dict[str, Any]:
-        if self._active_kind("dream"):
-            raise RuntimeError("a dream lab run is already queued or running")
-        stamp = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
-        archive_dir = self.root / "archives"
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        archive_path = archive_dir / "dream-workspace-{}.sqlite3".format(stamp)
-        # Stop the bridge collector from repopulating the rows between the
-        # archive and the optional pg_stat_statements reset.
-        with self.bridge._cycle_lock:
-            removed_applications: List[Dict[str, Any]] = []
-            seen_hints = set()
-            for improvement in self.store.list_improvements(500):
-                if str(improvement.get("status")) != "active":
-                    continue
-                scope = str(improvement.get("apply_scope") or "")
-                direct = scope == "postgresql_direct" or (
-                    not scope
-                    and bool(improvement.get("hints"))
-                    and not improvement.get("rewrite_sql")
-                )
-                norm_query = str(improvement.get("norm_query_string") or "").strip()
-                application_name = str(improvement.get("application_name") or "")
-                identity = (norm_query, application_name)
-                if not direct or not norm_query or identity in seen_hints:
-                    continue
-                self.db.remove_hint(norm_query, application_name)
-                seen_hints.add(identity)
-                removed_applications.append({
-                    "improvement_id": improvement.get("improvement_id"),
-                    "apply_scope": "postgresql_direct",
-                    "norm_query_string": norm_query,
-                    "application_name": application_name,
-                })
-            profiler = getattr(self.bridge, 'sql_profiler', None)
-            with (profiler.pause() if profiler else contextlib.nullcontext()):
-                result = self.store.clear_dream_records(archive_path)
-            result["removed_automatic_applications"] = removed_applications
-            if reset_pg_stat_statements:
-                try:
-                    result["pg_stat_statements_reset"] = self.db.reset_statement_stats()
-                except Exception as exc:
-                    result["pg_stat_statements_reset"] = {"status": "failed", "error": str(exc)}
-            else:
-                result["pg_stat_statements_reset"] = {"status": "skipped"}
-        memory_archives: List[str] = []
-        memory_deleted: List[str] = []
-        for path in self._memory_paths():
-            if not path.is_file():
-                continue
-            target = archive_dir / "{}-{}".format(stamp, path.name)
-            try:
-                shutil.copy2(str(path), str(target))
-                path.unlink()
-                memory_archives.append(str(target))
-                memory_deleted.append(str(path))
-            except OSError as exc:
-                result.setdefault("memory_errors", []).append(str(exc))
-        result["memory_archives"] = memory_archives
-        result["memory_deleted"] = memory_deleted
-        result["completed_at"] = utc_now()
-        (self.root / "last_dream_clear.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-        self.store.set_meta("last_lab_dream_clear", result)
-        return result
-
-    def start_dream(self, body: Mapping[str, Any]) -> Dict[str, Any]:
-        sql_id = str(body.get("sql_id") or "")
-        item = self.get_sql(sql_id)
-        # A manual lab action should fail before creating a run/job when the
-        # worker cannot call the shared DREAM/SysInsight endpoint.  Previously
-        # the request was accepted, the baseline ran, and the asynchronous
-        # worker immediately produced a misleading ``completed /
-        # analysis_completed / blocked`` record.
-        dream_offline = bool(getattr(self.bridge.args, "dream_offline", False))
-        api_configured = any(
-            bool(os.environ.get(name))
-            for name in ("SYSINSIGHT_GPT_API_KEY", "SYSINSIGHT_API_KEY", "OPENAI_API_KEY")
-        )
-        if not dream_offline and not api_configured:
-            raise RuntimeError(
-                "DREAM is not ready: shared API key is not configured; "
-                "set SYSINSIGHT_GPT_API_KEY and restart the bridge"
-            )
-        run_id = self._run_id("dream")
-        request_id = str(body.get("request_id") or "").strip()
-        if len(request_id) > 160:
-            raise ValueError("request_id is too long")
-        config = {
-            "sql_id": sql_id,
-            "title": item["title"],
-            "schema": item["schema"],
-            "query_number": item["query_number"],
-            "execution": "baseline_then_real_dream_analysis",
-        }
-        if request_id:
-            config["request_id"] = request_id
-        with self._lock:
-            # Make browser retries idempotent even when the first worker has
-            # already finished its very short baseline before the second HTTP
-            # request arrives.  The request id is persisted in config_json,
-            # so this also works across a page refresh within the same bridge
-            # lifetime.
-            if request_id:
-                for previous in self.store.list_lab_runs(200, kind="dream"):
-                    previous_config = previous.get("config") if isinstance(previous.get("config"), dict) else {}
-                    if previous_config.get("request_id") == request_id:
-                        return {
-                            "status": "already_submitted",
-                            "message": "this DREAM request was already submitted",
-                            "run": previous,
-                        }
-            existing = self._active_kind("dream")
-            if existing:
-                if existing.get("scenario_id") == sql_id:
-                    return {
-                        "status": "already_running",
-                        "message": "this SQL already has a DREAM run queued or running",
-                        "run": existing,
-                    }
-                raise RuntimeError("a dream lab run is already queued or running")
-            # A successful analysis already has a separate replay button. Do
-            # not let a second click on the original-SQL button create a new
-            # baseline/job for the same SQL; clear DREAM records explicitly
-            # when a fresh run is intended.  Blocked/failed runs remain
-            # retryable after the configuration problem is fixed.
-            previous = next(
-                (
-                    value
-                    for value in self.store.list_lab_runs(200, kind="dream")
-                    if value.get("scenario_id") == sql_id
-                    and value.get("status") == "completed"
-                    and isinstance(value.get("result"), dict)
-                    and isinstance(value["result"].get("job"), dict)
-                    and value["result"]["job"].get("status") in {"completed", "candidate"}
-                ),
-                None,
-            )
-            if previous is not None:
-                return {
-                    "status": "already_completed",
-                    "message": "this SQL already has a completed DREAM analysis; use replay or clear records first",
-                    "run": previous,
-                }
-            self.store.create_lab_run(run_id, "dream", sql_id, item["title"], config)
-            stop_event = threading.Event()
-            self._submit_active(run_id, stop_event, self._run_dream, run_id, item, stop_event)
-            return {"status": "queued", "run": self.store.get_lab_run(run_id)}
-
-    def _execute_lab_sql(
-        self,
-        run_id: str,
-        sql_id: str,
-        phase: str,
-        query: str,
-        method: str,
-        session_settings: Optional[Mapping[str, Any]] = None,
-    ) -> Tuple[str, Dict[str, Any]]:
-        started_at = utc_now()
-        execution_id = "lab-exec-" + hashlib.sha256((run_id + phase + str(time.time_ns())).encode()).hexdigest()[:16]
-        application_name = self._application_prefix(run_id, "dream") + phase
-        profiler = getattr(self.bridge, 'sql_profiler', None)
-        # PostgreSQL truncates application_name at NAMEDATALEN-1 (63 bytes).
-        # Keep the run/phase marker short so the sampler can always distinguish
-        # the lab connections, including DREAM replay sessions.
-        with (profiler.managed(application_name, query, execution_id, run_id, phase) if profiler else contextlib.nullcontext()):
-            result = self.db.execute_timed(
-                query,
-                application_name=application_name,
-                search_path=[self.bridge.args.db_schema, "public"] if self.bridge.args.db_schema != "public" else ["public"],
-                session_settings=session_settings,
-                timeout=max(30.0, min(180.0, float(self.bridge.args.db_timeout) * 6.0)),
-            )
-        execution_id = self.store.add_lab_execution(
-            {
-                "run_id": run_id,
-                "execution_id": execution_id,
-                "sql_id": sql_id,
-                "phase": phase,
-                "started_at": started_at,
-                "finished_at": utc_now(),
-                "duration_ms": result.get("duration_ms"),
-                "status": result.get("status", "failed"),
-                "method": method,
-                "query_text": query,
-                "result": result,
-                "error": result.get("error", ""),
-            }
-        )
-        return execution_id, result
-
-    def _observation_for_lab_sql(self, item: Mapping[str, Any], duration_ms: float) -> str:
-        query = str(item["query"])
-        query_id = "lab-{}".format(item["sql_id"])
-        row = {
-            "database": self.bridge.args.db,
-            "username": self.bridge.args.db_user,
-            "queryid": query_id,
-            "query": query,
-            "canonical_sql": _canonical_sql(query),
-            "hint_pattern": _hint_pattern(query),
-            "replay_sql": query,
-            "calls": 1,
-            "total_time_ms": duration_ms,
-            "min_time_ms": duration_ms,
-            "max_time_ms": duration_ms,
-            "mean_time_ms": duration_ms,
-            "rows": 0,
-            "shared_blks_hit": 0,
-            "shared_blks_read": 0,
-        }
-        keys = self.store.upsert_observations([row], [])
-        if not keys:
-            raise RuntimeError("could not persist the selected SQL observation")
-        return str(keys[0])
-
-    @staticmethod
-    def _job_summary(job: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
-        if not job:
-            return {}
-        result = job.get("result") if isinstance(job.get("result"), dict) else {}
-        publication = result.get("bridge_publication") if isinstance(result.get("bridge_publication"), dict) else {}
-        evaluation = result.get("evaluation") if isinstance(result.get("evaluation"), dict) else {}
-        return {
-            "job_id": job.get("job_id"),
-            "status": job.get("status"),
-            "attempts": job.get("attempts"),
-            "error": job.get("error"),
-            "reason": result.get("reason") or result.get("error") or publication.get("reason") or evaluation.get("msg", ""),
-            "root_causes": result.get("root_causes", []),
-            "fix_action": result.get("fix_action", ""),
-            "rewrite_sql": result.get("rewrite_sql", ""),
-            "old_time": result.get("old_time"),
-            "new_time": result.get("new_time"),
-            "evaluation_status": result.get("evaluation_status"),
-            "bridge_publication": publication,
-        }
-
-    def _run_dream(self, run_id: str, item: Mapping[str, Any], stop_event: threading.Event) -> None:
-        (self.root / run_id).mkdir(parents=True, exist_ok=True)
-        try:
-            self.store.update_lab_run(run_id, status="running", phase="baseline_execution")
-            execution_id, baseline = self._execute_lab_sql(
-                run_id,
-                str(item["sql_id"]),
-                "baseline",
-                str(item["query"]),
-                "original SQL baseline",
-            )
-            if baseline.get("status") != "completed":
-                raise RuntimeError("baseline SQL failed: {}".format(baseline.get("error", "unknown error")))
-            if stop_event.is_set():
-                raise LabStopped("operator requested stop")
-            # Reserve the manual job atomically with publishing its measured
-            # completion. The automatic collector must not steal this same
-            # signal between upsert and enqueue and make the lab fail.
-            with self.store._lock:
-                sql_key = self._observation_for_lab_sql(item, float(baseline.get("duration_ms") or 0.0))
-                self.store.update_lab_run(
-                    run_id, status="running", phase="dream_analysis",
-                    result_patch={"baseline_execution_id": execution_id, "baseline": baseline, "sql_key": sql_key},
-                )
-                job_id = self.store.enqueue_job(sql_key, None, cooldown=0.0, force=True)
-                if not job_id:
-                    raise RuntimeError("selected SQL already has an active DREAM improvement; clear the lab records first")
-                # Expose the real job during LLM/evaluation, not only after
-                # completion, so the frontend can follow actual live status.
-                self.store.update_lab_run(run_id,result_patch={'job_id':job_id,'trigger_source':'manual'})
-            dream_future = self.bridge.executor.submit(self.bridge._run_dream_job, job_id)
-            self.bridge.futures.append(dream_future)
-            job_result = dream_future.result()
-            job = self.store.get_job(job_id)
-            improvement = self.store.latest_improvement(sql_key)
-            result = {
-                "sql_id": item["sql_id"],
-                "title": item["title"],
-                "query": item["query"],
-                "baseline_execution_id": execution_id,
-                "baseline": baseline,
-                "sql_key": sql_key,
-                "job_id": job_id,
-                "job_result": job_result,
-                "job": self._job_summary(job),
-                "improvement": improvement,
-                "analysis_completed_at": utc_now(),
-            }
-            (self.root / run_id / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-            self.store.update_lab_run(run_id, status="completed", phase="analysis_completed", result_patch=result)
-        except LabStopped as exc:
-            self.store.update_lab_run(run_id, status="stopped", phase="stopped", error=str(exc))
-        except Exception as exc:
-            (self.root / run_id).mkdir(parents=True, exist_ok=True)
-            (self.root / run_id / "error.txt").write_text("{}: {}\n".format(type(exc).__name__, exc), encoding="utf-8")
-            self.store.update_lab_run(run_id, status="failed", phase="failed", error="{}: {}".format(type(exc).__name__, exc))
-
-    def replay_dream(self, body: Mapping[str, Any]) -> Dict[str, Any]:
-        run_id = str(body.get("run_id") or "")
-        with self._lock:
-            row = self.store.get_lab_run(run_id)
-            if row is None or row.get("kind") != "dream":
-                raise KeyError("DREAM lab run not found: {}".format(run_id))
-            result = row.get("result") if isinstance(row.get("result"), dict) else {}
-            if result.get("optimized_execution_id"):
-                return {"status": "already_completed", "run": row}
-            # This is the critical idempotency guard.  It is held while the
-            # row changes to optimized_execution and the future is attached,
-            # so a rapid double-click cannot submit two replay workers.
-            if row.get("status") == "running" and row.get("phase") == "optimized_execution":
-                return {
-                    "status": "already_queued",
-                    "message": "optimized SQL replay is already queued or running",
-                    "run": row,
-                }
-            if row.get("status") not in {"completed", "failed"}:
-                raise RuntimeError("DREAM analysis is not finished")
-            job = self.store.get_job(str(result.get("job_id", ""))) if result.get("job_id") else None
-            improvement = self.store.latest_improvement(str(result.get("sql_key", ""))) if result.get("sql_key") else None
-            if not job or str(job.get("status")) not in {"completed", "candidate"}:
-                raise RuntimeError("DREAM job has not completed successfully")
-            if not improvement:
-                raise RuntimeError("DREAM did not produce an improvement candidate")
-            original_query = str(result.get("query") or "")
-            application = self.bridge.resolve_dream_application(
-                str(result.get("sql_key") or ""),
-                original_query,
-            )
-            if not application.get("applied"):
-                validation = improvement.get("validation") if isinstance(improvement.get("validation"), dict) else {}
-                raise RuntimeError(
-                    str(validation.get("reason") or "DREAM has no active automatic improvement")
-                )
-            query = str(application.get("query") or "")
-            settings = {
-                str(name): str(value)
-                for name, value in (application.get("session_settings") or {}).items()
-            }
-            method = str(application.get("method") or "DREAM automatic application")
-            if not is_read_only_statement(query):
-                raise ValueError("optimized SQL is not read-only")
-            self.store.update_lab_run(run_id, status="running", phase="optimized_execution")
-            stop_event = threading.Event()
-            self._submit_active(
-                run_id,
-                stop_event,
-                self._run_dream_replay,
-                run_id,
-                str(result.get("sql_id")),
-                query,
-                method,
-                settings,
-                application,
-                result,
-                stop_event,
-            )
-            return {"status": "queued", "run": self.store.get_lab_run(run_id)}
-
-    def _run_dream_replay(
-        self,
-        run_id: str,
-        sql_id: str,
-        query: str,
-        method: str,
-        settings: Mapping[str, str],
-        application: Mapping[str, Any],
-        previous: Mapping[str, Any],
-        stop_event: threading.Event,
-    ) -> None:
-        try:
-            if stop_event.is_set():
-                raise LabStopped("operator requested stop")
-            execution_id, optimized = self._execute_lab_sql(
-                run_id,
-                sql_id,
-                "optimized",
-                query,
-                method,
-                settings,
-            )
-            baseline_ms = float((previous.get("baseline") or {}).get("duration_ms") or 0.0)
-            optimized_ms = float(optimized.get("duration_ms") or 0.0)
-            ratio = (baseline_ms - optimized_ms) / baseline_ms if baseline_ms > 0 else 0.0
-            if (
-                optimized.get("status") == "completed"
-                and application.get("improvement_id")
-                and application.get("apply_scope") == "bridge_managed"
-            ):
-                self.store.record_improvement_hit(
-                    str(application["improvement_id"]),
-                    "automatic bridge-managed DREAM replay",
-                )
-            patch = {
-                "optimized_execution_id": execution_id,
-                "optimized": optimized,
-                "optimized_query": query,
-                "optimization_method": method,
-                "session_settings": dict(settings),
-                "auto_application": dict(application),
-                "comparison": {
-                    "baseline_ms": baseline_ms,
-                    "optimized_ms": optimized_ms,
-                    "improvement_ratio": ratio,
-                    "improved": optimized.get("status") == "completed" and ratio > 0,
-                },
-                "replayed_at": utc_now(),
-            }
-            self.store.update_lab_run(run_id, status="completed", phase="completed", result_patch=patch)
-            (self.root / run_id / "result.json").write_text(
-                json.dumps({**dict(previous), **patch}, ensure_ascii=False, indent=2, default=str),
-                encoding="utf-8",
-            )
-        except LabStopped as exc:
-            self.store.update_lab_run(run_id, status="stopped", phase="replay_stopped", error=str(exc))
-        except Exception as exc:
-            self.store.update_lab_run(run_id, status="failed", phase="replay_failed", error="{}: {}".format(type(exc).__name__, exc))

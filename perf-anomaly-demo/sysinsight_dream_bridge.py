@@ -1,24 +1,13 @@
 #!/usr/bin/env python3
-"""Join the live SysInsight alert path with asynchronous DREAM SQL tuning.
+"""Bridge the live SysInsight alert path with PostgreSQL system tuning.
 
-The bridge has four deliberately separate responsibilities:
+The bridge has three deliberately separate responsibilities:
 
 * poll Prometheus and PostgreSQL without changing the workload;
-* persist a bounded rolling window of ``pg_stat_statements`` observations;
-* start one SysInsight incident analysis when an alert fires;
-* send slow, replayable read-only SQL to DREAM in a worker and register only a
-  validated, measured automatic action.
-
-``pg_hint_plan`` is the direct PostgreSQL next-execution hook for plan hints
-and planner GUCs.  Read-only SQL rewrites and executor/session GUCs use the
-bridge-managed execution path because PostgreSQL cannot replace arbitrary
-client SQL text at the server boundary.  DDL and unrecognized actions remain
-non-active candidates.
-
-The default mode is safe with respect to the tuning action: DREAM may measure
-session-local candidates, but a global hint is published only after DREAM
-reports a measured improvement and the action passes the read-only parser.
-Use ``--configure-hint-table`` once to enable pg_hint_plan for new connections.
+* persist a bounded rolling window of ``pg_stat_statements`` observations as
+  evidence for alert diagnosis;
+* start one SysInsight incident analysis when an alert fires, run the
+  perf/function-to-GUC candidate chain, and restore applied parameters.
 """
 
 from __future__ import annotations
@@ -59,11 +48,6 @@ LOGGER = logging.getLogger("sysinsight-dream-bridge")
 
 sys.path.insert(0, str(ROOT))
 from db_profile import profile_summary, resolve_profile  # noqa: E402
-from dream_auto_apply import (  # noqa: E402
-    direct_hint_phrase,
-    is_read_only_statement,
-    parse_dream_candidate,
-)
 from sysinsight_prometheus import (  # noqa: E402
     PrometheusClient,
     PrometheusError,
@@ -71,7 +55,6 @@ from sysinsight_prometheus import (  # noqa: E402
     collect_window,
 )
 from lab_controller import LabController  # noqa: E402
-from sql_profiling import SQLProfiler, init_schema as init_sql_profile_schema  # noqa: E402
 from keeninsight_portal import (  # noqa: E402
     KeenInsightPortal,
     init_schema as init_portal_schema,
@@ -134,19 +117,6 @@ def _canonical_sql(sql: str) -> str:
     return " ".join(text.lower().split()).strip().rstrip(";").strip()
 
 
-def _statement_text_identity(sql: str) -> str:
-    """Normalize whitespace without erasing literal values.
-
-    Canonical SQL intentionally replaces constants and is appropriate for
-    plan hints. A semantic rewrite may contain those constants, so rewrite
-    reuse needs this stricter identity as an additional guard.
-    """
-
-    text = _HINT_COMMENT.sub(" ", str(sql or ""))
-    text = _SQL_COMMENT.sub(" ", text)
-    return " ".join(text.split()).strip().rstrip(";").strip()
-
-
 def _hint_table_pattern(sql: str) -> str:
     """Convert a live SQL text to pg_hint_plan's ``?`` pattern.
 
@@ -164,64 +134,6 @@ def _hint_table_pattern(sql: str) -> str:
     # its normalized query string, even though pg_stat_statements omits it.
     if text and not text.endswith(";"):
         text += ";"
-    return text
-
-
-def _is_read_only_sql(sql: str) -> bool:
-    """Conservatively identify replayable analytical SQL before DREAM.
-
-    DREAM can validate this again, but filtering before queueing avoids
-    spending an API/worker slot on TP/WAL-changing statements.  A WITH query
-    containing a modifying keyword is rejected deliberately.
-    """
-
-    return is_read_only_statement(sql)
-
-
-def _hint_inner(value: str) -> str:
-    match = _HINT_COMMENT.search(str(value or ""))
-    text = match.group(1).strip() if match else str(value or "").strip()
-    if not text:
-        raise ValueError("empty pg_hint_plan hint")
-    # The bridge only forwards a hint phrase, never arbitrary SQL.  This also
-    # prevents a malformed model response from escaping into the hint table.
-    if any(token in text for token in ("/*", "*/", "--", ";", "'", '"')):
-        raise ValueError("unsafe pg_hint_plan hint")
-    if not re.fullmatch(r"[A-Za-z0-9_.,+/#()\-\s]+", text):
-        raise ValueError("unsafe character in pg_hint_plan hint")
-    # Parse one or more Name(...) directives.  A small balanced parser is
-    # needed because valid Leading hints contain nested parentheses, e.g.
-    # Leading((orders customer)).
-    position = 0
-    length = len(text)
-    while position < length:
-        while position < length and text[position].isspace():
-            position += 1
-        name = re.match(r"[A-Za-z][A-Za-z0-9_]*", text[position:])
-        if not name:
-            raise ValueError("unrecognized pg_hint_plan hint syntax")
-        position += len(name.group(0))
-        while position < length and text[position].isspace():
-            position += 1
-        if position >= length or text[position] != "(":
-            raise ValueError("unrecognized pg_hint_plan hint syntax")
-        depth = 0
-        while position < length:
-            char = text[position]
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth < 0:
-                    raise ValueError("unbalanced pg_hint_plan hint")
-                if depth == 0:
-                    position += 1
-                    break
-            position += 1
-        if depth != 0:
-            raise ValueError("unbalanced pg_hint_plan hint")
-        if position < length and not text[position].isspace():
-            raise ValueError("unrecognized pg_hint_plan hint syntax")
     return text
 
 
@@ -633,24 +545,6 @@ class DatabaseClient:
         )
         return rows[0] if rows else {"database": self.db}
 
-    def extension_status(self) -> Dict[str, Any]:
-        rows = self._rows(
-            """
-            SELECT json_build_object(
-                'extensions', (SELECT json_agg(json_build_object('name', extname, 'version', extversion))
-                               FROM pg_extension WHERE extname IN ('pg_hint_plan', 'pg_stat_statements')),
-                'hint_table_exists', to_regclass('hint_plan.hints') IS NOT NULL,
-                'hint_table_enabled', current_setting('pg_hint_plan.enable_hint_table', true),
-                'session_preload_libraries', current_setting('session_preload_libraries', true)
-            )::text AS status
-            """,
-            "sysinsight-dream-bridge-extension",
-        )
-        if not rows:
-            return {}
-        value = rows[0].get("status", {})
-        return json.loads(value) if isinstance(value, str) else (value or {})
-
     def database_setting(self, name: str) -> str:
         """Read a database-wide setting without confusing it with session state."""
 
@@ -670,83 +564,6 @@ class DatabaseClient:
             return ""
         setting = str(rows[-1].get("setting", ""))
         return setting.split("=", 1)[1] if "=" in setting else ""
-
-    def configure_hint_table(self) -> Dict[str, Any]:
-        """Enable hint-table loading for new connections to this database."""
-
-        before = self.extension_status()
-        previous_preload = self.database_setting("session_preload_libraries")
-        preload_values = [item.strip() for item in previous_preload.split(",") if item.strip()]
-        if "pg_hint_plan" not in preload_values:
-            preload_values.append("pg_hint_plan")
-        preload = ",".join(preload_values)
-        database = _safe_identifier(self.db, "database name")
-        commands = [
-            "CREATE EXTENSION IF NOT EXISTS pg_hint_plan",
-            "ALTER DATABASE {} SET session_preload_libraries = {}".format(database, _sql_literal(preload)),
-            "ALTER DATABASE {} SET pg_hint_plan.enable_hint_table = 'on'".format(database),
-        ]
-        for command in commands:
-            self.execute(command, "sysinsight-dream-bridge-hint-setup")
-        after = self.extension_status()
-        return {
-            "before": before,
-            "before_database_session_preload_libraries": previous_preload,
-            "after": after,
-            "commands": commands,
-            "new_connections_only": True,
-        }
-
-    def reset_hint_runtime(self) -> Dict[str, Any]:
-        database = _safe_identifier(self.db, "database name")
-        commands = [
-            "ALTER DATABASE {} RESET session_preload_libraries".format(database),
-            "ALTER DATABASE {} RESET pg_hint_plan.enable_hint_table".format(database),
-        ]
-        for command in commands:
-            self.execute(command, "sysinsight-dream-bridge-hint-reset")
-        return {"commands": commands, "status": self.extension_status()}
-
-    def upsert_hint(self, norm_query: str, hints: str, application_name: str = "") -> Dict[str, Any]:
-        phrase = _hint_inner(hints)
-        if not norm_query.strip():
-            raise ValueError("empty normalized query pattern")
-        insert_sql = """
-            INSERT INTO hint_plan.hints(norm_query_string, application_name, hints)
-            VALUES ({query}, {app}, {hints})
-            ON CONFLICT (norm_query_string, application_name)
-            DO UPDATE SET hints = EXCLUDED.hints
-        """.format(
-            query=_sql_literal(norm_query),
-            app=_sql_literal(application_name),
-            hints=_sql_literal(phrase),
-        )
-        self.execute(insert_sql, "sysinsight-dream-bridge-publish")
-        rows = self._rows(
-            "SELECT id, norm_query_string, application_name, hints FROM hint_plan.hints WHERE norm_query_string = {} AND application_name = {}".format(
-                _sql_literal(norm_query), _sql_literal(application_name)
-            ),
-            "sysinsight-dream-bridge-publish-readback",
-        )
-        return rows[0] if rows else {"norm_query_string": norm_query, "hints": phrase}
-
-    def remove_hint(self, norm_query: str, application_name: str = "") -> None:
-        sql = "DELETE FROM hint_plan.hints WHERE norm_query_string = {} AND application_name = {}".format(
-            _sql_literal(norm_query), _sql_literal(application_name)
-        )
-        self.execute(sql, "sysinsight-dream-bridge-rollback")
-
-    def explain(self, sql: str, hinted: bool = False) -> Any:
-        statement = str(sql).strip().rstrip(";")
-        if not statement:
-            return None
-        explain_sql = "EXPLAIN (FORMAT JSON) {}".format(statement)
-        raw = self._psql(explain_sql, "sysinsight-dream-bridge-explain")
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            return {"raw": raw}
-
 
 class StateStore:
     """Durable queue/audit state shared by the watcher and worker threads."""
@@ -958,7 +775,6 @@ class StateStore:
                     if "duplicate column name" not in str(exc).lower():
                         raise
             init_portal_schema(conn)
-            init_sql_profile_schema(conn)
             version = conn.execute("SELECT value FROM meta WHERE key='canonical_sql_version'").fetchone()
             if not version or version[0] != '2':
                 for row in conn.execute('SELECT sql_key,query_text FROM sql_observations').fetchall():
@@ -977,30 +793,6 @@ class StateStore:
                     conn.execute('DELETE FROM live_sql_samples WHERE canonical_sql=?',(row['canonical_sql'],))
                 conn.execute("INSERT INTO meta(key,value) VALUES('canonical_sql_version','2') ON CONFLICT(key) DO UPDATE SET value='2'")
             conn.execute('CREATE INDEX IF NOT EXISTS sql_observations_identity_idx ON sql_observations(database_name,username,queryid,canonical_sql)')
-
-    def recover_jobs(self) -> List[str]:
-        """Recover jobs left behind by a terminated bridge process.
-
-        The bridge is intended to have one owner per state database.  If the
-        process is killed while a DREAM subprocess is running, SQLite cannot
-        receive the normal ``finished_job`` update.  Re-queue those jobs on
-        the next owner startup and return all queued work so it can be
-        submitted immediately.
-        """
-
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                """
-                UPDATE dream_jobs
-                SET status='queued', started_at=NULL, finished_at=NULL,
-                    error='requeued after bridge restart'
-                WHERE status='running'
-                """
-            )
-            rows = conn.execute(
-                "SELECT job_id FROM dream_jobs WHERE status='queued' ORDER BY requested_at"
-            ).fetchall()
-            return [str(row["job_id"]) for row in rows]
 
     def recover_incidents(self) -> List[str]:
         """Close alert workflows whose owning bridge was terminated.
@@ -1114,110 +906,6 @@ class StateStore:
                 result.append(value)
             return result
 
-    def list_jobs(self, limit: int = 20) -> List[Dict[str, Any]]:
-        limit = self._bounded_limit(limit)
-        with self._lock, self._connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT j.*, o.queryid, o.query_text, o.canonical_sql,
-                       o.replay_sql, o.mean_time_ms, o.max_time_ms
-                FROM dream_jobs j
-                LEFT JOIN sql_observations o ON o.sql_key=j.sql_key
-                ORDER BY j.requested_at DESC LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-            result: List[Dict[str, Any]] = []
-            for row in rows:
-                value = self._decode_row(row, ("result_json",)) or {}
-                value["replayable"] = bool(value.get("replay_sql")) and "$" not in str(value.get("replay_sql")) and "?" not in str(value.get("replay_sql"))
-                result.append(value)
-            return result
-
-    def list_improvements(self, limit: int = 20) -> List[Dict[str, Any]]:
-        limit = self._bounded_limit(limit)
-        with self._lock, self._connection() as conn:
-            rows = conn.execute(
-                """
-                SELECT i.*, o.queryid, o.query_text, o.canonical_sql
-                FROM improvements i
-                LEFT JOIN sql_observations o ON o.sql_key=i.sql_key
-                ORDER BY i.created_at DESC LIMIT ?
-                """,
-                (limit,),
-            ).fetchall()
-            result: List[Dict[str, Any]] = []
-            for row in rows:
-                value = self._decode_row(
-                    row,
-                    ("root_causes", "validation_json", "session_settings_json"),
-                ) or {}
-                result.append(value)
-            return result
-
-    def get_improvement(self, improvement_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock, self._connection() as conn:
-            row = conn.execute(
-                """
-                SELECT i.*, o.queryid, o.query_text, o.canonical_sql
-                FROM improvements i
-                LEFT JOIN sql_observations o ON o.sql_key=i.sql_key
-                WHERE i.improvement_id=?
-                """,
-                (improvement_id,),
-            ).fetchone()
-            return self._decode_row(
-                row,
-                ("root_causes", "validation_json", "session_settings_json"),
-            )
-
-    def update_improvement_status(
-        self,
-        improvement_id: str,
-        status: str,
-        action: str,
-        validation_patch: Optional[Mapping[str, Any]] = None,
-    ) -> Optional[Dict[str, Any]]:
-        current = self.get_improvement(improvement_id)
-        if not current:
-            return None
-        validation = current.get("validation") if isinstance(current.get("validation"), dict) else {}
-        if validation_patch:
-            validation = dict(validation)
-            validation.update(validation_patch)
-        now = utc_now()
-        activated = current.get("activated_at")
-        if status == "active" and not activated:
-            activated = now
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                """
-                UPDATE improvements
-                SET status=?, activated_at=?, last_action_at=?, last_action=?, validation_json=?
-                WHERE improvement_id=?
-                """,
-                (status, activated, now, action, _json(validation), improvement_id),
-            )
-        return self.get_improvement(improvement_id)
-
-    def set_improvement_application(
-        self,
-        improvement_id: str,
-        apply_kind: str,
-        apply_scope: str,
-        session_settings: Mapping[str, Any],
-    ) -> Optional[Dict[str, Any]]:
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                """
-                UPDATE improvements
-                SET apply_kind=?, apply_scope=?, session_settings_json=?
-                WHERE improvement_id=?
-                """,
-                (apply_kind, apply_scope, _json(dict(session_settings)), improvement_id),
-            )
-        return self.get_improvement(improvement_id)
-
     def dashboard_snapshot(
         self,
         mean_ms: float = 1000.0,
@@ -1244,61 +932,18 @@ class StateStore:
                     (int(min_calls), float(mean_ms), float(max_ms)),
                 ).fetchone()[0]
             )
-            active_improvements = int(
-                conn.execute("SELECT COUNT(*) FROM improvements WHERE status='active'").fetchone()[0]
-            )
-            active_hints = int(
-                conn.execute(
-                    """
-                    SELECT COUNT(*) FROM improvements
-                    WHERE status='active'
-                      AND COALESCE(apply_scope, 'postgresql_direct')='postgresql_direct'
-                    """
-                ).fetchone()[0]
-            )
-            active_rewrites = int(
-                conn.execute(
-                    """
-                    SELECT COUNT(*) FROM improvements
-                    WHERE status='active' AND apply_scope='bridge_managed'
-                    """
-                ).fetchone()[0]
-            )
-            hint_hits = int(
-                conn.execute(
-                    """
-                    SELECT COALESCE(SUM(hit_count),0) FROM improvements
-                    WHERE status='active'
-                      AND COALESCE(apply_scope, 'postgresql_direct')='postgresql_direct'
-                    """
-                ).fetchone()[0]
-            )
-            automatic_hits = int(
-                conn.execute(
-                    "SELECT COALESCE(SUM(hit_count),0) FROM improvements WHERE status='active'"
-                ).fetchone()[0]
-            )
         result: Dict[str, Any] = {
             "database": str(self.path),
             "generated_at": utc_now(),
             "counts": {
                 "incidents": self._status_counts_with_total(self.list_incidents, counts("incidents"), limit),
-                "dream_jobs": self._status_counts_with_total(self.list_jobs, counts("dream_jobs"), limit),
-                "improvements": self._status_counts_with_total(self.list_improvements, counts("improvements"), limit),
                 "sql_observations": total_observations,
                 "slow_sql_observations": slow_observations,
-                "active_improvements": active_improvements,
-                "active_hints": active_hints,
-                "active_rewrites": active_rewrites,
-                "observed_auto_applications": automatic_hits,
-                "observed_hint_matches": hint_hits,
             },
         }
         if include_records:
             result.update({
                 "incidents": self.list_incidents(limit),
-                "jobs": self.list_jobs(limit),
-                "improvements": self.list_improvements(limit),
                 "sql_observations": self.list_sql_observations(
                     limit,
                     slow_only=False,
@@ -1320,8 +965,6 @@ class StateStore:
         # Events are derived from the durable state rows, which keeps the
         # audit view recoverable even if the bridge is restarted mid-action.
         incidents = self.list_incidents(limit)
-        jobs = self.list_jobs(limit)
-        improvements = self.list_improvements(limit)
         events: List[Dict[str, Any]] = []
 
         def add(occurred_at: Any, event_type: str, component: str, subject_id: str, status: str, data: Mapping[str, Any]) -> None:
@@ -1348,40 +991,6 @@ class StateStore:
                 add(row.get("finished_at"), "incident.finished", "sysinsight", incident_id, str(row.get("status", "")), {
                     "analysis_status": (analysis.get("analysis", {}) or {}).get("status", "") if isinstance(analysis, dict) else "",
                     "directory": row.get("directory"),
-                })
-        for row in jobs:
-            job_id = str(row.get("job_id", ""))
-            job_result = row.get("result") if isinstance(row.get("result"), dict) else {}
-            publication = job_result.get("bridge_publication") if isinstance(job_result.get("bridge_publication"), dict) else {}
-            evaluation = job_result.get("evaluation") if isinstance(job_result.get("evaluation"), dict) else {}
-            common = {
-                "sql_key": row.get("sql_key"),
-                "queryid": row.get("queryid"),
-                "query": row.get("canonical_sql") or row.get("query_text"),
-                "attempts": row.get("attempts"),
-                "retry_of": row.get("retry_of"),
-                "error": row.get("error"),
-                "reason": job_result.get("reason") or job_result.get("error") or publication.get("reason") or evaluation.get("msg", ""),
-            }
-            add(row.get("requested_at"), "dream.job.queued", "dream", job_id, "queued", common)
-            add(row.get("started_at"), "dream.job.started", "dream", job_id, "running", common)
-            add(row.get("finished_at"), "dream.job.finished", "dream", job_id, str(row.get("status", "")), common)
-        for row in improvements:
-            improvement_id = str(row.get("improvement_id", ""))
-            common = {
-                "sql_key": row.get("sql_key"),
-                "queryid": row.get("queryid"),
-                "query": row.get("canonical_sql") or row.get("query_text"),
-                "hints": row.get("hints"),
-                "improvement_ratio": row.get("improvement_ratio"),
-            }
-            add(row.get("created_at"), "improvement.created", "dream", improvement_id, str(row.get("status", "")), common)
-            if row.get("activated_at"):
-                add(row.get("activated_at"), "improvement.activated", "dream", improvement_id, "active", common)
-            if row.get("last_action_at") and row.get("last_action"):
-                add(row.get("last_action_at"), "improvement.action", "operator", improvement_id, str(row.get("status", "")), {
-                    **common,
-                    "action": row.get("last_action"),
                 })
         events.sort(key=lambda item: str(item.get("occurred_at", "")), reverse=True)
         return events[:limit]
@@ -1577,28 +1186,7 @@ class StateStore:
                             interval_time_ms,
                         ),
                     )
-                # pg_hint_plan does not expose a portable per-hint counter.
-                # For an active hint, newly observed calls are therefore
-                # recorded as matched executions.  The dashboard labels this
-                # as observed/matched rather than pretending it is a server
-                # side audit counter.
-                if interval_calls > 0:
-                    conn.execute(
-                        """
-                        UPDATE improvements
-                        SET hit_count=hit_count + ?
-                        WHERE sql_key=? AND status='active'
-                          AND COALESCE(apply_scope, 'postgresql_direct')='postgresql_direct'
-                        """,
-                        (interval_calls, key),
-                    )
                 keys.append(key)
-                if interval_calls > 0 and _is_read_only_sql(query):
-                    completed_ms = interval_time_ms / interval_calls
-                    if max_changed:
-                        completed_ms = max(completed_ms,current_max)
-                    conn.execute('UPDATE sql_observations SET pending_completed_ms=max(pending_completed_ms,?) WHERE sql_key=?',
-                                 (max(0.0,completed_ms),key))
         return keys
 
     def prune_observation_samples(
@@ -1706,7 +1294,6 @@ class StateStore:
                 conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0]
             )
             prune_portal_evidence(conn, cutoff)
-            changes("sql_profiles", "DELETE FROM sql_profiles WHERE COALESCE(finished_at,started_at) < ?", (cutoff,))
 
             # Select artifact identities before deleting their audit rows.
             expired_runs = conn.execute(
@@ -2024,88 +1611,6 @@ class StateStore:
             result = [dict(row) for row in rows if str(row["canonical_sql"] or "") not in excluded]
             return result[: int(limit)]
 
-    def get_observation(self, sql_key: str) -> Optional[Dict[str, Any]]:
-        with self._lock, self._connection() as conn:
-            return self._row(conn.execute("SELECT * FROM sql_observations WHERE sql_key=?", (sql_key,)).fetchone())
-
-    def latest_improvement(self, sql_key: str) -> Optional[Dict[str, Any]]:
-        with self._lock, self._connection() as conn:
-            row = conn.execute(
-                """
-                SELECT i.*, o.queryid, o.query_text, o.canonical_sql
-                FROM improvements i
-                LEFT JOIN sql_observations o ON o.sql_key=i.sql_key
-                WHERE i.sql_key=?
-                ORDER BY CASE WHEN i.status='active' THEN 0 ELSE 1 END,
-                         i.created_at DESC
-                LIMIT 1
-                """,
-                (sql_key,),
-            ).fetchone()
-            return self._decode_row(
-                row,
-                ("root_causes", "validation_json", "session_settings_json"),
-            )
-
-    def active_improvement(
-        self,
-        sql_key: str = "",
-        canonical_sql: str = "",
-    ) -> Optional[Dict[str, Any]]:
-        """Return the active action registered for one original statement.
-
-        A PostgreSQL statistics identity can change when the same statement
-        moves between users or clients. Prefer an exact key, but fall back to
-        the canonical SQL shape so an automatic rewrite is not lost merely
-        because the query-id changed.
-        """
-
-        where: List[str] = ["i.status='active'"]
-        params: List[Any] = []
-        ordering = "i.created_at DESC"
-        if sql_key and canonical_sql:
-            where.append("(i.sql_key=? OR o.canonical_sql=?)")
-            params.extend([sql_key, canonical_sql])
-            ordering = "CASE WHEN i.sql_key=? THEN 0 ELSE 1 END, i.created_at DESC"
-            params.append(sql_key)
-        elif sql_key:
-            where.append("i.sql_key=?")
-            params.append(sql_key)
-        elif canonical_sql:
-            where.append("o.canonical_sql=?")
-            params.append(canonical_sql)
-        else:
-            return None
-        with self._lock, self._connection() as conn:
-            row = conn.execute(
-                """
-                SELECT i.*, o.queryid, o.query_text, o.canonical_sql, o.replay_sql
-                FROM improvements i
-                LEFT JOIN sql_observations o ON o.sql_key=i.sql_key
-                WHERE {where}
-                ORDER BY {ordering}
-                LIMIT 1
-                """.format(where=" AND ".join(where), ordering=ordering),
-                tuple(params),
-            ).fetchone()
-            return self._decode_row(
-                row,
-                ("root_causes", "validation_json", "session_settings_json"),
-            )
-
-    def record_improvement_hit(self, improvement_id: str, action: str) -> None:
-        """Audit one successful bridge-managed application."""
-
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                """
-                UPDATE improvements
-                SET hit_count=hit_count + 1, last_action_at=?, last_action=?
-                WHERE improvement_id=? AND status='active'
-                """,
-                (utc_now(), str(action)[:200], improvement_id),
-            )
-
     def create_lab_run(
         self,
         run_id: str,
@@ -2214,244 +1719,6 @@ class StateStore:
             values.reverse()
             return values
 
-    def add_lab_execution(self, value: Mapping[str, Any]) -> str:
-        execution_id = str(
-            value.get("execution_id")
-            or "lab-exec-{}".format(hashlib.sha1((_json(value) + str(time.time_ns())).encode()).hexdigest()[:16])
-        )
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO lab_sql_executions(
-                    execution_id,run_id,sql_id,phase,started_at,finished_at,duration_ms,
-                    status,method,query_text,result_json,error
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    execution_id,
-                    value.get("run_id", ""),
-                    value.get("sql_id", ""),
-                    value.get("phase", ""),
-                    value.get("started_at", utc_now()),
-                    value.get("finished_at"),
-                    value.get("duration_ms"),
-                    value.get("status", "queued"),
-                    value.get("method", ""),
-                    value.get("query_text", ""),
-                    _json(value.get("result", {})),
-                    str(value.get("error", ""))[:4000],
-                ),
-            )
-        return execution_id
-
-    def list_lab_executions(self, run_id: str = "", limit: int = 100) -> List[Dict[str, Any]]:
-        limit = self._bounded_limit(limit, 500)
-        where = "WHERE run_id=?" if run_id else ""
-        params: Tuple[Any, ...] = (run_id, limit) if run_id else (limit,)
-        with self._lock, self._connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM lab_sql_executions {} ORDER BY started_at DESC LIMIT ?".format(where),
-                params,
-            ).fetchall()
-            return [self._decode_row(row, ("result_json",)) or {} for row in rows]
-
-    def clear_dream_records(self, archive_path: Path) -> Dict[str, Any]:
-        """Archive then clear the bridge's SQL/DREAM workspace.
-
-        Incidents and TPCC experiment runs remain as audit history.  Active
-        DREAM work is never deleted; the caller must stop/wait for it first.
-        """
-
-        archive_path = Path(archive_path).resolve()
-        archive_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._lock, self._connection() as conn:
-            active = conn.execute(
-                "SELECT COUNT(*) FROM dream_jobs WHERE status IN ('queued','running')"
-            ).fetchone()[0]
-            if int(active) > 0:
-                raise RuntimeError("cannot clear DREAM records while a job is queued or running")
-            counts: Dict[str, int] = {}
-            for table in (
-                "sql_observations",
-                "sql_observation_samples",
-                "live_sql_samples",
-                "dream_jobs",
-                "improvements",
-                "lab_sql_executions",
-                "sql_profiles",
-            ):
-                counts[table] = int(conn.execute("SELECT COUNT(*) FROM {}".format(table)).fetchone()[0])
-            counts["lab_dream_runs"] = int(
-                conn.execute("SELECT COUNT(*) FROM lab_runs WHERE kind='dream'").fetchone()[0]
-            )
-            counts["keeninsight_sql_evidence"] = int(
-                conn.execute("SELECT COUNT(*) FROM keeninsight_evidence WHERE entity_type='sql'").fetchone()[0]
-            )
-            # sqlite3.Connection.backup copies freelist pages as well. After
-            # months of churn that turned a small logical workspace into a
-            # multi-gigabyte archive. VACUUM INTO produces the same restorable
-            # SQLite snapshot while writing only live pages.
-            if archive_path.exists():
-                raise RuntimeError("DREAM archive already exists: {}".format(archive_path))
-            conn.execute("VACUUM INTO ?", (str(archive_path),))
-            conn.execute("DELETE FROM keeninsight_evidence WHERE entity_type='sql'")
-            for table in (
-                "sql_observation_samples",
-                "live_sql_samples",
-                "dream_jobs",
-                "improvements",
-                "sql_observations",
-                "lab_sql_executions",
-                "sql_profiles",
-            ):
-                conn.execute("DELETE FROM {}".format(table))
-            conn.execute("DELETE FROM lab_runs WHERE kind='dream'")
-        return {"status": "completed", "archive": str(archive_path), "deleted": counts}
-
-    def enqueue_job(
-        self,
-        sql_key: str,
-        incident_id: Optional[str],
-        cooldown: float,
-        force: bool = False,
-        retry_of: Optional[str] = None,
-    ) -> Optional[str]:
-        now = time.time()
-        with self._lock, self._connection() as conn:
-            pending = conn.execute('SELECT pending_completed_ms FROM sql_observations WHERE sql_key=?',(sql_key,)).fetchone()
-            completion_ms = float(pending[0]) if pending else 0.0
-            # Retain completed observations across active→idle poll races;
-            # acknowledge only once scheduling/the existing-job gate runs.
-            conn.execute('UPDATE sql_observations SET pending_completed_ms=0 WHERE sql_key=?',(sql_key,))
-            active = conn.execute(
-                "SELECT 1 FROM improvements WHERE sql_key=? AND status='active' LIMIT 1", (sql_key,)
-            ).fetchone()
-            if active:
-                return None
-            existing = conn.execute(
-                "SELECT status, requested_at, result_json FROM dream_jobs WHERE sql_key=? ORDER BY requested_at DESC LIMIT 1",
-                (sql_key,),
-            ).fetchone()
-            if existing and existing["status"] in {"queued", "running"}:
-                return None
-            if not force and existing and existing["status"] in {"completed", "candidate", "blocked", "failed"}:
-                replayable = conn.execute(
-                    "SELECT replay_sql FROM sql_observations WHERE sql_key=?",
-                    (sql_key,),
-                ).fetchone()
-                previous_result = _decode_json(existing["result_json"], {}) or {}
-                previous_reason = str(previous_result.get("reason", "")) if isinstance(previous_result, dict) else ""
-                # A blocked job caused by a missing live SQL sample may be
-                # retried as soon as an activity sample makes it replayable.
-                # Configuration/runtime/API failures require an explicit
-                # retry.  Completed/candidate/failed jobs also require an
-                # explicit retry: DREAM evaluates the target SQL in the same
-                # database, so its own measurement calls would otherwise look
-                # like fresh workload and trigger an endless self-loop.
-                sample_became_replayable = (
-                    existing["status"] == "blocked"
-                    and previous_reason.startswith("no replayable SQL sample")
-                    and replayable
-                    and replayable["replay_sql"]
-                )
-                if sample_became_replayable:
-                    pass
-                else:
-                    return None
-            job_id = "dream-{}-{}".format(dt.datetime.now().strftime("%Y%m%d%H%M%S"), hashlib.sha1((sql_key + str(now)).encode()).hexdigest()[:10])
-            conn.execute(
-                "INSERT INTO dream_jobs(job_id,sql_key,incident_id,retry_of,status,requested_at,trigger_source,source_completion_ms) VALUES(?,?,?,?,?,?,?,?)",
-                (job_id, sql_key, incident_id, retry_of, "queued", utc_now(),
-                 'manual' if force else 'automatic_completed_sql',completion_ms if not force and completion_ms>0 else None),
-            )
-            return job_id
-
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock, self._connection() as conn:
-            row = conn.execute(
-                """
-                SELECT j.*, o.queryid, o.query_text, o.canonical_sql,
-                       o.replay_sql, o.mean_time_ms, o.max_time_ms
-                FROM dream_jobs j
-                LEFT JOIN sql_observations o ON o.sql_key=j.sql_key
-                WHERE j.job_id=?
-                """,
-                (job_id,),
-            ).fetchone()
-            return self._decode_row(row, ("result_json",))
-
-    def retry_job(self, job_id: str, incident_id: Optional[str] = None) -> Optional[str]:
-        job = self.get_job(job_id)
-        if not job:
-            return None
-        return self.enqueue_job(
-            str(job["sql_key"]),
-            incident_id or job.get("incident_id"),
-            cooldown=0.0,
-            force=True,
-            retry_of=job_id,
-        )
-
-    def start_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                "UPDATE dream_jobs SET status='running', started_at=?, attempts=attempts+1 WHERE job_id=? AND status='queued'",
-                (utc_now(), job_id),
-            )
-            row = conn.execute("SELECT * FROM dream_jobs WHERE job_id=?", (job_id,)).fetchone()
-            return self._row(row)
-
-    def finish_job(
-        self,
-        job_id: str,
-        status: str,
-        result: Optional[Mapping[str, Any]] = None,
-        error: str = "",
-        input_path: Optional[Path] = None,
-        output_path: Optional[Path] = None,
-    ) -> None:
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                "UPDATE dream_jobs SET status=?, finished_at=?, result_json=?, error=?, input_path=?, output_path=? WHERE job_id=?",
-                (status, utc_now(), _json(result) if result is not None else None, error[:4000], str(input_path) if input_path else None, str(output_path) if output_path else None, job_id),
-            )
-            capture_portal_evidence(conn, "sql", job_id, result or {"status": status, "error": error[:4000]})
-
-    def add_improvement(self, value: Mapping[str, Any]) -> str:
-        improvement_id = str(value.get("improvement_id") or "improvement-{}".format(hashlib.sha1((_json(value) + str(time.time_ns())).encode()).hexdigest()[:16]))
-        with self._lock, self._connection() as conn:
-            conn.execute(
-                """
-                INSERT INTO improvements(
-                    improvement_id,sql_key,norm_query_string,application_name,hints,rewrite_sql,fix_action,
-                    root_causes,status,old_time,new_time,improvement_ratio,validation_json,
-                    apply_kind,apply_scope,session_settings_json,created_at,activated_at,hit_count
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (
-                    improvement_id,
-                    value.get("sql_key", ""),
-                    value.get("norm_query_string"),
-                    value.get("application_name", ""),
-                    value.get("hints"),
-                    value.get("rewrite_sql"),
-                    value.get("fix_action"),
-                    _json(value.get("root_causes", [])),
-                    value.get("status", "candidate"),
-                    value.get("old_time"),
-                    value.get("new_time"),
-                    value.get("improvement_ratio"),
-                    _json(value.get("validation", {})),
-                    value.get("apply_kind"),
-                    value.get("apply_scope"),
-                    _json(value.get("session_settings", {})),
-                    value.get("created_at", utc_now()),
-                    value.get("activated_at"),
-                    int(value.get("hit_count", 0) or 0),
-                ),
-            )
-        return improvement_id
-
     def recent(self, limit: int = 20) -> Dict[str, Any]:
         with self._lock, self._connection() as conn:
             def all_rows(sql: str) -> List[Dict[str, Any]]:
@@ -2460,8 +1727,6 @@ class StateStore:
             return {
                 "database": str(self.path),
                 "incidents": all_rows("SELECT * FROM incidents ORDER BY started_at DESC LIMIT ?"),
-                "jobs": all_rows("SELECT * FROM dream_jobs ORDER BY requested_at DESC LIMIT ?"),
-                "improvements": all_rows("SELECT * FROM improvements ORDER BY created_at DESC LIMIT ?"),
             }
 
 
@@ -2480,9 +1745,8 @@ def prune_output_artifacts(
     incident_root = (root / "incidents").resolve()
     lab_root = (root / "lab").resolve()
     job_root = (root / "jobs" / "dream_jobs").resolve()
-    profile_root = (root / "sql_profiles").resolve()
     archive_roots = ((root / "archives").resolve(), (lab_root / "archives").resolve())
-    allowed_roots = (root, incident_root, lab_root, job_root, profile_root, *archive_roots)
+    allowed_roots = (root, incident_root, lab_root, job_root, *archive_roots)
     removed: List[str] = []
     errors: List[str] = []
     reclaimed_bytes = 0
@@ -2553,7 +1817,6 @@ def prune_output_artifacts(
         (incident_root, keep_incidents, ""),
         (lab_root, keep_lab, "lab-"),
         (job_root, keep_jobs, ""),
-        (profile_root, set(), "sql-profile-"),
     ):
         if not scan_root.is_dir():
             continue
@@ -2777,70 +2040,6 @@ def _api_json(api_base: str, api_key: str, path: str, payload: Mapping[str, Any]
 
 
 class Bridge:
-    @staticmethod
-    def _sync_dream_runtime(runtime_root_value: str) -> Dict[str, Any]:
-        """Copy the executable integration files into the postgres-readable runtime.
-
-        The local worker cannot traverse ``/root`` under peer authentication.
-        Keeping a runtime copy in ``/tmp`` is intentional, but silently using
-        an older adapter is not.  Synchronize the small executable surface on
-        every bridge start and expose the result through the status API.
-        """
-
-        runtime_root = Path(runtime_root_value).resolve()
-        source_dream_root = (ROOT.parent / "dream").resolve()
-        if runtime_root == source_dream_root:
-            return {
-                "status": "source_runtime",
-                "runtime_root": str(runtime_root),
-                "files": [],
-                "synchronized_at": utc_now(),
-            }
-        manifest = (
-            (ROOT / "dream_live_adapter.py", runtime_root / "perf-anomaly-demo" / "dream_live_adapter.py"),
-            (source_dream_root / "dream/agent/plan/planner.py", runtime_root / "dream/agent/plan/planner.py"),
-            (source_dream_root / "dream/agent/prompt.py", runtime_root / "dream/agent/prompt.py"),
-            (source_dream_root / "dream/database/pg_env.py", runtime_root / "dream/database/pg_env.py"),
-            (
-                source_dream_root / "dream" / "agent" / "action" / "action_manager.py",
-                runtime_root / "dream" / "agent" / "action" / "action_manager.py",
-            ),
-            (
-                source_dream_root / "dream" / "agent" / "action" / "action_evaluation.py",
-                runtime_root / "dream" / "agent" / "action" / "action_evaluation.py",
-            ),
-            (
-                source_dream_root / "dream" / "agent" / "action" / "action_utils.py",
-                runtime_root / "dream" / "agent" / "action" / "action_utils.py",
-            ),
-            (
-                source_dream_root / "dream" / "runtime_config.py",
-                runtime_root / "dream" / "runtime_config.py",
-            ),
-        )
-        synchronized: List[Dict[str, Any]] = []
-        for source, destination in manifest:
-            if not source.is_file():
-                raise RuntimeError("missing DREAM runtime source: {}".format(source))
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.parent.chmod(0o755)
-            shared_inode = destination.exists() and source.samefile(destination)
-            if not shared_inode:
-                shutil.copy2(str(source), str(destination))
-            destination.chmod(0o644)
-            synchronized.append({
-                "source": str(source),
-                "destination": str(destination),
-                "sha256": hashlib.sha256(destination.read_bytes()).hexdigest(),
-                "mode": "shared_inode" if shared_inode else "copied",
-            })
-        return {
-            "status": "synchronized",
-            "runtime_root": str(runtime_root),
-            "files": synchronized,
-            "synchronized_at": utc_now(),
-        }
-
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self.store = StateStore(Path(args.state_db))
@@ -2848,9 +2047,7 @@ class Bridge:
         self.prometheus = PrometheusClient(args.prometheus_url, timeout=args.prometheus_timeout)
         self.output_root = Path(args.output).resolve()
         self.output_root.mkdir(parents=True, exist_ok=True)
-        self.sql_profiler = SQLProfiler(self.db, self.store, self.output_root, _canonical_sql,
-            enabled=os.environ.get("KEENINSIGHT_SQL_PROFILING", "1").lower() not in {"0", "false", "off"})
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.dream_workers))
+        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.sysinsight_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.capture_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.control_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
@@ -2865,11 +2062,7 @@ class Bridge:
         self.last_alert_error = ""
         self.last_collection: Dict[str, Any] = self.store.get_meta("latest_collection", {}) or {}
         self.last_collection_error = self.store.get_meta("last_collection_error", "") or ""
-        self.last_dream_gate: Dict[str, Any] = self.store.get_meta("last_dream_gate", {}) or {}
         self.last_sample_maintenance: Dict[str, Any] = self.store.get_meta("last_sample_maintenance", {}) or {}
-        self.last_extension_status: Dict[str, Any] = self.store.get_meta("hint_runtime", {}) or {}
-        self.dream_runtime_sync = self._sync_dream_runtime(args.dream_runtime_root)
-        self.store.set_meta("dream_runtime_sync", self.dream_runtime_sync)
         self._cycle_lock = threading.Lock()
         self._maintenance_lock = threading.Lock()
         self._sysinsight_lock = threading.Lock()
@@ -2891,13 +2084,6 @@ class Bridge:
             "startsAt": utc_now(),
             "source": "--force-alert",
         }
-        recovered_jobs: List[str] = []
-        if not getattr(args, "reset_hint_runtime", False):
-            recovered_jobs = self.store.recover_jobs()
-            for job_id in recovered_jobs:
-                self.futures.append(self.executor.submit(self._run_dream_job, job_id))
-            if recovered_jobs:
-                LOGGER.warning("recovered %d queued DREAM job(s) from the previous bridge run", len(recovered_jobs))
         if getattr(args, "http_port", 0) > 0:
             self.start_http()
 
@@ -2905,8 +2091,6 @@ class Bridge:
         if self._closed:
             return
         self._closed = True
-        if getattr(self, 'sql_profiler', None):
-            self.sql_profiler.close()
         if self.http_server is not None:
             try:
                 self.http_server.shutdown()
@@ -2962,20 +2146,12 @@ class Bridge:
                 "api_config_source": os.environ.get("SYSINSIGHT_API_CONFIG_SOURCE", "environment"),
                 "sysinsight_api_enabled": not bool(self.args.no_api),
                 "sysinsight_full_chain": bool(getattr(self.args, "sysinsight_full_chain", False)),
-                "dream_auto_apply": bool(self.args.auto_apply),
-                "tune_without_alert": bool(self.args.tune_without_alert),
-                "dream_long_sql_auto_trigger": True,
-                "dream_trigger_ms": self.args.dream_trigger_ms,
-                "dream_ready": bool(self.args.dream_offline or _read_api_key()),
-                "dream_offline": bool(self.args.dream_offline),
-                "dream_runtime_sync": self.dream_runtime_sync,
             },
             "database": {
                 "name": self.args.db,
                 "schema": self.args.db_schema,
                 "host": self.args.host,
                 "port": self.args.port,
-                "hint_runtime": self.last_extension_status,
             },
             "alert": {
                 "firing": bool(self.last_alert_snapshot),
@@ -2985,7 +2161,6 @@ class Bridge:
             "last_collection": self.last_collection,
             "last_collection_error": self.last_collection_error,
             "sample_maintenance": self.last_sample_maintenance,
-            "dream_gate": self.last_dream_gate,
             "state": state,
         }
         if include_details:
@@ -3027,190 +2202,6 @@ class Bridge:
         self.control_futures.append(future)
         return {"request_id": request_id, "status": "queued", "alert_firing": bool(alert)}
 
-    def retry_job(self, job_id: str) -> Dict[str, Any]:
-        new_job_id = self.store.retry_job(job_id, self.current_incident_id)
-        if not new_job_id:
-            raise RuntimeError("job is missing, already queued/running, or has an active improvement")
-        self.futures.append(self.executor.submit(self._run_dream_job, new_job_id))
-        return {"status": "queued", "job_id": new_job_id, "retry_of": job_id}
-
-    def activate_improvement(self, improvement_id: str) -> Dict[str, Any]:
-        improvement = self.store.get_improvement(improvement_id)
-        if not improvement:
-            raise KeyError("improvement not found: {}".format(improvement_id))
-        if improvement.get("status") == "active":
-            return {"status": "active", "already_active": True, "improvement": improvement}
-        original_sql = str(improvement.get("query_text") or "")
-        candidate = parse_dream_candidate(
-            str(improvement.get("fix_action") or ""),
-            str(improvement.get("rewrite_sql") or ""),
-            original_sql,
-        )
-        if candidate.get("unsupported_actions"):
-            raise ValueError("DREAM improvement contains an unsupported action")
-        apply_scope = str(candidate.get("apply_scope") or "none")
-        if apply_scope == "none":
-            raise ValueError("DREAM improvement has no executable automatic action")
-        if apply_scope == "bridge_managed":
-            normalized_settings = self.db.normalize_session_settings(
-                candidate.get("session_settings") or improvement.get("session_settings") or {}
-            )
-            if candidate.get("hints"):
-                _hint_inner(" ".join(str(value) for value in candidate.get("hints", [])))
-            execution_sql = str(candidate.get("execution_sql") or "").strip()
-            if not execution_sql or not _is_read_only_sql(execution_sql):
-                raise ValueError("DREAM improvement is not one read-only executable statement")
-            self.store.set_improvement_application(
-                improvement_id,
-                str(candidate.get("apply_kind") or "rewrite_sql"),
-                apply_scope,
-                normalized_settings,
-            )
-            updated = self.store.update_improvement_status(
-                improvement_id,
-                "active",
-                "manual_activate",
-                {
-                    "manual_action": "activate",
-                    "manual_action_at": utc_now(),
-                    "application_scope": "bridge_managed",
-                },
-            )
-            return {
-                "status": "active",
-                "application_scope": "bridge_managed",
-                "improvement": updated,
-            }
-        norm_query = str(improvement.get("norm_query_string") or "").strip()
-        normalized_settings = self.db.normalize_session_settings(
-            candidate.get("session_settings") or improvement.get("session_settings") or {}
-        )
-        phrase = _hint_inner(direct_hint_phrase(candidate, normalized_settings))
-        if not norm_query:
-            raise ValueError("improvement has no publishable query pattern")
-        runtime = self.db.extension_status()
-        enabled = str(runtime.get("hint_table_enabled", "")).lower() in {"on", "true", "1"}
-        if not runtime.get("hint_table_exists") or not enabled:
-            raise RuntimeError("pg_hint_plan hint table is not enabled for this database")
-        published = self.db.upsert_hint(
-            norm_query,
-            phrase,
-            str(improvement.get("application_name") or self.args.hint_application_name),
-        )
-        self.last_extension_status = runtime
-        self.store.set_improvement_application(
-            improvement_id,
-            str(candidate.get("apply_kind") or "plan_hint"),
-            "postgresql_direct",
-            normalized_settings,
-        )
-        updated = self.store.update_improvement_status(
-            improvement_id,
-            "active",
-            "manual_activate",
-            {"manual_action": "activate", "manual_action_at": utc_now(), "published_row": published},
-        )
-        return {"status": "active", "published_row": published, "improvement": updated}
-
-    def rollback_improvement(self, improvement_id: str) -> Dict[str, Any]:
-        improvement = self.store.get_improvement(improvement_id)
-        if not improvement:
-            raise KeyError("improvement not found: {}".format(improvement_id))
-        norm_query = str(improvement.get("norm_query_string") or "").strip()
-        apply_scope = str(improvement.get("apply_scope") or "")
-        direct = apply_scope == "postgresql_direct" or (
-            not apply_scope and bool(improvement.get("hints")) and not improvement.get("rewrite_sql")
-        )
-        if norm_query and direct:
-            self.db.remove_hint(
-                norm_query,
-                str(improvement.get("application_name") or self.args.hint_application_name),
-            )
-        updated = self.store.update_improvement_status(
-            improvement_id,
-            "rolled_back",
-            "manual_rollback",
-            {"manual_action": "rollback", "manual_action_at": utc_now()},
-        )
-        return {"status": "rolled_back", "removed": bool(norm_query and direct), "improvement": updated}
-
-    def resolve_dream_application(self, sql_key: str, original_sql: str) -> Dict[str, Any]:
-        """Resolve the active action for the next bridge-managed execution."""
-
-        improvement = self.store.active_improvement(
-            sql_key=str(sql_key or ""),
-            canonical_sql=_canonical_sql(original_sql),
-        )
-        if not improvement:
-            return {
-                "applied": False,
-                "query": original_sql,
-                "session_settings": {},
-                "method": "original SQL; no active DREAM improvement",
-            }
-        candidate = parse_dream_candidate(
-            str(improvement.get("fix_action") or ""),
-            str(improvement.get("rewrite_sql") or ""),
-            original_sql,
-        )
-        if candidate.get("unsupported_actions"):
-            raise ValueError("active DREAM improvement contains an unsupported action")
-        scope = str(improvement.get("apply_scope") or candidate.get("apply_scope") or "")
-        exact_key = bool(sql_key) and str(improvement.get("sql_key") or "") == str(sql_key)
-        if (
-            scope == "bridge_managed"
-            and candidate.get("rewrite_sql")
-            and not exact_key
-            and _statement_text_identity(original_sql)
-            != _statement_text_identity(str(improvement.get("query_text") or ""))
-        ):
-            return {
-                "applied": False,
-                "query": original_sql,
-                "session_settings": {},
-                "method": "active DREAM rewrite skipped: SQL literal text differs",
-                "reason": "semantic rewrite requires the same literal SQL text; use a parameter-aware rewrite",
-            }
-        query = original_sql
-        settings: Dict[str, str] = {}
-        if scope == "bridge_managed":
-            query = str(candidate.get("execution_sql") or candidate.get("rewrite_sql") or "").strip()
-            if not query or not _is_read_only_sql(query):
-                raise ValueError("active DREAM rewrite is not one read-only statement")
-            stored_settings = improvement.get("session_settings")
-            settings = {
-                str(name): str(value)
-                for name, value in (
-                    stored_settings if isinstance(stored_settings, dict) else candidate.get("session_settings") or {}
-                ).items()
-            }
-            if candidate.get("rewrite_sql"):
-                method = "DREAM automatic SQL rewrite"
-            elif candidate.get("hints"):
-                method = "DREAM automatic plan hint"
-            else:
-                method = "DREAM automatic session settings"
-            if settings and candidate.get("rewrite_sql"):
-                method += " + session settings"
-            elif settings and candidate.get("hints"):
-                method += " + session settings"
-        elif scope == "postgresql_direct":
-            # The original statement must be sent unchanged so the hint-table
-            # pattern matches; PostgreSQL applies both plan and Set hints.
-            method = "DREAM automatic pg_hint_plan application"
-        else:
-            raise RuntimeError("active DREAM improvement has no executable application scope")
-        return {
-            "applied": True,
-            "improvement_id": improvement.get("improvement_id"),
-            "apply_kind": improvement.get("apply_kind") or candidate.get("apply_kind"),
-            "apply_scope": scope,
-            "query": query,
-            "session_settings": settings,
-            "method": method,
-            "match_type": "sql_key" if exact_key else "canonical_sql",
-        }
-
     def prometheus_metrics(self) -> str:
         """Expose the durable automation state as a native Prometheus target."""
 
@@ -3250,26 +2241,15 @@ class Bridge:
             emit("sysinsight_dream_bridge_alert_firing", 1 if snapshot["alert"]["firing"] else 0, help_text="Whether the selected Prometheus alert is firing.")
             emit("sysinsight_dream_bridge_api_configured", 1 if snapshot["service"]["api_configured"] else 0, help_text="Whether the shared LLM API key is available through the environment.")
             emit("sysinsight_dream_bridge_sysinsight_full_chain", 1 if snapshot["service"].get("sysinsight_full_chain") else 0, help_text="Whether alert handling runs the source-aware SysInsight apply/retest/restore chain.")
-            emit("sysinsight_dream_bridge_dream_ready", 1 if snapshot["service"].get("dream_ready") else 0, help_text="Whether DREAM can run automatically with offline mode or a shared LLM API key.")
-            emit("sysinsight_dream_bridge_dream_gate_blocked", 1 if snapshot.get("dream_gate", {}).get("status") == "blocked" else 0, help_text="Whether automatic DREAM scheduling is currently blocked by configuration.")
-            emit("sysinsight_dream_bridge_auto_apply_enabled", 1 if snapshot["service"]["dream_auto_apply"] else 0, help_text="Whether validated DREAM hints may be auto-applied.")
-            emit("sysinsight_dream_bridge_tune_without_alert", 1 if snapshot["service"]["tune_without_alert"] else 0, help_text="Whether the legacy no-alert tuning override is enabled.")
-            emit("sysinsight_dream_bridge_dream_long_sql_auto_trigger", 1 if snapshot["service"].get("dream_long_sql_auto_trigger") else 0, help_text="Whether completed SQL at or above the DREAM runtime threshold can enqueue without a SysInsight alert.")
-            emit("sysinsight_dream_bridge_dream_trigger_ms", snapshot["service"].get("dream_trigger_ms", 10000), help_text="Minimum completed SQL runtime that can trigger DREAM, in milliseconds.")
             last_collection = snapshot.get("last_collection", {})
             emit("sysinsight_dream_bridge_last_collection_timestamp_seconds", _prometheus_timestamp(last_collection.get("collected_at")) or 0, help_text="Timestamp of the last successful collection attempt.")
             emit("sysinsight_dream_bridge_last_collection_error", 1 if snapshot.get("last_collection_error") else 0, help_text="Whether the last collection cycle failed.")
             emit("sysinsight_dream_bridge_sql_observations", counts.get("sql_observations", 0), help_text="Number of distinct SQL observations in the durable store.")
             emit("sysinsight_dream_bridge_slow_sql_observations", counts.get("slow_sql_observations", 0), help_text="Number of observations above the configured slow SQL thresholds.")
-            emit("sysinsight_dream_bridge_active_improvements", counts.get("active_improvements", 0), help_text="Number of active DREAM automatic improvements across all application paths.")
-            emit("sysinsight_dream_bridge_active_hints", counts.get("active_hints", 0), help_text="Number of active pg_hint_plan improvements.")
-            emit("sysinsight_dream_bridge_active_rewrites", counts.get("active_rewrites", 0), help_text="Number of active bridge-managed DREAM rewrites or executor settings.")
-            emit("sysinsight_dream_bridge_observed_auto_applications_total", counts.get("observed_auto_applications", 0), help_text="Observed applications of active DREAM improvements across all paths.")
-            emit("sysinsight_dream_bridge_observed_hint_matches_total", counts.get("observed_hint_matches", 0), help_text="New calls observed for active improvements.")
 
             lab = snapshot.get("lab", {}) if isinstance(snapshot.get("lab", {}), dict) else {}
             current_lab = lab.get("current", []) if isinstance(lab.get("current", []), list) else []
-            for kind in ("sysinsight", "dream"):
+            for kind in ("sysinsight",):
                 current = next((row for row in current_lab if row.get("kind") == kind), None)
                 latest = lab.get("latest_{}".format(kind))
                 row = current or (latest if isinstance(latest, dict) else {})
@@ -3424,61 +2404,9 @@ class Bridge:
                     "Current target business transaction TPS for every TPCC scenario; zero when the scenario is not running.",
                 )
 
-            for group, metric in (("incidents", "sysinsight_dream_bridge_incidents"), ("dream_jobs", "sysinsight_dream_bridge_dream_jobs"), ("improvements", "sysinsight_dream_bridge_improvements")):
-                values = counts.get(group, {}) if isinstance(counts.get(group, {}), dict) else {}
-                # ``dashboard_snapshot`` also carries a convenience ``total``
-                # field. It is not a status and must not become a second
-                # series in Grafana's status panels.
-                statuses = (set(values) - {"total"}) | ({"running", "completed", "failed"} if group == "incidents" else set())
-                if group == "dream_jobs":
-                    statuses |= {"queued", "running", "completed", "candidate", "blocked", "failed"}
-                if group == "improvements":
-                    statuses |= {"active", "candidate", "rolled_back", "no_action"}
-                for status in sorted(statuses):
-                    emit(metric, values.get(status, 0), {"status": status}, help_text="Durable {} grouped by status.".format(group.replace("_", " ")))
-
-            for row in state.get("sql_observations", []):
-                labels = {
-                    "sql_key": row.get("sql_key"),
-                    "queryid": row.get("queryid"),
-                    "query": row.get("canonical_sql") or row.get("query_text"),
-                    "improvement_status": row.get("improvement_status", "none"),
-                    "replayable": "true" if row.get("replayable") else "false",
-                }
-                emit("sysinsight_dream_bridge_sql_mean_time_ms", row.get("mean_time_ms", 0), labels, "Observed mean SQL execution time in milliseconds.")
-                emit("sysinsight_dream_bridge_sql_max_time_ms", row.get("max_time_ms", 0), labels, "Observed maximum SQL execution time in milliseconds.")
-                emit("sysinsight_dream_bridge_sql_calls", row.get("calls", 0), labels, "Cumulative calls for the observed SQL.")
-                emit("sysinsight_dream_bridge_sql_observation_count", row.get("observation_count", 0), labels, "Number of bridge observation cycles containing the SQL.")
-
-            for row in state.get("jobs", []):
-                job_result = row.get("result") if isinstance(row.get("result"), dict) else {}
-                publication = job_result.get("bridge_publication") if isinstance(job_result.get("bridge_publication"), dict) else {}
-                evaluation = job_result.get("evaluation") if isinstance(job_result.get("evaluation"), dict) else {}
-                job_reason = row.get("error") or job_result.get("reason") or job_result.get("error") or publication.get("reason") or evaluation.get("msg") or ""
-                labels = {
-                    "job_id": row.get("job_id"),
-                    "sql_key": row.get("sql_key"),
-                    "queryid": row.get("queryid"),
-                    "status": row.get("status"),
-                    "retry_of": row.get("retry_of") or "",
-                    "reason": job_reason,
-                }
-                emit("sysinsight_dream_bridge_dream_job_info", 1, labels, "DREAM job currently recorded by the bridge.")
-            for row in state.get("improvements", []):
-                validation = row.get("validation") if isinstance(row.get("validation"), dict) else {}
-                labels = {
-                    "improvement_id": row.get("improvement_id"),
-                    "sql_key": row.get("sql_key"),
-                    "queryid": row.get("queryid"),
-                    "status": row.get("status"),
-                    "apply_kind": row.get("apply_kind") or "",
-                    "apply_scope": row.get("apply_scope") or "",
-                    "hints": row.get("hints") or "",
-                    "reason": validation.get("reason") or "",
-                }
-                emit("sysinsight_dream_bridge_improvement_info", 1, labels, "DREAM improvement candidate or active automatic action.")
-                emit("sysinsight_dream_bridge_improvement_ratio", row.get("improvement_ratio", 0) or 0, labels, "Measured improvement ratio of a DREAM candidate.")
-                emit("sysinsight_dream_bridge_improvement_hit_count", row.get("hit_count", 0) or 0, labels, "Observed calls for an active improvement.")
+            values = counts.get("incidents", {}) if isinstance(counts.get("incidents", {}), dict) else {}
+            for status in sorted((set(values) - {"total"}) | {"running", "completed", "failed"}):
+                emit("sysinsight_dream_bridge_incidents", values.get(status, 0), {"status": status}, help_text="Durable incidents grouped by status.")
             for row in state.get("incidents", []):
                 sysinsight = row.get("sysinsight") if isinstance(row.get("sysinsight"), dict) else {}
                 analysis_status = ""
@@ -3494,21 +2422,6 @@ class Bridge:
             emit("sysinsight_dream_bridge_up", 1, help_text="Whether the SysInsight DREAM bridge process is alive.")
             emit("sysinsight_dream_bridge_state_error", 1, {"error": str(exc)}, "Whether the bridge state could be rendered completely.")
         return "\n".join(lines) + "\n"
-
-    def configure(self) -> Dict[str, Any]:
-        result = self.db.configure_hint_table()
-        self.last_extension_status = result.get("after", {}) if isinstance(result, dict) else {}
-        self.store.set_meta("hint_runtime", self.last_extension_status)
-        _write_json(self.output_root / "hint_table_setup.json", result)
-        result["status"] = "completed"
-        return result
-
-    def reset_hint_runtime(self) -> Dict[str, Any]:
-        result = self.db.reset_hint_runtime()
-        self.last_extension_status = result.get("status", {}) if isinstance(result, dict) else {}
-        self.store.set_meta("hint_runtime", self.last_extension_status)
-        _write_json(self.output_root / "hint_table_reset.json", result)
-        return result
 
     def _alert_key(self, alert: Mapping[str, Any]) -> str:
         labels = alert.get("labels", {}) if isinstance(alert, Mapping) else {}
@@ -3747,8 +2660,6 @@ class Bridge:
                 case['active_experiments'] = evidence.get('active_experiments') or []
                 if any(run.get('kind') == 'sysinsight' for run in case['active_experiments']):
                     case['workload'] = 'tpcc'
-                elif any(run.get('kind') == 'dream' for run in case['active_experiments']):
-                    case['workload'] = 'tpcds'
             profile = _profile_for(self.args.dbms, self.args.pg_version)
             input_payload = build_sysinsight_input(
                 case,
@@ -3760,8 +2671,6 @@ class Bridge:
             input_payload["bridge"] = {
                 "incident_id": incident_id,
                 "sql_observation_store": str(self.store.path),
-                "dream_queue": "asynchronous",
-                "auto_apply": "pg_hint_plan.hints",
             }
             _write_json(incident_dir / "prometheus_capture.json", prometheus)
             _write_json(incident_dir / "case_result.json", case)
@@ -3876,448 +2785,6 @@ class Bridge:
         self._launch_sysinsight(incident_id, incident_dir, alert, snapshot, slow_rows)
         LOGGER.info("Alert %s triggered SysInsight incident %s", (alert.get("labels", {}) or {}).get("alertname"), incident_id)
 
-    def _job_config(self, job_dir: Path) -> Path:
-        config_path = Path(self.args.dream_config).resolve()
-        configs = json.loads(config_path.read_text(encoding="utf-8"))
-        runtime_root = Path(self.args.dream_runtime_root).resolve()
-        source_root = (ROOT.parent / "dream").resolve()
-
-        def relocate(value: Any) -> Any:
-            if isinstance(value, str) and value.startswith(str(source_root)):
-                return str(runtime_root) + value[len(str(source_root)):]
-            if isinstance(value, dict):
-                return {key: relocate(item) for key, item in value.items()}
-            if isinstance(value, list):
-                return [relocate(item) for item in value]
-            return value
-
-        configs = relocate(configs)
-        # Model strings pinned in the example AGENT_CONFIG must not override
-        # the operator's live shared provider selection. Keep secrets in env.
-        openai_config = configs.setdefault("API_SETTINGS", {}).setdefault("openai", {})
-        openai_config.pop("api_key", None)
-        openai_config.update({"base_url": self.args.api_base, "model": self.args.model})
-        agent_config = configs.setdefault("AGENT_CONFIG", {})
-        for name in ("root_cause_llm_model", "fix_agent_model", "diagnostic_agent_model"):
-            agent_config[name] = self.args.model
-        database = configs.setdefault("DATABASE_CONFIG", {})
-        database.update({
-            "user": self.args.db_user,
-            "host": self.args.host,
-            "port": self.args.port,
-            "dbname": self.args.db,
-            "schema": self.args.db_schema,
-            "search_path": [self.args.db_schema, "public"] if self.args.db_schema != "public" else ["public"],
-        })
-        output = job_dir / "dream_config.json"
-        _write_json(output, configs)
-        return output
-
-    def _dream_python(self) -> str:
-        if self.args.dream_python:
-            return self.args.dream_python
-        candidate = Path(self.args.dream_runtime_root).resolve() / ".venv" / "bin" / "python"
-        return str(candidate) if candidate.exists() else sys.executable
-
-    def _run_dream_job(self, job_id: str) -> Dict[str, Any]:
-        job = self.store.start_job(job_id)
-        if not job:
-            return {"status": "missing"}
-        observation = self.store.get_observation(str(job["sql_key"]))
-        if not observation:
-            error = "SQL observation disappeared"
-            self.store.finish_job(job_id, "failed", error=error)
-            return {"status": "failed", "error": error}
-        if job.get('source_completion_ms'):
-            # Use the observed completed interval which caused this automatic
-            # job, not a potentially much older all-time fingerprint mean.
-            observation = {**observation, 'mean_time_ms': job['source_completion_ms']}
-        replay_sql = str(observation.get("replay_sql") or "").strip()
-        if not replay_sql or "$" in replay_sql or "?" in replay_sql:
-            error = "no replayable SQL sample; pg_stat_statements text is parameterized"
-            self.store.finish_job(job_id, "blocked", result={"status": "blocked", "reason": error})
-            LOGGER.info("DREAM job %s waiting for a literal SQL sample", job_id)
-            return {"status": "blocked", "reason": error}
-        if not _is_read_only_sql(replay_sql):
-            error = "SQL is not a read-only AP statement"
-            self.store.finish_job(job_id, "blocked", result={"status": "blocked", "reason": error})
-            LOGGER.info("DREAM job %s skipped non-read-only SQL", job_id)
-            return {"status": "blocked", "reason": error}
-        if not self.args.dream_offline and not _read_api_key():
-            error = "DREAM/SysInsight API key environment variable is not set"
-            self.store.finish_job(job_id, "blocked", result={"status": "blocked", "reason": error})
-            LOGGER.warning("DREAM job %s blocked until a shared API key is configured", job_id)
-            return {"status": "blocked", "reason": error}
-
-        incident_dir = self.store.incident_directory(job.get("incident_id")) or self.current_incident_dir or self.output_root / "jobs"
-        job_dir = incident_dir / "dream_jobs" / job_id
-        job_dir.mkdir(parents=True, exist_ok=True)
-        output_path = job_dir / "result.json"
-        input_path = job_dir / "input.json"
-        stdout_path = job_dir / "dream.log"
-        worker_dir: Optional[Path] = None
-
-        def persist_worker_artifacts() -> None:
-            if worker_dir is None:
-                return
-            for name in ("input.json", "dream_config.json", "result.json", "dream.log", "diagnosis_trace.json"):
-                source = worker_dir / name
-                target = job_dir / name
-                if source.exists():
-                    shutil.copy2(str(source), str(target))
-
-        try:
-            # The durable output directory may live below /root, while the
-            # worker intentionally runs as postgres.  Stage the complete
-            # worker exchange in /tmp so the worker can traverse and write
-            # it, then copy the audit artifacts back to the durable incident
-            # directory as the bridge owner.
-            worker_dir = Path(tempfile.mkdtemp(prefix="sysinsight-dream-", dir=tempfile.gettempdir()))
-            worker_dir.chmod(0o750)
-            if self.args.dream_run_as and os.geteuid() == 0:
-                try:
-                    account = pwd.getpwnam(self.args.dream_run_as)
-                    os.chown(str(worker_dir), account.pw_uid, account.pw_gid)
-                except (KeyError, OSError) as exc:
-                    LOGGER.warning("could not grant DREAM worker access to %s: %s", worker_dir, exc)
-
-            input_payload = {
-                "schema": "sysinsight.dream.live-job.v1",
-                "job_id": job_id,
-                "sql_key": observation["sql_key"],
-                "queryid": observation.get("queryid"),
-                "query": replay_sql,
-                "query_text_from_pg_stat_statements": observation.get("query_text"),
-                "mean_time_ms": observation.get("mean_time_ms"),
-                "max_time_ms": observation.get("max_time_ms"),
-                "calls": observation.get("calls"),
-                "hint_pattern": observation.get("hint_pattern"),
-                "requested_at": utc_now(),
-                'trigger_source': job.get('trigger_source'),
-                'source_completion_ms': job.get('source_completion_ms'),
-            }
-            worker_input_path = worker_dir / "input.json"
-            _write_json(worker_input_path, input_payload)
-            config_path = self._job_config(worker_dir)
-            worker_output_path = worker_dir / "result.json"
-            adapter_path = Path(self.args.dream_runtime_root).resolve() / "perf-anomaly-demo" / "dream_live_adapter.py"
-            if not adapter_path.exists():
-                adapter_path = ROOT / "dream_live_adapter.py"
-            command = [
-                self._dream_python(),
-                str(adapter_path),
-                "--config",
-                str(config_path),
-                "--sql",
-                replay_sql,
-                "--query-id",
-                str(observation.get("sql_key")),
-                "--queryid",
-                str(observation.get("queryid") or ""),
-                "--mean-time-ms",
-                str(observation.get("mean_time_ms") or 0),
-                "--max-time-ms",
-                str(observation.get("max_time_ms") or 0),
-                "--calls",
-                str(observation.get("calls") or 1),
-                "--output",
-                str(worker_output_path),
-            ]
-            if self.args.dream_root_cause:
-                command.extend(["--root-cause", self.args.dream_root_cause])
-            env = os.environ.copy()
-            if self.args.dream_offline:
-                env["DREAM_OFFLINE"] = "1"
-            if self.args.dream_offline_hint:
-                env["DREAM_OFFLINE_HINT"] = self.args.dream_offline_hint
-            cache_root = Path(_env_first("SYSINSIGHT_DREAM_CACHE", default="/tmp/sysinsight-dream-cache")).resolve()
-            cache_root.mkdir(parents=True, exist_ok=True)
-            if self.args.dream_run_as and os.geteuid() == 0:
-                try:
-                    account = pwd.getpwnam(self.args.dream_run_as)
-                    os.chown(str(cache_root), account.pw_uid, account.pw_gid)
-                    os.chmod(str(cache_root), 0o770)
-                except (KeyError, OSError) as exc:
-                    LOGGER.warning("could not grant DREAM cache access to %s: %s", cache_root, exc)
-            env["HF_HOME"] = str(cache_root)
-            env["TRANSFORMERS_CACHE"] = str(cache_root / "transformers")
-            env["XDG_CACHE_HOME"] = str(cache_root / "xdg")
-            runtime_root = Path(self.args.dream_runtime_root).resolve()
-            dream_python = Path(self._dream_python()).resolve()
-            # The reproducibility runtime may contain a copied venv whose
-            # interpreter was built with a private /root prefix.  When a worker
-            # runs as postgres, an adjacent copied base installation lets Python
-            # find its standard library without granting that user access to the
-            # checkout's private toolchain.
-            python_home = runtime_root / "python310"
-            if str(dream_python).startswith(str(runtime_root / ".venv")) and python_home.is_dir():
-                env["PYTHONHOME"] = str(python_home)
-            venv_site_packages = [
-                str(path)
-                for path in (runtime_root / ".venv" / "lib").glob("python*/site-packages")
-                if path.is_dir()
-            ]
-            env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(runtime_root), str(runtime_root / "perf-anomaly-demo"), *venv_site_packages, str(ROOT), env.get("PYTHONPATH", "")]))
-            if self.args.dream_run_as and os.geteuid() == 0:
-                command = ["runuser", "-u", self.args.dream_run_as, "--preserve-environment", "--"] + command
-            worker_log_path = worker_dir / "dream.log"
-            with worker_log_path.open("w", encoding="utf-8") as log:
-                completed = subprocess.run(
-                    command,
-                    cwd=str(worker_dir),
-                    env=env,
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    timeout=self.args.dream_timeout,
-                    check=False,
-                )
-            persist_worker_artifacts()
-            if worker_output_path.exists():
-                result = json.loads(worker_output_path.read_text(encoding="utf-8"))
-            else:
-                result = {"status": "failed", "error": "DREAM produced no result.json"}
-            result["returncode"] = completed.returncode
-            result["log"] = str(stdout_path)
-            if completed.returncode != 0 or result.get("status") == "failed":
-                self.store.finish_job(job_id, "failed", result=result, error=str(result.get("error", "DREAM failed")), input_path=input_path, output_path=output_path)
-                return result
-            publication = self._validate_and_publish(job_id, observation, result)
-            result["bridge_publication"] = publication
-            status = "completed" if publication.get("status") in {"active", "candidate", "no_action"} else "failed"
-            self.store.finish_job(job_id, status, result=result, error=publication.get("reason", ""), input_path=input_path, output_path=output_path)
-            return result
-        except subprocess.TimeoutExpired:
-            error = "DREAM timed out after {} seconds".format(self.args.dream_timeout)
-            result = {"status": "failed", "error": error}
-            if worker_dir is not None and (worker_dir / 'diagnosis_trace.json').is_file():
-                result['diagnosis_trace'] = json.loads((worker_dir / 'diagnosis_trace.json').read_text(encoding='utf-8'))
-            self.store.finish_job(job_id, "failed", result=result, error=error, input_path=input_path, output_path=output_path)
-            return result
-        except Exception as exc:
-            error = "{}: {}".format(type(exc).__name__, exc)
-            self.store.finish_job(job_id, "failed", error=error, input_path=input_path, output_path=output_path)
-            LOGGER.exception("DREAM job %s failed", job_id)
-            return {"status": "failed", "error": error}
-        finally:
-            if worker_dir is not None:
-                persist_worker_artifacts()
-                shutil.rmtree(str(worker_dir), ignore_errors=True)
-
-    def _validate_and_publish(self, job_id: str, observation: Mapping[str, Any], result: Mapping[str, Any]) -> Dict[str, Any]:
-        evaluation_status = result.get("evaluation_status")
-        try:
-            old_time = float(
-                result.get("old_time")
-                if result.get("old_time") is not None
-                else float(observation.get("mean_time_ms", 0) or 0) / 1000.0
-            )
-        except (TypeError, ValueError):
-            old_time = 0.0
-        if not math.isfinite(old_time) or old_time <= 0:
-            old_time = 0.0
-        new_time_value = result.get("new_time")
-        try:
-            new_time: Optional[float] = float(new_time_value) if new_time_value is not None else None
-        except (TypeError, ValueError):
-            new_time = None
-        if new_time is not None and (not math.isfinite(new_time) or new_time < 0):
-            new_time = None
-        ratio: Optional[float] = (
-            (old_time - new_time) / old_time
-            if old_time > 0 and new_time is not None
-            else None
-        )
-        rewrite_sql = str(result.get("rewrite_sql") or "")
-        fix_action = str(result.get("fix_action") or "")
-        original_sql = str(
-            observation.get("replay_sql")
-            or observation.get("query_text")
-            or result.get("query")
-            or ""
-        )
-        validation: Dict[str, Any] = {
-            "job_id": job_id,
-            "evaluation_status": evaluation_status,
-            "old_time_seconds": old_time,
-            "new_time_seconds": new_time,
-            "improvement_ratio": ratio,
-            "read_only": bool(result.get("read_only")),
-            "original_sql_read_only": _is_read_only_sql(original_sql),
-        }
-        try:
-            candidate = parse_dream_candidate(fix_action, rewrite_sql, original_sql)
-        except ValueError as exc:
-            candidate = {
-                "apply_kind": "unsupported",
-                "apply_scope": "none",
-                "hints": [],
-                "session_settings": {},
-                "rewrite_sql": "",
-                "unsupported_actions": [str(exc)],
-                "has_action": bool(rewrite_sql or fix_action),
-            }
-        validation.update({
-            "apply_kind": candidate.get("apply_kind"),
-            "application_scope": candidate.get("apply_scope"),
-            "unsupported_actions": candidate.get("unsupported_actions", []),
-        })
-
-        normalized_settings: Dict[str, str] = {}
-        phrase = ""
-        action_error = ""
-        if candidate.get("session_settings"):
-            try:
-                normalized_settings = self.db.normalize_session_settings(
-                    candidate.get("session_settings") or {}
-                )
-            except Exception as exc:
-                action_error = "session setting validation failed: {}".format(exc)
-        if not action_error and candidate.get("hints"):
-            try:
-                phrase = _hint_inner(" ".join(str(value) for value in candidate.get("hints", [])))
-            except ValueError as exc:
-                action_error = "hint validation failed: {}".format(exc)
-        validation["session_settings"] = normalized_settings
-        if phrase:
-            validation["hint_phrase"] = phrase
-
-        apply_scope = str(candidate.get("apply_scope") or "none")
-        apply_kind = str(candidate.get("apply_kind") or "no_action")
-        unsupported = list(candidate.get("unsupported_actions") or [])
-        if action_error:
-            unsupported.append(action_error)
-            validation["unsupported_actions"] = unsupported
-
-        try:
-            evaluation_passed = float(evaluation_status) == 1.0
-        except (TypeError, ValueError):
-            evaluation_passed = False
-        measured = ratio is not None
-        accepted = (
-            evaluation_passed
-            and bool(result.get("read_only"))
-            and bool(validation["original_sql_read_only"])
-            and measured
-            and ratio is not None
-            and ratio >= self.args.min_improvement
-            and apply_scope in {"postgresql_direct", "bridge_managed"}
-            and not unsupported
-        )
-
-        if not candidate.get("has_action"):
-            status = "no_action"
-            reason = str(result.get('explanation') or "DREAM returned no executable optimization action")
-        elif unsupported or apply_scope == "none":
-            status = "candidate"
-            reason = "DREAM action is not eligible for automatic application: {}".format(
-                "; ".join(str(value) for value in unsupported) or "unsupported action type"
-            )
-        elif not accepted:
-            status = "candidate"
-            failed_checks: List[str] = []
-            if not evaluation_passed:
-                failed_checks.append("DREAM evaluation status is not successful")
-            if not bool(result.get("read_only")) or not validation["original_sql_read_only"]:
-                failed_checks.append("SQL is not read-only")
-            if not measured:
-                failed_checks.append("optimized execution time is missing")
-            elif ratio is not None and ratio < self.args.min_improvement:
-                failed_checks.append(
-                    "measured improvement {:.1%} is below {:.1%}".format(
-                        ratio, self.args.min_improvement
-                    )
-                )
-            reason = "DREAM candidate did not pass automatic policy: {}".format(
-                "; ".join(failed_checks) or "unknown validation failure"
-            )
-        elif not self.args.auto_apply:
-            status = "candidate"
-            reason = "automatic application is disabled by --no-auto-apply"
-        elif apply_scope == "bridge_managed":
-            status = "active"
-            reason = (
-                "registered for automatic bridge-managed application; "
-                "the next matching managed execution will use the validated action"
-            )
-        else:
-            runtime = self.db.extension_status()
-            validation["hint_table_runtime"] = runtime
-            enabled = str(runtime.get("hint_table_enabled", "")).lower() in {"on", "true", "1"}
-            exists = bool(runtime.get("hint_table_exists"))
-            if not exists or not enabled:
-                status = "candidate"
-                reason = "pg_hint_plan hint table is not enabled for this database"
-            else:
-                direct_phrase = _hint_inner(direct_hint_phrase(candidate, normalized_settings))
-                phrase = direct_phrase
-                validation["hint_phrase"] = phrase
-                validation["norm_query_string"] = observation.get("hint_pattern")
-                validation["plan_validation"] = "not_run"
-                replay_sql = str(observation.get("replay_sql") or "")
-                if replay_sql and "$" not in replay_sql and "?" not in replay_sql:
-                    try:
-                        baseline_plan = self.db.explain(replay_sql)
-                        hinted_statement = "/*+ {} */ {}".format(phrase, replay_sql)
-                        hinted_plan = self.db.explain(hinted_statement)
-                        validation["plan_validation"] = {
-                            "baseline": baseline_plan,
-                            "hinted": hinted_plan,
-                            "changed": _json(baseline_plan) != _json(hinted_plan),
-                        }
-                    except Exception as exc:
-                        validation["plan_validation"] = {"status": "failed", "error": str(exc)}
-                published = self.db.upsert_hint(
-                    str(
-                        observation.get("hint_pattern")
-                        or _hint_table_pattern(str(observation.get("query_text", "")))
-                    ),
-                    phrase,
-                    self.args.hint_application_name,
-                )
-                status = "active"
-                reason = (
-                    "published to hint_plan.hints; new matching PostgreSQL executions "
-                    "are automatically optimized"
-                )
-                validation["published_row"] = published
-
-        validation["reason"] = reason
-        validation["auto_apply"] = status == "active"
-        if apply_scope == "bridge_managed" and (
-            candidate.get("rewrite_sql") or candidate.get("hints")
-        ):
-            stored_rewrite = str(candidate.get("execution_sql") or rewrite_sql)
-        else:
-            stored_rewrite = str(candidate.get("rewrite_sql") or rewrite_sql)
-        improvement_id = self.store.add_improvement({
-            "sql_key": observation["sql_key"],
-            "norm_query_string": observation.get("hint_pattern"),
-            "application_name": self.args.hint_application_name,
-            "hints": phrase,
-            "rewrite_sql": stored_rewrite,
-            "fix_action": fix_action,
-            "root_causes": result.get("root_causes", []),
-            "status": status,
-            "old_time": old_time,
-            "new_time": new_time,
-            "improvement_ratio": ratio,
-            "validation": validation,
-            "apply_kind": apply_kind,
-            "apply_scope": apply_scope,
-            "session_settings": normalized_settings,
-            "activated_at": utc_now() if status == "active" else None,
-        })
-        return {
-            "status": status,
-            "reason": reason,
-            "auto_apply": status == "active",
-            "application_scope": apply_scope,
-            "apply_kind": apply_kind,
-            "improvement_id": improvement_id,
-            "validation": validation,
-        }
-
     def collect_and_schedule(self, alert: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
         # Manual API triggers and the normal polling loop share the same
         # SQLite state.  Serializing collection keeps interval deltas and
@@ -4391,99 +2858,31 @@ class Bridge:
                 raise
 
     def _collect_and_schedule(self, alert: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
-        self.last_extension_status = self.db.extension_status()
-        self.store.set_meta("hint_runtime", self.last_extension_status)
         stats = self.db.collect_statements(self.args.stats_limit)
         active = self.db.collect_active(self.args.active_limit)
         keys = self.store.upsert_observations(stats, active)
-        if getattr(self, 'sql_profiler', None):
-            self.sql_profiler.observe(active)
         slow = self.store.slow_observations(
-            max(self.args.slow_mean_ms, self.args.dream_trigger_ms),
-            max(self.args.slow_max_ms, self.args.dream_trigger_ms),
+            self.args.slow_mean_ms,
+            self.args.slow_max_ms,
             self.args.min_calls,
             max(self.args.slow_limit, self.args.stats_limit) if self.args.query_regex else self.args.slow_limit,
             exclude_canonical_sql=[
                 str(row.get("canonical_sql") or _canonical_sql(str(row.get("query", ""))))
                 for row in active
             ],
-            completed_only=True,
-            completion_threshold_ms=self.args.dream_trigger_ms,
         )
         if self.args.query_regex:
             matcher = re.compile(self.args.query_regex, re.IGNORECASE)
             slow = [row for row in slow if matcher.search(str(row.get("query_text", "")))]
             slow = slow[: self.args.slow_limit]
         self._new_incident_if_needed(alert, self.db.database_snapshot(), slow)
-        queued: List[str] = []
-        # SysInsight is alert-driven, while DREAM is driven by a completed
-        # long AP statement. ``slow`` has already excluded active statements
-        # and applies the hard 10-second DREAM threshold, so an alert is not
-        # required for a qualifying SQL to enter the asynchronous queue.
-        dream_triggered = bool(alert or slow or self.args.tune_without_alert)
-        dream_ready = bool(self.args.dream_offline or _read_api_key())
-        if dream_triggered and not dream_ready:
-            gate = {
-                "status": "blocked",
-                "reason": "DREAM/SysInsight API key environment variable is not set",
-                "slow_count": len(slow),
-                "alert_firing": bool(alert),
-                "updated_at": utc_now(),
-            }
-            was_blocked = self.last_dream_gate.get("status") == "blocked"
-            reason_changed = self.last_dream_gate.get("reason") != gate["reason"]
-            self.last_dream_gate = gate
-            self.store.set_meta("last_dream_gate", gate)
-            if not was_blocked or reason_changed:
-                LOGGER.warning("automatic DREAM scheduling blocked: %s", gate["reason"])
-        elif dream_triggered:
-            # pg_stat_statements can expose a normalized/parameterized query
-            # without a literal replay_sql.  Keep collecting its timing, but
-            # do not manufacture a DREAM job that can only finish as
-            # ``blocked``.  The operator-facing lab supplies an explicit,
-            # read-only SQL statement and remains fully replayable.
-            replayable_slow = [
-                row
-                for row in slow
-                if str(row.get("replay_sql") or "").strip()
-                and _is_read_only_sql(str(row.get("replay_sql") or ""))
-            ]
-            gate = {
-                "status": "ready",
-                "reason": "offline mode" if self.args.dream_offline else "shared LLM API key is configured",
-                "slow_count": len(slow),
-                "replayable_slow_count": len(replayable_slow),
-                "alert_firing": bool(alert),
-                "updated_at": utc_now(),
-            }
-            self.last_dream_gate = gate
-            self.store.set_meta("last_dream_gate", gate)
-            for row in replayable_slow:
-                job_id = self.store.enqueue_job(str(row["sql_key"]), self.current_incident_id, self.args.job_cooldown)
-                if job_id:
-                    queued.append(job_id)
-                    self.futures.append(self.executor.submit(self._run_dream_job, job_id))
         payload = {
             "collected_at": utc_now(),
             "statement_count": len(stats),
             "active_count": len(active),
             "persisted_count": len(keys),
             "slow_count": len(slow),
-            "replayable_slow_count": sum(
-                1
-                for row in slow
-                if str(row.get("replay_sql") or "").strip()
-                and _is_read_only_sql(str(row.get("replay_sql") or ""))
-            ),
-            "queued_jobs": queued,
             "alert_firing": bool(alert),
-            "dream_ready": dream_ready,
-            "dream_gate": self.last_dream_gate,
-            "dream_trigger_policy": {
-                "min_runtime_ms": self.args.dream_trigger_ms,
-                "requires_statement_finished": True,
-                "active_sql_excluded": True,
-            },
             "sample_maintenance": self.last_sample_maintenance,
             "sample_policy": {
                 "retention_days": self.args.sample_retention_days,
@@ -4497,26 +2896,19 @@ class Bridge:
         self.store.set_meta("latest_collection", payload)
         self.store.set_meta("last_collection_error", "")
         _write_json(self.output_root / "latest_collection.json", payload)
-        LOGGER.info("collected SQL=%d active=%d slow=%d queued=%d alert=%s", len(stats), len(active), len(slow), len(queued), bool(alert))
+        LOGGER.info("collected SQL=%d active=%d slow=%d alert=%s", len(stats), len(active), len(slow), bool(alert))
         return payload
 
     def run_once(self) -> Dict[str, Any]:
         alert = self._current_alert()
         payload = self.collect_and_schedule(alert)
-        if self.args.wait_for_jobs > 0:
-            deadline = time.time() + self.args.wait_for_jobs
-            while time.time() < deadline:
-                pending = [future for future in self.futures if not future.done()]
-                if not pending:
-                    break
-                time.sleep(min(1.0, max(0.05, deadline - time.time())))
         status = self.store.recent(limit=20)
         result = {"status": "completed", "collection": payload, "state": status}
         _write_json(self.output_root / "run_once.json", result)
         return result
 
     def run(self) -> None:
-        LOGGER.info("starting SysInsight/DREAM bridge; state=%s output=%s", self.store.path, self.output_root)
+        LOGGER.info("starting SysInsight bridge; state=%s output=%s", self.store.path, self.output_root)
         try:
             while True:
                 self.request_retention_maintenance()
@@ -4637,8 +3029,8 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
                 asset = path[len("/keeninsight/"):]
                 # Exact file allowlist also rejects encoded traversal and directories.
                 allowed = {"template.html", "host-list.html", "alert-list.html",
-                           "alert-detail.html", "alert-rules.html", "sql-log.html", "sql-detail.html",
-                           "dba-rules.html", "manual.html", "code-source.html", "tuning-knowledge.html",
+                           "alert-detail.html", "alert-rules.html",
+                           "manual.html", "code-source.html",
                            "portal.js", "portal.css", "original-layouts.js"}
                 if asset not in allowed:
                     self._send_error_json(404, "portal asset not found")
@@ -4697,62 +3089,16 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
             if path == "/api/v1/events":
                 self._send_json({"events": self.bridge.store.events(self._query_int(query, "limit", 100, 2000))})
                 return
-            if path == "/api/v1/sql":
-                slow = self._query_value(query, "slow", "false").lower() in {"1", "true", "yes", "on"}
-                rows = self.bridge.store.list_sql_observations(
-                    self._query_int(query, "limit", 100, 2000),
-                    slow_only=slow,
-                    mean_ms=self.bridge.args.slow_mean_ms,
-                    max_ms=self.bridge.args.slow_max_ms,
-                    min_calls=self.bridge.args.min_calls,
-                    search=self._query_value(query, "q", ""),
-                )
-                self._send_json({"sql_observations": rows, "slow_only": slow})
-                return
             if path == "/api/v1/incidents":
                 self._send_json({"incidents": self.bridge.store.list_incidents(self._query_int(query, "limit", 50, 500))})
                 return
-            if path == "/api/v1/jobs":
-                self._send_json({"jobs": self.bridge.store.list_jobs(self._query_int(query, "limit", 50, 500))})
-                return
-            if path == "/api/v1/improvements":
-                self._send_json({"improvements": self.bridge.store.list_improvements(self._query_int(query, "limit", 50, 500))})
-                return
-
             parts = [unquote(item) for item in path.split("/") if item]
-            if len(parts) == 5 and parts[:4] == ["api", "v1", "lab", "sql"]:
-                self._send_json(self.bridge.lab.get_sql(parts[4]))
-                return
             if len(parts) == 5 and parts[:4] == ["api", "v1", "lab", "runs"]:
                 row = self.bridge.store.get_lab_run(parts[4])
                 if row is None:
                     self._send_error_json(404, "lab run not found")
                 else:
                     row["samples"] = self.bridge.store.list_lab_samples(parts[4], 500)
-                    row["executions"] = self.bridge.store.list_lab_executions(parts[4], 100)
-                    self._send_json(row)
-                return
-            if len(parts) == 4 and parts[:3] == ["api", "v1", "sql"]:
-                row = self.bridge.store.get_observation(parts[3])
-                if row is None:
-                    self._send_error_json(404, "SQL observation not found")
-                else:
-                    row["replayable"] = bool(row.get("replay_sql")) and "$" not in str(row.get("replay_sql")) and "?" not in str(row.get("replay_sql"))
-                    row["last_sample"] = _decode_json(row.pop("last_sample_json", None), None)
-                    self._send_json(row)
-                return
-            if len(parts) == 4 and parts[:3] == ["api", "v1", "jobs"]:
-                row = self.bridge.store.get_job(parts[3])
-                if row is None:
-                    self._send_error_json(404, "DREAM job not found")
-                else:
-                    self._send_json(row)
-                return
-            if len(parts) == 4 and parts[:3] == ["api", "v1", "improvements"]:
-                row = self.bridge.store.get_improvement(parts[3])
-                if row is None:
-                    self._send_error_json(404, "improvement not found")
-                else:
                     self._send_json(row)
                 return
             self._send_error_json(404, "unknown bridge endpoint")
@@ -4778,32 +3124,7 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
             if path == "/api/v1/actions/lab/stop":
                 self._send_json(self.bridge.lab.stop(str(body.get("run_id", ""))))
                 return
-            if path == "/api/v1/actions/lab/dream/clear":
-                reset_stats = bool(body.get("reset_pg_stat_statements", True))
-                self._send_json(self.bridge.lab.clear_dream(reset_stats))
-                return
-            if path == "/api/v1/actions/lab/dream/start":
-                self._send_json(self.bridge.lab.start_dream(body), 202)
-                return
-            if path == "/api/v1/actions/lab/dream/replay":
-                self._send_json(self.bridge.lab.replay_dream(body), 202)
-                return
             parts = [unquote(item) for item in path.split("/") if item]
-            if len(parts) == 6 and parts[:4] == ["api", "v1", "actions", "jobs"] and parts[5] == "retry":
-                self._send_json(self.bridge.retry_job(parts[4]), 202)
-                return
-            if len(parts) == 6 and parts[:4] == ["api", "v1", "actions", "improvements"] and parts[5] in {"activate", "rollback"}:
-                if parts[5] == "activate":
-                    self._send_json(self.bridge.activate_improvement(parts[4]))
-                else:
-                    self._send_json(self.bridge.rollback_improvement(parts[4]))
-                return
-            if path == "/api/v1/actions/hint-table/configure":
-                self._send_json(self.bridge.configure())
-                return
-            if path == "/api/v1/actions/hint-table/reset":
-                self._send_json(self.bridge.reset_hint_runtime())
-                return
             self._send_error_json(404, "unknown bridge action")
         except KeyError as exc:
             self._send_error_json(404, str(exc))
@@ -4838,12 +3159,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--active-limit", type=int, default=int(os.environ.get("SYSINSIGHT_ACTIVE_LIMIT", "100")))
     parser.add_argument("--slow-mean-ms", type=float, default=float(os.environ.get("SYSINSIGHT_SLOW_MEAN_MS", "10000")))
     parser.add_argument("--slow-max-ms", type=float, default=float(os.environ.get("SYSINSIGHT_SLOW_MAX_MS", "10000")))
-    parser.add_argument(
-        "--dream-trigger-ms",
-        type=float,
-        default=float(os.environ.get("SYSINSIGHT_DREAM_TRIGGER_MS", "10000")),
-        help="minimum completed AP SQL runtime that can enqueue DREAM",
-    )
     parser.add_argument("--min-calls", type=int, default=1)
     parser.add_argument("--slow-limit", type=int, default=int(os.environ.get("SYSINSIGHT_SLOW_LIMIT", "10")))
     parser.add_argument(
@@ -4871,20 +3186,6 @@ def parse_args() -> argparse.Namespace:
         help="maximum SQL observation samples deleted in one maintenance pass",
     )
     parser.add_argument("--query-regex", default="", help="optional SQL text filter; empty means every slow statement")
-    parser.add_argument("--job-cooldown", type=float, default=300.0)
-    parser.add_argument("--dream-workers", type=int, default=1)
-    parser.add_argument("--dream-config", default=str(ROOT.parent / "dream" / "config" / "tpcds_local_config.json"))
-    parser.add_argument("--dream-python", default="")
-    parser.add_argument("--dream-runtime-root", default=str(ROOT.parent / "dream"), help="DREAM checkout/runtime root visible to the worker user")
-    parser.add_argument("--dream-run-as", default=os.environ.get("SYSINSIGHT_DREAM_RUN_AS", ""), help="run DREAM as this OS user (needed for peer-authenticated local PostgreSQL)")
-    parser.add_argument("--dream-timeout", type=float, default=1800.0)
-    parser.add_argument("--dream-root-cause", default="")
-    parser.add_argument("--dream-offline", action="store_true")
-    parser.add_argument("--dream-offline-hint", default="", help="test-only deterministic hint passed to DREAM_OFFLINE")
-    parser.add_argument("--auto-apply", dest="auto_apply", action="store_true", default=True)
-    parser.add_argument("--no-auto-apply", dest="auto_apply", action="store_false")
-    parser.add_argument("--hint-application-name", default="", help="empty matches every application_name")
-    parser.add_argument("--min-improvement", type=float, default=0.10)
     parser.add_argument("--state-db", default="/tmp/sysinsight_dream_bridge.sqlite3")
     parser.add_argument("--output", default="/tmp/sysinsight_dream_bridge")
     parser.add_argument("--api-base", default=_env_first("SYSINSIGHT_GPT_BASE_URL", "SYSINSIGHT_API_BASE", "OPENAI_BASE_URL", default=DEFAULT_API_BASE))
@@ -4959,23 +3260,12 @@ def parse_args() -> argparse.Namespace:
         help="optional safe read-only SQL used for the live candidate replay",
     )
     parser.add_argument("--no-api", action="store_true", help="skip the live SysInsight API call")
-    parser.add_argument("--configure-hint-table", action="store_true", help="enable pg_hint_plan hint-table loading for new DB connections")
-    parser.add_argument("--reset-hint-runtime", action="store_true")
     parser.add_argument("--force-alert", action="store_true", help="treat this cycle as a firing alert for local verification")
-    parser.add_argument(
-        "--tune-without-alert",
-        action="store_true",
-        default=os.environ.get("SYSINSIGHT_TUNE_WITHOUT_ALERT", "0").lower() in {"1", "true", "yes", "on"},
-        help="enqueue slow SQL even when Prometheus has no firing alert",
-    )
     parser.add_argument("--http-listen", default=os.environ.get("SYSINSIGHT_BRIDGE_LISTEN", "127.0.0.1"))
     parser.add_argument("--http-port", type=int, default=int(os.environ.get("SYSINSIGHT_BRIDGE_PORT", "9108")), help="local API/metrics port; 0 disables HTTP")
-    parser.add_argument("--metrics-limit", type=int, default=100, help="maximum SQL/jobs/improvements exposed as metrics")
+    parser.add_argument("--metrics-limit", type=int, default=100, help="maximum SQL observations exposed as metrics")
     parser.add_argument("--once", action="store_true")
-    parser.add_argument("--wait-for-jobs", type=float, default=0.0, help="seconds to wait after --once for background jobs")
     args = parser.parse_args()
-    if args.reset_hint_runtime:
-        return args
     if (
         args.port <= 0
         or args.poll_interval <= 0
@@ -4983,13 +3273,12 @@ def parse_args() -> argparse.Namespace:
         or args.active_limit < 1
         or args.min_calls < 1
         or args.slow_limit < 1
-        or args.dream_trigger_ms < 10000
         or args.sample_retention_days <= 0
         or args.sample_max_rows < 1000
         or args.sample_maintenance_interval <= 0
         or args.sample_maintenance_batch < 1000
     ):
-        parser.error("invalid database/poll/slow-query/DREAM trigger settings")
+        parser.error("invalid database/poll/slow-query settings")
     if args.http_port < 0 or args.http_port > 65535 or args.metrics_limit < 1:
         parser.error("invalid bridge HTTP/metrics settings")
     if (
@@ -5002,8 +3291,6 @@ def parse_args() -> argparse.Namespace:
         or args.sysinsight_sql_timeout <= 0
     ):
         parser.error("invalid SysInsight full-chain settings")
-    if args.min_improvement < 0 or args.min_improvement >= 1:
-        parser.error("--min-improvement must be in [0,1)")
     return args
 
 
@@ -5012,12 +3299,6 @@ def main() -> int:
     args = parse_args()
     bridge = Bridge(args)
     try:
-        if args.reset_hint_runtime:
-            result = bridge.reset_hint_runtime()
-            print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
-            return 0
-        if args.configure_hint_table:
-            bridge.configure()
         if args.once:
             result = bridge.run_once()
             print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
