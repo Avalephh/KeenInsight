@@ -759,7 +759,6 @@ class LabController:
         for row in current:
             detail = self.store.get_lab_run(str(row["run_id"])) or dict(row)
             detail["samples"] = self.store.list_lab_samples(str(row["run_id"]), 1)
-            detail["executions"] = self.store.list_lab_executions(str(row["run_id"]), 20)
             current_details.append(detail)
 
         latest_sysinsight_summary = next((row for row in runs if row.get("kind") == "sysinsight"), None)
@@ -789,8 +788,6 @@ class LabController:
         }
         if current and current.get("samples"):
             result["sysinsight"]["sample"] = current["samples"][-1]
-        if latest and latest.get("executions"):
-            result["sysinsight"]["executions"] = latest["executions"]
         return result
 
     def reset_database(self) -> Dict[str, Any]:

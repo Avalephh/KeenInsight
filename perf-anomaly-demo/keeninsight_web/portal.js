@@ -87,6 +87,7 @@
   function alertEvidence(data) {
     const d=data.detailAnalysis||{};
     const c=d.comparison||{},diag=data.diagnosis||{},perf=d.perfCapture||{};
+    const chains=(d.runtimeCallChains||[]).map(x=>[number(x.samples,0),shown((x.matched_key_functions||[]).join(', ')),shown((x.frames||[]).join(' → '))]);
     return `<div class="ki-breadcrumb"><a href="template.html">Overview</a> / <a href="alert-list.html">Alert List</a> / ${esc(data.id)}</div><div class="ki-grid">
       ${panel('Alert',kv([['Reason',shown(data.reason)],['Time',date(data.time)],['Host',shown(data.host)],['Severity',tag(data.severity)],['Workflow status',tag(data.rawStatus)],['Trigger state (historical)',tag(data.triggerState||'not_retained')],['Duration',number(data.durationMs)+' ms'],['Message',shown(data.message||data.error||'No workflow error')]])+raw(d.triggeredRule,'Trigger evidence')+'<p class="ki-sub">Workflow completion does not mean the alert resolved or performance improved.</p>')}
       ${panel('Diagnosis',kv([['Model',shown(diag.model||'Not yet called')],['Real LLM calls',number(diag.llmCallCount,0)],['Candidates generated',number(diag.candidateCount,0)],['Differential functions',number(diag.hotFunctionCount,0)],['Hot functions',shown((data.rootCause||[]).join(', ')||'Not yet available')],['Meaning',shown(diag.explanation)]])+raw(diag.matchedParameters||[],'Matched source parameters'))}
@@ -94,7 +95,7 @@
       ${panel('Measured apply / retest / restore',kv([['Validation metric',shown(c.metric||'No comparison completed')],['Baseline',number(c.baseline_ms)+' ms'],['Tuned',number(c.tuned_ms)+' ms'],['Restored',number(c.restored_ms)+' ms'],['Measured time reduction',percent(c.tuned_improvement_ratio)],['Restoration',tag(d.application?.status||'not_applied')]])+raw(d.validationSql||{},'Actual replay SQL')+raw(d.application,'Application and restoration'))}
       ${panel('Workflow stages',stages(d.stages))}
       ${panel('Differential profiling',d.differentialProfiling?code(d.differentialProfiling):empty(data.availability?.profiling))}
-      ${panel('Runtime call chains',d.runtimeCallChains?.length?code(d.runtimeCallChains):empty(data.message||'No runtime stack evidence retained yet'))}
+      ${panel('perf flame graph / call chains',(chains.length?table(['Samples','Matched functions','Call path'],chains):empty(data.message||'No runtime stack evidence retained yet'))+raw(perf.perf||{},'perf command, duration and artifact')+raw(perf.postprocess||{},'Fold / function-range postprocess'))}
       ${panel('Source / parameter evidence',d.functionCodeExamples?.length?code(d.functionCodeExamples):empty('No source evidence retained yet'))}
       ${panel('Candidate parameters',Object.keys(d.knobs||{}).length?code(d.knobs):empty('No candidate recorded yet'))}
       ${panel('SHAP model evidence',d.shapAnalysis?raw(d.shapAnalysis,'Model, training validation, exact SHAP values and additivity check'):empty(data.availability?.shapAnalysis))}
@@ -134,19 +135,44 @@
     return window.KeenInsightLayouts.alert({rules,profiling,shap,functions:hot,knobs,explanation:shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),beforeTuning_latency:c.baseline_ms==null?'Not measured':number(c.baseline_ms)+' ms',afterTuning_latency:c.tuned_ms==null?'Not measured':number(c.tuned_ms)+' ms',beforeTuning_restored:'—',afterTuning_restored:c.restored_ms==null?'Not measured':number(c.restored_ms)+' ms',beforeTuning_state:esc(c.metric||'No validation'),afterTuning_state:tag(app.status||'not_applied')})+`<p class="ki-sample-note">Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
   }
 
+  async function showRunDetail(runId, incidentParam) {
+    try {
+      const response=await fetch('/api/v1/lab/runs/'+encodeURIComponent(runId),{cache:'no-store'});
+      if(!response.ok)throw new Error(await response.text());
+      const d=await response.json(), r=d.result||{}, c=r.comparison||{}, t=r.tuning||{}, cfg=r.config||d.config||{};
+      const phases=Object.entries(r.phases||{}).map(([name,p])=>{
+        const b=(p.business_tps_summary||{}).steady_tps, pr=(p.pressure_tps_summary||{}).steady_tps;
+        const rc=[(p.control||{}).returncode,(p.external||{}).returncode].filter(v=>v!==undefined&&v!==null).join(' / ');
+        return [esc(name),number(p.duration_seconds,0)+' s',number(b),number(pr),shown(rc||'-')];
+      });
+      const incidents=[...new Set([...String(incidentParam||'').split(','),...(r.sysinsight_state?.current_incidents||[]).map(x=>x.incident_id),...(r.incidentIds||[])])].filter(Boolean);
+      const html=`<div class="ki-stats"><div class="ki-stat"><strong>${tag(d.status)}</strong><span>${esc(d.phase||'')}</span></div><div class="ki-stat"><strong>${number(c.baseline_tps)}</strong><span>Baseline TPS</span></div><div class="ki-stat"><strong>${number(c.pressure_before_tps)}</strong><span>Pressure before</span></div><div class="ki-stat"><strong>${number(c.pressure_after_tps)}</strong><span>Pressure after</span></div><div class="ki-stat"><strong>${percent(c.tuning_gain_ratio)}</strong><span>Change</span></div></div>`+
+        panel('Run',kv([['Run ID',esc(d.run_id)],['Scenario',esc(r.scenario?.title||d.scenario_id||'—')],['Kind',esc(d.kind||'—')],['Requested',date(d.requested_at)],['Started',date(d.started_at)],['Finished',date(d.finished_at)],['Error',shown(d.error||'None')]]))+
+        panel('Configuration',code(cfg))+
+        panel('Pressure comparison',kv([['Baseline TPS',number(c.baseline_tps)],['Pressure before TPS',number(c.pressure_before_tps)],['Pressure after TPS',number(c.pressure_after_tps)],['Tuning gain TPS',number(c.tuning_gain_tps)],['Tuning gain ratio',percent(c.tuning_gain_ratio)],['External pressure before',number(c.external_pressure_before_tps)],['External pressure after',number(c.external_pressure_after_tps)],['Same pressure observed',shown(c.same_pressure_observed)],['Comparison valid',shown(c.comparison_valid)],['Recovery ratio',percent(c.recovery_ratio)]])+(c.comparison_valid===false?'<p class="ki-sub">Comparison is not valid because the before/after external pressure differed beyond the allowed window. Re-run with longer pressure windows for a demo result.</p>':''))+
+        panel('Tuning candidate',kv([['Status',tag(t.status||'unknown')],['Source',shown(t.source||'—')],['Source type',shown(t.source_type||'—')],['Reason',shown(t.reason||'—')]])+raw(t.application||{} ,'Application / restore evidence')+(t.blocked_by_safety?raw(t.blocked_by_safety,'Blocked settings'):''))+
+        panel('Phases',phases.length?table(['Phase','Duration','Target TPS (steady)','Pressure TPS (steady)','Return codes'],phases):empty('No phase records retained.'))+
+        panel('Linked alerts',incidents.length?incidents.map(id=>link('alert-detail.html',id,id)).join(' · '):empty('No alert incident linked to this run.'))+
+        raw(d,'Full run record');
+      showModal('Tuning run · '+runId,html);
+    } catch(error) {
+      showModal('Tuning run','<div class="ki-empty">Failed to load run detail: '+esc(error.message)+'</div>');
+    }
+  }
+
   function overview(data) {
     const auto=data.automation||{};
     const summaries=Object.entries(data.workflowCounts||{}).map(([name,values])=>[esc(name.replaceAll('_',' ')),...['running','completed','failed','skipped'].map(state=>number(values[state]||0,0))]);
     const experiments=(data.recentRuns||[]).map(r=>{
       const c=r.comparison||{};
       const measurement=`${number(c.baseline_tps)} → ${number(c.pressure_before_tps)} → ${number(c.pressure_after_tps)} TPS`;
-      return [date(r.requested_at),`${esc(r.title||r.scenario_id)}<div class="ki-sub">${esc(r.run_id)}</div>`,`${tag(r.status)} ${tag(r.phase)}`,measurement+`<div class="ki-sub">Normal → pressure → tuned under pressure · change ${percent(c.tuning_gain_ratio)}</div>`,`${tag(r.tuningStatus||'awaiting_result')}<div class="ki-sub">${esc(r.candidateSourceType||'No candidate source')}</div>`,`${(r.incidentIds||[]).map(id=>link('alert-detail.html',id,'Alert')).join(' · ')}${raw(r,'Experiment evidence / provenance')}`];
+      return [date(r.requested_at),`${esc(r.title||r.scenario_id)}<div class="ki-sub">${esc(r.run_id)}</div>`,`${tag(r.status)} ${tag(r.phase)}`,measurement+`<div class="ki-sub">Normal → pressure → tuned under pressure · change ${percent(c.tuning_gain_ratio)}</div>`,`${tag(r.tuningStatus||'awaiting_result')}<div class="ki-sub">${esc(r.candidateSourceType||'No candidate source')}</div>`,`<button class="action-btn" data-ki-run-detail="${esc(r.run_id)}" data-ki-run-incidents="${esc((r.incidentIds||[]).join(','))}">Details</button> ${(r.incidentIds||[]).map(id=>link('alert-detail.html',id,'Alert')).join(' · ')}${raw(r,'Experiment evidence / provenance')}`];
     });
     const alerts=(data.recentAlerts||[]).map(a=>[date(a.time),link('alert-detail.html',a.id,a.id),tag(a.status),shown(a.diagnosis?.model),number(a.diagnosis?.llmCallCount,0),tag(a.applicationStatus||'not_applied'),percent(a.comparison?.tuned_improvement_ratio),shown(a.message||a.error||'No workflow error')]);
     return `<div class="ki-stats ki-overview-stats">${Object.entries(data.counts||{}).map(([k,v])=>`<div class="ki-stat"><strong>${v}</strong><span>${esc(k.replaceAll('_',' '))}</span></div>`).join('')}</div>`+
       panel('Automatic workflow configuration',kv([['Model',shown(auto.model)],['Current alert',tag(auto.currentAlertFiring?'firing':'inactive')],['Collector',shown(auto.collectionError||'Healthy')]])+'<p class="ki-sub">System-parameter tuning runs through the SysInsight alert workflow.</p>')+
       panel('Workflow outcomes',table(['Workflow / actions','Running','Completed','Failed','Skipped'],summaries)+'<p class="ki-sub">Completed means processing finished, not guaranteed benefit.</p>')+
-      panel('Recent experiments',table(['Time','Scenario','State / phase','Measured result','Tuning source','Evidence'],experiments))+
+      panel('Tuning history (recent experiments)',table(['Time','Scenario','State / phase','Measured result','Tuning source','Details / evidence'],experiments))+
       panel('SysInsight live alert workflows',table(['Time','Alert','State','Model','LLM calls','Restoration','Time reduction','Message'],alerts))+
       panel('Data coverage and known limits',coverage(data.capabilities||[]))+
       panel('Data categories',table(['Category','Page','Stored data'],data.schema.categories.map(r=>[esc(r.name),`<a href="${esc(r.page)}">${esc(r.page)}</a>`,esc(r.description)])));
@@ -187,6 +213,7 @@
       tbody.innerHTML=rows.length?rows.map(cells).join(''):`<tr><td colspan="${table.querySelectorAll('thead th').length}">${empty()}</td></tr>`;
     }
     body.querySelectorAll('[data-ki-record]').forEach(n=>n.onclick=()=>{const item=items.find(x=>String(x.id)===n.dataset.kiRecord);if(item)showModal(item.title||item.name||item.id,code(item));});
+    body.querySelectorAll('[data-ki-run-detail]').forEach(n=>n.onclick=()=>showRunDetail(n.dataset.kiRunDetail,n.dataset.kiRunIncidents));
     total=data.total||0;
     if(config[1]==='overview')return;
     let pager=body.querySelector('.table-footer,.data-container>.pagination,.table-container>.pagination,#ki-pager');
