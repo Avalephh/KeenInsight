@@ -2956,16 +2956,23 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
-    def _send_bytes(self, status: int, body: bytes, content_type: str) -> None:
+    def _send_bytes(self, status: int, body: bytes, content_type: str, extra_headers: Optional[Mapping[str, str]] = None) -> None:
         self.send_response(status)
         self._headers(content_type)
+        for name, value in (extra_headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def _send_json(self, value: Mapping[str, Any], status: int = 200) -> None:
-        body = json.dumps(value, ensure_ascii=False, indent=2, default=str).encode("utf-8")
-        self._send_bytes(status, body, "application/json; charset=utf-8")
+        raw = json.dumps(value, ensure_ascii=False, indent=2, default=str).encode("utf-8")
+        if len(raw) > 4096 and "gzip" in self.headers.get("Accept-Encoding", "").lower():
+            body = gzip.compress(raw, compresslevel=6)
+            self._send_bytes(status, body, "application/json; charset=utf-8",
+                             {"Content-Encoding": "gzip", "Vary": "Accept-Encoding"})
+        else:
+            self._send_bytes(status, raw, "application/json; charset=utf-8")
 
     def _send_error_json(self, status: int, message: str) -> None:
         self._send_json({"status": "error", "error": message}, status)

@@ -100,7 +100,7 @@
       ${panel('Candidate parameters',Object.keys(d.knobs||{}).length?code(d.knobs):empty('No candidate recorded yet'))}
       ${panel('SHAP model evidence',d.shapAnalysis?raw(d.shapAnalysis,'Model, training validation, exact SHAP values and additivity check'):empty(data.availability?.shapAnalysis))}
       ${panel('Metric evidence',raw(d.runtimeData||{},'Measured host / database window')+'<p class="ki-sub">Time-series monitoring remains in Grafana. Differential profiling and model SHAP attribution are distinct evidence sources.</p>')}
-      </div>${raw(data,'Full alert record / export schema')}`;
+      </div><p class="ki-sub">This page shows a compact evidence view; large function/stack arrays are truncated for fast loading. <a class="ki-button" href="${esc(data.fullEvidenceUrl||('/api/v1/keeninsight/alerts/'+encodeURIComponent(data.id)+'?full=1'))}" download="${esc(data.id)}-full-evidence.json">Download full evidence JSON</a></p>`;
   }
 
   function alertDetail(data){
@@ -236,7 +236,7 @@
     if(busy&&!replace)return;
     controller?.abort();controller=new AbortController();const local=controller;
     busy=true;document.getElementById('ki-refresh').disabled=true;
-    const timeout=setTimeout(()=>local.abort(),15000);
+    const timeout=setTimeout(()=>local.abort(),30000);
     try {
       const id=new URLSearchParams(location.search).get('id');
       if(detail&&!id)throw new Error('Missing record ID');

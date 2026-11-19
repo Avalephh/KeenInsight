@@ -251,7 +251,7 @@ class KeenInsightPortal:
         total = self._rows("SELECT count(*) n FROM incidents " + where, (pattern, pattern, pattern))[0]["n"]
         return {"items": [self._alert(row, False) for row in rows], "total": total}
 
-    def _alert(self, row, detail=True):
+    def _alert(self, row, detail=True, full=False):
         alert = decode(row.get("alert_json"), {})
         result = decode(row.get("sysinsight_json"), {})
         labels = alert.get("labels") or {}
@@ -324,6 +324,28 @@ class KeenInsightPortal:
                        }, "evidence": evidence,
                        "availability": {"shapAnalysis": "recorded" if (shap_analysis or {}).get('status') == 'completed' else (shap_analysis or {}).get('reason') or "not collected",
                                         "profiling": "recorded" if detection else "no profiler artifact retained"}})
+        if not full:
+            analysis = record.get("detailAnalysis") or {}
+            truncated = {}
+            for key, limit in (("hotFunctions", 30), ("functionCodeExamples", 30), ("runtimeCallChains", 20)):
+                values = analysis.get(key)
+                if isinstance(values, list) and len(values) > limit:
+                    analysis[key] = values[:limit]
+                    truncated[key] = {"shown": limit, "total": len(values)}
+            profiling = analysis.get("differentialProfiling")
+            if isinstance(profiling, dict):
+                key_functions = profiling.get("key_functions")
+                if isinstance(key_functions, list) and len(key_functions) > 30:
+                    profiling = dict(profiling)
+                    profiling["key_functions"] = key_functions[:30]
+                    profiling["key_function_count"] = profiling.get("key_function_count", len(key_functions))
+                    profiling["truncated"] = {"shown": 30, "total": len(key_functions)}
+                    analysis["differentialProfiling"] = profiling
+                    truncated["differentialProfiling.key_functions"] = {"shown": 30, "total": len(key_functions)}
+            if truncated:
+                analysis["truncated"] = truncated
+            record.pop("evidence", None)
+            record["fullEvidenceUrl"] = "/api/v1/keeninsight/alerts/{}?full=1".format(row["incident_id"])
         return record
 
     def references(self, category):
@@ -420,6 +442,7 @@ class KeenInsightPortal:
         except (TypeError, ValueError):
             raise ValueError("invalid pagination")
         search = str(arg("q", ""))[:500]
+        full = str(arg("full", "0")).lower() in {"1", "true", "yes", "on"}
         parts = resource.split("/", 1)
         category = parts[0]
         identity = parts[1] if len(parts)>1 else ""
@@ -439,7 +462,7 @@ class KeenInsightPortal:
                 rows = self._rows("SELECT * FROM incidents WHERE incident_id=?", (identity,))
                 if not rows:
                     raise KeyError("alert not found")
-                data = self._alert(rows[0])
+                data = self._alert(rows[0], full=full)
             else:
                 data = self.alerts(limit, offset, search, filters)
         elif category in {"manual", "code", "alertRules"}:
