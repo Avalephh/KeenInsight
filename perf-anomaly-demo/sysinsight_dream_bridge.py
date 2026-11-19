@@ -2077,6 +2077,8 @@ class Bridge:
         self.portal = KeenInsightPortal(self)
         self.http_server: Optional[ThreadingHTTPServer] = None
         self.http_thread: Optional[threading.Thread] = None
+        self.http_servers: List[ThreadingHTTPServer] = []
+        self.http_threads: List[threading.Thread] = []
         self._forced_alert: Dict[str, Any] = {
             "state": "firing",
             "labels": {"alertname": self.args.alert_name or "ForcedSysInsightAlert"},
@@ -2091,13 +2093,15 @@ class Bridge:
         if self._closed:
             return
         self._closed = True
-        if self.http_server is not None:
+        for server in list(getattr(self, "http_servers", [])) or ([self.http_server] if self.http_server else []):
             try:
-                self.http_server.shutdown()
-                self.http_server.server_close()
+                server.shutdown()
+                server.server_close()
             except Exception:
                 LOGGER.exception("could not stop bridge HTTP server")
-            self.http_server = None
+        self.http_server = None
+        self.http_servers = []
+        self.http_threads = []
         try:
             self.lab.shutdown()
         except Exception:
@@ -2110,21 +2114,37 @@ class Bridge:
                 # Python 3.8 does not expose cancel_futures.
                 executor.shutdown(wait=wait)
 
+    def _start_http_listener(self, port: int, mode: str) -> None:
+        server = BridgeHTTPServer(
+            (self.args.http_listen, int(port)),
+            BridgeHTTPHandler,
+            self,
+            mode=mode,
+        )
+        thread = threading.Thread(
+            target=server.serve_forever,
+            name="sysinsight-dream-bridge-http-{}".format(mode),
+            daemon=True,
+        )
+        thread.start()
+        self.http_servers.append(server)
+        self.http_threads.append(thread)
+        LOGGER.info("bridge %s listener on http://%s:%s", mode, self.args.http_listen, port)
+
     def start_http(self) -> None:
         if self.http_server is not None:
             return
-        self.http_server = BridgeHTTPServer(
-            (self.args.http_listen, int(self.args.http_port)),
-            BridgeHTTPHandler,
-            self,
-        )
-        self.http_thread = threading.Thread(
-            target=self.http_server.serve_forever,
-            name="sysinsight-dream-bridge-http",
-            daemon=True,
-        )
-        self.http_thread.start()
-        LOGGER.info("bridge API and metrics listening on http://%s:%s", self.args.http_listen, self.args.http_port)
+        self._start_http_listener(int(self.args.http_port), "default")
+        self.http_server = self.http_servers[0]
+        self.http_thread = self.http_threads[0]
+        for port, mode in ((getattr(self.args, "http_port_zh", 0), "zh"),
+                           (getattr(self.args, "http_port_zh_lab", 0), "zh_lab")):
+            if not port or int(port) == int(self.args.http_port):
+                continue
+            try:
+                self._start_http_listener(int(port), mode)
+            except Exception:
+                LOGGER.exception("could not start %s listener on port %s", mode, port)
 
     def dashboard_snapshot(self, limit: int = 50, include_details: bool = False) -> Dict[str, Any]:
         state = self.store.dashboard_snapshot(
@@ -2932,8 +2952,9 @@ class BridgeHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-    def __init__(self, address: Tuple[str, int], handler: Any, bridge: Bridge) -> None:
+    def __init__(self, address: Tuple[str, int], handler: Any, bridge: Bridge, mode: str = "default") -> None:
         self.bridge = bridge
+        self.mode = mode
         super().__init__(address, handler)
 
 
@@ -2945,6 +2966,10 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
     @property
     def bridge(self) -> Bridge:
         return self.server.bridge  # type: ignore[attr-defined]
+
+    @property
+    def mode(self) -> str:
+        return str(getattr(self.server, "mode", "default"))
 
     def log_message(self, format: str, *args: Any) -> None:
         LOGGER.info("bridge-api %s", format % args)
@@ -3012,6 +3037,10 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def _public_redirect(self, port: int, path: Optional[str] = None) -> None:
+        host = getattr(self.bridge.args, "public_host", "123.56.83.97")
+        self._redirect("http://{}:{}{}".format(host, port, path or self.path))
+
     def do_OPTIONS(self) -> None:
         self.send_response(204)
         self._headers("text/plain; charset=utf-8")
@@ -3024,25 +3053,37 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query, keep_blank_values=True)
         try:
             if path == "/":
-                self._redirect("/ui")
+                if self.mode == "zh":
+                    self._redirect("/keeninsight/")
+                elif self.mode == "zh_lab":
+                    self._redirect("/lab")
+                else:
+                    self._redirect("/ui")
                 return
             if path == "/healthz":
                 self._send_json({"status": "ok", "service": "sysinsight-dream-bridge", "pid": os.getpid()})
                 return
             if path in {"/keeninsight", "/keeninsight/index.html"}:
-                self._redirect("/keeninsight/host-list.html")
+                if self.mode == "zh_lab":
+                    self._public_redirect(int(getattr(self.bridge.args, "http_port_zh", 8004)), self.path)
+                else:
+                    self._redirect("/keeninsight/host-list.html")
                 return
             if path.startswith("/keeninsight/"):
+                if self.mode == "zh_lab":
+                    self._public_redirect(int(getattr(self.bridge.args, "http_port_zh", 8004)), self.path)
+                    return
                 asset = path[len("/keeninsight/"):]
                 # Exact file allowlist also rejects encoded traversal and directories.
                 allowed = {"template.html", "host-list.html", "alert-list.html",
                            "alert-detail.html", "alert-rules.html",
                            "manual.html", "code-source.html",
-                           "portal.js", "portal.css", "original-layouts.js"}
+                           "portal.js", "portal-zh.js", "portal.css", "original-layouts.js"}
                 if asset not in allowed:
                     self._send_error_json(404, "portal asset not found")
                     return
-                file_path = ROOT / "keeninsight_web" / asset
+                portal_root = ROOT / ("keeninsight_web_zh" if self.mode == "zh" else "keeninsight_web")
+                file_path = portal_root / asset
                 content_type = {".html": "text/html", ".js": "application/javascript", ".css": "text/css"}[file_path.suffix]
                 self._send_bytes(200, file_path.read_bytes(), content_type + "; charset=utf-8")
                 return
@@ -3061,6 +3102,9 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
                 self._send_bytes(200, self.bridge.prometheus_metrics().encode("utf-8"), "text/plain; version=0.0.4; charset=utf-8")
                 return
             if path == "/ui":
+                if self.mode == "zh":
+                    self._public_redirect(int(getattr(self.bridge.args, "http_port_zh_lab", 8005)), self.path)
+                    return
                 ui_path = ROOT / "bridge_ui.html"
                 if ui_path.exists():
                     body = ui_path.read_bytes()
@@ -3069,6 +3113,9 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
                 self._send_bytes(200, body, "text/html; charset=utf-8")
                 return
             if path in {"/lab", "/experiment"}:
+                if self.mode == "zh":
+                    self._public_redirect(int(getattr(self.bridge.args, "http_port_zh_lab", 8005)), self.path)
+                    return
                 ui_path = ROOT / "experiment_lab.html"
                 if ui_path.exists():
                     body = ui_path.read_bytes()
@@ -3270,6 +3317,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--force-alert", action="store_true", help="treat this cycle as a firing alert for local verification")
     parser.add_argument("--http-listen", default=os.environ.get("SYSINSIGHT_BRIDGE_LISTEN", "127.0.0.1"))
     parser.add_argument("--http-port", type=int, default=int(os.environ.get("SYSINSIGHT_BRIDGE_PORT", "8001")), help="local API/metrics port; 0 disables HTTP")
+    parser.add_argument("--http-port-zh", type=int, default=int(os.environ.get("SYSINSIGHT_BRIDGE_ZH_PORT", "8004")), help="Chinese portal port; 0 disables")
+    parser.add_argument("--http-port-zh-lab", type=int, default=int(os.environ.get("SYSINSIGHT_BRIDGE_ZH_LAB_PORT", "8005")), help="Chinese lab/admin port; 0 disables")
+    parser.add_argument("--public-host", default=os.environ.get("SYSINSIGHT_PUBLIC_HOST", "123.56.83.97"))
     parser.add_argument("--metrics-limit", type=int, default=100, help="maximum SQL observations exposed as metrics")
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
@@ -3286,7 +3336,7 @@ def parse_args() -> argparse.Namespace:
         or args.sample_maintenance_batch < 1000
     ):
         parser.error("invalid database/poll/slow-query settings")
-    if args.http_port < 0 or args.http_port > 65535 or args.metrics_limit < 1:
+    if any(port < 0 or port > 65535 for port in (args.http_port, args.http_port_zh, args.http_port_zh_lab)) or args.metrics_limit < 1:
         parser.error("invalid bridge HTTP/metrics settings")
     if (
         args.sysinsight_chain_timeout <= 0

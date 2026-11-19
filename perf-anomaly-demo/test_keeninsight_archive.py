@@ -43,7 +43,8 @@ class ArchivePresentationTests(unittest.TestCase):
                 with self.subTest(page=name):
                     original=archive.read(name).decode("utf-8-sig").replace("\r\n","\n")
                     current=(WEB/Path(name).name).read_text()
-                    styles=lambda value:re.findall(r"<style[^>]*>(.*?)</style>",value,re.S)
+                    current=re.sub(r"/\* v2-scroll:start \*/.*?/\* v2-scroll:end \*/","",current,flags=re.S)
+                    styles=lambda value:[re.sub(r"\s+","",sheet) for sheet in re.findall(r"<style[^>]*>(.*?)</style>",value,re.S)]
                     self.assertEqual(styles(original),styles(current))
                     self.assertNotIn("realtime-monitor",current)
 

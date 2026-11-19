@@ -36,6 +36,8 @@ source .env.local
 - 监控大屏：<http://127.0.0.1:8002/d/local-postgresql-demo/582e36f?orgId=1&refresh=15s>
 - SysInsight 系统调优联动大屏：<http://127.0.0.1:8002/d/sysinsight-dream-automation?orgId=1&refresh=15s>
 - SysInsight 系统调优实验看板：<http://127.0.0.1:8002/d/sysinsight-experiment-lab?orgId=1&refresh=5s>
+- 中文产品门户：<http://127.0.0.1:8004/keeninsight/>
+- 中文实验台 / 管理台：<http://127.0.0.1:8005/lab>、<http://127.0.0.1:8005/ui>
 - 联动管理控制台：<http://127.0.0.1:8001/ui>
 - 一页实验控制台：<http://127.0.0.1:8001/lab>
 - KeenInsight 动态产品页（由 English.zip 页面接入真实结果）：<http://127.0.0.1:8001/keeninsight/>

@@ -67,6 +67,8 @@ Grafana：<http://127.0.0.1:8002/>；Prometheus：<http://127.0.0.1:8003/>。Gra
 
 一页实验控制台：<http://127.0.0.1:8001/lab>；Grafana 实验看板：<http://127.0.0.1:8002/d/sysinsight-experiment-lab?orgId=1&refresh=5s>。控制台可重置实验参数、触发 TPCC 基线→压力→恢复，并查看压力下调优前后的目标业务 TPS 对比。
 
+中文演示入口：产品门户 <http://127.0.0.1:8004/keeninsight/>，中文实验台 <http://127.0.0.1:8005/lab>，中文管理台 <http://127.0.0.1:8005/ui>。中文版与英文版共用同一份 bridge 数据和 Grafana/Prometheus。
+
 ## 运行真实 API 的 TPCC 验证
 
 先准备环境变量，不要把 key 写入 Git：
