@@ -77,7 +77,7 @@ locators, targeted experiment, code-knowledge validation, and final action
 state.  This is the complete automatic path; the four steps above remain the
 inspectable manual path.
 
-The same flow works for the following non-index cases, which are the primary
+The same flow works for the following system-tuning cases, which are the primary
 showcase of the system's operator-aware capability:
 
 | Case | User-visible pressure | Evidence to point at | Recovery |
@@ -88,7 +88,6 @@ showcase of the system's operator-aware capability:
 | parallel worker underprovisioning | session workers set to 0 | `Workers Planned/Launched` and live host limits | bounded database worker proposal |
 | stale statistics | 2% → 92% distribution shift without `ANALYZE` (isolated probe; autovacuum disabled for the window) | estimated vs. actual rows and `pg_stat_user_tables` | typed `ANALYZE` completed; clean restores the probe |
 | lock contention | two real row-locking sessions | waiter, blocker, `pg_blocking_pids`, lock graph | stop/release the demo sessions |
-| filtered scan/index (secondary) | missing btree index | observed `Seq Scan` predicate | validated `CREATE INDEX CONCURRENTLY` |
 
 ## RAG portion
 
@@ -120,7 +119,7 @@ Recall@5, MRR, precision, term coverage, and the negative no-hit result.
 ## Strict paper-capability walkthrough
 
 For the portions that are not represented by the five-minute workload card,
-use the **eBPF observability**, **Models & LLVM**, and **Tuning agent** views:
+use the **eBPF observability** and **Models & LLVM** views:
 
 1. Start probes before the pressure query.  The API attaches real BCC
    uprobe/uretprobe pairs to PostgreSQL functions and a `vfs_write` kprobe;
@@ -139,11 +138,6 @@ use the **eBPF observability**, **Models & LLVM**, and **Tuning agent** views:
    typed system action.  Click **Retrieve code knowledge** to show the exact
    PostgreSQL source snippets, compiler support rows, experiment-required
    hypothesis, and validation accumulated from a real tuning experiment.
-4. In **Tuning agent**, submit a read-only query.  Every session-local hint and
-   rewrite is measured on PostgreSQL, checked for result equivalence, and
-   ranked by measured latency/plan cost or the learned pairwise model.  Index
-   candidates are proposal-only and require the same explicit reviewed action
-   gate as the workload path.
 
 The strict reproducibility controls retain both sides of the observability
 trade-off:
@@ -151,7 +145,6 @@ trade-off:
 ```bash
 python scripts/ebpf_strict_smoke.py
 python scripts/ebpf_overhead_smoke.py
-python scripts/optimizer_strict_smoke.py
 python scripts/ebpf_auto_adapt_smoke.py
 python scripts/ebpf_long_query_smoke.py
 python scripts/code_knowledge_smoke.py
@@ -179,7 +172,7 @@ python scripts/preflight.py --require-clean
 ```
 
 The cleanup releases in-memory lock sessions, rolls back only workload-originated
-applied actions, verifies no demo index or waiting lock remains, and preserves
+applied actions, verifies no waiting lock remains, and preserves
 historical runs, incidents, feedback, audit records, and their RAG-derived
 copies within the retention window.  A completed `ANALYZE` action is not
 rolled back; the cleanup explicitly restores and re-analyzes the isolated

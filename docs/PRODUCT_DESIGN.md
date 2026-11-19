@@ -1,3 +1,8 @@
+> **v2 scope note (2026-11-19):** SQL-level tuning (query optimizer agent,
+> hints, rewrites, index actions, SQL evidence pages) has been removed from
+> this codebase.  This document records the pre-v2 artifact; the active product
+> is the SysInsight system-parameter tuning path only.
+
 # KeenInsight PostgreSQL 智能运维平台产品设计
 
 > 产品版本：Prometheus + Grafana 监控架构设计稿 v2

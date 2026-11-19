@@ -13,8 +13,6 @@ problems identified in the previous demonstration review:
 * Lasso-based probe adaptation, event-vector differential profiling, XGBoost /
   TreeSHAP diagnosis, and PostgreSQL-source LLVM CFG/SSA propagation are
   available;
-* the query optimizer agent measures session-local hints and safe rewrites,
-  while index changes remain explicit reviewed proposals;
 * the RAG path combines collected paper/review/project sources with runtime
   evidence, compiler-backed code retrieval/summary, TF-IDF/KMeans experience
   mining, and real BGE vector retrieval;
@@ -25,7 +23,7 @@ problems identified in the previous demonstration review:
 Deterministic PostgreSQL rules remain visible and are fused with model
 hypotheses; neither is mislabeled as the other.  A configured OpenAI-compatible
 LLM can generate grounded RAG, incident/plan explanations, compiler-backed
-code summaries, and additional query candidates, but the safe deterministic
+code summaries, and additional system-parameter candidates, but the safe deterministic
 path remains authoritative. Every generated candidate passes the same
 allowlist, semantic, and measured verification gates.
 
@@ -46,12 +44,10 @@ The Compose database is PostgreSQL 16 with
 `pg_stat_statements`, `compute_query_id`, and `track_io_timing` enabled.  The
 demo schema is created by the database initialization script.  Use the
 **Workloads** panel to run actual hash-join spill, grouped-aggregate spill,
-window-sort spill, parallel-worker, lock-contention, or optional missing-index
-workloads.  The three `work_mem` cases use the same safe setting action but
+window-sort spill, parallel-worker, or lock-contention workloads.  The three `work_mem` cases use the same safe setting action but
 exercise different PostgreSQL operators and expose their actual plan changes.
-The panel lets you change the measured repetition count, the selected
-`customer_id`, the baseline session `work_mem`, and the baseline
-parallel-worker setting; the server validates these knobs against PostgreSQL
+The panel lets you change the measured repetition count, the baseline session
+`work_mem`, and the baseline parallel-worker setting; the server validates these knobs against PostgreSQL
 before execution.  A separate stale-statistics case shifts a namespaced table
 distribution and recovers planner estimates with a typed `ANALYZE` action.
 The guided walkthrough takes one scenario through baseline,
@@ -70,7 +66,7 @@ The development measurement snapshot in `docs/MEASURED_RESULTS.md` was taken
 against PostgreSQL 12.22 on an existing local instance; rerun the protocol on
 the PostgreSQL 16 Compose image before using those numbers as a new result.
 The strict implementation audit, including real eBPF loss/overhead checks,
-model metrics, LLVM evidence, optimizer verification, and RAG evaluation, is
+model metrics, LLVM evidence, system-tuning verification, and RAG evaluation, is
 in `docs/ICDE_CLAIM_AUDIT.md`.
 
 ### Continuous telemetry retention
@@ -162,7 +158,7 @@ python scripts/collect_sources.py \
 
 At runtime a low-frequency indexer also mirrors recent workload runs, tuning
 actions, measured feedback, incidents, the latest telemetry snapshot, model
-and optimizer records, SQL lifecycle events, source-analysis/code-knowledge
+records, SQL lifecycle events, source-analysis/code-knowledge
 evidence, and empirical knowledge entries.  Static documents use content hashes; runtime
 records use stable source keys, so repeated syncs are idempotent.  The default
 interval is 60 seconds and can be changed with
@@ -206,9 +202,9 @@ The `-v` option removes only the named demo volume.
 Copy `.env.example` to `.env` and set `KI_DATABASE_URL`.  The service account
 needs permission to read `pg_stat_activity`, `pg_locks`, `pg_settings`, and
 `pg_stat_statements`.  A monitoring-only deployment can use the PostgreSQL
-`pg_read_all_stats` role.  Applying database-level settings or creating an
-index requires the corresponding PostgreSQL privileges and is intentionally
-rejected if the server refuses it.
+`pg_read_all_stats` role.  Applying database-level settings requires the
+corresponding PostgreSQL privileges and is intentionally rejected if the server
+refuses it.
 
 `pg_stat_statements` must be loaded through `shared_preload_libraries` and the
 extension must be created in the monitored database.  A restart is required
@@ -236,20 +232,19 @@ tests/               unit tests for evidence parsing and guardrails
 1. The browser submits an action ID, never executable SQL.  eBPF start/stop
    and adaptive selection are explicit operator controls.
 2. Only action types implemented by `app/tuning.py` can change the database;
-   the non-index actions are limited to validated database-scoped
-   `work_mem` and `max_parallel_workers_per_gather` settings plus a validated
-   `ANALYZE` refresh.  Query hints are session-local; rewrites are restricted
-   to a provably equivalent form; index add/remove candidates are proposal-only
-   until a reviewed typed action is requested.  The statistics refresh is
-   recorded as completed maintenance because it has no meaningful inverse.
-3. Query plans from arbitrary input are explained only after conservative
-   read-only validation; `EXPLAIN ANALYZE` is only exposed through an explicit
-   user action and accepts `SELECT`/read-only statements.
+   they are limited to validated database-scoped `work_mem` and
+   `max_parallel_workers_per_gather` settings plus a validated `ANALYZE`
+   refresh.  SQL-level hints, rewrites and index changes are not part of the
+   v2 control plane.  The statistics refresh is recorded as completed
+   maintenance because it has no meaningful inverse.
+3. System-tuning candidates are validated against live PostgreSQL metadata and
+   the typed-action allowlist; diagnosis plans are read only and never execute
+   arbitrary SQL.
 4. The default persistent setting action is scoped to the current database,
    not the whole cluster.  The service records the previous value before
    applying it.
-5. An index rollback drops an index only when KeenInsight created it during the
-   recorded action.
+5. A database-parameter rollback restores the previous database-scoped
+   override recorded before the action.
 6. Observations are persisted in `keeninsight.snapshots`, incidents in
    `keeninsight.incidents`, eBPF events and SQL lifecycle rows in their
    dedicated tables, and all action changes in `keeninsight.audit_events`.
