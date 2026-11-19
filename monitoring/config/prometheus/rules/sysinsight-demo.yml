@@ -2,11 +2,20 @@ groups:
   - name: sysinsight-demo
     rules:
       - alert: SysInsightDemoAnomaly
-        expr: pg_stat_activity_count{job="postgres",datname="keeninsight",state="active"} >= 3
-        for: 0s
+        # v2 system-tuning story: the anomaly is the target business TPS drop
+        # during the external-pressure phase, not mere session activity.  The
+        # baseline reference comes from the baseline samples of the same lab
+        # run retained by Prometheus; phase matching keeps the rule silent
+        # during the baseline itself and after tuning.
+        expr: |
+          sysinsight_dream_lab_tpcc_business_tps{phase="pressure_before"} > 0
+          and
+          sysinsight_dream_lab_tpcc_business_tps{phase="pressure_before"}
+            < 0.9 * scalar(max without (phase, status, run_id, scenario_id) (max_over_time(sysinsight_dream_lab_tpcc_business_tps{phase="baseline"}[10m])))
+        for: 10s
         labels:
           severity: warning
           source: sysinsight-demo
         annotations:
-          summary: "SysInsight demo database activity anomaly"
-          description: "The local keeninsight database has at least three active PostgreSQL sessions."
+          summary: "SysInsight demo: target business TPS dropped under external pressure"
+          description: "The target business TPS under pressure is below 90% of the baseline maximum for 10 seconds."

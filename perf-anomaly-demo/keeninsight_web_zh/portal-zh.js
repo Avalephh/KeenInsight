@@ -566,6 +566,8 @@
         "TPCC 热点仓库 Payment 外部并发": "TPCC 热点仓库支付业务外部并发",
         "The local keeninsight database has at least three active PostgreSQL sessions.": "本地 keeninsight 数据库至少有 3 个活跃的 PostgreSQL 会话。",
         "ok": "正常",
+        "SysInsight demo: target business TPS dropped under external pressure": "SysInsight 演示：外部压力下目标业务 TPS 下降",
+        "The target business TPS under pressure is below 90% of the baseline maximum for 10 seconds.": "压力阶段的目标业务 TPS 低于基线最大值的 90%，并持续 10 秒。",
   };
   const entries = Object.entries(map).sort((a,b)=>b[0].length-a[0].length);
   const patterns = [
