@@ -558,6 +558,14 @@
         "within_training_range": "在训练范围内",
         "low_confidence": "低置信度",
         "unavailable": "不可用",
+        "restart is disabled for a live experiment": "实时实验期间禁用重启",
+        "Bridge restarted before this alert workflow completed; inspect retained stages and configuration restoration evidence.": "告警工作流完成前 Bridge 已重启；请检查保留的阶段与配置恢复证据。",
+        "bridge collector": "Bridge 采集器",
+        "Prometheus node exporter instant vector": "Prometheus node exporter 即时向量",
+        "whole host; disk=root filesystem": "整机；磁盘=根文件系统",
+        "TPCC 热点仓库 Payment 外部并发": "TPCC 热点仓库支付业务外部并发",
+        "The local keeninsight database has at least three active PostgreSQL sessions.": "本地 keeninsight 数据库至少有 3 个活跃的 PostgreSQL 会话。",
+        "ok": "正常",
   };
   const entries = Object.entries(map).sort((a,b)=>b[0].length-a[0].length);
   const patterns = [
@@ -602,6 +610,9 @@
     for (const textNode of nodes) {
       const parent = textNode.parentElement;
       if (!parent || skip.has(parent.tagName)) continue;
+      // Parameter documentation and code/source excerpts stay in their original
+      // technical English; translating them word by word produces broken text.
+      if (parent.closest && parent.closest('.snippet-text,.snippet-title,.code-block')) continue;
       const next = replace(textNode.nodeValue);
       if (next !== textNode.nodeValue) textNode.nodeValue = next;
     }
