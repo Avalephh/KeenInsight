@@ -312,8 +312,7 @@ def artifact_summary(path: Path, payload: dict[str, Any]) -> str:
                 f"Server: {_compact((payload.get('database') or {}).get('server') or {})}",
                 f"Row counts: {_compact((payload.get('database') or {}).get('row_counts') or {})}",
                 f"Clean checks: waiting_locks_api={payload.get('waiting_locks_api')}; "
-                f"applied_actions={payload.get('applied_actions')}; "
-                f"missing_index={((payload.get('demo_state') or {}).get('missing_index_exists'))}",
+                f"applied_actions={payload.get('applied_actions')}",
             ]
         )
     elif path.name == "stats-case.json":

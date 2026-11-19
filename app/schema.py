@@ -398,40 +398,6 @@ SCHEMA_STATEMENTS = [
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
     """,
-    """
-    CREATE TABLE IF NOT EXISTS keeninsight.optimizer_runs (
-        id BIGSERIAL PRIMARY KEY,
-        query TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'running'
-            CHECK (status IN ('running', 'completed', 'failed')),
-        baseline JSONB NOT NULL DEFAULT '{}'::jsonb,
-        knowledge JSONB NOT NULL DEFAULT '[]'::jsonb,
-        source_evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
-        selected_candidate TEXT,
-        ranking JSONB NOT NULL DEFAULT '[]'::jsonb,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        finished_at TIMESTAMPTZ,
-        error TEXT
-    )
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS keeninsight.optimizer_candidates (
-        id BIGSERIAL PRIMARY KEY,
-        run_id BIGINT NOT NULL REFERENCES keeninsight.optimizer_runs(id) ON DELETE CASCADE,
-        candidate_key TEXT NOT NULL,
-        action_type TEXT NOT NULL,
-        query TEXT NOT NULL,
-        hints JSONB NOT NULL DEFAULT '{}'::jsonb,
-        proposal JSONB NOT NULL DEFAULT '{}'::jsonb,
-        plan JSONB NOT NULL DEFAULT '{}'::jsonb,
-        measurement JSONB NOT NULL DEFAULT '{}'::jsonb,
-        semantic_equivalence JSONB NOT NULL DEFAULT '{}'::jsonb,
-        score DOUBLE PRECISION,
-        rank INTEGER,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        UNIQUE (run_id, candidate_key)
-    )
-    """,
     "CREATE INDEX IF NOT EXISTS ebpf_events_observed_at_idx ON keeninsight.ebpf_events (observed_at DESC)",
     "CREATE INDEX IF NOT EXISTS ebpf_events_function_idx ON keeninsight.ebpf_events (function_name, observed_at DESC)",
     "CREATE INDEX IF NOT EXISTS event_outbox_status_idx ON keeninsight.event_outbox (status, created_at)",
@@ -443,7 +409,6 @@ SCHEMA_STATEMENTS = [
     "CREATE INDEX IF NOT EXISTS code_knowledge_knob_idx ON keeninsight.code_knowledge (knob, updated_at DESC)",
     "CREATE INDEX IF NOT EXISTS tuning_experiences_cluster_idx ON keeninsight.tuning_experiences (cluster_id, confidence DESC)",
     "CREATE INDEX IF NOT EXISTS rag_embeddings_model_idx ON keeninsight.rag_embeddings (model_name, dimensions)",
-    "CREATE INDEX IF NOT EXISTS optimizer_candidates_run_idx ON keeninsight.optimizer_candidates (run_id, rank)",
 ]
 
 DEFAULT_RULES = [

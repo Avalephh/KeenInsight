@@ -40,7 +40,7 @@ from .workload import WorkloadError, WorkloadRunner
 # returned to callers so a benchmark name is never silently presented as a
 # benchmark measurement.
 LEGACY_LOAD_TO_SCENARIO = {
-    "tpcc": "missing_index",
+    "tpcc": "hash_join_spill",
     "tpch": "aggregate_spill",
     "sysbench": "sort_spill",
     "custom": "hash_join_spill",
@@ -946,12 +946,6 @@ class LegacyTuneCompatibility:
             before = ((before_observations.get("statistics_measurement") or {}).get("estimate_error_ratio"))
             after_value = ((after_observations.get("statistics_measurement") or {}).get("estimate_error_ratio"))
             return {key: self._number(after_value if recommended else before, 0.0)}
-        if action_type == "create_index":
-            index_name = str(target.get("index") or "index")
-            return {f"index:{index_name}": 1 if recommended else 0}
-        if action_type == "drop_index":
-            index_name = str(target.get("index") or "index")
-            return {f"index:{index_name}": 0 if recommended else 1}
         return {"typed_action": 1 if recommended else 0}
 
     def _candidate_targets(

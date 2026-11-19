@@ -17,7 +17,6 @@
         <div class="nav-group-label">实时总览</div>
         <button class="nav-item active" data-view="overview">总览</button>
         <button class="nav-item" data-view="incidents">异常事件</button>
-        <button class="nav-item" data-view="queries">查询证据</button>
         <div class="nav-group-label">调优闭环</div>
         <button class="nav-item" data-view="workloads">工作负载</button>
         <button class="nav-item" data-view="workload-runner">实时测量</button>
@@ -27,7 +26,7 @@
         <button class="nav-item" data-view="rag">RAG 知识</button>
         <button class="nav-item" data-view="observability">eBPF 可观测性</button>
         <button class="nav-item" data-view="analysis">模型与 LLVM</button>
-        <button class="nav-item" data-view="agent">调优智能体</button>
+        <button class="nav-item" data-view="agent">调优经验</button>
         <div class="nav-group-label">系统</div>
         <button class="nav-item" data-view="settings">PostgreSQL 设置</button>
         <button class="nav-item" data-view="audit">审计记录</button>
@@ -56,7 +55,7 @@
           <div>
             <div class="eyebrow">实时 PostgreSQL 控制面</div>
             <h2>从发现异常到验证恢复</h2>
-            <p>先看数据库吞吐、延迟、连接和缓存；需要根因时，再进入异常、查询证据或实时测量页面。</p>
+            <p>先看数据库吞吐、延迟、连接和缓存；需要根因时，再进入异常、eBPF 观测或实时测量页面。</p>
             <div class="overview-hero-actions"><button class="button primary" data-view-link="workloads">开始异常演练</button><button class="button secondary" data-view-link="observability">查看实时观测</button></div>
           </div>
           <div class="overview-hero-status"><span class="live-pulse" id="overviewLiveDot"></span><strong id="overviewLiveState">正在读取实例状态</strong><span id="overviewLiveDetail">等待最新观测</span></div>
@@ -101,17 +100,6 @@
         <div class="section-intro"><div><div class="eyebrow">检测与诊断</div><h2>异常事件</h2><p>每个异常都由当前 PostgreSQL 观测生成，并保留对应证据。</p></div><div class="inline-controls"><select id="incidentStatusFilter"><option value="">全部状态</option><option value="active">活跃</option><option value="resolved">已解决</option><option value="ignored">已忽略</option></select><button class="button secondary" id="incidentRefresh">刷新</button></div></div>
         <article class="card"><div id="incidentTable"></div></article>
         <article class="card hidden" id="incidentDetailCard"><div class="card-heading"><div><h2 id="incidentDetailTitle">异常详情</h2><p id="incidentDetailSummary"></p></div><button class="text-button" id="closeIncidentDetail">关闭</button></div><div id="incidentDetail"></div></article>
-      </section>
-
-      <section class="view" id="view-queries">
-        <div class="section-intro"><div><div class="eyebrow">数据库证据</div><h2>查询证据</h2><p>统计数据来自 <code>pg_stat_statements</code>；执行计划由已连接的 PostgreSQL 服务器返回。</p></div><button class="button secondary" id="queryRefresh">刷新</button></div>
-        <article class="card"><div id="queryTable"></div></article>
-        <article class="card">
-          <div class="card-heading"><div><h2>查看只读查询执行计划</h2><p>普通 EXPLAIN 不执行查询；只有确认愿意运行 SELECT 时才勾选 ANALYZE。</p></div></div>
-          <textarea id="explainQuery" class="query-input" spellcheck="false" placeholder="SELECT ..."></textarea>
-          <div class="form-row"><label class="toggle-label"><input type="checkbox" id="explainAnalyze"> EXPLAIN ANALYZE（执行只读查询）</label><button class="button primary" id="explainButton">检查执行计划</button></div>
-          <div id="explainResult" class="result-box hidden"></div>
-        </article>
       </section>
 
       <section class="view" id="view-workloads">
@@ -224,14 +212,12 @@
           <article class="card"><div class="card-heading"><div><h2>模型注册表</h2><p>XGBoost 模型与时间留出评估指标。</p></div><div class="inline-controls"><button class="button small secondary" id="trainLatencyButton">训练耗时模型</button><button class="button small secondary" id="trainRootCauseButton">训练根因模型</button></div></div><div id="modelStatusPanel"></div></article>
           <article class="card"><div class="card-heading"><div><h2>LLVM 源码传播</h2><p>由 Clang 生成 CFG/SSA 中间表示、源码定位信息，以及来自 PostgreSQL 源码树的有依据代码假设。</p></div><div class="inline-controls"><button class="button small secondary" id="runSourceAnalysisButton">运行分析</button><button class="button small secondary" id="retrieveCodeKnowledgeButton">检索代码知识</button></div></div><div id="sourceStatusPanel"></div><div id="codeKnowledgePanel" class="result-box hidden"></div></article>
         </div>
-        <article class="card"><div class="card-heading"><div><h2>仅基于计划的预测与 TreeSHAP</h2><p>请输入只读查询。模型不允许使用执行后的溢出计数器。</p></div></div><textarea id="modelQuery" class="query-input" spellcheck="false" placeholder="SELECT count(*) FROM keeninsight_demo.orders"></textarea><div class="form-row"><label class="toggle-label">模型 <select id="modelType"><option value="latency_prediction">耗时预测</option><option value="root_cause">根因分析</option></select></label><button class="button primary" id="modelPredictButton">预测并解释</button></div><div id="modelPredictionPanel" class="result-box hidden"></div></article>
         <article class="card"><div class="card-heading"><div><h2>差分画像</h2><p>根据函数事件向量和函数级 TreeSHAP 对比两个已完成的 eBPF 会话；系统调优按钮会通过 LLVM 源码证据，将实测热点映射为待审核的设置操作。</p></div><button class="button secondary" id="differentialRefresh">刷新画像</button></div><div id="differentialPanel"></div><div id="systemTuningPanel" class="result-box hidden"></div></article>
       </section>
 
       <section class="view" id="view-agent">
-        <div class="section-intro"><div><div class="eyebrow">检索增强调优闭环</div><h2>查询调优智能体</h2><p>智能体检索证据，生成类型化的会话级提示或可证明范围很窄的改写，在 PostgreSQL 上实测每个候选，检查结果等价性，并按实测耗时/计划代价或学习到的成对模型排序。持久化索引建议必须经过明确审核。</p></div><button class="button secondary" id="agentRefresh">刷新历史</button></div>
-        <article class="card"><div class="card-heading"><div><h2>优化只读查询</h2><p>候选执行有边界且为只读；生成的 SQL 不会自动应用。</p></div></div><textarea id="agentQuery" class="query-input" spellcheck="false" placeholder="SELECT count(*) FROM keeninsight_demo.orders o JOIN keeninsight_demo.customers c ON c.customer_id = o.customer_id"></textarea><div class="form-row"><label class="toggle-label">测量次数 <input id="agentRepetitions" type="number" min="1" max="7" value="3"></label><button class="button primary" id="agentOptimizeButton">运行调优智能体</button></div><div id="agentResultPanel" class="result-box hidden"></div></article>
-        <div class="two-column"><article class="card"><div class="card-heading"><div><h2>最近的智能体运行</h2></div></div><div id="agentRunsPanel"></div></article><article class="card"><div class="card-heading"><div><h2>挖掘出的经验</h2><p>从实测调优反馈中进行 TF-IDF/KMeans 聚类。</p></div><button class="button small secondary" id="mineExperiencesButton">挖掘经验</button></div><div id="experiencePanel"></div></article></div>
+        <div class="section-intro"><div><div class="eyebrow">系统调优经验</div><h2>实测调优经验</h2><p>从实测的系统参数调优反馈中进行 TF-IDF/KMeans 聚类。</p></div><button class="button secondary" id="mineExperiencesButton">挖掘经验</button></div>
+        <article class="card"><div id="experiencePanel"></div></article>
       </section>
 
       <section class="view" id="view-settings">

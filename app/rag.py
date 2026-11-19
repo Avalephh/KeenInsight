@@ -45,7 +45,6 @@ RUNTIME_SOURCE_TYPES = (
     "runtime-model",
     "runtime-prediction",
     "runtime-differential",
-    "runtime-optimizer",
     "runtime-experience",
     "runtime-source-analysis",
     "runtime-code-knowledge",
@@ -738,26 +737,6 @@ def sync_runtime_evidence(db: Database, *, limit: int = 100) -> dict[str, Any]:
                 title=f"Differential profile #{row['id']}",
                 content="Function differential and SHAP evidence\n" + json.dumps(row, indent=2, ensure_ascii=False, default=str),
                 metadata={"differential_profile_id": row["id"]},
-            )
-        )
-
-    optimizer_runs = db.fetch_all(
-        """
-        SELECT id, query, status, baseline, knowledge, source_evidence,
-               selected_candidate, ranking, created_at, finished_at, error
-        FROM keeninsight.optimizer_runs ORDER BY id DESC LIMIT %s
-        """,
-        (max(1, min(limit, 200)),),
-    )
-    for row in optimizer_runs:
-        results.append(
-            _runtime_document(
-                db,
-                source_key=f"runtime:optimizer_run:{row['id']}",
-                source_type="runtime-optimizer",
-                title=f"Tuning agent run #{row['id']}",
-                content="Tuning agent evidence\n" + json.dumps(row, indent=2, ensure_ascii=False, default=str),
-                metadata={"optimizer_run_id": row["id"]},
             )
         )
 

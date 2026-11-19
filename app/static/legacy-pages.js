@@ -43,8 +43,6 @@
         sort_spill: '窗口排序溢出',
         parallel_query_underprovisioned: '并行工作进程不足',
         stale_statistics: '统计信息过期',
-        missing_index: '缺少索引',
-        filtered_sequential_scan: '过滤顺序扫描',
         temporary_file_spill: '临时文件溢出'
     };
     const labelForKind = (kind) => kindName[kind] || String(kind || '数据库信号').replace(/_/g, ' ');
@@ -58,17 +56,12 @@
         'runtime-experience': '运行时调优经验',
         'runtime-lifecycle': '运行时生命周期',
         'runtime-model': '运行时模型',
-        'runtime-observability': '运行时可观测性',
-        'runtime-optimizer': '运行时优化器'
+        'runtime-observability': '运行时可观测性'
     }[String(value)] || String(value || 'PostgreSQL 知识'));
     const actionName = (value) => ({
         set_database_parameter: '设置数据库参数',
         set_parameter: '设置参数',
-        create_index: '创建索引',
-        drop_index: '删除索引',
-        refresh_statistics: '刷新统计信息',
-        query_hint: '查询提示',
-        query_rewrite: '查询改写'
+        refresh_statistics: '刷新统计信息'
     }[String(value)] || String(value || '未指定'));
     const incidentSummary = (incident) => {
         const evidence = incident && incident.evidence || {};
@@ -404,13 +397,9 @@
     const init = () => {
         if (page === 'alert-list.html') return initAlertList();
         if (page === 'alert-detail.html') return initAlertDetail();
-        if (page === 'sql-log.html') return initSqlLog();
-        if (page === 'sql-detail.html') return initSqlDetail();
         if (page === 'alert-rules.html') return initAlertRules();
-        if (page === 'dba-rules.html') return initDbaRules();
         if (page === 'code-source.html') return initCodeSource();
         if (page === 'manual.html') return initManual();
-        if (page === 'tuning-knowledge.html') return initTuningKnowledge();
         return null;
     };
     const runInit = () => {

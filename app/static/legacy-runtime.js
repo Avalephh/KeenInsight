@@ -402,12 +402,8 @@
         'alert-list.html': 'KeenInsight - 异常列表',
         'alert-detail.html': 'KeenInsight - 异常详情',
         'alert-rules.html': 'KeenInsight - 异常规则',
-        'sql-log.html': 'KeenInsight - SQL 日志',
-        'sql-detail.html': 'KeenInsight - SQL 详情',
-        'dba-rules.html': 'KeenInsight - 诊断规则',
         'code-source.html': 'KeenInsight - 源码分析',
         'manual.html': 'KeenInsight - 使用手册',
-        'tuning-knowledge.html': 'KeenInsight - 调优经验知识'
     };
     const translateLegacyInterface = () => {
         document.documentElement.lang = 'zh-CN';
@@ -612,9 +608,7 @@
         const bodyIds = {
             'alert-list.html': 'alertTableBody',
             'alert-rules.html': 'ruleTableBody',
-            'dba-rules.html': 'ruleTableBody',
             'code-source.html': 'functionTableBody',
-            'sql-log.html': 'logTableBody'
         };
         const bodyId = bodyIds[page];
         if (bodyId) {
@@ -692,11 +686,10 @@
                     <div class="ki-template-card"><div class="ki-template-card-label">CPU 使用率</div><div class="ki-template-card-value">${fixed(host.cpu_usage_pct, 1)}${host.cpu_usage_pct == null ? '' : '%'}</div></div>
                     <div class="ki-template-card"><div class="ki-template-card-label">采集器周期数</div><div class="ki-template-card-value">${valueOrDash((state.meta.collector || {}).cycles)}</div></div>
                 </div>
-                <div class="ki-live-note">以上数值来自持久化快照和当前 PostgreSQL 连接。下方入口提供异常、SQL 证据、源码分析和实测调优闭环。</div>
+                <div class="ki-live-note">以上数值来自持久化快照和当前 PostgreSQL 连接。下方入口提供异常、源码分析和实测调优闭环。</div>
                 <div class="ki-template-actions">
                     <a class="primary" href="host-list.html">打开实例</a>
                     <a href="realtime-monitor.html">实时监控</a>
-                    <a href="sql-log.html">SQL 日志</a>
                     <a href="alert-list.html">异常列表</a>
                     <a href="../console.html">证据控制台</a>
                 </div>
@@ -723,7 +716,6 @@
                 api('/dashboard'),
                 optionalApi('/activity?limit=6', { items: [] }),
                 optionalApi('/locks', { items: [] }),
-                optionalApi('/queries?limit=6', { items: [] })
             ]);
             const dashboard = results[0] || {};
             const snapshot = (dashboard.snapshot || {}).payload || {};
@@ -734,7 +726,6 @@
             const server = (state.meta || {}).server || {};
             const activities = results[1].items || [];
             const lockRows = results[2].items || [];
-            const queryRows = results[3].items || [];
             const incidents = dashboard.active_incidents || [];
             const txCommit = numberOrNull(rates.xact_commit);
             const txRollback = numberOrNull(rates.xact_rollback);
@@ -744,9 +735,8 @@
             const severity = (value) => ({ critical: '严重', warning: '警告', info: '信息' }[String(value)] || String(value || '信息'));
             const activityHtml = activities.length ? activities.slice(0, 5).map((row) => `<div class="ki-live-list-item"><div class="ki-live-list-main"><span>PID ${escapeHtml(row.pid)}</span><span class="ki-live-count">${escapeHtml({ active: '活跃', idle: '空闲', 'idle in transaction': '事务空闲' }[row.state] || row.state || '未知')}</span></div><div class="ki-live-list-text">${escapeHtml(String(row.query || '（无查询文本）').replace(/\s+/g, ' ').trim())}</div><div class="ki-live-list-meta">${escapeHtml(row.application_name || '未命名应用')} · ${escapeHtml(row.wait_event || '未等待')}${row.query_start ? ` · ${escapeHtml(formatDate(row.query_start))}` : ''}</div></div>`).join('') : '<div class="ki-live-empty">当前实例没有可展示的实时会话。控制台连接已从列表中排除。</div>';
             const locksHtml = lockRows.length ? lockRows.slice(0, 5).map((row) => `<div class="ki-live-list-item"><div class="ki-live-list-main"><span>等待 PID ${escapeHtml(row.waiting_pid)}</span><span class="ki-live-count">锁等待</span></div><div class="ki-live-list-text">${escapeHtml(row.relation || row.locktype || '未命名对象')} · ${escapeHtml(row.waiting_mode || '未知模式')}</div><div class="ki-live-list-meta">阻塞 PID ${escapeHtml(row.blocking_pid || '—')} · ${escapeHtml(row.wait_event || '未提供等待事件')}</div></div>`).join('') : '<div class="ki-live-empty">当前没有未获授权的锁请求。启动“锁竞争”场景后，这里会显示真实阻塞关系。</div>';
-            const queriesHtml = queryRows.length ? queryRows.slice(0, 5).map((row) => `<div class="ki-live-list-item"><div class="ki-live-list-main"><span>${escapeHtml(fixed(row.mean_exec_time_ms, 1))} 毫秒</span><span class="ki-live-count">${escapeHtml(fixed(row.calls, 0))} 次</span></div><div class="ki-live-list-text">${escapeHtml(String(row.query || '—').replace(/\s+/g, ' ').trim())}</div><div class="ki-live-list-meta">临时块 ${escapeHtml(fixed(row.temp_blks_written, 0))} · 总耗时 ${escapeHtml(fixed(row.total_exec_time_ms, 1))} 毫秒</div></div>`).join('') : '<div class="ki-live-empty">当前没有可展示的 pg_stat_statements 查询。先运行一个工作负载即可留下查询证据。</div>';
             const incidentsHtml = incidents.length ? incidents.slice(0, 4).map((incident) => `<div class="ki-live-list-item"><div class="ki-live-list-main"><span>${escapeHtml(severity(incident.severity))} · ${escapeHtml(incidentLabel(incident.kind))}</span><span class="ki-live-count">活跃</span></div><div class="ki-live-list-text">${escapeHtml(incidentSummary(incident))}</div><div class="ki-live-list-meta"><a href="alert-detail.html?id=${encodeURIComponent(incident.id)}">查看异常 ${escapeHtml(incident.id)}</a> · ${escapeHtml(formatDate(incident.last_seen || incident.first_seen))}</div></div>`).join('') : '<div class="ki-live-empty">当前没有活跃异常。规则仍在后台持续评估。</div>';
-            target.innerHTML = `<div class="ki-live-workspace-head"><div><div class="ki-live-online">PostgreSQL 实例在线</div><h2>当前实例实时工作区</h2><p>指标、会话、锁和查询均来自这台机器上当前连接的 PostgreSQL；页面不再展示跨数据库的示例主机。</p></div><div class="ki-live-workspace-actions"><a class="primary" href="realtime-monitor.html">打开实时监控</a><a href="alert-list.html">异常列表</a><a href="sql-log.html">SQL 证据</a><a href="/console#workloads">异常实验室</a></div></div><div class="ki-live-metrics">${metric('活跃会话', valueOrDash(database.numbackends), 'pg_stat_database.numbackends')}${metric('CPU 使用率', percentage(host.cpu_usage_pct), '当前采集周期')}${metric('内存使用率', percentage(host.memory_used_pct), formatBytes(host.memory_available_bytes) + ' 可用')}${metric('磁盘使用率', percentage(host.disk_used_pct), formatBytes(host.disk_free_bytes) + ' 可用')}${metric('事务 / 秒', valueOrDash(fixed(txRate, 1)), '提交 + 回滚')}${metric('临时字节 / 秒', formatBytes(rates.temp_bytes), 'pg_stat_database')}</div><div class="ki-live-columns"><div class="ki-live-panel"><div class="ki-live-panel-head"><h3>当前异常</h3><span class="ki-live-count">${escapeHtml(incidents.length)} 条</span></div><div class="ki-live-list">${incidentsHtml}</div></div><div class="ki-live-panel"><div class="ki-live-panel-head"><h3>锁等待</h3><span class="ki-live-count">${escapeHtml(lockRows.length)} 条</span></div><div class="ki-live-list">${locksHtml}</div></div><div class="ki-live-panel"><div class="ki-live-panel-head"><h3>查询证据</h3><span class="ki-live-count">${escapeHtml(queryRows.length)} 条</span></div><div class="ki-live-list">${queriesHtml}</div></div></div><div class="ki-live-note">数据源：${escapeHtml(server.database_name || serverName(state.meta))} · ${escapeHtml(backendType(state.meta))} · 最近快照 ${escapeHtml(formatDate((dashboard.snapshot || {}).collected_at || compact.collected_at))}。实时会话、锁和查询接口读取失败时会明确显示空状态。</div>`;
+            target.innerHTML = `<div class="ki-live-workspace-head"><div><div class="ki-live-online">PostgreSQL 实例在线</div><h2>当前实例实时工作区</h2><p>指标、会话和锁均来自这台机器上当前连接的 PostgreSQL；页面不再展示跨数据库的示例主机。</p></div><div class="ki-live-workspace-actions"><a class="primary" href="realtime-monitor.html">打开实时监控</a><a href="alert-list.html">异常列表</a><a href="/console#workloads">异常实验室</a></div></div><div class="ki-live-metrics">${metric('活跃会话', valueOrDash(database.numbackends), 'pg_stat_database.numbackends')}${metric('CPU 使用率', percentage(host.cpu_usage_pct), '当前采集周期')}${metric('内存使用率', percentage(host.memory_used_pct), formatBytes(host.memory_available_bytes) + ' 可用')}${metric('磁盘使用率', percentage(host.disk_used_pct), formatBytes(host.disk_free_bytes) + ' 可用')}${metric('事务 / 秒', valueOrDash(fixed(txRate, 1)), '提交 + 回滚')}${metric('临时字节 / 秒', formatBytes(rates.temp_bytes), 'pg_stat_database')}</div><div class="ki-live-columns"><div class="ki-live-panel"><div class="ki-live-panel-head"><h3>当前异常</h3><span class="ki-live-count">${escapeHtml(incidents.length)} 条</span></div><div class="ki-live-list">${incidentsHtml}</div></div><div class="ki-live-panel"><div class="ki-live-panel-head"><h3>锁等待</h3><span class="ki-live-count">${escapeHtml(lockRows.length)} 条</span></div><div class="ki-live-list">${locksHtml}</div></div></div><div class="ki-live-note">数据源：${escapeHtml(server.database_name || serverName(state.meta))} · ${escapeHtml(backendType(state.meta))} · 最近快照 ${escapeHtml(formatDate((dashboard.snapshot || {}).collected_at || compact.collected_at))}。实时会话和锁接口读取失败时会明确显示空状态。</div>`;
             target.classList.add('ki-live-ready');
         } catch (error) {
             showError(target, error);
@@ -771,7 +761,7 @@
                 <td>${renderUsage(host.disk, host.disk == null ? 'progress-low' : host.disk > 70 ? 'progress-high' : 'progress-low')}</td>
                 <td>当前监控实例</td>
                 <td>${escapeHtml(formatDate(host.created))}</td>
-                <td><span class="action-link" data-ki-monitor>监控</span><span class="action-link" data-ki-sql>SQL 日志</span></td>
+                <td><span class="action-link" data-ki-monitor>监控</span></td>
             </tr>
         `;
         tbody.classList.remove('ki-live-pending');
@@ -780,9 +770,6 @@
         hostState.row.addEventListener('click', () => navigateMonitor(host.name, host.address, host.type));
         hostState.row.querySelector('[data-ki-monitor]').addEventListener('click', (event) => {
             event.stopPropagation(); navigateMonitor(host.name, host.address, host.type);
-        });
-        hostState.row.querySelector('[data-ki-sql]').addEventListener('click', (event) => {
-            event.stopPropagation(); setSelectedHost({ name: host.name, ip: host.address, type: host.type }); window.location.href = 'sql-log.html';
         });
     };
 

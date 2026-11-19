@@ -169,18 +169,6 @@ SCENARIO_METADATA = [
         "parameters": {"account_id": 1},
     },
     {
-        "name": "missing_index",
-        "title": "Filtered scan without a customer index",
-        "description": (
-            "Runs a real selective query against keeninsight_demo.orders and compares the observed plan before and after a validated btree index."
-        ),
-        "query": (
-            "SELECT order_id, customer_id, order_date, amount, status "
-            "FROM keeninsight_demo.orders WHERE customer_id = %s ORDER BY order_id"
-        ),
-        "parameters": {"customer_id": 1234},
-    },
-    {
         "name": "stale_statistics",
         "title": "Stale statistics after a distribution shift",
         "description": (

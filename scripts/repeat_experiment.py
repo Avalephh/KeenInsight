@@ -103,7 +103,6 @@ def _run_once(
     base_url: str,
     repetitions: int,
     warmups: int,
-    customer_id: int | None,
     baseline_work_mem: str | None,
     baseline_parallel_workers: int | None,
     output: Path,
@@ -120,8 +119,6 @@ def _run_once(
         "--output",
         str(output),
     ]
-    if customer_id is not None:
-        command.extend(["--customer-id", str(customer_id)])
     if baseline_work_mem is not None:
         command.extend(["--baseline-work-mem", baseline_work_mem])
     if baseline_parallel_workers is not None:
@@ -162,7 +159,6 @@ def main() -> None:
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--repetitions", type=int, default=7)
     parser.add_argument("--warmups", type=int, default=2)
-    parser.add_argument("--customer-id", type=int, default=None)
     parser.add_argument("--baseline-work-mem", default=None)
     parser.add_argument("--baseline-parallel-workers", type=int, default=None)
     args = parser.parse_args()
@@ -184,7 +180,6 @@ def main() -> None:
                 args.base_url,
                 args.repetitions,
                 args.warmups,
-                args.customer_id,
                 args.baseline_work_mem,
                 args.baseline_parallel_workers,
                 raw_output,
@@ -204,12 +199,10 @@ def main() -> None:
             "complete_protocol_repetitions": args.runs,
             "timed_repetitions_per_phase": args.repetitions,
             "warmup_repetitions_per_phase": args.warmups,
-            "customer_id": args.customer_id,
             "baseline_work_mem": args.baseline_work_mem,
             "baseline_parallel_workers": args.baseline_parallel_workers,
         },
         "summary": {
-            "missing_index": _scenario_summary(records, "missing_index"),
             "hash_join_spill": _scenario_summary(records, "hash_join_spill"),
             "aggregate_spill": _scenario_summary(records, "aggregate_spill"),
             "sort_spill": _scenario_summary(records, "sort_spill"),

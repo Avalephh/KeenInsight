@@ -185,8 +185,6 @@ def main() -> None:
             raise SystemExit("clean preflight failed: waiting locks remain")
         if applied.get("items"):
             raise SystemExit("clean preflight failed: applied actions remain")
-        if state.get("missing_index_exists"):
-            raise SystemExit("clean preflight failed: demo index remains")
 
     static_manifest = (manifest.get("rag") or {}).get("static_manifest") or {}
     # Do not copy the manifest's self-sensitive digest into the preflight

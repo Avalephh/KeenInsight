@@ -23,7 +23,6 @@ from .diagnose import (
     UnsafeQuery,
     diagnose_incident,
     diagnose_plan,
-    explain_query,
     grounded_explanation,
     parallel_workers_action,
 )
@@ -36,7 +35,6 @@ from .legacy_tune import LegacyTuneCompatibility
 from .llm import LLMClient
 from .modeling import ModelManager, ModelingError
 from .llvm_analysis import LLVMAnalysisError, SourceAnalyzer
-from .optimizer import OptimizerError, QueryTuningAgent
 from .rag import RagError, RagIndexer, ask as rag_ask, database_status as rag_database_status, search as rag_search
 from .vector_rag import EmbeddingIndex, VectorRagError
 from .pg import (
@@ -116,11 +114,6 @@ def _static_source_manifest(source_dir: Path) -> dict[str, Any]:
         "source_type_counts": counts,
         "sha256": hashlib.sha256(raw).hexdigest(),
     }
-
-
-class ExplainRequest(BaseModel):
-    query: str = Field(min_length=1, max_length=100_000)
-    analyze: bool = False
 
 
 class ActionProposalRequest(BaseModel):
@@ -235,19 +228,6 @@ class SourceKnowledgeRequest(BaseModel):
     limit: int = Field(default=50, ge=1, le=200)
 
 
-class OptimizerRequest(BaseModel):
-    query: str = Field(min_length=1, max_length=100_000)
-    repetitions: int = Field(default=3, ge=1, le=7)
-
-
-class OptimizerVerifyRequest(BaseModel):
-    candidate_key: str = Field(min_length=1, max_length=200)
-
-
-class OptimizerActionRequest(BaseModel):
-    candidate_key: str = Field(min_length=1, max_length=200)
-
-
 def _build_app() -> FastAPI:
     settings_obj = Settings.from_env()
     db = Database(settings_obj.database_url)
@@ -318,15 +298,6 @@ def _build_app() -> FastAPI:
             )
         }
 
-    tuning_agent = QueryTuningAgent(
-        db,
-        rag_retriever=rag_search,
-        source_evidence=source_evidence,
-        llm_url=settings_obj.rag_llm_url,
-        llm_model=settings_obj.rag_llm_model,
-        llm_token=settings_obj.rag_llm_token,
-        llm_client=llm_client,
-    )
     experience_miner = ExperienceMiner(db)
 
     @asynccontextmanager
@@ -365,7 +336,6 @@ def _build_app() -> FastAPI:
         app.state.model_manager = model_manager
         app.state.source_analyzer = source_analyzer
         app.state.llm = llm_client
-        app.state.tuning_agent = tuning_agent
         app.state.experience_miner = experience_miner
         collector.start()
         # Do not let the first browser request race the first database
@@ -437,7 +407,6 @@ def _build_app() -> FastAPI:
                 (SELECT count(*)::int FROM keeninsight.source_analyses WHERE relation_type = 'llvm_control_edge') AS llvm_control_edges,
                 (SELECT count(*)::int FROM keeninsight.source_analyses WHERE relation_type = 'llvm_data_flow') AS llvm_data_flows,
                 (SELECT count(*)::int FROM keeninsight.code_knowledge) AS code_knowledge_records,
-                (SELECT count(*)::int FROM keeninsight.optimizer_runs) AS optimizer_runs,
                 (SELECT count(*)::int FROM keeninsight.tuning_experiences) AS tuning_experiences,
                 (SELECT count(*)::int FROM keeninsight.rag_embeddings) AS rag_embeddings
             """
@@ -455,8 +424,7 @@ def _build_app() -> FastAPI:
                     "latency_and_root_cause_models": "XGBoost temporal validation with persisted plan-only features and TreeSHAP",
                     "differential_function_profiling": "real eBPF event-vector deltas plus function-level XGBoost/TreeSHAP",
                     "llvm_code_propagation": "clang-generated LLVM IR CFG/SSA data-flow analysis, call graph, and knob-to-function propagation",
-                    "tuning_agent": "retrieval-grounded system/SQL actions, measured ranking, semantic verification, reviewed actions, compiler-backed code retrieval/summary, and an automatic closed-loop deploy/feedback/rollback endpoint",
-                    "sql_optimizer_agent": "session-local hints, semantics-preserving rewrite candidates, and proposal-only index add/remove candidates",
+                    "tuning_agent": "retrieval-grounded system parameter actions, measured ranking, semantic verification, reviewed actions, compiler-backed code retrieval/summary, and an automatic closed-loop deploy/feedback/rollback endpoint",
                     "upstream_workload_tune_compatibility": "the main/WorkloadTune_new configuration → baseline → exception → one-step → apply → multi-round API sequence backed by real PostgreSQL runs and typed feedback",
                     "embedding_rag": "384-dimensional BGE embeddings persisted in PostgreSQL with vector/hybrid evaluation",
                     "experience_closure": "feedback clustering, association rules, confidence, and provenance-backed runtime RAG",
@@ -475,7 +443,6 @@ def _build_app() -> FastAPI:
                     "artifacts/aa-control-results.json",
                     "artifacts/rag-vector-evaluation-strict.json",
                     "artifacts/rag-hybrid-evaluation-strict.json",
-                    "artifacts/optimizer-strict-smoke.json",
                     "artifacts/ebpf-smoke-strict.json",
                     "artifacts/ebpf-overhead-strict.json",
                     "artifacts/ebpf-auto-adapt-strict.json",
@@ -496,7 +463,6 @@ def _build_app() -> FastAPI:
             },
             "analysis": jsonable(model_manager.status()),
             "source_analysis": jsonable(source_analyzer.status()),
-            "tuning_agent": jsonable(tuning_agent.status()),
             "llm": llm_client.status(),
             "experiences": jsonable(experience_miner.status()),
             "demo_state": jsonable(workloads.demo_state()),
@@ -692,43 +658,6 @@ def _build_app() -> FastAPI:
     def get_queries(limit: int = Query(default=50, ge=1, le=200)) -> Dict[str, Any]:
         rows, error = top_queries(db, limit)
         return {"items": jsonable_rows(rows), "unavailable_reason": error}
-
-    @app.post("/api/queries/explain")
-    def explain(request: ExplainRequest) -> Dict[str, Any]:
-        try:
-            # Screening happens before optional EXPLAIN ANALYZE execution so
-            # the endpoint exposes the same pre-execution path used by the
-            # workload diagnosis flow.
-            try:
-                screen = model_manager.screen(request.query)
-            except (ModelingError, UnsafeQuery) as exc:
-                screen = {"available": False, "reason": str(exc)}
-            result = explain_query(db, request.query, analyze=request.analyze)
-            result["pre_execution_screen"] = screen
-            result["llm_analysis"] = grounded_explanation(
-                llm_client,
-                title="PostgreSQL 执行计划",
-                summary=json.dumps(result.get("summary") or {}, ensure_ascii=False, default=str),
-                root_causes=[],
-                evidence=[
-                    {
-                        "source": "EXPLAIN JSON plan summary",
-                        "observed": result.get("summary") or {},
-                        "interpretation": "这是连接实例返回的执行计划摘要；模型只负责把已观测字段解释给用户。",
-                    },
-                    {
-                        "source": "pre-execution model screen",
-                        "observed": screen,
-                        "interpretation": "这是执行前模型筛查结果，不授权任何数据库动作。",
-                    },
-                ],
-                actions=[],
-            )
-            return jsonable(result)
-        except UnsafeQuery as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except Exception as exc:
-            raise HTTPException(status_code=422, detail=f"PostgreSQL EXPLAIN failed: {exc}") from exc
 
     @app.get("/api/settings")
     def get_settings(search: Optional[str] = None) -> Dict[str, Any]:
@@ -1515,10 +1444,6 @@ def _build_app() -> FastAPI:
         except Exception as exc:
             raise HTTPException(status_code=422, detail=f"code knowledge retrieval failed: {exc}") from exc
 
-    @app.get("/api/optimizer/status")
-    def optimizer_status() -> Dict[str, Any]:
-        return jsonable(tuning_agent.status())
-
     @app.get("/api/experiences/status")
     def experiences_status() -> Dict[str, Any]:
         return jsonable(experience_miner.status())
@@ -1535,92 +1460,6 @@ def _build_app() -> FastAPI:
     @app.get("/api/experiences")
     def experiences(limit: int = Query(default=100, ge=1, le=500)) -> Dict[str, Any]:
         return {"items": jsonable_rows(experience_miner.list(limit))}
-
-    @app.post("/api/optimizer/optimize")
-    def optimizer_optimize(request: OptimizerRequest) -> Dict[str, Any]:
-        try:
-            result = tuning_agent.optimize(request.query, repetitions=request.repetitions)
-            record_audit(
-                db,
-                "tuning_agent_completed",
-                "optimizer_run",
-                (result.get("run") or {}).get("id"),
-                {
-                    "candidate_count": len(result.get("candidates") or []),
-                    "selected_candidate": result.get("selected_candidate"),
-                },
-            )
-            return jsonable(result)
-        except (OptimizerError, UnsafeQuery) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.get("/api/optimizer/runs")
-    def optimizer_runs(limit: int = Query(default=50, ge=1, le=200)) -> Dict[str, Any]:
-        return {"items": jsonable_rows(tuning_agent.list_runs(limit))}
-
-    @app.get("/api/optimizer/runs/{run_id}")
-    def optimizer_run(run_id: int) -> Dict[str, Any]:
-        row = tuning_agent.get_run(run_id)
-        if not row:
-            raise HTTPException(status_code=404, detail="optimizer run not found")
-        return jsonable(row)
-
-    @app.post("/api/optimizer/runs/{run_id}/verify")
-    def optimizer_verify(run_id: int, request: OptimizerVerifyRequest) -> Dict[str, Any]:
-        try:
-            result = tuning_agent.verify_candidate(run_id, request.candidate_key)
-            record_audit(
-                db,
-                "tuning_candidate_verified",
-                "optimizer_run",
-                run_id,
-                {"candidate_key": request.candidate_key, "equivalent": (result.get("verification") or {}).get("semantic_equivalence", {}).get("equivalent")},
-            )
-            return jsonable(result)
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        except (OptimizerError, UnsafeQuery) as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-    @app.post("/api/optimizer/runs/{run_id}/propose-action")
-    def optimizer_propose_action(run_id: int, request: OptimizerActionRequest) -> Dict[str, Any]:
-        """Turn an agent's typed persistent proposal into a reviewed action."""
-        run = tuning_agent.get_run(run_id)
-        if not run:
-            raise HTTPException(status_code=404, detail="optimizer run not found")
-        candidate = next(
-            (item for item in run.get("candidates") or [] if item.get("candidate_key") == request.candidate_key),
-            None,
-        )
-        if not candidate:
-            raise HTTPException(status_code=404, detail="optimizer candidate not found")
-        proposal = candidate.get("proposal") or {}
-        if candidate.get("action_type") not in {"index_selection", "index_removal"} or proposal.get("action_type") not in {"create_index", "drop_index"}:
-            raise HTTPException(
-                status_code=422,
-                detail="only a typed reviewed index candidate can become a persistent action",
-            )
-        proposal = {
-            **proposal,
-            "source": {
-                "type": "optimizer_candidate",
-                "optimizer_run_id": run_id,
-                "candidate_key": request.candidate_key,
-                "query": run.get("query"),
-            },
-        }
-        try:
-            action = create_action(db, proposal)
-            record_audit(
-                db,
-                "optimizer_action_proposed",
-                "tuning_action",
-                action.get("id"),
-                {"optimizer_run_id": run_id, "candidate_key": request.candidate_key},
-            )
-            return jsonable(action)
-        except ActionValidationError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.get("/api/source-analysis")
     def source_analysis(
@@ -2487,7 +2326,6 @@ def _build_app() -> FastAPI:
             },
             "analysis": jsonable(model_manager.status()),
             "source_analysis": jsonable(source_analyzer.status()),
-            "tuning_agent": jsonable(tuning_agent.status()),
             "llm": llm_client.status(),
             "experiences": jsonable(experience_miner.status()),
             "rag": jsonable(rag_database_status(db)),
@@ -2586,27 +2424,6 @@ def _build_app() -> FastAPI:
                            provenance, created_at, updated_at
                     FROM keeninsight.code_knowledge
                     ORDER BY updated_at ASC, id ASC LIMIT %s
-                    """,
-                    (limit,),
-                )
-            ),
-            "optimizer_runs": jsonable_rows(
-                db.fetch_all(
-                    """
-                    SELECT id, query, status, baseline, knowledge, source_evidence,
-                           selected_candidate, ranking, created_at, finished_at, error
-                    FROM keeninsight.optimizer_runs ORDER BY created_at ASC LIMIT %s
-                    """,
-                    (limit,),
-                )
-            ),
-            "optimizer_candidates": jsonable_rows(
-                db.fetch_all(
-                    """
-                    SELECT id, run_id, candidate_key, action_type, query, hints,
-                           proposal, plan, measurement, semantic_equivalence,
-                           score, rank, created_at
-                    FROM keeninsight.optimizer_candidates ORDER BY created_at ASC LIMIT %s
                     """,
                     (limit,),
                 )

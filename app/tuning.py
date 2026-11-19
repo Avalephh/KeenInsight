@@ -21,11 +21,11 @@ from psycopg.rows import dict_row
 
 from .audit import record_audit
 from .db import Database
-from .pg import index_exists, jsonable, relation_columns, relation_exists, relation_kind, safe_identifier
+from .pg import jsonable, relation_exists, relation_kind, safe_identifier
 
 
 ALLOWED_DATABASE_PARAMETERS = {"work_mem", "max_parallel_workers_per_gather"}
-ALLOWED_ACTION_TYPES = {"set_database_parameter", "create_index", "drop_index", "refresh_statistics"}
+ALLOWED_ACTION_TYPES = {"set_database_parameter", "refresh_statistics"}
 PROTECTED_SCHEMAS = {"pg_catalog", "information_schema", "keeninsight"}
 
 
@@ -43,10 +43,6 @@ def create_action(
         raise ActionValidationError(f"unsupported action type: {action_type!r}")
     if action_type == "set_database_parameter":
         target, before, rollback = _validate_setting_target(db, target)
-    elif action_type == "create_index":
-        target, before, rollback = _validate_index_target(db, target)
-    elif action_type == "drop_index":
-        target, before, rollback = _validate_drop_index_target(db, target)
     else:
         target, before, rollback = _validate_statistics_target(db, target)
 
@@ -190,10 +186,6 @@ def apply_action(db: Database, action_id: int) -> dict[str, Any]:
     try:
         if action["action_type"] == "set_database_parameter":
             after = _apply_database_parameter(db, action["target"])
-        elif action["action_type"] == "create_index":
-            after = _apply_index(db, action["target"])
-        elif action["action_type"] == "drop_index":
-            after = _apply_drop_index(db, action["target"], action["before_state"])
         elif action["action_type"] == "refresh_statistics":
             after = _apply_statistics(db, action["target"])
         else:  # defensive: create_action already rejects this
@@ -272,10 +264,6 @@ def rollback_action(db: Database, action_id: int) -> dict[str, Any]:
     try:
         if action["action_type"] == "set_database_parameter":
             rollback = _rollback_database_parameter(db, action["target"], action["rollback_state"])
-        elif action["action_type"] == "create_index":
-            rollback = _rollback_index(db, action["target"], action["before_state"], action["after_state"])
-        elif action["action_type"] == "drop_index":
-            rollback = _rollback_dropped_index(db, action["target"], action["before_state"], action["after_state"])
         else:
             raise ActionValidationError(f"unsupported action type: {action['action_type']}")
         db.execute(
@@ -417,118 +405,6 @@ def _validate_setting_target(
     return normalized, before, rollback
 
 
-def _validate_index_target(
-    db: Database, target: dict[str, Any]
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    schema_name = str(target.get("schema", "public"))
-    table_name = str(target.get("table", ""))
-    index_name = str(target.get("index", ""))
-    columns = target.get("columns")
-    if not all(safe_identifier(value) for value in (schema_name, table_name, index_name)):
-        raise ActionValidationError("schema, table, and index must be simple PostgreSQL identifiers")
-    if (
-        schema_name in PROTECTED_SCHEMAS
-        or schema_name.startswith("pg_")
-    ):
-        raise ActionValidationError(
-            f"index creation is not allowed in protected schema {schema_name!r}"
-        )
-    if not isinstance(columns, list) or not columns or not all(
-        isinstance(value, str) and safe_identifier(value) for value in columns
-    ):
-        raise ActionValidationError("columns must be a non-empty list of safe identifiers")
-    if len(set(columns)) != len(columns):
-        raise ActionValidationError("index columns must be unique")
-    if not relation_exists(db, schema_name, table_name):
-        raise ActionValidationError(f"relation {schema_name}.{table_name} does not exist")
-    if relation_kind(db, schema_name, table_name) != "r":
-        raise ActionValidationError(
-            f"index target {schema_name}.{table_name} is not an ordinary table"
-        )
-    actual_columns = {row["column_name"] for row in relation_columns(db, schema_name, table_name)}
-    missing = sorted(set(columns) - actual_columns)
-    if missing:
-        raise ActionValidationError(f"index columns do not exist: {missing}")
-    exists = index_exists(db, schema_name, index_name)
-    normalized = {
-        "schema": schema_name,
-        "table": table_name,
-        "index": index_name,
-        "columns": columns,
-        "method": "btree",
-    }
-    before = {"exists": exists}
-    rollback = {"drop_created_index_only": not exists}
-    if exists:
-        raise ActionValidationError(
-            f"index {schema_name}.{index_name} already exists; no create action is needed"
-        )
-    return normalized, before, rollback
-
-
-def _validate_drop_index_target(
-    db: Database, target: dict[str, Any]
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    """Validate a reviewed removal of an unused, non-constraint index."""
-    schema_name = str(target.get("schema", "public"))
-    index_name = str(target.get("index", ""))
-    if not all(safe_identifier(value) for value in (schema_name, index_name)):
-        raise ActionValidationError("schema and index must be simple PostgreSQL identifiers")
-    if schema_name in PROTECTED_SCHEMAS or schema_name.startswith("pg_"):
-        raise ActionValidationError(
-            f"index removal is not allowed in protected schema {schema_name!r}"
-        )
-    row = db.fetch_one(
-        """
-        SELECT c.oid::text AS index_oid, c.relname AS index_name,
-               table_class.relname AS table_name,
-               COALESCE(i.indisvalid, FALSE) AS indisvalid,
-               COALESCE(i.indisprimary, FALSE) AS indisprimary,
-               COALESCE(i.indisunique, FALSE) AS indisunique,
-               COALESCE(i.indisexclusion, FALSE) AS indisexclusion,
-               COALESCE(s.idx_scan, 0)::bigint AS idx_scan,
-               pg_get_indexdef(c.oid) AS index_definition
-        FROM pg_class c
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        LEFT JOIN pg_index i ON i.indexrelid = c.oid
-        LEFT JOIN pg_class table_class ON table_class.oid = i.indrelid
-        LEFT JOIN pg_stat_user_indexes s ON s.indexrelid = c.oid
-        WHERE n.nspname = %s AND c.relname = %s AND c.relkind = 'i'
-        """,
-        (schema_name, index_name),
-    )
-    if not row:
-        raise ActionValidationError(f"index {schema_name}.{index_name} does not exist")
-    if not row.get("indisvalid"):
-        raise ActionValidationError("refusing to remove an invalid index")
-    if row.get("indisprimary") or row.get("indisunique") or row.get("indisexclusion"):
-        raise ActionValidationError("refusing to remove a primary, unique, or exclusion index")
-    if int(row.get("idx_scan") or 0) != 0:
-        raise ActionValidationError(
-            "index has observed scans; only a zero-scan index can enter the removal proposal"
-        )
-    expected_table = target.get("table")
-    if expected_table and str(expected_table) != str(row.get("table_name")):
-        raise ActionValidationError("index table does not match PostgreSQL metadata")
-    normalized = {
-        "schema": schema_name,
-        "table": row.get("table_name"),
-        "index": index_name,
-        "method": "drop_index_concurrently",
-    }
-    before = {
-        "exists": True,
-        "index_oid": row.get("index_oid"),
-        "index_definition": row.get("index_definition"),
-        "idx_scan": int(row.get("idx_scan") or 0),
-    }
-    rollback = {
-        "recreate_index_definition": row.get("index_definition"),
-        "index_oid": row.get("index_oid"),
-    }
-    return normalized, before, rollback
-
-
 def _validate_statistics_target(
     db: Database, target: dict[str, Any]
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
@@ -601,66 +477,6 @@ def _rollback_database_parameter(
     return {"restored_database_override": previous, "verification": verification}
 
 
-def _apply_index(db: Database, target: dict[str, Any]) -> dict[str, Any]:
-    schema_name = target["schema"]
-    table_name = target["table"]
-    index_name = target["index"]
-    columns = target["columns"]
-    if _fresh_index_identity(db.dsn, schema_name, index_name):
-        raise ActionValidationError(
-            f"index {schema_name}.{index_name} appeared after the proposal; refusing to adopt it"
-        )
-    with psycopg.connect(db.dsn, autocommit=True) as conn:
-        conn.execute(
-            sql.SQL("CREATE INDEX CONCURRENTLY {} ON {} ({})").format(
-                # PostgreSQL accepts a schema-qualified table here, but the
-                # index name itself is resolved in the table's schema and
-                # must not be rendered as "schema"."index" in CREATE INDEX.
-                sql.Identifier(index_name),
-                sql.Identifier(schema_name, table_name),
-                sql.SQL(", ").join(sql.Identifier(column) for column in columns),
-            )
-        )
-    identity = _fresh_index_identity(db.dsn, schema_name, index_name)
-    if not identity or not identity.get("indisvalid"):
-        raise RuntimeError("PostgreSQL did not report the created index")
-    return {
-        "created": True,
-        "index_oid": identity["index_oid"],
-        "index_definition": identity["index_definition"],
-        "verification": {"index_exists": True, "index_valid": identity["indisvalid"]},
-    }
-
-
-def _apply_drop_index(
-    db: Database, target: dict[str, Any], before_state: dict[str, Any]
-) -> dict[str, Any]:
-    current = _fresh_index_identity(db.dsn, target["schema"], target["index"])
-    if not current:
-        raise ActionValidationError("index disappeared after the removal proposal")
-    if (
-        str(current.get("index_oid")) != str(before_state.get("index_oid"))
-        or current.get("index_definition") != before_state.get("index_definition")
-    ):
-        raise ActionValidationError(
-            "index identity changed after the removal proposal; refusing to drop it"
-        )
-    with psycopg.connect(db.dsn, autocommit=True) as conn:
-        conn.execute(
-            sql.SQL("DROP INDEX CONCURRENTLY {} ").format(
-                sql.Identifier(target["schema"], target["index"])
-            )
-        )
-    exists = bool(_fresh_index_identity(db.dsn, target["schema"], target["index"]))
-    if exists:
-        raise RuntimeError("PostgreSQL still reports the removed index")
-    return {
-        "dropped": True,
-        "index_definition": before_state.get("index_definition"),
-        "verification": {"index_exists": False},
-    }
-
-
 def _apply_statistics(db: Database, target: dict[str, Any]) -> dict[str, Any]:
     schema_name = target["schema"]
     table_name = target["table"]
@@ -678,65 +494,6 @@ def _apply_statistics(db: Database, target: dict[str, Any]) -> dict[str, Any]:
             "relation_exists": relation_exists(db, schema_name, table_name),
             "last_analyze": state.get("last_analyze"),
         },
-    }
-
-
-def _rollback_index(
-    db: Database,
-    target: dict[str, Any],
-    before_state: dict[str, Any],
-    after_state: dict[str, Any],
-) -> dict[str, Any]:
-    if before_state.get("exists"):
-        raise ActionValidationError("refusing to drop an index that predated this action")
-    if not after_state.get("created"):
-        raise ActionValidationError("refusing to drop an index not recorded as created")
-    current = _fresh_index_identity(db.dsn, target["schema"], target["index"])
-    if not current:
-        return {
-            "dropped_created_index": True,
-            "verification": {"index_exists": False},
-        }
-    if (
-        str(current.get("index_oid")) != str(after_state.get("index_oid"))
-        or current.get("index_definition") != after_state.get("index_definition")
-    ):
-        raise ActionValidationError(
-            "refusing to drop an index whose PostgreSQL identity changed after the action"
-        )
-    with psycopg.connect(db.dsn, autocommit=True) as conn:
-        conn.execute(
-            sql.SQL("DROP INDEX CONCURRENTLY IF EXISTS {}").format(
-                sql.Identifier(target["schema"], target["index"])
-            )
-        )
-    exists = bool(_fresh_index_identity(db.dsn, target["schema"], target["index"]))
-    return {"dropped_created_index": not exists, "verification": {"index_exists": exists}}
-
-
-def _rollback_dropped_index(
-    db: Database,
-    target: dict[str, Any],
-    before_state: dict[str, Any],
-    after_state: dict[str, Any],
-) -> dict[str, Any]:
-    if not before_state.get("exists") or not before_state.get("index_definition"):
-        raise ActionValidationError("no trusted index definition is available for rollback")
-    if _fresh_index_identity(db.dsn, target["schema"], target["index"]):
-        raise ActionValidationError("refusing to recreate an index name that is already in use")
-    definition = str(before_state["index_definition"])
-    if not definition.upper().startswith("CREATE INDEX "):
-        raise ActionValidationError("catalog returned an unexpected index definition")
-    with psycopg.connect(db.dsn, autocommit=True) as conn:
-        conn.execute(sql.SQL(definition))
-    identity = _fresh_index_identity(db.dsn, target["schema"], target["index"])
-    if not identity or not identity.get("indisvalid"):
-        raise RuntimeError("PostgreSQL did not recreate the removed index")
-    return {
-        "recreated": True,
-        "index_oid": identity.get("index_oid"),
-        "index_definition": identity.get("index_definition"),
-        "verification": {"index_exists": True, "index_valid": identity.get("indisvalid")},
     }
 
 
@@ -783,29 +540,6 @@ def _statistics_state(db: Database, schema_name: str, table_name: str) -> dict[s
     return result
 
 
-def _fresh_index_exists(dsn: str, schema_name: str, index_name: str) -> bool:
-    return bool(_fresh_index_identity(dsn, schema_name, index_name))
-
-
-def _fresh_index_identity(
-    dsn: str, schema_name: str, index_name: str
-) -> dict[str, Any] | None:
-    with psycopg.connect(dsn, row_factory=dict_row) as conn:
-        row = conn.execute(
-            """
-            SELECT c.oid::text AS index_oid,
-                   COALESCE(i.indisvalid, FALSE) AS indisvalid,
-                   pg_get_indexdef(c.oid) AS index_definition
-            FROM pg_class c
-            JOIN pg_namespace n ON n.oid = c.relnamespace
-            LEFT JOIN pg_index i ON i.indexrelid = c.oid
-            WHERE n.nspname = %s AND c.relname = %s AND c.relkind = 'i'
-            """,
-            (schema_name, index_name),
-        ).fetchone()
-        return dict(row) if row else None
-
-
 def _size_bytes(db: Database, value: str) -> int:
     try:
         row = db.fetch_one("SELECT pg_size_bytes(%s) AS bytes", (value,))
@@ -831,14 +565,7 @@ def _optional_size_bytes(db: Database, value: str | None, unit: str | None = Non
 def _description(action_type: str, target: dict[str, Any]) -> str:
     if action_type == "set_database_parameter":
         return f"Set {target['parameter']} to {target['value']} for database {target['database']}"
-    if action_type == "refresh_statistics":
-        return f"Refresh PostgreSQL statistics for {target['schema']}.{target['table']}"
-    if action_type == "drop_index":
-        return f"Drop unused index {target['schema']}.{target['index']} concurrently"
-    return (
-        f"Create btree index {target['schema']}.{target['index']} on "
-        f"{target['schema']}.{target['table']} ({', '.join(target['columns'])})"
-    )
+    return f"Refresh PostgreSQL statistics for {target['schema']}.{target['table']}"
 
 
 def _require_identifier(value: str) -> None:

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import json
-import hashlib
-import re
 import statistics
 import threading
 import time
@@ -25,7 +23,7 @@ from demo.scenarios import (
 
 from .db import Database
 from .diagnose import flatten_plan, hash_batches, summarize_plan
-from .pg import index_exists, relation_columns, relation_exists, safe_identifier
+from .pg import relation_exists
 from .tuning import create_action
 
 
@@ -237,9 +235,6 @@ class WorkloadRunner:
             "table_stats": table_stats,
             "work_mem": setting or {},
             "parallel_workers": parallel_setting or {},
-            "missing_index_exists": index_exists(
-                self.db, "keeninsight_demo", "orders_customer_id_idx"
-            ),
             "stats_probe": self._stats_probe_state(),
             "tpcc": self.tpcc_state(),
         }
@@ -457,11 +452,7 @@ class WorkloadRunner:
             }
         )
         try:
-            if name == "missing_index":
-                observations = self._run_missing_index(
-                    phase, repetitions, warmup_repetitions, effective_parameters
-                )
-            elif name == "hash_join_spill":
+            if name == "hash_join_spill":
                 observations = self._run_hash_join(
                     phase, repetitions, warmup_repetitions, effective_parameters
                 )
@@ -584,91 +575,6 @@ class WorkloadRunner:
             """,
             (run_id,),
         )
-
-    def _run_missing_index(
-        self,
-        phase: str,
-        repetitions: int,
-        warmup_repetitions: int,
-        parameters: dict[str, Any],
-    ) -> dict[str, Any]:
-        query = get_scenario("missing_index")["query"]
-        customer_id = int(parameters["customer_id"])
-        index_present = index_exists(self.db, "keeninsight_demo", "orders_customer_id_idx")
-        timings: list[float] = []
-        result_row_count = 0
-        plan: dict[str, Any] | None = None
-        with psycopg.connect(
-            self.db.dsn, row_factory=dict_row, autocommit=True
-        ) as conn:
-            for warmup_index in range(warmup_repetitions):
-                conn.execute(query, (customer_id,)).fetchall()
-                self._publish_sample_progress(
-                    phase=phase,
-                    query=query,
-                    warmup_completed=warmup_index + 1,
-                    timed_completed=0,
-                    total_samples=warmup_repetitions + repetitions,
-                    timings=timings,
-                )
-            counters_before = _database_counter_snapshot(self.db.dsn)
-            query_counters_before = _query_counter_snapshot(
-                self.db.dsn, query, parameter_count=1
-            )
-            timed_started = time.perf_counter()
-            for timed_index in range(repetitions):
-                started = time.perf_counter()
-                rows = conn.execute(query, (customer_id,)).fetchall()
-                result_row_count = len(rows)
-                sample_ms = (time.perf_counter() - started) * 1000
-                timings.append(sample_ms)
-                self._publish_sample_progress(
-                    phase=phase,
-                    query=query,
-                    warmup_completed=warmup_repetitions,
-                    timed_completed=timed_index + 1,
-                    total_samples=warmup_repetitions + repetitions,
-                    timings=timings,
-                    last_sample_ms=sample_ms,
-                )
-            timed_elapsed_ms = (time.perf_counter() - timed_started) * 1000
-            counters_after = _database_counter_snapshot(self.db.dsn)
-            query_counters_after = _query_counter_snapshot(
-                self.db.dsn, query, parameter_count=1
-            )
-            plan = _explain_analyze(conn, query, (customer_id,))
-        observations = {
-            "query": query,
-            "phase": phase,
-            "parameters": {"customer_id": customer_id},
-            "index_present": index_present,
-            "timings_ms": timings,
-            "median_query_time_ms": statistics.median(timings),
-            "p95_query_time_ms": percentile(timings, 0.95),
-            "timing_summary": summarize_timings(timings),
-            "result": {"row_count": result_row_count},
-            "server_execution_time_ms": plan["document"].get("Execution Time"),
-            "database_measurement": database_measurement(
-                counters_before, counters_after, timed_elapsed_ms
-            ),
-            "query_measurement": query_measurement(
-                query_counters_before, query_counters_after, timed_elapsed_ms
-            ),
-            "plan": plan,
-            "plan_summary": summarize_plan(plan["document"], plan["nodes"]),
-            "measurement_note": (
-                "Warm-up executions are excluded from timed samples. Client timing "
-                "includes the PostgreSQL round trip; server execution time comes "
-                "from the separately observed EXPLAIN ANALYZE plan. Database "
-                "counter deltas include observer/concurrent activity; no expected "
-                "value is substituted."
-            ),
-        }
-        if not index_present:
-            proposal = _index_proposal_from_plan(self.db, plan)
-            if proposal:
-                observations["action_proposal"] = proposal
-        return observations
 
     def _run_hash_join(
         self,
@@ -900,36 +806,6 @@ class WorkloadRunner:
         """Validate user knobs against the connected PostgreSQL catalog/data."""
         if not isinstance(parameters, dict):
             raise WorkloadError("workload parameters must be a JSON object")
-        if scenario == "missing_index":
-            unknown = sorted(set(parameters) - {"customer_id"})
-            if unknown:
-                raise WorkloadError(f"unsupported missing_index parameter(s): {unknown}")
-            default = int(get_scenario(scenario)["parameters"]["customer_id"])
-            raw_customer_id = parameters.get("customer_id", default)
-            if isinstance(raw_customer_id, bool):
-                raise WorkloadError("customer_id must be an integer")
-            try:
-                customer_id = int(raw_customer_id)
-            except (TypeError, ValueError) as exc:
-                raise WorkloadError("customer_id must be an integer") from exc
-            try:
-                row = self.db.fetch_one(
-                    """
-                    SELECT EXISTS (
-                        SELECT 1 FROM keeninsight_demo.orders WHERE customer_id = %s
-                    ) AS has_rows
-                    """,
-                    (customer_id,),
-                )
-            except Exception as exc:
-                raise WorkloadError(
-                    f"could not validate customer_id against demo data: {exc}"
-                ) from exc
-            if not row or not row["has_rows"]:
-                raise WorkloadError(
-                    f"customer_id {customer_id} has no rows in keeninsight_demo.orders"
-                )
-            return {"customer_id": customer_id}
         if scenario in {"hash_join_spill", "aggregate_spill", "sort_spill"}:
             unknown = sorted(set(parameters) - {"baseline_work_mem"})
             if unknown:
@@ -1733,116 +1609,6 @@ def summarize_timings(values: list[float]) -> dict[str, Any]:
         "stdev_ms": statistics.stdev(values) if len(values) > 1 else 0.0,
         "relative_stdev": (statistics.stdev(values) / mean) if len(values) > 1 and mean else 0.0,
     }
-
-
-def _index_proposal_from_plan(
-    db: Database, plan: dict[str, Any]
-) -> dict[str, Any] | None:
-    """Derive a narrow index proposal from an observed simple equality filter.
-
-    This intentionally declines joins, expressions, compound predicates, and
-    unknown relations.  The server-side action validator performs the final
-    catalog checks before anything can be applied.
-    """
-    for node in plan.get("nodes") or []:
-        if node.get("Node Type") != "Seq Scan" or not node.get("Filter"):
-            continue
-        schema_name = str(node.get("Schema") or "public")
-        table_name = str(node.get("Relation Name") or "")
-        column_name = _simple_equality_column(
-            str(node.get("Filter")),
-            {str(node.get("Alias") or ""), table_name},
-        )
-        if not (
-            safe_identifier(schema_name)
-            and safe_identifier(table_name)
-            and safe_identifier(column_name or "")
-        ):
-            continue
-        if not relation_exists(db, schema_name, table_name):
-            continue
-        actual_columns = {
-            row["column_name"] for row in relation_columns(db, schema_name, table_name)
-        }
-        if column_name not in actual_columns:
-            continue
-        index_name = _derived_index_name(table_name, column_name)
-        if index_exists(db, schema_name, index_name):
-            continue
-        return {
-            "action_type": "create_index",
-            "target": {
-                "schema": schema_name,
-                "table": table_name,
-                "index": index_name,
-                "columns": [column_name],
-            },
-            "description": (
-                "Create a btree index on the equality predicate observed in "
-                "the sequential-scan plan, then validate the query again."
-            ),
-            "proposal_evidence": {
-                "node_type": node.get("Node Type"),
-                "relation": f"{schema_name}.{table_name}",
-                "filter": node.get("Filter"),
-                "plan_rows": node.get("Plan Rows"),
-                "actual_rows": node.get("Actual Rows"),
-                "predicate_column": column_name,
-                "calculation": "derive_single_column_btree_from_observed_simple_equality_filter",
-            },
-        }
-    return None
-
-
-def _simple_equality_column(filter_text: str, qualifiers: set[str]) -> str | None:
-    normalized = filter_text.strip()
-    while _wrapped_by_parentheses(normalized):
-        normalized = normalized[1:-1].strip()
-    match = re.fullmatch(
-        r"(?:(?P<qual>[A-Za-z_][A-Za-z0-9_]*)\.)?"
-        r"(?P<column>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*"
-        r"(?:'[^']*(?:''[^']*)*'(?:\:\:[A-Za-z_][A-Za-z0-9_ ]*)?|"
-        r"[-+]?[0-9]+(?:\.[0-9]+)?(?:\:\:[A-Za-z_][A-Za-z0-9_ ]*)?)",
-        normalized,
-    )
-    if not match:
-        return None
-    qualifier = match.group("qual")
-    if qualifier and qualifier not in qualifiers:
-        return None
-    return match.group("column")
-
-
-def _wrapped_by_parentheses(value: str) -> bool:
-    if len(value) < 2 or value[0] != "(" or value[-1] != ")":
-        return False
-    depth = 0
-    quoted = False
-    index = 0
-    while index < len(value):
-        char = value[index]
-        if char == "'":
-            if quoted and index + 1 < len(value) and value[index + 1] == "'":
-                index += 1
-            else:
-                quoted = not quoted
-        elif not quoted:
-            if char == "(":
-                depth += 1
-            elif char == ")":
-                depth -= 1
-                if depth == 0 and index != len(value) - 1:
-                    return False
-        index += 1
-    return depth == 0 and not quoted
-
-
-def _derived_index_name(table_name: str, column_name: str) -> str:
-    base = f"{table_name}_{column_name}_idx"
-    if len(base) <= 63:
-        return base
-    suffix = hashlib.sha256(base.encode("utf-8")).hexdigest()[:10]
-    return f"{base[:52]}_{suffix}"
 
 
 def percentile(values: list[float], quantile: float) -> float:

@@ -13,7 +13,6 @@ from typing import Any
 
 
 SCENARIOS = {
-    "missing_index": {},
     "hash_join_spill": {"baseline_work_mem": "64kB"},
     "aggregate_spill": {"baseline_work_mem": "64kB"},
     "sort_spill": {"baseline_work_mem": "64kB"},

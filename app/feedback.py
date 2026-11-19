@@ -269,13 +269,7 @@ def evaluate_runs(
     intervention_verified = True
     intervention_reason = "the action target was observed in the after-phase execution context"
 
-    if action_type == "create_index":
-        target_index = target.get("index")
-        index_observed_before = target_index in before_plan["index_names"]
-        index_observed_after = target_index in after_plan["index_names"]
-        verified_plan_change = index_observed_after and not index_observed_before
-        plan_reason = "target index appears in the after-phase PostgreSQL plan"
-    elif action_type == "set_database_parameter" and target.get("parameter") == "work_mem":
+    if action_type == "set_database_parameter" and target.get("parameter") == "work_mem":
         observed_value = after_observations.get("phase_work_mem")
         intervention_verified = _memory_values_equal(observed_value, target.get("value"))
         intervention_reason = (
@@ -445,8 +439,6 @@ def _root_cause(
 ) -> str:
     action_type = action.get("action_type")
     before = outcome.get("plan_before") or {}
-    if action_type == "create_index" and "Seq Scan" in (before.get("scan_nodes") or []):
-        return "filtered_sequential_scan"
     if action_type == "refresh_statistics":
         return "stale_statistics"
     if action_type == "set_database_parameter" and baseline["scenario"] in {

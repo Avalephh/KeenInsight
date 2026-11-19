@@ -174,7 +174,6 @@ def verify_rollback(
         "result_before": before.get("result"),
         "result_after_rollback": restored.get("result"),
         "database_state": {
-            "missing_index_exists": state_payload.get("missing_index_exists"),
             "work_mem": state_payload.get("work_mem"),
             "parallel_workers": state_payload.get("parallel_workers"),
         },
@@ -193,7 +192,6 @@ def main() -> None:
     parser.add_argument("--output", default="experiment-results.json")
     parser.add_argument("--repetitions", type=int, default=7)
     parser.add_argument("--warmups", type=int, default=2)
-    parser.add_argument("--customer-id", type=int, default=None)
     parser.add_argument("--baseline-work-mem", default=None)
     parser.add_argument("--baseline-parallel-workers", type=int, default=None)
     args = parser.parse_args()
@@ -209,7 +207,6 @@ def main() -> None:
         "protocol": {
             "timed_repetitions": args.repetitions,
             "warmup_repetitions": args.warmups,
-            "customer_id": args.customer_id,
             "baseline_work_mem": args.baseline_work_mem,
             "baseline_parallel_workers": args.baseline_parallel_workers,
         },
@@ -218,19 +215,9 @@ def main() -> None:
         "manifest": request(args.base_url, "/api/demo/manifest"),
     }
     output["bootstrap"] = request(args.base_url, "/api/demo/bootstrap", "POST")
-    missing_parameters = {}
-    if args.customer_id is not None:
-        missing_parameters["customer_id"] = args.customer_id
     hash_parameters = {}
     if args.baseline_work_mem is not None:
         hash_parameters["baseline_work_mem"] = args.baseline_work_mem
-    output["missing_index"] = run_scenario(
-        args.base_url,
-        "missing_index",
-        args.repetitions,
-        args.warmups,
-        missing_parameters,
-    )
     output["hash_join_spill"] = run_scenario(
         args.base_url,
         "hash_join_spill",

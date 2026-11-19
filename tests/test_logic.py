@@ -15,7 +15,7 @@ from app.diagnose import (
 from app.feedback import evaluate_runs
 from app.pg import safe_identifier
 from app.rag import _rerank_rows, chunk_locator, chunk_text
-from app.workload import _simple_equality_column, summarize_timings
+from app.workload import summarize_timings
 
 
 def test_read_only_query_validation_accepts_select_and_rejects_mutation():
@@ -144,102 +144,6 @@ def test_query_statistics_are_compared_as_interval_deltas():
     }]
     # A newly visible top-N row is not automatically treated as fresh work.
     assert _derive_query_deltas(current, []) == []
-
-
-def test_index_candidate_parser_declines_compound_or_unrelated_filters():
-    assert _simple_equality_column(
-        "(orders.customer_id = '1234'::smallint)", {"orders"}
-    ) == "customer_id"
-    assert _simple_equality_column(
-        "((orders.customer_id = 1) AND (orders.status = 'PAID'))", {"orders"}
-    ) is None
-    assert _simple_equality_column("(other.customer_id = 1)", {"orders"}) is None
-
-
-def test_feedback_is_derived_from_measured_timings_and_plan_change():
-    action = {
-        "action_type": "create_index",
-        "target": {"index": "orders_customer_id_idx"},
-    }
-    baseline = {
-        "scenario": "missing_index",
-        "observations": {
-            "timings_ms": [20.0, 22.0, 21.0],
-            "median_query_time_ms": 21.0,
-            "p95_query_time_ms": 21.9,
-            "result": {"row_count": 40},
-            "plan_summary": {
-                "root_node": "Gather Merge",
-                "scan_nodes": ["Seq Scan"],
-                "join_nodes": [],
-                "has_temp_blocks": False,
-            },
-            "plan": {
-                "nodes": [
-                    {"Node Type": "Seq Scan", "Relation Name": "orders", "Filter": "(customer_id = 1)"}
-                ]
-            },
-        },
-    }
-    after = {
-        "scenario": "missing_index",
-        "observations": {
-            "timings_ms": [0.3, 0.4, 0.2],
-            "median_query_time_ms": 0.3,
-            "p95_query_time_ms": 0.39,
-            "result": {"row_count": 40},
-            "plan_summary": {
-                "root_node": "Sort",
-                "scan_nodes": ["Bitmap Heap Scan", "Bitmap Index Scan"],
-                "join_nodes": [],
-                "has_temp_blocks": False,
-            },
-            "plan": {
-                "nodes": [{"Node Type": "Bitmap Index Scan", "Index Name": "orders_customer_id_idx"}]
-            },
-        },
-    }
-    outcome = evaluate_runs(action, baseline, after)
-    assert outcome["effective"] is True
-    assert outcome["observed_effect"] == "effective"
-    assert outcome["median_improvement_pct"] > 98
-    assert outcome["plan_change"]["verified_plan_change"] is True
-
-
-def test_feedback_does_not_call_a_single_sample_effective():
-    action = {
-        "action_type": "create_index",
-        "target": {"index": "orders_customer_id_idx"},
-    }
-    baseline = {
-        "scenario": "missing_index",
-        "observations": {
-                "timings_ms": [20.0, 22.0],
-                "median_query_time_ms": 21.0,
-                "p95_query_time_ms": 21.9,
-                "result": {"row_count": 40},
-                "plan_summary": {"scan_nodes": ["Seq Scan"]},
-            "plan": {"nodes": [{"Node Type": "Seq Scan"}]},
-        },
-    }
-    after = {
-        "scenario": "missing_index",
-        "observations": {
-                "timings_ms": [0.3, 0.4],
-                "median_query_time_ms": 0.3,
-                "p95_query_time_ms": 0.39,
-                "result": {"row_count": 40},
-                "plan_summary": {"scan_nodes": ["Bitmap Index Scan"]},
-            "plan": {
-                "nodes": [
-                    {"Node Type": "Bitmap Index Scan", "Index Name": "orders_customer_id_idx"}
-                ]
-            },
-        },
-    }
-    outcome = evaluate_runs(action, baseline, after)
-    assert outcome["effective"] is False
-    assert outcome["observed_effect"] == "insufficient_repetitions"
 
 
 def test_statistics_feedback_uses_estimate_accuracy_not_latency_improvement():

@@ -85,16 +85,6 @@ DEFAULT_KNOWLEDGE = [
     },
     {
         "source_type": "postgresql-documentation",
-        "title": "EXPLAIN plans identify sequential and index scans",
-        "root_cause": "filtered_sequential_scan",
-        "context": {"plan_signals": ["Node Type=Seq Scan", "Filter"]},
-        "action_type": "create_index",
-        "action_template": {"requires": ["validated relation", "validated columns"]},
-        "provenance": "https://www.postgresql.org/docs/16/using-explain.html",
-        "verified": True,
-    },
-    {
-        "source_type": "postgresql-documentation",
         "title": "ANALYZE refreshes planner statistics after data changes",
         "root_cause": "stale_statistics",
         "context": {

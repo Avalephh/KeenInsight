@@ -1,4 +1,5 @@
 import os
+import re
 import zipfile
 from pathlib import Path
 
@@ -15,19 +16,32 @@ def test_original_english_page_set_is_complete_and_wired():
         "alert-list.html",
         "alert-detail.html",
         "alert-rules.html",
-        "sql-log.html",
-        "sql-detail.html",
-        "dba-rules.html",
         "code-source.html",
         "manual.html",
-        "tuning-knowledge.html",
     }
     assert {path.name for path in LEGACY.glob("*.html")} == expected
+    for removed in ("sql-log.html", "sql-detail.html", "dba-rules.html", "tuning-knowledge.html"):
+        assert not (LEGACY / removed).exists()
     for path in LEGACY.glob("*.html"):
         content = path.read_text(encoding="utf-8")
         assert '<style>' in content
         assert '/static/legacy-runtime.js' in content
         assert '/static/legacy-pages.js' in content
+
+
+def _strip_removed_sql_menu(html):
+    html = re.sub(
+        r"\n\s*<div class=\"menu-group-title\">SQL level</div>.*?(?=\n\s*<div class=\"menu-group-title\">System Settings</div>)",
+        "",
+        html,
+        flags=re.S,
+    )
+    return re.sub(
+        r"\n\s*<div class=\"menu-item\" onclick=\"location\.href='tuning-knowledge\.html'\">.*?Tuning-derived Knowledge\s*</div>",
+        "",
+        html,
+        flags=re.S,
+    )
 
 
 def test_legacy_shell_matches_supplied_archive_before_adapters():
@@ -39,6 +53,8 @@ def test_legacy_shell_matches_supplied_archive_before_adapters():
             if item.is_dir() or not item.filename.lower().endswith(".html"):
                 continue
             name = Path(item.filename).name
+            if not (LEGACY / name).is_file():
+                continue
             expected = zipped.read(item.filename).decode("utf-8", "replace")
             actual = (LEGACY / name).read_text(encoding="utf-8")
             for script in (
@@ -46,7 +62,13 @@ def test_legacy_shell_matches_supplied_archive_before_adapters():
                 '\n    <script src="/static/legacy-pages.js"></script>',
             ):
                 actual = actual.replace(script, "")
-            assert actual.replace("\r\n", "\n") == expected.replace("\r\n", "\n")
+            actual = _strip_removed_sql_menu(actual)
+            expected = _strip_removed_sql_menu(expected)
+            def normalize(value):
+                value = value.replace("\r\n", "\n").replace("\r", "\n")
+                return "\n".join(line for line in value.split("\n") if line.strip())
+
+            assert normalize(actual) == normalize(expected)
 
 
 def test_advanced_console_is_preserved_separately():
@@ -91,7 +113,6 @@ def test_legacy_adapter_uses_compact_live_projection_and_typed_pages():
     pages = (STATIC / "legacy-pages.js").read_text(encoding="utf-8")
     assert "/dashboard/metrics" in runtime
     assert "/incidents" in pages
-    assert "/queries" in pages
     assert "/source-analysis/knowledge" in pages
     assert "/rag/search" in pages
 
