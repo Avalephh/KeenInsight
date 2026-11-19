@@ -152,16 +152,27 @@ def _inject_hint_into_sql(hint, sql):
 
 
 async def check_sql_rewrite(origin_sql, rewrite_sql, *, db, fix_agent):
+    # Keep the checks already performed by this evaluator as audit evidence;
+    # a result-set match is not promoted to a formal equivalence proof.
+    audit = {'status': 'checking', 'qed_equivalence': None, 'result_set_comparisons': [], 'rewrite_retries': 0}
+    db.last_rewrite_validation = audit
     print("start QED check")
     qed_match = db.check_sql_equivalence(origin_sql, rewrite_sql)
+    check = getattr(db, 'last_equivalence_check', {'method':'unknown','status':'not_recorded'})
+    audit['equivalence_check'] = check
+    audit['qed_equivalence'] = bool(qed_match) if check.get('method')=='qed' else None
+    if check.get('method') == 'result_set_comparison':
+        audit['result_set_comparisons'].append(bool(qed_match))
     print(f"QED equivalence check: {qed_match}")
 
     if qed_match:
+        audit['status'] = 'qed_equivalence_passed' if check.get('formal_proof') else 'result_set_comparison_passed'
         return rewrite_sql
 
     retry_count = 0
     max_retry = 5
     match = db.compare_sql_results(origin_sql, rewrite_sql)
+    audit['result_set_comparisons'].append(bool(match))
     print(f"Result set comparison match: {match}")
 
     while not match and retry_count < max_retry:
@@ -172,10 +183,14 @@ async def check_sql_rewrite(origin_sql, rewrite_sql, *, db, fix_agent):
         rewrite_sql = new_rewrite_sql
         retry_count += 1
         match = db.compare_sql_results(origin_sql, rewrite_sql)
+        audit['rewrite_retries'] = retry_count
+        audit['result_set_comparisons'].append(bool(match))
         print(f"Result set comparison match: {match}")
 
     if not match:
+        audit['status'] = 'rewrite_rejected_returned_original'
         print("Failed to rewrite SQL, return original SQL")
         return origin_sql
 
+    audit['status'] = 'result_set_comparison_passed'
     return rewrite_sql

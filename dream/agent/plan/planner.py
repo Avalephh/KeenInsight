@@ -9,6 +9,7 @@ if rcrank_path not in sys.path:
     sys.path.append(rcrank_path)
 
 import json
+import math
 
 import numpy as np
 import pandas as pd
@@ -115,42 +116,53 @@ class Planner:
         )
         # print("prompt: ", prompt)
 
-        output = await self.diagnosis_agent(prompt)
-        parsed = self.parse_and_validate(output)
-        if parsed is not None:
-            labels, conf_map, explanation = parsed
-        else:
-            labels, conf_map, explanation = None, None, ""
-        # retry
-        retry = 0
-        while labels is None and retry < 5:
-            output = await self.diagnosis_agent(prompt)
+        self.last_diagnosis = {
+            'model': self.root_cause_model, 'prompt': prompt,
+            'initial_root_causes': root_causes, 'initial_confidence': state_confidence,
+            'attempts': [], 'status': 'running',
+        }
+        for attempt in range(6):
+            try:
+                output = await self.diagnosis_agent(prompt)
+            except Exception as exc:
+                self.last_diagnosis.update(status='failed', error=str(exc))
+                raise
             parsed = self.parse_and_validate(output)
+            self.last_diagnosis['attempts'].append({
+                'attempt': attempt + 1, 'raw_response': output, 'valid': parsed is not None,
+            })
             if parsed is not None:
                 labels, conf_map, explanation = parsed
-            else:
-                labels, conf_map, explanation = None, None, ""
-            retry += 1
-
-        if labels is None:
-            labels = ["normal"]
-            conf_map = {"normal": 1.0}
-            explanation = "Unable to diagnose root causes. Defaulting to normal state."
-
-        return {"root_causes": labels, "confidence": conf_map, "explanation": explanation}
+                self.last_diagnosis['status'] = 'completed'
+                if not explanation:
+                    explanation = ('All four root-cause confidences are <= 0.5; no optimization action selected.'
+                                   if labels == ['normal'] else 'Selected root causes have confidence > 0.5.')
+                return {"root_causes": labels, "confidence": conf_map, "explanation": explanation}
+        self.last_diagnosis['status'] = 'invalid_response'
+        raise ValueError('DREAM root-cause diagnosis returned invalid JSON/schema in all 6 attempts; not a normal/no_action diagnosis')
 
     def parse_and_validate(self, json_text):
         try:
             data = json.loads(json_text)
-            reported_pred = [str(x).lower().strip() for x in data.get("predicted_root_causes", [])]
-            items = data.get("root_causes", [])
+            if not isinstance(data, dict) or not isinstance(data.get('predicted_root_causes'), list):
+                return None
+            reported_pred = [str(x).lower().strip() for x in data['predicted_root_causes']]
+            items = data.get("root_causes")
+            allowed = {'missing indexes', 'suboptimal plan optimizer', 'inappropriate query knobs', 'poorly written queries'}
+            if not isinstance(items, list) or len(items) != len(allowed) or len(set(reported_pred)) != len(reported_pred):
+                return None
             explanation = data.get("explanation", "")
 
             derived_pred = []
             conf_map = {}
             for it in items:
                 label = str(it.get("label", "")).lower().strip()
-                conf = float(it.get("confidence", 0.0))
+                value = it.get('confidence')
+                if label not in allowed or label in conf_map or isinstance(value, bool) or not isinstance(value, (int, float)):
+                    return None
+                conf = float(value)
+                if not math.isfinite(conf) or not 0.0 <= conf <= 1.0:
+                    return None
                 if conf > 0.5:
                     derived_pred.append(label)
                 conf_map[label] = conf
@@ -161,7 +173,6 @@ class Planner:
 
             if len(derived_pred) == 0:
                 derived_pred = ["normal"]
-                conf_map = {"normal": 1.0}
 
             return derived_pred, conf_map, explanation
         except Exception:

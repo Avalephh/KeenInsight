@@ -132,8 +132,16 @@ class ActionManager:
             db=self.db,
             memory_manager=self.memory_manager,
         )
+        self.last_action_trace = {
+            'model': self.diagnostic_model, 'action_space': action_space,
+            'retrieval_enabled': self.enable_retrieval,
+            'positive_cases': len(positives), 'negative_cases': len(negatives),
+            'rewrite_rule_candidates': getattr(query_info, 'rewrite_rule_candidates', []),
+            'rule_evidence_kind': 'structural_candidates_provided_to_llm_not_confirmed_transformations',
+        }
 
         action_result = await self.action_generate(root_cause, base_info, action_space, mode, positives, negatives)
+        self.last_action_trace['raw_response'] = action_result
         explanation, _, _ = self.parse_action_result(action_result)
 
         # Extract fix action and rewrite sql
@@ -150,6 +158,8 @@ class ActionManager:
             fix_agent=self.fixAgent,
         )
         evaluation_result["explanation"] = explanation
+        evaluation_result['action_trace'] = self.last_action_trace
+        evaluation_result['semantic_validation'] = getattr(self.db, 'last_rewrite_validation', {'status':'not_requested_no_rewrite'})
         if evaluation_result.get("fix_action"):
             index_names = extract_index_names(evaluation_result.get("fix_action"))
             knob_names = extract_knob_names(evaluation_result.get("fix_action"))

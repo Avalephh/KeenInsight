@@ -28,6 +28,7 @@ class PostgresDB:
         self.log_path = db_config.get("log_path")
         self.query_timeout = db_config.get("query_timeout")
         self.comparison_timeout = db_config.get("comparison_timeout", self.query_timeout or 20)
+        self.application_name = db_config.get('application_name') or 'sysinsight-dream-worker'
 
         # DREAM originally assumed a public-schema TPC-H database.  SysInsight
         # keeps its workload tables in a dedicated schema, so make the schema
@@ -69,7 +70,8 @@ class PostgresDB:
     def connect(self):
         """Establish and return a database connection"""
         if self.connection is None or self.connection.closed:
-            self.connection = psycopg.connect(self.conn_str, autocommit=True, prepare_threshold=None)
+            self.connection = psycopg.connect(self.conn_str, autocommit=True, prepare_threshold=None,
+                                             application_name=self.application_name)
             with self.connection.cursor() as cur:
                 cur.execute(f"SET search_path TO {self._search_path_sql}")
         return self.connection
@@ -635,10 +637,15 @@ class PostgresDB:
         raise TypeError
 
     def check_sql_equivalence(self, sql1, sql2):
-
+        self.last_equivalence_check = {'method':'qed','status':'checking','formal_proof':None}
         if shutil.which("nix") is None:
             print("QED unavailable: nix is not installed; falling back to result-set comparison")
-            return self.compare_sql_results(sql1, sql2)
+            match = self.compare_sql_results(sql1, sql2)
+            self.last_equivalence_check = {
+                'method':'result_set_comparison','status':'matched' if match else 'not_matched',
+                'formal_proof':False,'reason':'nix is not installed; formal QED prover was not executed',
+            }
+            return match
 
         schema_info = self.fetch_schema_info()
 
@@ -711,6 +718,7 @@ class PostgresDB:
                     content = f.read().strip()
                     result_json = json.loads(content)
                     if result_json.get("provable", False):
+                        self.last_equivalence_check.update(status='proved',formal_proof=True)
                         return True
                     if result_json.get("panicked", False):
                         if prover_retcode != 0:

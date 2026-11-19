@@ -195,6 +195,8 @@ def build_root_cause_diagnosis_prompt(query_info, root_causes, state_confidence,
     - Initial model suggested root causes: {root_causes}
     - Initial model confidence (0-1): {state_confidence}
     - Historical Tuning Summary (per root cause): {history_text}
+    - The initial model is an advisory prior, not a diagnosis gate. Its calibration may not transfer to this workload. A near-zero initial confidence must not prevent a higher evidence-based final confidence.
+    - Metric provenance: {getattr(query_info, 'metric_provenance', 'Use only measured metrics; unavailable metrics are not evidence of zero load.')}
 
     4. Root Cause Diagnosis Guidance:
     Use the **Query Information** and the **Initial Suggestion** to infer the root causes and their confidence, as follows:
@@ -203,7 +205,9 @@ def build_root_cause_diagnosis_prompt(query_info, root_causes, state_confidence,
     - If a label has success_count > 0 and fail_count > 0, it indicates partial benefit but decreasing returns. CONTINUE using this root cause as a reference, and increase the other root causes confidence for exploraiton. Adjust confidence downward if further attempts do not yield improvements.  
 
     5. Confidence rules Guidance:
-    - Confidence adjustment of each root cause **MUST** be restricted to the range of [0.1,0.3].  
+    - Assign each FINAL confidence independently in [0,1] based on the SQL, execution plan and available measured evidence. There is no 0.1-0.3 cap on either the final value or its change from the initial model prior.
+    - On the first diagnosis, there is no previous calibrated LLM confidence to increment. Do not treat a near-zero initial model score as an upper bound. Confidences are independent probabilities, not shares that must sum to 1.
+    - A slow query alone does not prove a fix exists. If no root cause has sufficient evidence, keep all confidences <= 0.5 and return an empty predicted_root_causes array.
     - If a root cause shows no improvement after multiple rounds, reduce its confidence below 0.5 to retire it from active diagnosis. In such cases, select a new candidate root cause for exploration, initializing its confidence slightly above 0.5. 
     - Confidence values should reflect both historical results and current judgment based on Query Information, Ensure the model makes independent judgments about which root causes to explore next, rather than blindly following previous confidence values.  
  
@@ -283,6 +287,9 @@ def build_action_space_prompt(root_causes, db, knob_config, current_knob_values,
 
         matcher = SQLRuleMatcher()
         rule_descriptions = matcher.get_rule_descriptions(query_info.query)
+        # Persist the actual rule candidates provided to the action LLM.
+        # A structural match is NOT proof the final rewrite used that rule.
+        query_info.rewrite_rule_candidates = matcher.match_rules(query_info.query)
 
         action_space_prompt += f"""
     • Query Rewrite Space: 
