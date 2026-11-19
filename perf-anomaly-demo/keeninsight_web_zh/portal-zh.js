@@ -568,6 +568,8 @@
         "ok": "正常",
         "SysInsight demo: target business TPS dropped under external pressure": "SysInsight 演示：外部压力下目标业务 TPS 下降",
         "The target business TPS under pressure is below 90% of the baseline maximum for 10 seconds.": "压力阶段的目标业务 TPS 低于基线最大值的 90%，并持续 10 秒。",
+        "Target business TPS: 10% drop for 10s": "目标业务 TPS：10 秒下降 10%",
+        "Target business TPS is below 90% of the baseline maximum for 10 seconds.": "压力阶段的目标业务 TPS 低于基线最大值的 90%，并持续 10 秒。",
   };
   const entries = Object.entries(map).sort((a,b)=>b[0].length-a[0].length);
   const patterns = [

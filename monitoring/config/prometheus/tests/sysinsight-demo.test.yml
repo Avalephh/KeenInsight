@@ -22,10 +22,12 @@ tests:
           - exp_labels:
               severity: warning
               source: sysinsight-demo
+              metric: target_business_tps
+              drop_percent: "10"
               phase: pressure_before
               status: running
               run_id: run-1
               scenario_id: tp_payment_hot
             exp_annotations:
-              summary: "SysInsight demo: target business TPS dropped under external pressure"
-              description: "The target business TPS under pressure is below 90% of the baseline maximum for 10 seconds."
+              summary: "Target business TPS: 10% drop for 10s"
+              description: "Target business TPS is below 90% of the baseline maximum for 10 seconds."

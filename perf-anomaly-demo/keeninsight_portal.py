@@ -422,12 +422,18 @@ class KeenInsightPortal:
             values = []
             for group in payload.get("data", {}).get("groups", []):
                 for rule in group.get("rules", []):
+                    labels = rule.get("labels", {}) or {}
+                    try:
+                        drop_percent = float(labels.get("drop_percent"))
+                    except (TypeError, ValueError):
+                        drop_percent = None
                     values.append({"id": group["name"] + ":" + rule["name"], "name": rule["name"],
                                    "desc": rule.get("annotations", {}).get("description"), "reason": rule.get("annotations", {}).get("summary"),
                                    "alertField": rule.get("query"), "threshold": None,
+                                   "metric": labels.get("metric"), "dropPercent": drop_percent,
                                    "period": rule.get("duration"), "state": rule.get("state"),
                                    "health": rule.get("health"), "lastError": rule.get("lastError"),
-                                   "severity": rule.get("labels", {}).get("severity"),
+                                   "severity": labels.get("severity"),
                                    "source": "Prometheus loaded rules", "file": group.get("file")})
             return values
         except Exception as exc:

@@ -16,6 +16,8 @@ groups:
         labels:
           severity: warning
           source: sysinsight-demo
+          metric: target_business_tps
+          drop_percent: "10"
         annotations:
-          summary: "SysInsight demo: target business TPS dropped under external pressure"
-          description: "The target business TPS under pressure is below 90% of the baseline maximum for 10 seconds."
+          summary: "Target business TPS: 10% drop for 10s"
+          description: "Target business TPS is below 90% of the baseline maximum for 10 seconds."

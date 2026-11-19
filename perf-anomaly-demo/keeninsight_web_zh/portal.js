@@ -203,8 +203,19 @@
         document.querySelectorAll('#snippetsContainer tr').forEach(tr=>['snippet-source-col','snippet-content-col','snippet-action-col'].forEach((c,i)=>tr.cells[i].className=c));break;
       case 'code':
         target='functionTableBody';rows=items.map(r=>[esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,shown(r.category),`<div class="code-block">${esc(r.functionFlow||'Runtime call chains are retained per alert, not this static reference.')}</div>`,`<div class="code-block">${esc(r.dataFlow||'Not retained')} → ${esc(r.description)}</div>`,evidenceButton(r)]);break;
-      case 'alertRules':
-        target='ruleTableBody';rows=items.map(r=>[`<div class="rule-name">${esc(r.name)}</div><div class="rule-desc">${shown(r.reason)}</div>`,shown(r.desc),`<code class="ki-flow">${esc(r.alertField)}</code>`,'In expression',number(r.period)+' s',tag(r.state)+' '+tag(r.health),evidenceButton(r)]);break;
+      case 'alertRules': {
+        const metricLabels={'target_business_tps':'目标业务 TPS'};
+        target='ruleTableBody';
+        rows=items.map(r=>[
+          `<div class="rule-name">${esc(r.name)}</div>`,
+          esc(metricLabels[r.metric]||r.metric||'—'),
+          r.dropPercent==null?'—':`下降 ${number(r.dropPercent,0)}%`,
+          r.period==null?'—':`${number(r.period,0)} 秒`,
+          `${tag(r.state)} ${tag(r.health)}`,
+          `<button class="action-btn" data-ki-rule-detail="${esc(r.id)}">详情</button>`
+        ]);
+        break;
+      }
       case 'overview':
         document.getElementById('overviewContent').innerHTML=overview(data);break;
     }
@@ -214,6 +225,14 @@
     }
     body.querySelectorAll('[data-ki-record]').forEach(n=>n.onclick=()=>{const item=items.find(x=>String(x.id)===n.dataset.kiRecord);if(item)showModal(item.title||item.name||item.id,code(item));});
     body.querySelectorAll('[data-ki-run-detail]').forEach(n=>n.onclick=()=>showRunDetail(n.dataset.kiRunDetail,n.dataset.kiRunIncidents));
+    body.querySelectorAll('[data-ki-rule-detail]').forEach(n=>n.onclick=()=>{
+      const r=items.find(x=>String(x.id)===n.dataset.kiRuleDetail);
+      if(!r)return;
+      const metricLabels={'target_business_tps':'目标业务 TPS'};
+      const metric=metricLabels[r.metric]||r.metric||'—';
+      const condition=r.dropPercent==null?'—':`下降 ${number(r.dropPercent,0)}%`;
+      showModal('规则详情',`<dl class="ki-kv"><dt>指标</dt><dd>${esc(metric)}</dd><dt>触发条件</dt><dd>${esc(condition)}</dd><dt>持续时间</dt><dd>${r.period==null?'—':number(r.period,0)+' 秒'}</dd><dt>状态</dt><dd>${tag(r.state)} ${tag(r.health)}</dd></dl>`+raw({query:r.alertField,summary:r.reason,description:r.desc},'原始规则'));
+    });
     total=data.total||0;
     if(config[1]==='overview')return;
     let pager=body.querySelector('.table-footer,.data-container>.pagination,.table-container>.pagination,#ki-pager');

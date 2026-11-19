@@ -203,8 +203,21 @@
         document.querySelectorAll('#snippetsContainer tr').forEach(tr=>['snippet-source-col','snippet-content-col','snippet-action-col'].forEach((c,i)=>tr.cells[i].className=c));break;
       case 'code':
         target='functionTableBody';rows=items.map(r=>[esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,shown(r.category),`<div class="code-block">${esc(r.functionFlow||'Runtime call chains are retained per alert, not this static reference.')}</div>`,`<div class="code-block">${esc(r.dataFlow||'Not retained')} → ${esc(r.description)}</div>`,evidenceButton(r)]);break;
-      case 'alertRules':
-        target='ruleTableBody';rows=items.map(r=>[`<div class="rule-name">${esc(r.name)}</div><div class="rule-desc">${shown(r.reason)}</div>`,shown(r.desc),`<code class="ki-flow">${esc(r.alertField)}</code>`,'In expression',number(r.period)+' s',tag(r.state)+' '+tag(r.health),evidenceButton(r)]);break;
+      case 'alertRules': {
+        const metricLabels={'target_business_tps':'Target business TPS'};
+        const drop=r=>r.dropPercent==null?'—':`${number(r.dropPercent,0)}% drop`;
+        target='ruleTableBody';
+        rows=items.map(r=>[
+          `<div class="rule-name">${esc(r.name)}</div>`,
+          esc(metricLabels[r.metric]||r.metric||'—'),
+          drop(r),
+          r.dropPercent==null?'—':`${number(r.dropPercent,0)}%`,
+          r.period==null?'—':`${number(r.period,0)} s`,
+          `${tag(r.state)} ${tag(r.health)}`,
+          evidenceButton(r)
+        ]);
+        break;
+      }
       case 'overview':
         document.getElementById('overviewContent').innerHTML=overview(data);break;
     }
