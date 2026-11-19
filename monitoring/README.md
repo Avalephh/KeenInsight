@@ -1,5 +1,12 @@
 # 本机 Prometheus/Grafana 监控 Demo
 
+## 重启恢复与新机器部署
+
+统一入口：`bash scripts/deploy.sh install|start|restart|stop|status|doctor`（从项目根目录执行）。
+部署后使用独立开机服务 `keeninsight-demo.service`，不替换已有端口 8000 的服务。
+DREAM runtime 与 exporter 已改为持久目录，不依赖重启后会消失的 `/tmp`。
+完整的依赖、模型/数据库迁移边界与验收步骤见 [DEPLOYMENT.md](DEPLOYMENT.md)。
+
 本目录负责本机 PostgreSQL 与主机指标的采集和展示，不改动旧项目，不创建数据库角色。常规监控启动不修改 PostgreSQL 配置；实验控制台的 TPCC 调优阶段会通过 TemporaryPostgresConfiguration 临时应用候选并在结束后恢复。发行包、二进制和运行数据不纳入 Git；启动脚本支持通过环境变量指定安装路径。
 
 ## 依赖
@@ -31,6 +38,7 @@ source .env.local
 - SysInsight / DREAM 实验看板：<http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1&refresh=5s>
 - 联动管理控制台：<http://127.0.0.1:9108/ui>
 - 一页实验控制台：<http://127.0.0.1:9108/lab>
+- KeenInsight 动态产品页（由 English.zip 页面接入真实结果）：<http://127.0.0.1:9108/keeninsight/>
 - Prometheus：<http://127.0.0.1:9090/>
 - Grafana 初始登录：`admin` / `admin`
 
@@ -38,6 +46,15 @@ Grafana 只监听本机回环地址，适合首期本机 Demo。Dashboard 由 `d
 主机 PostgreSQL 监控大屏顶部现在用折线图展示全部 27 个 TPCC 场景的目标业务事务 TPS；当前运行场景会连续显示基线、压力前和调优后压力三个阶段，其余场景固定为 0，默认保留最近 6 小时历史曲线。详细的外部压力强度、基线/压力前后和调优对比仍在实验看板中查看。这些指标来自实验控制台的真实 TPCC control worker，不是数据库全局事务速率；没有运行场景时当前值全部为 0，但已采集的历史曲线仍可回看。
 
 ## SysInsight / DREAM 联动
+
+KeenInsight 英文页面与实验控制台共用同一个 Bridge/SQLite，无需另起 Web 服务。
+11 个页面的数据来自 `/api/v1/keeninsight/`，支持分页、搜索、10 秒自动刷新、手动刷新、
+JSON 导出和详情跳转；实时监控统一由现有 Grafana 展示，不再提供重复的 realtime-monitor 页面。
+数据类别、原静态字段对应关系和缺失项约定见
+[`perf-anomaly-demo/KEENINSIGHT_DATA_MODEL.md`](../perf-anomaly-demo/KEENINSIGHT_DATA_MODEL.md)。
+新 DREAM 任务额外保存真实 EXPLAIN 计划、诊断解释和模型实际返回的置信度；
+告警/SQL 任务完成时将补充证据写入 `keeninsight_evidence`，与基础记录一起按 24 小时清理，
+运行中的任务和生效方案的证据保留。未采集的 SHAP、SQL 火焰图、生命周期分阶段资源值显示缺失原因。
 
 `start.sh` 会同时启动 `perf-anomaly-demo/sysinsight_dream_bridge.py`，默认监听本机 `9108` 端口。它向 Prometheus 暴露 `sysinsight_dream_bridge_*` 指标，并向管理控制台提供动作时间线、SQL 观测、DREAM 队列及自动应用方案管理。桥接状态持久化在 `monitoring/data/sysinsight_dream_bridge.sqlite3`，输出凭证在 `monitoring/data/sysinsight_dream_bridge/`。启动时默认给 `postgresql@12-main.service` 加运行时资源护栏：CPU 250%、内存 24GiB、任务数 512；可通过 `SYSINSIGHT_PG_*` 调整，设置 `SYSINSIGHT_PG_RESOURCE_GUARD=0` 才会关闭。
 
@@ -53,6 +70,15 @@ Grafana 只监听本机回环地址，适合首期本机 Demo。Dashboard 由 `d
 `600`）中设置 key、`SYSINSIGHT_GPT_BASE_URL` 和 `SYSINSIGHT_GPT_MODEL`，然后重启
 bridge；也可以在启动 `monitoring/start.sh` 的同一个 shell 中导出这些变量。key 不会写入
 SQLite、日志或 Grafana。
+
+本机当前通过 `monitoring/.env.local` 中的
+`SYSINSIGHT_CODEX_CONFIG_DIR=/root/.codex` 复用当前 Codex provider、model 和 API-key 认证。
+`start.sh` 使用 `codex_api_launcher.py` 启动 Bridge，每次启动重新读取 `config.toml` 和
+`auth.json`；不会复制 Key 到仓库、参数文件或命令行。DREAM 的根因、诊断、修复三个 Agent
+统一采用同一个运行时模型，覆盖旧示例 JSON 中写死的模型名称。
+当前 provider 已实测支持应用原有的 Chat Completions 请求，因此不需要更改调优协议。
+可执行 `python3 monitoring/codex_api_launcher.py --config-dir /root/.codex --check`
+检查非敏感配置；Python 3.11 之前需要 `tomli`。
 
 当自动调优已开启但 API key 不可用时，bridge 会在“DREAM 调度闸门”中记录阻塞原因，
 并跳过自动入队，不会按轮询周期重复制造 blocked 任务。历史 blocked 记录仍保留在审计表中；

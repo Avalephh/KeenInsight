@@ -58,10 +58,35 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 def _stage(stages: List[Dict[str, Any]], name: str, status: str, detail: Any = None) -> None:
-    item: Dict[str, Any] = {"name": name, "status": status}
+    item: Dict[str, Any] = {"name": name, "status": status, 'recordedAt': utc_now()}
     if detail is not None:
         item["detail"] = detail
     stages.append(item)
+
+
+class StageJournal(list):
+    """Publish completed stage evidence while the lengthy chain is running."""
+    def __init__(self, path: Path):
+        super().__init__()
+        self.path = path
+
+    def append(self, item):
+        previous = next((stage for stage in self if stage['name']==item['name']), None)
+        if previous is not None:
+            started = previous.get('startedAt')
+            if started:
+                item['startedAt'] = started
+                if item['status'] != 'running':
+                    item['finishedAt'] = item['recordedAt']
+                    item['durationMs'] = round((dt.datetime.fromisoformat(item['finishedAt'])-dt.datetime.fromisoformat(started)).total_seconds()*1000,3)
+            self[self.index(previous)] = item
+        else:
+            if item['status']=='running':
+                item['startedAt'] = item['recordedAt']
+            super().append(item)
+        temporary = self.path.with_suffix('.tmp')
+        _write_json(temporary, {'updatedAt': utc_now(), 'stages': self})
+        temporary.replace(self.path)
 
 
 def _counter_rate(prometheus: Mapping[str, Any], query_name: str, lookback_seconds: float = 90.0) -> Optional[float]:
@@ -183,6 +208,7 @@ def _capture_perf(
     command = [
         str(info["perf_path"]),
         "record",
+        "--clockid", "mono",
         "-F",
         str(int(frequency)),
         "-g",
@@ -297,6 +323,8 @@ def _capture_perf(
         "counts_path": str(counts_path),
         "function_count": function_count,
     })
+    if function_count == 0:
+        postprocess.update(status='no_function_samples', reason='perf produced no real function samples')
     return {"perf": info, "postprocess": postprocess}
 
 
@@ -407,14 +435,16 @@ def _is_read_only_sql(sql: str) -> bool:
 
 def _sql_from_case(case: Mapping[str, Any], explicit: str) -> Tuple[str, str]:
     candidates: List[Tuple[str, Any]] = []
+    if explicit:
+        if not _is_read_only_sql(explicit):
+            raise ValueError('configured validation SQL must be one replayable read-only statement')
+        candidates.append(('configured_validation_sql', explicit))
     for row in case.get("slow_queries", []) if isinstance(case.get("slow_queries"), list) else []:
         if isinstance(row, Mapping):
             candidates.extend([("completed_slow_sql.replay_sql", row.get("replay_sql")), ("completed_slow_sql.query", row.get("query"))])
     for row in case.get("active_queries", []) if isinstance(case.get("active_queries"), list) else []:
         if isinstance(row, Mapping):
             candidates.append(("active_sql.query", row.get("query")))
-    if explicit:
-        candidates.append(("configured_validation_sql", explicit))
     candidates.append(("safe_tpcds_canary", DEFAULT_VALIDATION_SQL))
     candidates.append(("safe_catalog_canary", "SELECT count(*) FROM pg_catalog.pg_class"))
     for source, value in candidates:
@@ -482,7 +512,12 @@ def _candidate_and_validation(api: Mapping[str, Any], args: argparse.Namespace, 
 
     profile = resolve_profile(args.dbms, args.pg_version)
     constraints = profile.constraints()
-    candidates = candidate_configurations(api, max_candidates=max(1, int(args.candidate_count)))
+    # candidate_count controls acquisition, not validation. The original
+    # source emits multiple templates even when acquisition n_candidates=1.
+    # Truncating here discarded its selected row and all valid alternatives
+    # whenever the first raw response was malformed. Validate actual returned
+    # candidates without inventing repairs or relaxing the constraints.
+    candidates = candidate_configurations(api, max_candidates=64)
     records: List[Dict[str, Any]] = []
     for candidate in candidates:
         structural = validate_candidate(candidate.get("configuration", {}), constraints)
@@ -530,6 +565,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--case-result", required=True)
     parser.add_argument("--prometheus-capture", required=True)
     parser.add_argument("--active-pids", required=True)
+    parser.add_argument("--perf-capture", default="", help="Evidence captured at alert receipt, before the analysis queue")
     parser.add_argument("--incident-dir", required=True)
     parser.add_argument("--db", default="keeninsight")
     parser.add_argument("--db-user", default="postgres")
@@ -564,7 +600,7 @@ def main() -> int:
     active_pids_path = Path(args.active_pids).resolve()
     anomaly_dir = incident_dir / "anomaly"
     anomaly_dir.mkdir(parents=True, exist_ok=True)
-    stages: List[Dict[str, Any]] = []
+    stages: List[Dict[str, Any]] = StageJournal(incident_dir / 'workflow_progress.json')
     result: Dict[str, Any] = {
         "schema": "sysinsight.postgresql.live-chain.v1",
         "status": "running",
@@ -589,14 +625,17 @@ def main() -> int:
         _write_json(case_path, case)
         _stage(stages, "alert_handoff", "completed", {"case_result": str(case_path), "active_pid_count": len(pids)})
 
-        perf_capture = _capture_perf(
-            anomaly_dir,
-            pids,
-            args.perf_seconds,
-            args.perf_frequency,
-            args.stackcollapse,
-            env,
-        )
+        if args.perf_capture:
+            capture_path = Path(args.perf_capture).resolve()
+            if capture_path.parent != incident_dir:
+                raise ValueError('perf capture must belong to the current incident')
+            perf_capture = _load_json(capture_path)
+            if sorted(perf_capture.get('perf', {}).get('pids', [])) != sorted(pids):
+                raise ValueError('captured backend PIDs do not match this incident')
+        else:
+            perf_capture = _capture_perf(
+                anomaly_dir, pids, args.perf_seconds, args.perf_frequency, args.stackcollapse, env,
+            )
         case.setdefault("anomaly", {})["perf"] = perf_capture.get("perf")
         case["anomaly"]["perf_postprocess"] = perf_capture.get("postprocess")
         _write_json(case_path, case)
@@ -605,8 +644,25 @@ def main() -> int:
             raise RuntimeError("perf/source input was not generated: {}".format(perf_capture.get("postprocess")))
         _stage(stages, "perf_capture_and_function_range", "completed", perf_capture.get("postprocess"))
 
+        from sysinsight_shap import explain_subprocess, compact_evidence
+        _stage(stages, 'shap_model_attribution', 'running')
+        experiments=case.get('active_experiments') or []
+        tp_runs=[r for r in experiments if r.get('kind')=='sysinsight']
+        # Experiment phase is captured with the backend snapshot, not guessed
+        # later when the LLM eventually starts running.
+        shap_context={'workload':case.get('workload','unknown'),
+                      'phase':tp_runs[0].get('phase','unknown') if len(tp_runs)==1 else 'unknown'}
+        full_shap_analysis = explain_subprocess(perf_capture['postprocess']['counts_path'],context=shap_context)
+        _write_json(incident_dir / 'shap_analysis.json', full_shap_analysis)
+        shap_analysis = compact_evidence(full_shap_analysis)
+        result['shap_analysis'] = shap_analysis
+        _stage(stages, 'shap_model_attribution', 'completed' if shap_analysis.get('status') == 'completed' else 'unavailable', {
+            'modelVersion': shap_analysis.get('modelVersion'), 'reason': shap_analysis.get('reason'),
+            'target': shap_analysis.get('explainedTarget'), 'additivityResidual': shap_analysis.get('additivityResidual')})
+
         normal_profile = _normal_profile(args.normal_profile)
         detection = _run_source_detection(case_path, anomaly_dir, normal_profile, args.dbms, args.pg_version, env)
+        detection['shap'] = shap_analysis
         case["sysinsight_source_detection"] = detection
         case.setdefault("anomaly", {})["sysinsight_source_detection"] = detection
         _write_json(case_path, case)
@@ -645,6 +701,7 @@ def main() -> int:
             "static_parameter_evidence": len(input_payload.get("source_evidence", {}).get("static_parameter_evidence", [])),
         })
 
+        _stage(stages, 'llm_candidate_generation', 'running', {'model': args.model})
         api = _api_result(case_path, input_path, incident_dir / "sysinsight_api", args, env)
         result["api"] = {
             "status": "completed",
@@ -657,6 +714,7 @@ def main() -> int:
         _stage(stages, "llm_candidate_generation", "completed", result["api"])
 
         db_args = _db_args(args)
+        _stage(stages, 'candidate_validation', 'running')
         selected = _candidate_and_validation(api, args, db_args)
         _write_json(incident_dir / "candidate_validation.json", selected)
         result["candidate_validation"] = selected
@@ -674,6 +732,7 @@ def main() -> int:
         sql, sql_source = _sql_from_case(case, args.validation_sql)
         result["validation_sql"] = {"source": sql_source, "sql": sql}
         db = DatabaseClient(args.db, args.db_user, args.host, args.port, args.run_as, timeout=max(30.0, args.sql_timeout))
+        _stage(stages, 'baseline_replay', 'running')
         baseline = _measure_sql(db, sql, args, "baseline")
         if baseline.get("status") != "completed":
             raise RuntimeError("baseline validation SQL failed: {}".format(baseline))
@@ -683,6 +742,7 @@ def main() -> int:
         tuned: Dict[str, Any] = {}
         configuration = candidate.get("validation", {}).get("configuration", {})
         applier = TemporaryPostgresConfiguration(db_args, dict(configuration), "sysinsight-live", allow_restart=False)
+        _stage(stages, 'temporary_candidate_apply_and_tuned_replay', 'running')
         try:
             with applier as applied:
                 tuned = _measure_sql(
@@ -711,6 +771,7 @@ def main() -> int:
             "tuned": tuned,
         })
 
+        _stage(stages, 'restore_and_post_restore_replay', 'running')
         restored = _measure_sql(db, sql, args, "restored")
         result["restored_replay"] = restored
         if restored.get("status") != "completed":
@@ -745,6 +806,9 @@ def main() -> int:
         _write_json(result_path, result)
         return 0
     except Exception as exc:
+        for pending in list(stages):
+            if pending.get('status') == 'running':
+                _stage(stages, pending['name'], 'failed', {'error': '{}: {}'.format(type(exc).__name__, exc)})
         result["status"] = "failed"
         result["error"] = "{}: {}".format(type(exc).__name__, exc)
         result["traceback"] = traceback.format_exc()

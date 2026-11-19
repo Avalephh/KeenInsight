@@ -1,0 +1,67 @@
+{
+  "sourceModelSha256": "bfe2bbb0c93dc30c342e6ddb16f8b3f72d271e6bb45596533f705d00efeaa484",
+  "sourceDatasetSha256": "654512f889d0c26ddcaa4346eda82b2f7b5ba5b181b3da66df38320cfbd1b58f",
+  "method": "Independent later time batch, six existing scenarios; not used to train the pinned model",
+  "validation": {
+    "maePercentagePoints": 28.44550709049689,
+    "r2": -4.964181716862031,
+    "rows": 6,
+    "scenarioGroups": 6
+  },
+  "candidateValidation": {
+    "maePercentagePoints": 17.465033610716464,
+    "r2": -1.2697021796772119
+  },
+  "candidatePromoted": false,
+  "evaluationSha256": "3308cecad4a55c0905fe3fcb741499504a301fa9ba743b0281669ae9668c3e1f",
+  "protocolSha256": "e97cf5dd1711e6522a4da14ebd35931d45d2b8e27ac4da836077ad956fdd2ea1",
+  "testRows": [
+    {
+      "scenarioId": "tp_stock_level_burst",
+      "countsSha256": "0be540c32e5b64b1c915d16214b3646ddd3e39e6a244ed7338b0895b6dab5420",
+      "target": 0.44329834621320724,
+      "legacyPrediction": 0.5548199518479622,
+      "candidatePrediction": 0.37239812973897485
+    },
+    {
+      "scenarioId": "tp_full_mix_surge_high",
+      "countsSha256": "33ec4773de17d76b4f2d2fc09ba0617af7f7202345298b1be94bdeb1ee64f385",
+      "target": 0.2343486368883758,
+      "legacyPrediction": 0.6049703733543216,
+      "candidatePrediction": 0.46286388701434383
+    },
+    {
+      "scenarioId": "tp_wal_checkpoint",
+      "countsSha256": "896d0cd86707592644b5082aba7d27ea9533c48e8db7998486576aa001d04d37",
+      "target": 0.13783201722900215,
+      "legacyPrediction": 0.5449382421321552,
+      "candidatePrediction": 0.3694748350400981
+    },
+    {
+      "scenarioId": "tp_order_status_hot",
+      "countsSha256": "f46cf59a1fa977d71c42b55380c39c16c5895d08da443cf06e50c1b5d4c24fb7",
+      "target": 0.15755627009646303,
+      "legacyPrediction": 0.5576456534479515,
+      "candidatePrediction": 0.44291864815036863
+    },
+    {
+      "scenarioId": "tp_payment_hot",
+      "countsSha256": "216343aea1a074e05d5c3dc0f2f3c3cd1703c0ecf8be8871a29009765bba2688",
+      "target": 0.45644447215813433,
+      "legacyPrediction": 0.5839318510952616,
+      "candidatePrediction": 0.5763508463800909
+    },
+    {
+      "scenarioId": "tp_stock_level_hot",
+      "countsSha256": "db579a2333c5cea7c365a5a6d58ff130fec27add9bac771fe4dc6f1178fc0b5c",
+      "target": 0.24144389009993406,
+      "legacyPrediction": 0.5313479862372779,
+      "candidatePrediction": 0.35301887005576327
+    }
+  ],
+  "limitations": [
+    "Only one independent time batch with six scenario measurements; confidence remains limited.",
+    "Historical and newly aligned target windows differ; domain shift is explicitly tested, not concealed."
+  ],
+  "publishedAt": "2026-10-24T08:33:10.712104+00:00"
+}

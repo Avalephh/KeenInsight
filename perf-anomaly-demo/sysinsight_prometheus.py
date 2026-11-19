@@ -408,6 +408,7 @@ def build_sysinsight_input(
         "database_metrics": database_metrics,
         "function_anomalies": steps[6]["data"],
         "source_evidence": source_evidence,
+        "shap_analysis": source_detection.get('shap') if isinstance(source_detection, dict) else None,
         "tuning_context": steps[7]["data"],
         "prometheus_capture": prometheus,
         "steps": steps,

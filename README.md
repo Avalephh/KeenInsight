@@ -1,5 +1,9 @@
 # 数据库性能监控与 SysInsight Demo
 
+重启恢复／新机部署统一入口：`bash scripts/deploy.sh install`；
+日常管理用 `start|restart|stop|status`。首次部署需要准备数据库、真实模型和私有 API 配置，
+具体步骤见 [部署说明](monitoring/DEPLOYMENT.md)；脚本不会自动覆盖数据库或清空优化记录。
+
 这个 Git 工作区保存当前 Demo 的可复现源码和配置，包含：
 
 - `monitoring/`：原生 Prometheus、node_exporter、postgres_exporter 和 Grafana OSS 的本机监控配置与启动脚本；

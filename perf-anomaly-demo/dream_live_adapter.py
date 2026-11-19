@@ -109,10 +109,15 @@ async def run_one(args: argparse.Namespace) -> Dict[str, Any]:
         "shared_blks_hit": 0,
         "shared_blks_read": 0,
     }
+    args._portal_evidence = {"query": sql, "old_time": duration_s}
 
     async with DBAgent(configs=configs) as agent:
+        args._portal_evidence.update(api_model=agent.action_manager.api_runtime.get('model'),
+                                     api_base=agent.action_manager.api_runtime.get('base_url'))
         if plan_json is None:
             plan_json = agent.db.get_plan(sql)
+        collected_plan = plan_json
+        args._portal_evidence["plan_json"] = collected_plan
         plan_json = _plan_or_fallback(plan_json)
         query_info = QueryInfo(
             query_id=args.query_id,
@@ -122,6 +127,11 @@ async def run_one(args: argparse.Namespace) -> Dict[str, Any]:
             external_metrics=_external_metrics(),
             execution_time=duration_s,
             is_rewrite=False,
+        )
+        query_info.metric_provenance = (
+            'SQL, execution runtime and EXPLAIN plan come from PostgreSQL. '
+            'Internal and external metric arrays are compatibility placeholders, '
+            'not collected measurements; their zeros must be treated as unknown, not zero CPU/I/O.'
         )
 
         state: Dict[str, Any] = {
@@ -138,31 +148,68 @@ async def run_one(args: argparse.Namespace) -> Dict[str, Any]:
             state["current_root"] = root_causes
             predicted_explanation = "root cause supplied by bridge configuration"
         else:
-            predicted_root, state, predicted_explanation = await agent.planner.predict(
-                query_info, state, agent.memory_manager
-            )
+            try:
+                predicted_root, state, predicted_explanation = await agent.planner.predict(
+                    query_info, state, agent.memory_manager
+                )
+            finally:
+                args._portal_evidence['diagnosis_trace'] = getattr(agent.planner, 'last_diagnosis', {})
+                _write(Path(args.output).with_name('diagnosis_trace.json'), args._portal_evidence['diagnosis_trace'])
             root_causes = predicted_root
 
         if isinstance(root_causes, str):
             root_causes = [root_causes]
+        args._portal_evidence["diagnosis_results"] = {
+            "query_id": args.query_id, "root_causes": root_causes or [],
+            "confidence": state.get("confidence") or {}, "explanation": predicted_explanation,
+            "rule_matches_detail": [],
+        }
         if not root_causes or root_causes == ["normal"]:
             return {
+                **args._portal_evidence,
                 "status": "no_action",
+                "api_model": agent.action_manager.api_runtime.get("model"),
+                "api_base": agent.action_manager.api_runtime.get("base_url"),
                 "query_id": args.query_id,
                 "queryid": args.queryid,
                 "root_causes": root_causes,
                 "explanation": predicted_explanation,
                 "old_time": duration_s,
+                "query": sql,
+                "plan_json": collected_plan,
+                "diagnosis_results": {
+                    "query_id": args.query_id, "root_causes": root_causes or [],
+                    "confidence": state.get("confidence") or {},
+                    "explanation": predicted_explanation,
+                    "rule_matches_detail": [],
+                },
             }
 
-        evaluation = await agent.action_manager.step(query_info, root_causes, mode="exploit")
+        try:
+            evaluation = await agent.action_manager.step(query_info, root_causes, mode="exploit")
+        finally:
+            args._portal_evidence['action_trace'] = getattr(agent.action_manager, 'last_action_trace', {})
+            candidates = getattr(query_info, 'rewrite_rule_candidates', [])
+            args._portal_evidence['diagnosis_results']['rule_matches_detail'] = [
+                {**rule, 'evidence_kind': 'structural_candidate_provided_to_action_llm',
+                 'applied': None, 'source': 'DREAM SQLRuleMatcher'} for rule in candidates
+            ]
         result: Dict[str, Any] = {
+            **args._portal_evidence,
             "status": "completed",
             "query_id": args.query_id,
             "queryid": args.queryid,
             "query": sql,
             "root_causes": root_causes,
             "prediction_explanation": predicted_explanation,
+            "plan_json": collected_plan,
+            "diagnosis_results": {
+                "query_id": args.query_id,
+                "root_causes": root_causes,
+                "confidence": state.get("confidence") or {},
+                "explanation": predicted_explanation,
+                "rule_matches_detail": args._portal_evidence['diagnosis_results']['rule_matches_detail'],
+            },
             "evaluation": evaluation,
             "old_time": duration_s,
             "mean_time_ms": args.mean_time_ms,
@@ -195,6 +242,7 @@ def main() -> int:
         return 0
     except Exception as exc:
         result = {
+            **getattr(args, "_portal_evidence", {}),
             "status": "failed",
             "error": "{}: {}".format(type(exc).__name__, exc),
             "query_id": args.query_id,

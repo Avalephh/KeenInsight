@@ -46,6 +46,7 @@
     <h1>SysInsight / DREAM 实验控制台</h1>
     <a href="http://127.0.0.1:3000/d/sysinsight-experiment-lab?orgId=1" target="_blank">Grafana 实验看板</a>
     <a href="/ui" target="_blank">自动联动管理</a>
+    <a href="/keeninsight/" target="_blank">KeenInsight 动态结果</a>
     <button id="refreshButton" class="secondary" onclick="refreshAll(true)">刷新</button>
   </header>
   <main>
@@ -152,7 +153,7 @@
       try {
         selectedSql = await get('/api/v1/lab/sql/' + encodeURIComponent($('sqlCatalog').value));
         $('sqlText').textContent = selectedSql.query || '';
-        $('sqlMeta').innerHTML = `<b>${text(selectedSql.title)}</b><br>来源：${text(selectedSql.source)}<br>行数：${text(selectedSql.line_count)}；复杂度：${text(selectedSql.complexity_score)}<br>只读校验：${selectedSql.read_only ? '<span class="ok">通过</span>' : '<span class="bad">不通过</span>'}`;
+        $('sqlMeta').innerHTML = `<b>${text(selectedSql.title)}</b><br>来源：${text(selectedSql.source)}<br>行数：${text(selectedSql.line_count)}；复杂度：${text(selectedSql.complexity_score)}<br>只读校验：${selectedSql.read_only ? '<span class="ok">通过</span>' : '<span class="bad">不通过</span>'}${selectedSql.recommendation_note ? '<br><b>演示范围：</b>' + text(selectedSql.recommendation_note) : ''}`;
       } catch (e) { message('SQL 详情加载失败：' + e.message, true); }
     }
 
@@ -376,6 +377,7 @@
     }
 
     async function startDream() {
+      if (dreamRequestInFlight) return;
       if (!selectedSql || !$('sqlCatalog').value) { message('请先选择一条可执行的只读 TPC-DS SQL。', true); return; }
       dreamRequestInFlight = true;
       $('startDream').disabled = true;
@@ -406,13 +408,13 @@
 
     async function replayDream() {
       if (replayRequestInFlight) return;
-      const status = await get('/api/v1/lab/status'); const run = currentRun(status, 'dream') || status.latest_dream;
-      if (!run) return;
       replayRequestInFlight = true;
       $('replayDream').disabled = true;
       $('dreamState').textContent = '正在再次发送同一 SQL，系统正在解析并自动应用活动方案...';
       message('正在再次发送同一 SQL；防重复锁已生效，只允许一次执行...');
       try {
+        const status = await get('/api/v1/lab/status'); const run = currentRun(status, 'dream') || status.latest_dream;
+        if (!run) { message('没有可重放的 DREAM 实验。', true); return; }
         const v = await post('/api/v1/actions/lab/dream/replay', {run_id: run.run_id});
         if (v.status === 'already_completed') {
           message('优化 SQL 已经执行过，本次没有重复执行。');

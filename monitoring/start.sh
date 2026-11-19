@@ -28,7 +28,11 @@ MONITORING_DASHBOARDS_DIR="${MONITORING_DASHBOARDS_DIR:-$BASE_DIR/dashboards}"
 POSTGRES_QUERY_CONFIG="${POSTGRES_EXPORTER_QUERY_CONFIG:-$BASE_DIR/config/postgres_exporter/queries.yaml}"
 POSTGRES_EXPORTER_DATA_SOURCE_NAME="${POSTGRES_EXPORTER_DATA_SOURCE_NAME:-postgresql://postgres@/keeninsight?host=/var/run/postgresql&sslmode=disable}"
 BRIDGE_SCRIPT="${SYSINSIGHT_BRIDGE_SCRIPT:-$BASE_DIR/../perf-anomaly-demo/sysinsight_dream_bridge.py}"
-BRIDGE_PYTHON="${SYSINSIGHT_BRIDGE_PYTHON:-python3}"
+DEFAULT_BRIDGE_PYTHON=python3
+if [ -x "$BASE_DIR/../.venv/bin/python" ]; then
+  DEFAULT_BRIDGE_PYTHON="$BASE_DIR/../.venv/bin/python"
+fi
+BRIDGE_PYTHON="${SYSINSIGHT_BRIDGE_PYTHON:-$DEFAULT_BRIDGE_PYTHON}"
 BRIDGE_STATE_DB="${SYSINSIGHT_BRIDGE_STATE_DB:-$BASE_DIR/data/sysinsight_dream_bridge.sqlite3}"
 BRIDGE_OUTPUT="${SYSINSIGHT_BRIDGE_OUTPUT:-$BASE_DIR/data/sysinsight_dream_bridge}"
 BRIDGE_HTTP_LISTEN="${SYSINSIGHT_BRIDGE_LISTEN:-127.0.0.1}"
@@ -75,23 +79,22 @@ BRIDGE_SYSINSIGHT_VALIDATION_SQL="${SYSINSIGHT_CHAIN_VALIDATION_SQL:-}"
 # wants an unrestricted database service.
 PG_RESOURCE_GUARD_ENABLED="${SYSINSIGHT_PG_RESOURCE_GUARD:-1}"
 PG_SERVICE="${SYSINSIGHT_PG_SERVICE:-postgresql@${SYSINSIGHT_DB_VERSION:-12}-${SYSINSIGHT_PG_CLUSTER:-main}.service}"
-PG_CPU_QUOTA="${SYSINSIGHT_PG_CPU_QUOTA:-250%}"
-PG_MEMORY_LIMIT="${SYSINSIGHT_PG_MEMORY_LIMIT:-24G}"
+DEFAULT_PG_CPU_QUOTA="$(python3 -c 'import os; print(str(min(250,max(50,(os.cpu_count() or 1)*70)))+"%")')"
+DEFAULT_PG_MEMORY_LIMIT="$(python3 -c 'from pathlib import Path; t=next(int(x.split()[1])*1024 for x in Path("/proc/meminfo").read_text().splitlines() if x.startswith("MemTotal:")); print(min(24*1024**3,int(t*.8)))')"
+PG_CPU_QUOTA="${SYSINSIGHT_PG_CPU_QUOTA:-$DEFAULT_PG_CPU_QUOTA}"
+PG_MEMORY_LIMIT="${SYSINSIGHT_PG_MEMORY_LIMIT:-$DEFAULT_PG_MEMORY_LIMIT}"
 PG_TASKS_MAX="${SYSINSIGHT_PG_TASKS_MAX:-512}"
 
-# A peer-authenticated PostgreSQL worker cannot traverse /root. Previous
-# reproducibility runs create a readable runtime view under /tmp; use the
-# newest one automatically unless the operator explicitly selects a root.
-BRIDGE_DREAM_RUNTIME_ROOT="${SYSINSIGHT_DREAM_RUNTIME_ROOT:-}"
-if [ -z "$BRIDGE_DREAM_RUNTIME_ROOT" ]; then
-  for candidate in /tmp/dream-runtime-*; do
-    if [ -d "$candidate/dream" ] && [ -r "$candidate/dream" ]; then
-      BRIDGE_DREAM_RUNTIME_ROOT="$candidate"
-    fi
-  done
-fi
-if [ -z "$BRIDGE_DREAM_RUNTIME_ROOT" ]; then
-  BRIDGE_DREAM_RUNTIME_ROOT="$BASE_DIR/../dream"
+# Keep worker code, models and Python off /tmp; never make /root traversable.
+BRIDGE_DREAM_RUNTIME_ROOT="${SYSINSIGHT_DREAM_RUNTIME_ROOT:-/var/lib/keeninsight/dream-runtime}"
+if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
+  "$BRIDGE_PYTHON" "$BASE_DIR/deployment.py" doctor
+  python3 "$BASE_DIR/prepare_runtime.py" --runtime "$BRIDGE_DREAM_RUNTIME_ROOT" --verify
+  BRIDGE_DREAM_CONFIG="$BRIDGE_DREAM_RUNTIME_ROOT/config.json"
+  export SYSINSIGHT_DREAM_CACHE="${SYSINSIGHT_DREAM_CACHE:-$BRIDGE_DREAM_RUNTIME_ROOT/state/cache}"
+  if [ -z "${POSTGRES_SOURCE_ROOT:-}" ] && [ -d "$BASE_DIR/../third_party/postgresql-12.22/src/backend" ]; then
+    export POSTGRES_SOURCE_ROOT="$BASE_DIR/../third_party/postgresql-12.22"
+  fi
 fi
 
 mkdir -p "$BASE_DIR/run" "$BASE_DIR/logs" "$BASE_DIR/data/prometheus" "$BASE_DIR/data/grafana"
@@ -116,14 +119,16 @@ start_process() {
   local pid_file="$BASE_DIR/run/$name.pid"
   shift
 
-  if [ -f "$pid_file" ] && kill -0 "$(<"$pid_file")" 2>/dev/null; then
+  if python3 "$BASE_DIR/process_control.py" check "$pid_file"; then
     echo "$name already running (pid $(<"$pid_file"))"
     return 0
   fi
 
   nohup setsid "$@" >>"$BASE_DIR/logs/$name.log" 2>&1 </dev/null &
-  echo $! >"$pid_file"
-  echo "started $name (pid $!)"
+  local started_pid=$!
+  sleep 0.3
+  python3 "$BASE_DIR/process_control.py" stamp "$pid_file" --pid "$started_pid"
+  echo "started $name (pid $started_pid)"
 }
 
 if [ ! -x "$PROMETHEUS_BIN" ]; then
@@ -151,8 +156,10 @@ fi
 # runtime copy makes only this executable and query file reachable from /tmp
 # for the local peer-authenticated exporter process. Copying instead of using
 # a hard link also works when the checkout and /tmp are different filesystems.
-POSTGRES_EXPORTER_RUNTIME_BIN="/tmp/new-monitoring-postgres-exporter"
-POSTGRES_QUERY_RUNTIME="/tmp/new-monitoring-postgres-queries.yaml"
+EXPORTER_RUNTIME_DIR="${SYSINSIGHT_EXPORTER_RUNTIME_DIR:-/var/lib/keeninsight/exporter}"
+install -d -m 0755 "$EXPORTER_RUNTIME_DIR"
+POSTGRES_EXPORTER_RUNTIME_BIN="$EXPORTER_RUNTIME_DIR/postgres_exporter"
+POSTGRES_QUERY_RUNTIME="$EXPORTER_RUNTIME_DIR/queries.yaml"
 install -m 0755 "$POSTGRES_EXPORTER_BIN" "$POSTGRES_EXPORTER_RUNTIME_BIN"
 install -m 0644 "$POSTGRES_QUERY_CONFIG" "$POSTGRES_QUERY_RUNTIME"
 
@@ -170,6 +177,7 @@ start_process node_exporter \
 
 start_process postgres_exporter \
   runuser -u postgres -- env \
+  PGAPPNAME=keeninsight-postgres-exporter \
   DATA_SOURCE_NAME="$POSTGRES_EXPORTER_DATA_SOURCE_NAME" \
   "$POSTGRES_EXPORTER_RUNTIME_BIN" \
   --extend.query-path="$POSTGRES_QUERY_RUNTIME" \
@@ -242,6 +250,12 @@ if [ "${SYSINSIGHT_BRIDGE_ENABLED:-1}" != "0" ]; then
       bridge_args+=(--tune-without-alert)
       ;;
   esac
+  if [ -n "${SYSINSIGHT_CODEX_CONFIG_DIR:-}" ]; then
+    bridge_args=(
+      "$BRIDGE_PYTHON" "$BASE_DIR/codex_api_launcher.py"
+      --config-dir "$SYSINSIGHT_CODEX_CONFIG_DIR" -- "${bridge_args[@]}"
+    )
+  fi
   start_process sysinsight_dream_bridge "${bridge_args[@]}"
 fi
 
@@ -253,3 +267,5 @@ if curl -fsS --max-time 3 -X POST http://127.0.0.1:9090/-/reload >/dev/null 2>&1
 else
   echo "Prometheus configuration reload unavailable; startup config remains active" >&2
 fi
+
+python3 "$BASE_DIR/deployment.py" health --wait 60

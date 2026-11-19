@@ -11,6 +11,7 @@ the second execution separately.
 from __future__ import annotations
 
 import datetime as dt
+import contextlib
 import copy
 import hashlib
 import json
@@ -312,7 +313,9 @@ def _query_catalog() -> List[Dict[str, Any]]:
                 # Q4 used to be the default entry, but its original SQL
                 # exceeded the lab timeout during the stability audit, so it
                 # must remain selectable without being presented as a demo.
-                "recommended": query_id in {31, 44, 88},
+                "recommended": query_id in {31, 88},
+                'demo_capability': 'automatic_rewrite' if query_id in {31,88} else 'diagnosis_candidate' if query_id==44 else 'exploratory',
+                'recommendation_note': ('Current LLM may propose index DDL for Q44. Diagnosis/evaluation works, but DDL is not automatically published; use Q31/Q88 for the full automatic-application demo.' if query_id==44 else ''),
                 "schema": "tpcds",
                 "read_only": _is_read_only(text),
             }
@@ -1710,7 +1713,9 @@ class LabController:
                     "norm_query_string": norm_query,
                     "application_name": application_name,
                 })
-            result = self.store.clear_dream_records(archive_path)
+            profiler = getattr(self.bridge, 'sql_profiler', None)
+            with (profiler.pause() if profiler else contextlib.nullcontext()):
+                result = self.store.clear_dream_records(archive_path)
             result["removed_automatic_applications"] = removed_applications
             if reset_pg_stat_statements:
                 try:
@@ -1832,19 +1837,24 @@ class LabController:
         session_settings: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[str, Dict[str, Any]]:
         started_at = utc_now()
+        execution_id = "lab-exec-" + hashlib.sha256((run_id + phase + str(time.time_ns())).encode()).hexdigest()[:16]
+        application_name = self._application_prefix(run_id, "dream") + phase
+        profiler = getattr(self.bridge, 'sql_profiler', None)
         # PostgreSQL truncates application_name at NAMEDATALEN-1 (63 bytes).
         # Keep the run/phase marker short so the sampler can always distinguish
         # the lab connections, including DREAM replay sessions.
-        result = self.db.execute_timed(
-            query,
-            application_name=self._application_prefix(run_id, "dream") + phase,
-            search_path=[self.bridge.args.db_schema, "public"] if self.bridge.args.db_schema != "public" else ["public"],
-            session_settings=session_settings,
-            timeout=max(30.0, min(180.0, float(self.bridge.args.db_timeout) * 6.0)),
-        )
+        with (profiler.managed(application_name, query, execution_id, run_id, phase) if profiler else contextlib.nullcontext()):
+            result = self.db.execute_timed(
+                query,
+                application_name=application_name,
+                search_path=[self.bridge.args.db_schema, "public"] if self.bridge.args.db_schema != "public" else ["public"],
+                session_settings=session_settings,
+                timeout=max(30.0, min(180.0, float(self.bridge.args.db_timeout) * 6.0)),
+            )
         execution_id = self.store.add_lab_execution(
             {
                 "run_id": run_id,
+                "execution_id": execution_id,
                 "sql_id": sql_id,
                 "phase": phase,
                 "started_at": started_at,
@@ -1921,20 +1931,21 @@ class LabController:
                 raise RuntimeError("baseline SQL failed: {}".format(baseline.get("error", "unknown error")))
             if stop_event.is_set():
                 raise LabStopped("operator requested stop")
-            sql_key = self._observation_for_lab_sql(item, float(baseline.get("duration_ms") or 0.0))
-            self.store.update_lab_run(
-                run_id,
-                status="running",
-                phase="dream_analysis",
-                result_patch={
-                    "baseline_execution_id": execution_id,
-                    "baseline": baseline,
-                    "sql_key": sql_key,
-                },
-            )
-            job_id = self.store.enqueue_job(sql_key, None, cooldown=0.0, force=True)
-            if not job_id:
-                raise RuntimeError("selected SQL already has an active DREAM improvement; clear the lab records first")
+            # Reserve the manual job atomically with publishing its measured
+            # completion. The automatic collector must not steal this same
+            # signal between upsert and enqueue and make the lab fail.
+            with self.store._lock:
+                sql_key = self._observation_for_lab_sql(item, float(baseline.get("duration_ms") or 0.0))
+                self.store.update_lab_run(
+                    run_id, status="running", phase="dream_analysis",
+                    result_patch={"baseline_execution_id": execution_id, "baseline": baseline, "sql_key": sql_key},
+                )
+                job_id = self.store.enqueue_job(sql_key, None, cooldown=0.0, force=True)
+                if not job_id:
+                    raise RuntimeError("selected SQL already has an active DREAM improvement; clear the lab records first")
+                # Expose the real job during LLM/evaluation, not only after
+                # completion, so the frontend can follow actual live status.
+                self.store.update_lab_run(run_id,result_patch={'job_id':job_id,'trigger_source':'manual'})
             dream_future = self.bridge.executor.submit(self.bridge._run_dream_job, job_id)
             self.bridge.futures.append(dream_future)
             job_result = dream_future.result()

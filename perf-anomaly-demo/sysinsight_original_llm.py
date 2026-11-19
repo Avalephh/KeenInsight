@@ -131,6 +131,12 @@ def resolve_model(api_base: str, api_key: str, requested: str) -> Tuple[str, Dic
     for model_id in model_ids:
         if re.sub(r"[^a-z0-9]", "", model_id.lower()) == wanted:
             return model_id, {"requested": requested, "resolved": model_id, "model_ids": model_ids}
+    if not model_ids:
+        # Some OpenAI-compatible relay gateways serve chat completions but
+        # expose an empty /models list. Keep the configured model name; the
+        # actual acquisition request still validates whether it is usable.
+        return requested, {"requested": requested, "resolved": requested,
+                           "model_ids": [], "model_listing": "empty; using configured model"}
     raise RuntimeError("model {} is not listed; available models: {}".format(requested, model_ids))
 
 
@@ -292,6 +298,21 @@ def case_path(path_text: str) -> Path:
     return path
 
 
+def live_workload_template(template: str, case_result: Dict[str, Any]) -> str:
+    """Replace the upstream demo's fixed scale/thread prose for live alerts."""
+    if case_result.get('mode') != 'live_alert':
+        return template
+    legacy = '- Benchmark tool: tpcc;\n - Data scale: 100 w;\n - Concurrent threads: 16 threads;'
+    context = {
+        'workload_label': case_result.get('workload') or 'unknown',
+        'backend_sessions_in_alert_snapshot': len(case_result.get('active_queries') or []),
+        'active_experiments': case_result.get('active_experiments') or [],
+        'data_scale': 'not measured by this alert collector; do not assume 100 warehouses',
+        'concurrency_note': 'Snapshot backend sessions are not a claim about total configured client threads.',
+    }
+    return template.replace(legacy, 'Live workload context (measured snapshot / declared experiment configuration):\n'+json.dumps(context,ensure_ascii=False,default=str))
+
+
 def original_context(
     case_result: Dict[str, Any], case_file: Path, profile: DatabaseProfile,
     sysinsight_input: Optional[Dict[str, Any]] = None,
@@ -341,6 +362,10 @@ def original_context(
         raise FileNotFoundError("original SysInsight key-function file: {}".format(key_file))
 
     promptlib = ParameterLibrary(task_context)
+    promptlib.question_template = live_workload_template(promptlib.question_template, case_result)
+    if case_result.get('mode') == 'live_alert':
+        task_context['source_compatibility_workload'] = task_context['workload']
+        task_context['workload'] = str(case_result.get('workload') or 'unknown')
     promptlib.config = initial_config
     promptlib.keyFunction_file = str(key_file)
     promptlib.resource = resource_snapshot(case_result)
@@ -366,6 +391,18 @@ def original_context(
     }
     if source_evidence.get("status") == "completed":
         promptlib.question_template += "\n\n" + render_source_evidence(source_evidence)
+    shap_analysis = (sysinsight_input or {}).get('shap_analysis') or source_detection.get('shap') or {}
+    if shap_analysis.get('status') == 'completed':
+        from sysinsight_shap import llm_evidence
+        shap_context = llm_evidence(shap_analysis)
+        task_context['shap_model_version'] = shap_analysis.get('modelVersion')
+        task_context['shap_advisory_status'] = shap_context.get('status','included_experimental')
+        promptlib.question_template += (
+            '\n\nExperimental local PG12 model attribution (real tree-path-dependent TreeSHAP):\n'
+            'Attributions explain a local regression model, NOT causal parameter effects or the LLM. '
+            'If excluded_low_confidence, numerical predictions and contributions have been withheld: '
+            'do not use SHAP to select parameters. Measured source evidence and workload replay remain authoritative.\n'
+            + json.dumps(shap_context,ensure_ascii=False,default=str))
     if compact_observation:
         promptlib.question_template += (
             "\n\n10. Canonical live SysInsight observation captured for this tuning decision "

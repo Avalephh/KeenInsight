@@ -71,6 +71,14 @@ from sysinsight_prometheus import (  # noqa: E402
     collect_window,
 )
 from lab_controller import LabController  # noqa: E402
+from sql_profiling import SQLProfiler, init_schema as init_sql_profile_schema  # noqa: E402
+from keeninsight_portal import (  # noqa: E402
+    KeenInsightPortal,
+    init_schema as init_portal_schema,
+    capture as capture_portal_evidence,
+    incident_evidence as collect_portal_incident,
+    prune as prune_portal_evidence,
+)
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -113,6 +121,16 @@ def _canonical_sql(sql: str) -> str:
     text = _SQL_STRING.sub("?", text)
     text = _PARAMETER.sub("?", text)
     text = _SQL_NUMBER.sub("?", text)
+    # pg_stat_statements parameterizes scalar NULL/boolean constants too.
+    # Keep IS [NOT] NULL/TRUE/FALSE predicates and quoted identifiers intact:
+    # those are syntax, not literal-value placeholders.
+    pattern = re.compile(r'"(?:""|[^"])*"|\b(?:null|true|false)\b', re.IGNORECASE)
+    source = text
+    def normalize_constant(match):
+        if match.group(0).startswith('"') or re.search(r'\bis(?:\s+not)?\s*$', source[:match.start()], re.IGNORECASE):
+            return match.group(0)
+        return '?'
+    text = pattern.sub(normalize_constant, text)
     return " ".join(text.lower().split()).strip().rstrip(";").strip()
 
 
@@ -551,8 +569,20 @@ class DatabaseClient:
             row["hint_pattern"] = _hint_table_pattern(str(row.get("query", "")))
         return rows
 
-    def collect_active(self, limit: int = 200) -> List[Dict[str, Any]]:
+    def collect_active(self, limit: int = 200, include_recent_idle: bool = False) -> List[Dict[str, Any]]:
         limit = max(1, min(int(limit), 2000))
+        # A pgbench/backend session survives between short transactions. It
+        # can be idle at this instant yet execute throughout the perf window.
+        state_filter = "state = 'active'"
+        if include_recent_idle:
+            state_filter = """(state = 'active' OR (
+                state IN ('idle', 'idle in transaction')
+                AND state_change > clock_timestamp() - interval '5 seconds'
+                AND query ~* '^\\s*(select|with|insert|update|delete|begin|commit|end)\\M'
+                AND application_name !~* '(exporter|grafana|sysinsight-dream-bridge|autovacuum)'
+            )) AND application_name <> 'keeninsight-api'
+               AND application_name !~* '(exporter|grafana|sysinsight-dream-bridge|sysinsight-dream-worker|sysinsight-live-)'
+               AND query !~* '\\m(pg_stat[a-z_]*|pg_settings|pg_catalog|information_schema)\\M'"""
         query = """
             SELECT pid::text AS pid,
                    usename AS username,
@@ -563,17 +593,18 @@ class DatabaseClient:
                    wait_event,
                    query,
                    query_start::text AS query_start,
+                   backend_start::text AS backend_start,
                    EXTRACT(EPOCH FROM (clock_timestamp() - query_start)) * 1000.0 AS duration_ms
             FROM pg_stat_activity
             WHERE datname = current_database()
-              AND state = 'active'
+              AND {state_filter}
               AND pid <> pg_backend_pid()
               AND backend_type = 'client backend'
               AND query NOT ILIKE '%pg_stat_activity%'
               AND query NOT ILIKE '%pg_stat_statements%'
-            ORDER BY duration_ms DESC
+            ORDER BY (state = 'active') DESC, duration_ms DESC
             LIMIT {limit}
-        """.format(limit=limit)
+        """.format(limit=limit, state_filter=state_filter)
         rows = self._rows(query, "sysinsight-dream-bridge-active")
         for row in rows:
             row["canonical_sql"] = _canonical_sql(str(row.get("query", "")))
@@ -917,12 +948,35 @@ class StateStore:
                 "ALTER TABLE sql_observations ADD COLUMN last_interval_time_ms REAL NOT NULL DEFAULT 0",
                 "ALTER TABLE sql_observations ADD COLUMN last_interval_max_ms REAL NOT NULL DEFAULT 0",
                 "ALTER TABLE sql_observations ADD COLUMN last_interval_max_changed INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE sql_observations ADD COLUMN pending_completed_ms REAL NOT NULL DEFAULT 0",
+                "ALTER TABLE dream_jobs ADD COLUMN trigger_source TEXT",
+                "ALTER TABLE dream_jobs ADD COLUMN source_completion_ms REAL",
             ):
                 try:
                     conn.execute(statement)
                 except sqlite3.OperationalError as exc:
                     if "duplicate column name" not in str(exc).lower():
                         raise
+            init_portal_schema(conn)
+            init_sql_profile_schema(conn)
+            version = conn.execute("SELECT value FROM meta WHERE key='canonical_sql_version'").fetchone()
+            if not version or version[0] != '2':
+                for row in conn.execute('SELECT sql_key,query_text FROM sql_observations').fetchall():
+                    conn.execute('UPDATE sql_observations SET canonical_sql=? WHERE sql_key=?',
+                                 (_canonical_sql(row['query_text']),row['sql_key']))
+                for row in conn.execute('SELECT * FROM live_sql_samples').fetchall():
+                    canonical = _canonical_sql(row['query_text'])
+                    if canonical == row['canonical_sql']:
+                        continue
+                    conn.execute('''INSERT INTO live_sql_samples(canonical_sql,query_text,username,first_seen,last_seen)
+                        VALUES(?,?,?,?,?) ON CONFLICT(canonical_sql) DO UPDATE SET
+                        query_text=CASE WHEN excluded.last_seen>live_sql_samples.last_seen THEN excluded.query_text ELSE live_sql_samples.query_text END,
+                        username=CASE WHEN excluded.last_seen>live_sql_samples.last_seen THEN excluded.username ELSE live_sql_samples.username END,
+                        first_seen=min(first_seen,excluded.first_seen),last_seen=max(last_seen,excluded.last_seen)''',
+                        (canonical,row['query_text'],row['username'],row['first_seen'],row['last_seen']))
+                    conn.execute('DELETE FROM live_sql_samples WHERE canonical_sql=?',(row['canonical_sql'],))
+                conn.execute("INSERT INTO meta(key,value) VALUES('canonical_sql_version','2') ON CONFLICT(key) DO UPDATE SET value='2'")
+            conn.execute('CREATE INDEX IF NOT EXISTS sql_observations_identity_idx ON sql_observations(database_name,username,queryid,canonical_sql)')
 
     def recover_jobs(self) -> List[str]:
         """Recover jobs left behind by a terminated bridge process.
@@ -947,6 +1001,30 @@ class StateStore:
                 "SELECT job_id FROM dream_jobs WHERE status='queued' ORDER BY requested_at"
             ).fetchall()
             return [str(row["job_id"]) for row in rows]
+
+    def recover_incidents(self) -> List[str]:
+        """Close alert workflows whose owning bridge was terminated.
+
+        Unlike a read-only DREAM diagnosis, an interrupted global-parameter
+        experiment must not be replayed blindly. Preserve its evidence and
+        show interruption, not an indefinitely running or invented success.
+        Called only by the new single-owner bridge during startup.
+        """
+        with self._lock, self._connection() as conn:
+            records = [dict(row) for row in conn.execute(
+                "SELECT incident_id,sysinsight_json FROM incidents WHERE status IN ('queued','running')"
+            )]
+        for record in records:
+            result = _decode_json(record.get("sysinsight_json"), {}) or {}
+            result.update({
+                "reason": "bridge_restart_interrupted_workflow",
+                "explanation": "Bridge restarted before this alert workflow completed; retained evidence is available and the workflow was not automatically replayed.",
+                "error": "Bridge restarted before this alert workflow completed; inspect retained stages and configuration restoration evidence.",
+                "recovery": {"status": "interrupted", "recovered_at": utc_now(),
+                             "automatically_replayed": False},
+            })
+            self.finish_incident(record["incident_id"], "failed", result)
+        return [record["incident_id"] for record in records]
 
     @staticmethod
     def _row(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
@@ -1331,6 +1409,10 @@ class StateStore:
                 "UPDATE incidents SET finished_at=?, status=?, sysinsight_json=? WHERE incident_id=?",
                 (utc_now(), status, _json(sysinsight) if sysinsight is not None else None, incident_id),
             )
+            row = conn.execute("SELECT directory FROM incidents WHERE incident_id=?", (incident_id,)).fetchone()
+            if row:
+                capture_portal_evidence(conn, "alert", incident_id,
+                    collect_portal_incident(row["directory"] or ROOT, sysinsight))
 
     def incident_directory(self, incident_id: Optional[str]) -> Optional[Path]:
         if not incident_id:
@@ -1345,13 +1427,13 @@ class StateStore:
         now = utc_now()
         active_by_canonical: Dict[str, Mapping[str, Any]] = {}
         for active in active_rows:
-            canonical = str(active.get("canonical_sql") or _canonical_sql(str(active.get("query", ""))))
+            canonical = _canonical_sql(str(active.get('query') or '')) or str(active.get('canonical_sql') or '')
             if canonical and canonical not in active_by_canonical:
                 active_by_canonical[canonical] = active
         keys: List[str] = []
         with self._lock, self._connection() as conn:
             for active in active_rows:
-                canonical = str(active.get("canonical_sql") or _canonical_sql(str(active.get("query", ""))))
+                canonical = _canonical_sql(str(active.get('query') or '')) or str(active.get('canonical_sql') or '')
                 active_query = str(active.get("query", "")).strip()
                 if canonical and active_query and "$" not in active_query and "?" not in active_query:
                     conn.execute(
@@ -1367,12 +1449,17 @@ class StateStore:
                     )
             for row in rows:
                 query = str(row.get("query", "")).strip()
-                canonical = str(row.get("canonical_sql") or _canonical_sql(query))
+                canonical = _canonical_sql(query) or str(row.get('canonical_sql') or '')
                 if not canonical:
                     continue
                 queryid = str(row.get("queryid", ""))
                 username = str(row.get("username", ""))
                 key = "{}:{}:{}:{}".format(row.get("database", ""), username, queryid, hashlib.sha256(canonical.encode()).hexdigest()[:20])
+                retained = conn.execute('''SELECT sql_key FROM sql_observations WHERE database_name=? AND username=?
+                    AND queryid=? AND canonical_sql=? ORDER BY last_seen DESC LIMIT 1''',
+                    (str(row.get('database','')),username,queryid,canonical)).fetchone()
+                if retained:
+                    key = str(retained['sql_key'])
                 active = active_by_canonical.get(canonical)
                 saved_sample = conn.execute(
                     "SELECT query_text, username FROM live_sql_samples WHERE canonical_sql=?",
@@ -1506,6 +1593,12 @@ class StateStore:
                         (interval_calls, key),
                     )
                 keys.append(key)
+                if interval_calls > 0 and _is_read_only_sql(query):
+                    completed_ms = interval_time_ms / interval_calls
+                    if max_changed:
+                        completed_ms = max(completed_ms,current_max)
+                    conn.execute('UPDATE sql_observations SET pending_completed_ms=max(pending_completed_ms,?) WHERE sql_key=?',
+                                 (max(0.0,completed_ms),key))
         return keys
 
     def prune_observation_samples(
@@ -1612,6 +1705,8 @@ class StateStore:
             before_samples = int(
                 conn.execute("SELECT COUNT(*) FROM sql_observation_samples").fetchone()[0]
             )
+            prune_portal_evidence(conn, cutoff)
+            changes("sql_profiles", "DELETE FROM sql_profiles WHERE COALESCE(finished_at,started_at) < ?", (cutoff,))
 
             # Select artifact identities before deleting their audit rows.
             expired_runs = conn.execute(
@@ -1913,12 +2008,8 @@ class StateStore:
         ]
         params: List[Any] = [int(min_calls), float(mean_ms), float(max_ms)]
         if completed_only:
-            where.append(
-                "last_interval_calls > 0 AND "
-                "(last_interval_time_ms / NULLIF(last_interval_calls, 0) >= ? "
-                "OR (last_interval_max_changed = 1 AND last_interval_max_ms >= ?))"
-            )
-            params.extend([float(completion_threshold_ms), float(completion_threshold_ms)])
+            where.append("pending_completed_ms >= ?")
+            params.append(float(completion_threshold_ms))
         params.append(query_limit)
         with self._lock, self._connection() as conn:
             rows = conn.execute(
@@ -2187,10 +2278,14 @@ class StateStore:
                 "dream_jobs",
                 "improvements",
                 "lab_sql_executions",
+                "sql_profiles",
             ):
                 counts[table] = int(conn.execute("SELECT COUNT(*) FROM {}".format(table)).fetchone()[0])
             counts["lab_dream_runs"] = int(
                 conn.execute("SELECT COUNT(*) FROM lab_runs WHERE kind='dream'").fetchone()[0]
+            )
+            counts["keeninsight_sql_evidence"] = int(
+                conn.execute("SELECT COUNT(*) FROM keeninsight_evidence WHERE entity_type='sql'").fetchone()[0]
             )
             # sqlite3.Connection.backup copies freelist pages as well. After
             # months of churn that turned a small logical workspace into a
@@ -2199,6 +2294,7 @@ class StateStore:
             if archive_path.exists():
                 raise RuntimeError("DREAM archive already exists: {}".format(archive_path))
             conn.execute("VACUUM INTO ?", (str(archive_path),))
+            conn.execute("DELETE FROM keeninsight_evidence WHERE entity_type='sql'")
             for table in (
                 "sql_observation_samples",
                 "live_sql_samples",
@@ -2206,6 +2302,7 @@ class StateStore:
                 "improvements",
                 "sql_observations",
                 "lab_sql_executions",
+                "sql_profiles",
             ):
                 conn.execute("DELETE FROM {}".format(table))
             conn.execute("DELETE FROM lab_runs WHERE kind='dream'")
@@ -2221,6 +2318,11 @@ class StateStore:
     ) -> Optional[str]:
         now = time.time()
         with self._lock, self._connection() as conn:
+            pending = conn.execute('SELECT pending_completed_ms FROM sql_observations WHERE sql_key=?',(sql_key,)).fetchone()
+            completion_ms = float(pending[0]) if pending else 0.0
+            # Retain completed observations across active→idle poll races;
+            # acknowledge only once scheduling/the existing-job gate runs.
+            conn.execute('UPDATE sql_observations SET pending_completed_ms=0 WHERE sql_key=?',(sql_key,))
             active = conn.execute(
                 "SELECT 1 FROM improvements WHERE sql_key=? AND status='active' LIMIT 1", (sql_key,)
             ).fetchone()
@@ -2258,8 +2360,9 @@ class StateStore:
                     return None
             job_id = "dream-{}-{}".format(dt.datetime.now().strftime("%Y%m%d%H%M%S"), hashlib.sha1((sql_key + str(now)).encode()).hexdigest()[:10])
             conn.execute(
-                "INSERT INTO dream_jobs(job_id,sql_key,incident_id,retry_of,status,requested_at) VALUES(?,?,?,?,?,?)",
-                (job_id, sql_key, incident_id, retry_of, "queued", utc_now()),
+                "INSERT INTO dream_jobs(job_id,sql_key,incident_id,retry_of,status,requested_at,trigger_source,source_completion_ms) VALUES(?,?,?,?,?,?,?,?)",
+                (job_id, sql_key, incident_id, retry_of, "queued", utc_now(),
+                 'manual' if force else 'automatic_completed_sql',completion_ms if not force and completion_ms>0 else None),
             )
             return job_id
 
@@ -2312,6 +2415,7 @@ class StateStore:
                 "UPDATE dream_jobs SET status=?, finished_at=?, result_json=?, error=?, input_path=?, output_path=? WHERE job_id=?",
                 (status, utc_now(), _json(result) if result is not None else None, error[:4000], str(input_path) if input_path else None, str(output_path) if output_path else None, job_id),
             )
+            capture_portal_evidence(conn, "sql", job_id, result or {"status": status, "error": error[:4000]})
 
     def add_improvement(self, value: Mapping[str, Any]) -> str:
         improvement_id = str(value.get("improvement_id") or "improvement-{}".format(hashlib.sha1((_json(value) + str(time.time_ns())).encode()).hexdigest()[:16]))
@@ -2376,8 +2480,9 @@ def prune_output_artifacts(
     incident_root = (root / "incidents").resolve()
     lab_root = (root / "lab").resolve()
     job_root = (root / "jobs" / "dream_jobs").resolve()
+    profile_root = (root / "sql_profiles").resolve()
     archive_roots = ((root / "archives").resolve(), (lab_root / "archives").resolve())
-    allowed_roots = (root, incident_root, lab_root, job_root, *archive_roots)
+    allowed_roots = (root, incident_root, lab_root, job_root, profile_root, *archive_roots)
     removed: List[str] = []
     errors: List[str] = []
     reclaimed_bytes = 0
@@ -2448,6 +2553,7 @@ def prune_output_artifacts(
         (incident_root, keep_incidents, ""),
         (lab_root, keep_lab, "lab-"),
         (job_root, keep_jobs, ""),
+        (profile_root, set(), "sql-profile-"),
     ):
         if not scan_root.is_dir():
             continue
@@ -2692,6 +2798,9 @@ class Bridge:
             }
         manifest = (
             (ROOT / "dream_live_adapter.py", runtime_root / "perf-anomaly-demo" / "dream_live_adapter.py"),
+            (source_dream_root / "dream/agent/plan/planner.py", runtime_root / "dream/agent/plan/planner.py"),
+            (source_dream_root / "dream/agent/prompt.py", runtime_root / "dream/agent/prompt.py"),
+            (source_dream_root / "dream/database/pg_env.py", runtime_root / "dream/database/pg_env.py"),
             (
                 source_dream_root / "dream" / "agent" / "action" / "action_manager.py",
                 runtime_root / "dream" / "agent" / "action" / "action_manager.py",
@@ -2739,8 +2848,11 @@ class Bridge:
         self.prometheus = PrometheusClient(args.prometheus_url, timeout=args.prometheus_timeout)
         self.output_root = Path(args.output).resolve()
         self.output_root.mkdir(parents=True, exist_ok=True)
+        self.sql_profiler = SQLProfiler(self.db, self.store, self.output_root, _canonical_sql,
+            enabled=os.environ.get("KEENINSIGHT_SQL_PROFILING", "1").lower() not in {"0", "false", "off"})
         self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, args.dream_workers))
         self.sysinsight_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        self.capture_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.control_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         self.lab_executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
         self.futures: List[concurrent.futures.Future[Any]] = []
@@ -2765,7 +2877,11 @@ class Bridge:
         # startup, then continue at the configured interval.
         self._next_sample_maintenance = time.time()
         self._closed = False
+        interrupted = self.store.recover_incidents()
+        if interrupted:
+            LOGGER.warning("closed %d alert workflow(s) interrupted by bridge restart", len(interrupted))
         self.lab = LabController(self)
+        self.portal = KeenInsightPortal(self)
         self.http_server: Optional[ThreadingHTTPServer] = None
         self.http_thread: Optional[threading.Thread] = None
         self._forced_alert: Dict[str, Any] = {
@@ -2789,6 +2905,8 @@ class Bridge:
         if self._closed:
             return
         self._closed = True
+        if getattr(self, 'sql_profiler', None):
+            self.sql_profiler.close()
         if self.http_server is not None:
             try:
                 self.http_server.shutdown()
@@ -2801,7 +2919,7 @@ class Bridge:
         except Exception:
             LOGGER.exception("could not stop lab workloads")
         wait = bool(self.args.wait_for_jobs)
-        for executor in (self.control_executor, self.lab_executor, self.executor, self.sysinsight_executor):
+        for executor in (self.control_executor, self.lab_executor, self.executor, self.capture_executor, self.sysinsight_executor):
             try:
                 executor.shutdown(wait=wait, cancel_futures=False)
             except TypeError:
@@ -2839,6 +2957,9 @@ class Bridge:
                 "pid": os.getpid(),
                 "http_listen": "{}:{}".format(self.args.http_listen, self.args.http_port),
                 "api_configured": bool(_read_api_key()),
+                "api_model": self.args.model,
+                "api_base": self.args.api_base,
+                "api_config_source": os.environ.get("SYSINSIGHT_API_CONFIG_SOURCE", "environment"),
                 "sysinsight_api_enabled": not bool(self.args.no_api),
                 "sysinsight_full_chain": bool(getattr(self.args, "sysinsight_full_chain", False)),
                 "dream_auto_apply": bool(self.args.auto_apply),
@@ -3434,8 +3555,55 @@ class Bridge:
     def _launch_sysinsight(self, incident_id: str, incident_dir: Path, alert: Mapping[str, Any], snapshot: Mapping[str, Any], slow_rows: Sequence[Mapping[str, Any]]) -> None:
         # Keep alert analysis independent from the DREAM pool: a slow API call
         # must not delay a queued SQL tuning job (or vice versa).
-        future = self.sysinsight_executor.submit(self._run_sysinsight, incident_id, incident_dir, alert, dict(snapshot), list(slow_rows))
+        # Acquire per-incident evidence while the alert/load is present, NOT
+        # after waiting for an earlier incident's slow LLM/apply/retest work.
+        capture = None
+        if self.args.sysinsight_full_chain and not self.args.no_api:
+            capture = self.capture_executor.submit(self._capture_alert_evidence, incident_dir)
+        future = self.sysinsight_executor.submit(self._run_sysinsight, incident_id, incident_dir, alert, dict(snapshot), list(slow_rows), capture)
         self.futures.append(future)
+        if capture is not None:
+            def finish_empty_capture_without_queue_delay(completed_capture):
+                try:
+                    empty = not completed_capture.result().get('active_rows')
+                except Exception:
+                    empty = True
+                if empty and future.cancel():
+                    self._run_sysinsight(incident_id, incident_dir, alert, dict(snapshot), list(slow_rows), completed_capture)
+            capture.add_done_callback(finish_empty_capture_without_queue_delay)
+
+    def _capture_alert_evidence(self, incident_dir: Path) -> Dict[str, Any]:
+        from sysinsight_live_chain import _capture_perf, _source_environment
+
+        started_at = utc_now()
+        active_rows = []
+        attempts = 0
+        deadline = time.monotonic() + 5.0
+        while True:
+            attempts += 1
+            active_rows = self.db.collect_active(self.args.active_limit, include_recent_idle=True)
+            if active_rows or time.monotonic() >= deadline:
+                break
+            time.sleep(0.25)
+        pids = sorted({int(row['pid']) for row in active_rows if int(row['pid']) > 1})
+        experiments = [run for run in self.store.list_lab_runs(10, include_result=False)
+                       if run.get('status') == 'running']
+        _write_json(incident_dir / 'active_pids.json', pids)
+        _write_json(incident_dir / 'backend_snapshot.json', {
+            'started_at': started_at, 'sampled_at': utc_now(), 'attempts': attempts,
+            'selection': 'active_or_recently_idle_workload_backend', 'rows': active_rows,
+            'active_experiments': experiments,
+        })
+        capture = _capture_perf(
+            incident_dir / 'anomaly', pids, self.args.sysinsight_perf_seconds,
+            self.args.sysinsight_perf_frequency, self.args.sysinsight_stackcollapse,
+            _source_environment(),
+        )
+        _write_json(incident_dir / 'perf_capture.json', capture)
+        prometheus = self._collect_prometheus(self.args.sysinsight_window)
+        _write_json(incident_dir / 'prometheus_capture.json', prometheus)
+        return {'active_rows': active_rows, 'perf_capture': capture, 'prometheus': prometheus,
+                'active_experiments': experiments}
 
     def _launch_live_sysinsight_chain(
         self,
@@ -3508,6 +3676,8 @@ class Bridge:
         ]
         if self.args.sysinsight_stackcollapse:
             command.extend(["--stackcollapse", self.args.sysinsight_stackcollapse])
+        if (incident_dir / "perf_capture.json").is_file():
+            command.extend(["--perf-capture", str(incident_dir / "perf_capture.json")])
         if self.args.sysinsight_normal_profile:
             command.extend(["--normal-profile", self.args.sysinsight_normal_profile])
         if self.args.sysinsight_validation_sql:
@@ -3557,12 +3727,28 @@ class Bridge:
             "command": command,
         }
 
-    def _run_sysinsight(self, incident_id: str, incident_dir: Path, alert: Mapping[str, Any], snapshot: Mapping[str, Any], slow_rows: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
+    def _run_sysinsight(self, incident_id: str, incident_dir: Path, alert: Mapping[str, Any], snapshot: Mapping[str, Any], slow_rows: Sequence[Mapping[str, Any]], capture_future: Optional[concurrent.futures.Future] = None) -> Dict[str, Any]:
         result: Dict[str, Any] = {"status": "running", "incident_id": incident_id, "started_at": utc_now()}
         try:
-            prometheus = self._collect_prometheus(self.args.sysinsight_window)
-            active_rows = self.db.collect_active(self.args.active_limit)
+            evidence = capture_future.result() if capture_future is not None else None
+            prometheus = evidence['prometheus'] if evidence else self._collect_prometheus(self.args.sysinsight_window)
+            active_rows = evidence['active_rows'] if evidence else self.db.collect_active(self.args.active_limit)
+            if evidence and not active_rows:
+                result.update({
+                    'status': 'skipped', 'reason': 'no_workload_backend_at_alert',
+                    'explanation': '告警采样窗口内未发现仍存活的业务后端；保留告警，不伪造调用链或调优方案。',
+                    'capture': str(incident_dir / 'backend_snapshot.json'), 'finished_at': utc_now(),
+                })
+                _write_json(incident_dir / 'sysinsight_analysis.json', result)
+                self.store.finish_incident(incident_id, 'skipped', result)
+                return result
             case = _live_case(self.args.db, self.args.db_schema, self.args.workload, alert, snapshot, slow_rows, active_rows)
+            if evidence:
+                case['active_experiments'] = evidence.get('active_experiments') or []
+                if any(run.get('kind') == 'sysinsight' for run in case['active_experiments']):
+                    case['workload'] = 'tpcc'
+                elif any(run.get('kind') == 'dream' for run in case['active_experiments']):
+                    case['workload'] = 'tpcds'
             profile = _profile_for(self.args.dbms, self.args.pg_version)
             input_payload = build_sysinsight_input(
                 case,
@@ -3706,6 +3892,14 @@ class Bridge:
             return value
 
         configs = relocate(configs)
+        # Model strings pinned in the example AGENT_CONFIG must not override
+        # the operator's live shared provider selection. Keep secrets in env.
+        openai_config = configs.setdefault("API_SETTINGS", {}).setdefault("openai", {})
+        openai_config.pop("api_key", None)
+        openai_config.update({"base_url": self.args.api_base, "model": self.args.model})
+        agent_config = configs.setdefault("AGENT_CONFIG", {})
+        for name in ("root_cause_llm_model", "fix_agent_model", "diagnostic_agent_model"):
+            agent_config[name] = self.args.model
         database = configs.setdefault("DATABASE_CONFIG", {})
         database.update({
             "user": self.args.db_user,
@@ -3734,6 +3928,10 @@ class Bridge:
             error = "SQL observation disappeared"
             self.store.finish_job(job_id, "failed", error=error)
             return {"status": "failed", "error": error}
+        if job.get('source_completion_ms'):
+            # Use the observed completed interval which caused this automatic
+            # job, not a potentially much older all-time fingerprint mean.
+            observation = {**observation, 'mean_time_ms': job['source_completion_ms']}
         replay_sql = str(observation.get("replay_sql") or "").strip()
         if not replay_sql or "$" in replay_sql or "?" in replay_sql:
             error = "no replayable SQL sample; pg_stat_statements text is parameterized"
@@ -3762,7 +3960,7 @@ class Bridge:
         def persist_worker_artifacts() -> None:
             if worker_dir is None:
                 return
-            for name in ("input.json", "dream_config.json", "result.json", "dream.log"):
+            for name in ("input.json", "dream_config.json", "result.json", "dream.log", "diagnosis_trace.json"):
                 source = worker_dir / name
                 target = job_dir / name
                 if source.exists():
@@ -3795,6 +3993,8 @@ class Bridge:
                 "calls": observation.get("calls"),
                 "hint_pattern": observation.get("hint_pattern"),
                 "requested_at": utc_now(),
+                'trigger_source': job.get('trigger_source'),
+                'source_completion_ms': job.get('source_completion_ms'),
             }
             worker_input_path = worker_dir / "input.json"
             _write_json(worker_input_path, input_payload)
@@ -3889,8 +4089,11 @@ class Bridge:
             return result
         except subprocess.TimeoutExpired:
             error = "DREAM timed out after {} seconds".format(self.args.dream_timeout)
-            self.store.finish_job(job_id, "failed", error=error, input_path=input_path, output_path=output_path)
-            return {"status": "failed", "error": error}
+            result = {"status": "failed", "error": error}
+            if worker_dir is not None and (worker_dir / 'diagnosis_trace.json').is_file():
+                result['diagnosis_trace'] = json.loads((worker_dir / 'diagnosis_trace.json').read_text(encoding='utf-8'))
+            self.store.finish_job(job_id, "failed", result=result, error=error, input_path=input_path, output_path=output_path)
+            return result
         except Exception as exc:
             error = "{}: {}".format(type(exc).__name__, exc)
             self.store.finish_job(job_id, "failed", error=error, input_path=input_path, output_path=output_path)
@@ -4004,7 +4207,7 @@ class Bridge:
 
         if not candidate.get("has_action"):
             status = "no_action"
-            reason = "DREAM returned no executable optimization action"
+            reason = str(result.get('explanation') or "DREAM returned no executable optimization action")
         elif unsupported or apply_scope == "none":
             status = "candidate"
             reason = "DREAM action is not eligible for automatic application: {}".format(
@@ -4193,6 +4396,8 @@ class Bridge:
         stats = self.db.collect_statements(self.args.stats_limit)
         active = self.db.collect_active(self.args.active_limit)
         keys = self.store.upsert_observations(stats, active)
+        if getattr(self, 'sql_profiler', None):
+            self.sql_profiler.observe(active)
         slow = self.store.slow_observations(
             max(self.args.slow_mean_ms, self.args.dream_trigger_ms),
             max(self.args.slow_max_ms, self.args.dream_trigger_ms),
@@ -4424,6 +4629,34 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/healthz":
                 self._send_json({"status": "ok", "service": "sysinsight-dream-bridge", "pid": os.getpid()})
+                return
+            if path in {"/keeninsight", "/keeninsight/index.html"}:
+                self._redirect("/keeninsight/host-list.html")
+                return
+            if path.startswith("/keeninsight/"):
+                asset = path[len("/keeninsight/"):]
+                # Exact file allowlist also rejects encoded traversal and directories.
+                allowed = {"template.html", "host-list.html", "alert-list.html",
+                           "alert-detail.html", "alert-rules.html", "sql-log.html", "sql-detail.html",
+                           "dba-rules.html", "manual.html", "code-source.html", "tuning-knowledge.html",
+                           "portal.js", "portal.css", "original-layouts.js"}
+                if asset not in allowed:
+                    self._send_error_json(404, "portal asset not found")
+                    return
+                file_path = ROOT / "keeninsight_web" / asset
+                content_type = {".html": "text/html", ".js": "application/javascript", ".css": "text/css"}[file_path.suffix]
+                self._send_bytes(200, file_path.read_bytes(), content_type + "; charset=utf-8")
+                return
+            if path.startswith("/api/v1/keeninsight/"):
+                try:
+                    payload = self.bridge.portal.get(path[len("/api/v1/keeninsight/" ):], query)
+                    self._send_json(payload)
+                except KeyError as exc:
+                    self._send_error_json(404, str(exc))
+                except ValueError as exc:
+                    self._send_error_json(400, str(exc))
+                except RuntimeError as exc:
+                    self._send_error_json(503, str(exc))
                 return
             if path == "/metrics":
                 self._send_bytes(200, self.bridge.prometheus_metrics().encode("utf-8"), "text/plain; version=0.0.4; charset=utf-8")
