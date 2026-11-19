@@ -96,7 +96,7 @@ window.KeenInsightLayouts = {
                                 <!-- Knobs to Tune -->
                                 <div class="tuning-section green-background">
                                     <div class="tuning-section-title">Tuning Actions</div>
-                                    <div class="knob-list" style="gap: 8px;">
+                                    <div class="knob-list" style="gap: 8px;" role="region" aria-label="Tuning actions" tabindex="0">
                                         ${v.knobs}
                                     </div>
                                 </div>
