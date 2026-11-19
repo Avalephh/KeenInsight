@@ -35,8 +35,8 @@ fi
 BRIDGE_PYTHON="${SYSINSIGHT_BRIDGE_PYTHON:-$DEFAULT_BRIDGE_PYTHON}"
 BRIDGE_STATE_DB="${SYSINSIGHT_BRIDGE_STATE_DB:-$BASE_DIR/data/sysinsight_dream_bridge.sqlite3}"
 BRIDGE_OUTPUT="${SYSINSIGHT_BRIDGE_OUTPUT:-$BASE_DIR/data/sysinsight_dream_bridge}"
-BRIDGE_HTTP_LISTEN="${SYSINSIGHT_BRIDGE_LISTEN:-127.0.0.1}"
-BRIDGE_HTTP_PORT="${SYSINSIGHT_BRIDGE_PORT:-9108}"
+BRIDGE_HTTP_LISTEN="${SYSINSIGHT_BRIDGE_LISTEN:-0.0.0.0}"
+BRIDGE_HTTP_PORT="${SYSINSIGHT_BRIDGE_PORT:-8001}"
 BRIDGE_DB="${SYSINSIGHT_DB:-keeninsight}"
 BRIDGE_DB_USER="${SYSINSIGHT_DB_USER:-postgres}"
 BRIDGE_DB_HOST="${SYSINSIGHT_DB_HOST:-/var/run/postgresql}"
@@ -155,7 +155,8 @@ start_process prometheus \
   --config.file="$PROMETHEUS_CONFIG" \
   --storage.tsdb.path="$BASE_DIR/data/prometheus" \
   --storage.tsdb.retention.time=24h \
-  --web.listen-address=127.0.0.1:9090 \
+  --web.listen-address=0.0.0.0:8003 \
+  --web.external-url=http://123.56.83.97:8003/ \
   --web.enable-lifecycle
 
 start_process node_exporter \
@@ -240,7 +241,7 @@ fi
 # Apply a changed scrape configuration when Prometheus was already running.
 # New Prometheus processes read it at startup; the lifecycle endpoint makes
 # repeated `start.sh` calls converge without restarting the time-series store.
-if curl -fsS --max-time 3 -X POST http://127.0.0.1:9090/-/reload >/dev/null 2>&1; then
+if curl -fsS --max-time 3 -X POST http://127.0.0.1:8003/-/reload >/dev/null 2>&1; then
   echo "reloaded Prometheus configuration"
 else
   echo "Prometheus configuration reload unavailable; startup config remains active" >&2

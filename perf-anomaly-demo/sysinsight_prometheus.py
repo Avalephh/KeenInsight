@@ -48,7 +48,7 @@ def _promql_label(value: str) -> str:
 class PrometheusClient:
     """Small dependency-free client for the Prometheus HTTP API."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:9090", timeout: float = 5.0) -> None:
+    def __init__(self, base_url: str = "http://127.0.0.1:8003", timeout: float = 5.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
 
@@ -421,7 +421,7 @@ def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
+    parser.add_argument("--prometheus-url", default="http://127.0.0.1:8003")
     parser.add_argument("--db", default="keeninsight")
     parser.add_argument("--alert-name", default="SysInsightDemoAnomaly")
     parser.add_argument("--window-seconds", type=float, default=300.0)

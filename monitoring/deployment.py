@@ -23,11 +23,11 @@ def components():
 
 
 def endpoints():
-    port = int(os.environ.get("SYSINSIGHT_BRIDGE_PORT", "9108"))
-    result = {"prometheus": "http://127.0.0.1:9090/-/ready",
+    port = int(os.environ.get("SYSINSIGHT_BRIDGE_PORT", "8001"))
+    result = {"prometheus": "http://127.0.0.1:8003/-/ready",
               "node_exporter": "http://127.0.0.1:9100/metrics",
               "postgres_exporter": "http://127.0.0.1:9187/metrics",
-              "grafana": "http://127.0.0.1:3000/api/health"}
+              "grafana": "http://127.0.0.1:8002/api/health"}
     if "sysinsight_dream_bridge" in components():
         result["sysinsight_dream_bridge"] = "http://127.0.0.1:{}/healthz".format(port)
     return result

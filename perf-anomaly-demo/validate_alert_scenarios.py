@@ -271,8 +271,8 @@ def summarize(directory, state_db):
 
 if __name__=="__main__":
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url",default="http://127.0.0.1:9108")
-    parser.add_argument("--prometheus-url",default="http://127.0.0.1:9090")
+    parser.add_argument("--base-url",default="http://127.0.0.1:8001")
+    parser.add_argument("--prometheus-url",default="http://127.0.0.1:8003")
     parser.add_argument("--state-db",default=str(ROOT.parent/"monitoring/data/sysinsight_dream_bridge.sqlite3"))
     parser.add_argument("--output",default=str(ROOT/"results/alert_trigger_validation"))
     parser.add_argument("--alert-name",default="SysInsightDemoAnomaly")

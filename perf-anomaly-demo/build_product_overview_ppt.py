@@ -375,7 +375,7 @@ def catalog_facts():
 
 def fetch_json(path):
     try:
-        with urllib.request.urlopen(f"http://127.0.0.1:9108{path}", timeout=2.0) as response:
+        with urllib.request.urlopen(f"http://127.0.0.1:8001{path}", timeout=2.0) as response:
             return json.loads(response.read().decode("utf-8"))
     except Exception:
         return {}
@@ -1220,9 +1220,9 @@ def build_deck():
     add_text(slide, "运行组件", 0.88, 1.55, 3.58, 0.28, 14, INK, True, margin=0)
     components = [
         ("PostgreSQL", "5432 · keeninsight", BLUE, PALE_BLUE),
-        ("Prometheus", "9090 · 24h retention", ORANGE, PALE_ORANGE),
-        ("Grafana", "3000 · 3 dashboards", CYAN, PALE_CYAN),
-        ("Bridge", "9108 · API / UI / metrics", PURPLE, PALE_PURPLE),
+        ("Prometheus", "8003 · 24h retention", ORANGE, PALE_ORANGE),
+        ("Grafana", "8002 · 3 dashboards", CYAN, PALE_CYAN),
+        ("Bridge", "8001 · API / UI / metrics", PURPLE, PALE_PURPLE),
         ("Exporters", "node + postgres", GREEN, PALE_GREEN),
         ("LLM", "共享 GPT-5.6-SOL API", GOLD, PALE_GOLD),
     ]
@@ -1238,13 +1238,13 @@ def build_deck():
     add_box(slide, 5.02, 1.26, 7.71, 5.47, WHITE, LINE)
     add_text(slide, "访问入口", 5.31, 1.55, 6.98, 0.28, 14, INK, True, margin=0)
     url_rows = [
-        ("Grafana 首页", "http://127.0.0.1:3000/", "admin / admin（本机默认）"),
-        ("PostgreSQL 监控", "http://127.0.0.1:3000/d/local-postgresql-demo/582e36f", "系统指标 + 场景 TPS"),
-        ("自动化看板", "http://127.0.0.1:3000/d/sysinsight-dream-automation", "事件 / Job / 改进 / 命中"),
-        ("实验结果看板", "http://127.0.0.1:3000/d/sysinsight-experiment-lab", "TP / AP 前后对比"),
-        ("管理页", "http://127.0.0.1:9108/ui", "状态与历史"),
-        ("实验控制台", "http://127.0.0.1:9108/lab", "场景触发与清理"),
-        ("Prometheus", "http://127.0.0.1:9090/", "原始指标查询"),
+        ("Grafana 首页", "http://123.56.83.97:8002/", "admin / admin（本机默认）"),
+        ("PostgreSQL 监控", "http://123.56.83.97:8002/d/local-postgresql-demo/582e36f", "系统指标 + 场景 TPS"),
+        ("自动化看板", "http://123.56.83.97:8002/d/sysinsight-dream-automation", "事件 / Job / 改进 / 命中"),
+        ("实验结果看板", "http://123.56.83.97:8002/d/sysinsight-experiment-lab", "TP / AP 前后对比"),
+        ("管理页", "http://123.56.83.97:8001/ui", "状态与历史"),
+        ("实验控制台", "http://123.56.83.97:8001/lab", "场景触发与清理"),
+        ("Prometheus", "http://123.56.83.97:8003/", "原始指标查询"),
     ]
     y = 2.05
     for idx, (name, url, desc) in enumerate(url_rows):

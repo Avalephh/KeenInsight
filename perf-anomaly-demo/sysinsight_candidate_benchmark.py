@@ -266,7 +266,7 @@ def _runner_args(args: Any) -> Any:
         "run_as": getattr(args, "run_as", "postgres"),
         "host": getattr(args, "host", "/var/run/postgresql"),
         "port": int(getattr(args, "port", 5432)),
-        "prometheus_url": getattr(args, "prometheus_url", "http://127.0.0.1:9090"),
+        "prometheus_url": getattr(args, "prometheus_url", "http://127.0.0.1:8003"),
         "alert_name": getattr(args, "alert_name", "SysInsightDemoAnomaly"),
         "baseline_duration": int(getattr(args, "baseline_duration", 20)),
         "case_duration": int(getattr(args, "case_duration", 25)),

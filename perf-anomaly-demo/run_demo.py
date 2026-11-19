@@ -71,7 +71,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--anomaly-rows", type=int, default=260_000)
     parser.add_argument("--sample-interval", type=float, default=1.0)
     parser.add_argument("--perf-frequency", type=int, default=300)
-    parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
+    parser.add_argument("--prometheus-url", default="http://127.0.0.1:8003")
     parser.add_argument("--alert-name", default="SysInsightDemoAnomaly")
     parser.add_argument("--alert-poll-interval", type=float, default=1.0)
     parser.add_argument(

@@ -85,7 +85,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--pg-version", default=os.environ.get("SYSINSIGHT_DB_VERSION", "12"))
     parser.add_argument("--pg-cluster", default="main")
     parser.add_argument("--dbms", default=os.environ.get("SYSINSIGHT_DBMS", "postgresql"))
-    parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
+    parser.add_argument("--prometheus-url", default="http://127.0.0.1:8003")
     parser.add_argument("--prometheus-capture", default="", help="reuse a previously captured adapter JSON")
     parser.add_argument("--prometheus-step", type=float, default=15.0)
     parser.add_argument("--prometheus-timeout", type=float, default=5.0)

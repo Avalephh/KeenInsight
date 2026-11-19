@@ -576,7 +576,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dbms", default="postgresql")
     parser.add_argument("--pg-version", default="12")
     parser.add_argument("--pg-cluster", default="main")
-    parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
+    parser.add_argument("--prometheus-url", default="http://127.0.0.1:8003")
     parser.add_argument("--alert-name", default="SysInsightDemoAnomaly")
     parser.add_argument("--api-base", default=DEFAULT_API_BASE)
     parser.add_argument("--model", default=DEFAULT_MODEL)

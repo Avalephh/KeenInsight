@@ -106,10 +106,10 @@ bash scripts/deploy.sh start
 `status` 同时检查实际进程身份、Grafana DB、HTTP、exporter `pg_up=1`；
 进程存在但连不到 PG 也判为失败。它**不等于**两类调优收益验收。
 
-- 产品页：`http://127.0.0.1:9108/keeninsight/`
-- 实验控制台：`http://127.0.0.1:9108/lab`
-- Grafana：`http://127.0.0.1:3000/`
-- Prometheus：`http://127.0.0.1:9090/`
+- 产品页：`http://127.0.0.1:8001/keeninsight/`
+- 实验控制台：`http://127.0.0.1:8001/lab`
+- Grafana：`http://127.0.0.1:8002/`
+- Prometheus：`http://127.0.0.1:8003/`
 
 服务健康后，性能验收是 SysInsight 同压力下业务 TPS 前后对比。不要把健康检查通过
 当成已经重新验证六组场景的收益。

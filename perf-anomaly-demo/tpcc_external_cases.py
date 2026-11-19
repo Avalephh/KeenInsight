@@ -552,7 +552,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-as", default="postgres")
     parser.add_argument("--host", default="/var/run/postgresql")
     parser.add_argument("--port", type=int, default=5432)
-    parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
+    parser.add_argument("--prometheus-url", default="http://127.0.0.1:8003")
     parser.add_argument("--alert-name", default="SysInsightDemoAnomaly")
     parser.add_argument("--baseline-duration", type=int, default=20)
     parser.add_argument("--case-duration", type=int, default=25)
