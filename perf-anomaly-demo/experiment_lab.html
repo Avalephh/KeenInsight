@@ -90,7 +90,8 @@
     const text = value => esc(value === undefined || value === null ? '' : value);
     const jsonText = value => JSON.stringify(value ?? {}, null, 2);
     const when = value => value ? new Date(value).toLocaleString() : '-';
-    const pill = value => { const v = String(value || 'unknown'); return `<span class="pill ${esc(v)}">${text(v)}</span>`; };
+    const statusZh = { completed: '已完成', running: '运行中', queued: '排队中', failed: '失败', stopped: '已停止', blocked: '已阻止', active: '活跃', ready: '就绪', applied: '已应用', applied_and_restored: '已应用并恢复', session_only_applied_and_ended: '仅会话应用并结束', applying: '应用中', apply_failed: '应用失败', skipped: '跳过', unknown: '未知' };
+    const pill = value => { const v = String(value || 'unknown'); return `<span class="pill ${esc(v)}">${text(statusZh[v] || v)}</span>`; };
     let catalog = null;
     let selectedRun = {sysinsight: ''};
     let refreshInFlight = false;
@@ -142,6 +143,10 @@
 
     function phaseLabel(name) {
       return ({baseline: '基线', pressure_before: '压力调优前', pressure_after: '压力调优后', completed: '已完成', failed: '失败', stopped: '已停止'})[name] || name || '空闲';
+    }
+
+    function kindLabel(value) {
+      return ({sysinsight: 'SysInsight', tpcc: 'TPCC'})[value] || value || '-';
     }
 
     function tuningApplied(status) {
@@ -250,7 +255,7 @@
     }
 
     function renderHistory(status) {
-      $('runHistory').innerHTML = (status.runs || []).map(v => `<tr><td>${text(when(v.requested_at))}</td><td>${text(v.kind)}</td><td>${text(v.scenario_id || v.title || '-')}</td><td>${pill(v.status)}</td><td>${text(v.phase)}</td><td class="sql">${text(v.error || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">暂无审计记录</td></tr>';
+      $('runHistory').innerHTML = (status.runs || []).map(v => `<tr><td>${text(when(v.requested_at))}</td><td>${text(kindLabel(v.kind))}</td><td>${text(v.scenario_id || v.title || '-')}</td><td>${pill(v.status)}</td><td>${text(phaseLabel(v.phase))}</td><td class="sql">${text(v.error || '')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">暂无审计记录</td></tr>';
     }
 
     async function refreshAll(manual = false) {

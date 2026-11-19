@@ -37,7 +37,10 @@
     const text = value => esc(value === undefined || value === null ? '' : value);
     async function get(path) { const r = await fetch(path); if (!r.ok) throw new Error(await r.text()); return r.json(); }
     async function post(path, body = {}) { const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}); const v = await r.json(); if (!r.ok) throw new Error(v.error || JSON.stringify(v)); return v; }
-    function pill(value) { const s = String(value || 'unknown'); return `<span class="pill ${esc(s)}">${text(s)}</span>`; }
+    const statusZh = { completed: '已完成', running: '运行中', queued: '排队中', failed: '失败', stopped: '已停止', blocked: '已阻止', active: '活跃', applied: '已应用', applied_and_restored: '已应用并恢复', session_only_applied_and_ended: '仅会话应用并结束', skipped: '跳过', ok: '正常', error: '错误', unknown: '未知' };
+    const componentZh = { sysinsight: 'SysInsight' };
+    const eventZh = { 'incident.started': '异常事件开始', 'incident.finished': '异常事件完成' };
+    function pill(value) { const s = String(value || 'unknown'); return `<span class="pill ${esc(s)}">${text(statusZh[s] || s)}</span>`; }
     function when(value) { return value ? new Date(value).toLocaleString() : '-'; }
     function showError(error) { $('summary').textContent = '操作失败：' + error.message; $('summary').className = 'bad'; }
     async function collect(force) { try { await post('/api/v1/actions/collect', {force_alert: !!force}); await refresh(); } catch (e) { showError(e); } }
@@ -56,7 +59,7 @@
       $('summary').textContent = `数据库 ${s.database?.name || '-'} / schema ${s.database?.schema || '-'}；模型 ${svc.api_model || '-'}${s.last_collection_error ? '；采集错误：' + s.last_collection_error : ''}`;
       $('summary').className = 'muted'; $('updated').textContent = '更新于 ' + new Date().toLocaleTimeString();
     }
-    function renderEvents(rows) { $('events').innerHTML = rows.map(e => `<tr><td>${text(when(e.occurred_at))}</td><td>${text(e.component)}</td><td>${text(e.event_type)}</td><td>${pill(e.status)}</td><td class="detail">${text(JSON.stringify(e.data || {}))}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">暂无动作</td></tr>'; }
+    function renderEvents(rows) { $('events').innerHTML = rows.map(e => `<tr><td>${text(when(e.occurred_at))}</td><td>${text(componentZh[e.component] || e.component)}</td><td>${text(eventZh[e.event_type] || e.event_type)}</td><td>${pill(e.status)}</td><td class="detail">${text(JSON.stringify(e.data || {}))}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">暂无动作</td></tr>'; }
     async function refresh() { try { const [s,e] = await Promise.all([get('/api/v1/status?limit=50'),get('/api/v1/events?limit=80')]); renderCards(s); renderEvents(e.events || []); } catch (e) { showError(e); } }
     refresh(); setInterval(refresh, 5000);
   </script>
