@@ -19,6 +19,11 @@ import time
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 VERSION = "keeninsight.ui.v1"
+HOST_METRIC_KEYS = ("cpu_percent", "memory_used_percent", "disk_read_bytes_per_second",
+                    "disk_write_bytes_per_second", "load1")
+DATABASE_METRIC_KEYS = ("transactions_committed", "transactions_rolled_back", "tuples_returned",
+                        "tuples_fetched", "blocks_read", "blocks_hit", "temporary_files",
+                        "temporary_bytes", "locks", "database_size_bytes")
 CATEGORIES = {
     "hosts": ("host-list.html", "Host identity, database, cluster, collection health"),
     "alerts": ("alert-list.html", "Alert trigger, raw state, diagnosis, apply/retest/restore evidence"),
@@ -56,6 +61,46 @@ def clean(value):
     if isinstance(value, float) and not math.isfinite(value):
         return None
     return value
+
+
+def hot_functions_from_source(source):
+    """Build the Function Analysis list from retained evidence.
+
+    Used when differential profiling was not stored (for example an incident
+    interrupted before candidate validation).  Only function names that already
+    appear in perf call chains or source associations are returned; nothing is
+    invented or borrowed from another incident.
+    """
+    if not isinstance(source, dict):
+        return []
+    totals = {}
+    order = []
+    for chain in source.get("runtime_call_chains") or []:
+        if not isinstance(chain, dict):
+            continue
+        try:
+            weight = float(chain.get("samples") or 0)
+        except (TypeError, ValueError):
+            weight = 0.0
+        for name in chain.get("matched_key_functions") or []:
+            name = str(name or "")
+            if not name:
+                continue
+            if name not in totals:
+                order.append(name)
+                totals[name] = 0.0
+            totals[name] += weight
+    values = [{"Function": name, "Samples": totals[name], "Evidence": "runtime_call_chain"}
+              for name in order]
+    seen = set(order)
+    for item in source.get("static_parameter_evidence") or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("function") or "")
+        if name and name not in seen:
+            seen.add(name)
+            values.append({"Function": name, "Evidence": "source_association"})
+    return values
 
 
 def init_schema(conn):
@@ -103,6 +148,7 @@ def incident_evidence(directory, result):
             "perfCapture": load_json(directory / "perf_capture.json", {}),
             "progress": load_json(directory / "workflow_progress.json", {}),
             "shap_analysis": load_json(directory / "shap_analysis.json", {}),
+            "prometheusCapture": load_json(directory / "prometheus_capture.json", {}),
             "llm": load_json(directory / "sysinsight_api/result.json", {})}
 
 
@@ -271,23 +317,54 @@ class KeenInsightPortal:
             if row['status'] in {'running', 'queued'}:
                 evidence = incident_evidence(row.get('directory') or ROOT, result)
         inputs = evidence.get("input") or {}
+        incident_path = Path(row.get("directory") or ROOT)
+        backfill = load_json(incident_path / "backfill_function_analysis.json", {}) or {}
+        prometheus_capture = (evidence.get("prometheusCapture")
+                              or load_json(incident_path / "prometheus_capture.json", {}) or {})
+        metric_queries = prometheus_capture.get("queries") or {}
+        runtime_host = inputs.get("host_metrics") or {
+            key: metric_queries[key] for key in HOST_METRIC_KEYS if key in metric_queries}
+        runtime_database = inputs.get("database_metrics") or {
+            key: metric_queries[key] for key in DATABASE_METRIC_KEYS if key in metric_queries}
         chain = evidence.get("live_chain") or chain
         if isinstance(chain.get("result"), dict):
             chain = chain["result"]
         record["error"] = record.get("error") or chain.get("error")
         record['message'] = result.get('explanation') or result.get('reason') or chain.get('reason')
-        source = chain.get("source_evidence") or inputs.get("source_evidence") or {}
+        source = (chain.get("source_evidence") or inputs.get("source_evidence")
+                  or backfill.get("source_evidence") or {})
         detection = chain.get("source_detection") or {}
-        shap_analysis = chain.get('shap_analysis') or detection.get('shap') or evidence.get('shap_analysis') or None
+        if not detection:
+            detection = load_json(Path(row.get("directory") or ROOT)
+                                  / "anomaly" / "sysinsight_source_detection_result.json", {}) or {}
+        detection = detection or backfill.get("source_detection") or {}
+        shap_analysis = (chain.get('shap_analysis') or detection.get('shap')
+                         or evidence.get('shap_analysis') or backfill.get('shap_analysis') or None)
+        function_anomalies = inputs.get('function_anomalies') or {}
         compare = detection.get('source_compare') or {}
+        if not (compare.get('key_functions') or []):
+            fallback_functions = function_anomalies.get('key_functions') or []
+            if fallback_functions:
+                compare = {
+                    'source': 'sysinsight_input.function_anomalies',
+                    'key_function_count': function_anomalies.get('function_count') or len(fallback_functions),
+                    'key_functions': fallback_functions,
+                }
         match = detection.get('source_match') or {}
         hot_functions = compare.get('key_functions') or []
+        derived_hot_functions = False
+        if not hot_functions:
+            hot_functions = hot_functions_from_source(source)
+            derived_hot_functions = bool(hot_functions)
+        hot_function_count = compare.get('key_function_count')
+        if not hot_function_count and derived_hot_functions:
+            hot_function_count = len(hot_functions)
         record['rootCause'] = [f.get('Function') for f in hot_functions[:5] if f.get('Function')]
         api = chain.get('api') or {}
         record['diagnosis'] = {**(result.get('analysis') or {}),
             'model': api.get('model') or (result.get('analysis') or {}).get('model'),
             'llmCallCount': api.get('llm_call_count'), 'candidateCount': api.get('candidate_count'),
-            'hotFunctionCount': compare.get('key_function_count'),
+            'hotFunctionCount': hot_function_count,
             'matchedParameters': match.get('matched_knob') or [],
             'explanation': record['message'] or ('Measured differential profiling and source associations guide the LLM candidate; associations are not proof of causation.' if detection else 'Awaiting measured profiling/source evidence.'),
         }
@@ -297,7 +374,31 @@ class KeenInsightPortal:
         record['triggerState'] = alert.get('state')
         if not detail:
             return record
+        candidate_knobs = chain.get("candidate_validation") or {}
+        if not candidate_knobs:
+            llm_evidence = evidence.get("llm") or {}
+            selector = llm_evidence.get("source_selector") or {}
+            selected = selector.get("selected_source_materialized_configuration")
+            if isinstance(selected, list):
+                selected = selected[0] if selected and isinstance(selected[0], dict) else None
+            if isinstance(selected, dict) and selected:
+                candidate_knobs = {
+                    "status": "candidate_only",
+                    "source": selector.get("source_method") or "LLM candidate",
+                    "selected_candidate": {"configuration": selected},
+                }
         progress = evidence.get('progress') or {}
+        stages = list(chain.get("stages") or progress.get('stages') or [])
+        if backfill:
+            stages.append({
+                "name": "post_hoc_function_analysis",
+                "status": "completed",
+                "recordedAt": backfill.get("generated_at"),
+                "detail": {
+                    "source": (backfill.get("provenance") or {}).get("source"),
+                    "note": (backfill.get("provenance") or {}).get("note"),
+                },
+            })
         running_stages = [stage for stage in progress.get('stages', []) if stage.get('status')=='running']
         if running_stages:
             record['diagnosis']['currentStage'] = running_stages[-1]['name']
@@ -306,24 +407,25 @@ class KeenInsightPortal:
                            "triggeredRule": {"name": row.get("alert_name"), "actual": alert.get("value"),
                                              "state": alert.get("state"), "labels": labels,
                                              "description": annotations.get("description")},
-                           "runtimeData": {"host": inputs.get("host_metrics") or {},
-                                           "database": inputs.get("database_metrics") or {}},
-                           "differentialProfiling": detection.get("source_compare") or None,
+                           "runtimeData": {"host": runtime_host, "database": runtime_database},
+                           "differentialProfiling": compare or None,
                            "shapAnalysis": shap_analysis,
-                           "hotFunctions": (detection.get("source_compare") or {}).get("key_functions") or [],
-                           "knobs": chain.get("candidate_validation") or {},
+                           "hotFunctions": hot_functions,
+                           "hotFunctionsDerived": derived_hot_functions,
+                           "knobs": candidate_knobs,
                            "runtimeCallChains": source.get("runtime_call_chains") or [],
                            "functionCodeExamples": source.get("static_parameter_evidence") or [],
                            "comparison": chain.get("comparison") or {},
                            "application": chain.get("temporary_application") or {},
-                           "stages": chain.get("stages") or progress.get('stages') or [],
+                           "stages": stages,
+                           "backfillGenerated": bool(backfill),
                            "backendSnapshot": evidence.get('backendSnapshot') or {},
                            "perfCapture": chain.get('perf') or evidence.get('perfCapture') or {},
                            "llm": api,
                            "validationSql": chain.get('validation_sql') or {},
                        }, "evidence": evidence,
                        "availability": {"shapAnalysis": "recorded" if (shap_analysis or {}).get('status') == 'completed' else (shap_analysis or {}).get('reason') or "not collected",
-                                        "profiling": "recorded" if detection else "no profiler artifact retained"}})
+                                        "profiling": "recorded" if compare else "no profiler artifact retained"}})
         if not full:
             analysis = record.get("detailAnalysis") or {}
             truncated = {}

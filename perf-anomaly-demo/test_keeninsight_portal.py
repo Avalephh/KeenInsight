@@ -10,7 +10,7 @@ import threading
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from keeninsight_portal import KeenInsightPortal
+from keeninsight_portal import KeenInsightPortal, hot_functions_from_source
 from sysinsight_dream_bridge import StateStore, BridgeHTTPServer, BridgeHTTPHandler
 
 
@@ -50,6 +50,46 @@ class PortalTest(unittest.TestCase):
         self.assertIsNone(record["cpuPercent"])
         self.assertIsNone(record["diskPercent"])
         self.assertEqual(record["status"], "partial")
+
+    def test_function_analysis_falls_back_to_retained_evidence(self):
+        source = {
+            "runtime_call_chains": [
+                {"samples": 10, "matched_key_functions": ["alpha", "beta"]},
+                {"samples": 5, "matched_key_functions": ["beta"]},
+            ],
+            "static_parameter_evidence": [{"function": "gamma"}, {"function": "alpha"}],
+        }
+        values = hot_functions_from_source(source)
+        self.assertEqual([item["Function"] for item in values], ["alpha", "beta", "gamma"])
+        self.assertEqual(values[0]["Samples"], 10)
+        self.assertEqual(values[1]["Samples"], 15)
+        self.assertEqual(values[0]["Evidence"], "runtime_call_chain")
+        self.assertEqual(values[2]["Evidence"], "source_association")
+        self.assertEqual(hot_functions_from_source(None), [])
+
+    def test_interrupted_alert_uses_backfilled_function_analysis(self):
+        incident_dir = Path(self.tmp.name) / "backfill-incident"
+        incident_dir.mkdir()
+        (incident_dir / "backfill_function_analysis.json").write_text(json.dumps({
+            "schema_version": "keeninsight.backfill.v1",
+            "generated_at": "2026-11-20T00:00:00+00:00",
+            "provenance": {"source": "retained perf counts"},
+            "source_detection": {"source_compare": {
+                "key_function_count": 1,
+                "key_functions": [{"Function": "fixture_function", "Sample Rate": 1,
+                                   "Diff From Mean": 2, "Change": 1}],
+            }},
+            "source_evidence": {"runtime_call_chains": [], "static_parameter_evidence": []},
+            "shap_analysis": {"status": "completed"},
+        }), encoding="utf-8")
+        incident = self.store.start_incident({"labels": {"alertname": "Fixture"}}, incident_dir)
+        self.store.finish_incident(incident, "failed", {"error": "interrupted"})
+        detail = self.portal.get("alerts/" + incident, {})
+        analysis = detail["detailAnalysis"]
+        self.assertTrue(analysis["backfillGenerated"])
+        self.assertEqual(analysis["hotFunctions"][0]["Function"], "fixture_function")
+        self.assertEqual(analysis["differentialProfiling"]["key_function_count"], 1)
+        self.assertEqual(analysis["stages"][-1]["name"], "post_hoc_function_analysis")
 
     def test_alert_filters_run_before_pagination(self):
         for level in ["info", "critical", "critical"]:

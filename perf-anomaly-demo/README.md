@@ -62,6 +62,14 @@ PostgreSQL 12.22 源码构建的 276 条文档化 GUC 关联，其中 231 条数
 
 Prometheus 演示规则位于 `../monitoring/config/prometheus/rules/sysinsight-demo.yml`：`SysInsightDemoAnomaly` 在外部压力阶段（`phase="pressure_before"`）的目标业务 TPS 低于基线最大值的 90% 并持续 10 秒时触发，用于把“TPS 下降”作为系统调优流程的异常入口；它不改变 SysInsight 的异常提取逻辑。
 
+如果某次告警在函数采样之后、候选生成或验证之前被重启中断，incident 目录仍会保留 `anomaly/anomaly_counts_*.txt` 和 `anomaly/anomaly.folded`。此时运行：
+
+```bash
+python3 backfill_incident_analysis.py <incident-dir>
+```
+
+会基于这些原始 perf 数据事后生成差分画像、函数分析、运行时调用链、源码关联和 SHAP，并写入 `backfill_function_analysis.json`；门户会自动读取它。该工具不会伪造 LLM 候选、应用结果或调优前后对比。
+
 ## 源码调用链证据
 
 统一入口生成的 `sysinsight_input.json` 现在会保留两类真实证据：一类是异常阶段

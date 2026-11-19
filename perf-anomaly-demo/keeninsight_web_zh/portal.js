@@ -112,14 +112,22 @@
       const rate=Number(f['Sample Rate']),delta=Number(f['Diff From Mean'])*(f.Change===1?1:-1),normal=rate-delta;
       return `<div class="profiling-row"><div class="profiling-function">${esc(f.Function)}</div><div class="profiling-value">${number(normal)}</div><div class="profiling-value">${number(rate)}</div><div class="profiling-diff ${delta>=0?'high':'low'}">${delta>=0?'+':''}${number(delta)}</div><div class="profiling-bar"><div class="profiling-bar-fill ${delta>=0?'high':'low'}" style="width:${Math.min(100,Math.abs(delta)/max*100)}%"></div></div></div>`;
     }).join(''):empty('No differential sampling evidence retained.');
-    const hot=(d.hotFunctions||[]).map(f=>{
+    const hotList=d.hotFunctions||[];
+    const hot=hotList.map(f=>{
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
-      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${source?esc(source.file)+':'+source.line:'Source location not retained for this function'}</div><div class="function-sources"><span class="source-tag">perf differential sampling</span></div></div></div>`;
-    }).join('')||empty('No measured hot functions retained.');
+      const evidence=f.Evidence==='runtime_call_chain'?'perf 调用链':f.Evidence==='source_association'?'源码关联':'perf 差分采样';
+      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${source?esc(source.file)+':'+source.line:'未保留该函数的源码位置'}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
+    }).join('');
+    const hotNote=d.hotFunctionsDerived?'<p class="ki-sample-note">该告警没有差分采样结果，以下函数由运行时 perf 调用链和源码关联生成。</p>':'';
+    const functionsHtml=hotList.length?hotNote+hot:empty(data.rawStatus==='skipped'
+      ?'该告警被跳过：采样窗口内没有存活的业务后端，因此没有函数证据。'
+      :'该告警在函数采样前中断，没有可用的函数证据。');
+    const backfillNote=d.backfillGenerated?'<p class="ki-sample-note">该告警的差分画像、SHAP 和函数分析由保留的 perf 数据事后生成；调优候选与前后对比仍以原始流程记录为准。</p>':'';
+    const interrupted=d.backfillGenerated||(d.stages||[]).some(s=>['running','failed'].includes(String(s.status)));
     const knobs=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).map(([name,value])=>{
       const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name];
       return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div></div>`;
-    }).join('')||empty('No candidate parameters recorded.');
+    }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'No candidate parameters recorded.');
     const s=d.shapAnalysis;
     let shap=empty(s?.reason||'No SHAP evidence retained for this alert. New completed captures run the local model; historical differential rates are not substituted.');
     if(s?.status==='completed'&&s.features?.length){
@@ -132,7 +140,9 @@
         return `<div class="shap-feature"><div class="shap-name" title="${esc((f.parameters||[]).join(', '))}">${esc(f.name)}</div><div class="shap-value" title="Inclusive sampled function rate, not CPU utilization">${f.isAggregate?'aggregate':number(f.value)}</div><div class="shap-bar ki-shap-diverging"><div class="shap-bar-fill ${positive?'low':'high'}" style="position:absolute;left:${positive?50:50-width}%;width:${width}%"></div></div><div class="shap-impact" style="color:${positive?'#008943':'#c62c20'}">${positive?'+':''}${number(f.shapValue*100,3)} pp</div></div>`;
       }).join('');
     }
-    return window.KeenInsightLayouts.alert({rules,profiling,shap,functions:hot,knobs,explanation:shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),beforeTuning_latency:c.baseline_ms==null?'Not measured':number(c.baseline_ms)+' ms',afterTuning_latency:c.tuned_ms==null?'Not measured':number(c.tuned_ms)+' ms',beforeTuning_restored:'—',afterTuning_restored:c.restored_ms==null?'Not measured':number(c.restored_ms)+' ms',beforeTuning_state:esc(c.metric||'No validation'),afterTuning_state:tag(app.status||'not_applied')})+`<p class="ki-sample-note">Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
+    const notMeasured=interrupted?'未完成（工作流中断）':'Not measured';
+    const noValidation=interrupted?'调优未执行':'No validation';
+    return backfillNote+window.KeenInsightLayouts.alert({rules,profiling,shap,functions:functionsHtml,knobs,explanation:shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),beforeTuning_latency:c.baseline_ms==null?notMeasured:number(c.baseline_ms)+' ms',afterTuning_latency:c.tuned_ms==null?notMeasured:number(c.tuned_ms)+' ms',beforeTuning_restored:'—',afterTuning_restored:c.restored_ms==null?notMeasured:number(c.restored_ms)+' ms',beforeTuning_state:esc(c.metric||noValidation),afterTuning_state:tag(app.status||'not_applied')})+`<p class="ki-sample-note">Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
   }
 
   async function showRunDetail(runId, incidentParam) {
