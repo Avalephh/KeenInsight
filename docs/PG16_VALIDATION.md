@@ -1,0 +1,28 @@
+# PostgreSQL 16 validation
+
+The reproducible target is the bundled `postgres:16` Compose database.  The
+local development measurements in `docs/MEASURED_RESULTS.md` were collected
+from PostgreSQL 12.22 and must not be labelled as PostgreSQL 16 results.
+
+When Docker Engine with Compose v2 is available, run:
+
+```bash
+./scripts/validate_pg16.sh
+```
+
+The script uses an isolated Compose project, binds PostgreSQL to `127.0.0.1`
+port 55432 and the API to port 18000, waits for `/api/health`, runs
+`scripts/preflight.py --expected-major 16 --require-clean`, and then executes
+three complete repetitions with seven timed samples and two warm-ups per
+phase.  Its raw output defaults to
+`artifacts/pg16-repeat-results.json`.  The exit trap removes the temporary
+Compose volume and containers after the run.
+
+If Docker is unavailable, the script exits with status 2 and an explicit
+message; that is an environment limitation, not a successful PostgreSQL 16
+validation.  Do not copy the PostgreSQL 12 snapshot into a PostgreSQL 16
+claim.  Preserve the raw JSON, image digest, host resources, schema counts,
+settings, and failures when the validation is run on another machine.
+
+The script deliberately uses alternate ports so it cannot replace or disturb
+an existing local PostgreSQL/demo service on 5432/8000.

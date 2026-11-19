@@ -1,0 +1,98 @@
+SOURCE_KEY: project:tests/test_legacy_compatibility.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: tests/test_legacy_compatibility.py
+SOURCE_URI: project://tests/test_legacy_compatibility.py
+---
+from app.legacy_tune import (
+LEGACY_LOAD_TO_SCENARIO,
+LegacyTuneCompatibility,
+)
+
+def test_upstream_workload_tune_routes_are_registered_with_original_methods():
+compatibility = LegacyTuneCompatibility(None, None)
+routes = {
+(route.path, method)
+for route in compatibility.router.routes
+for method in (route.methods or set())
+}
+expected = {
+("/api/tune/setConfig", "POST"),
+("/api/tune/firstEvaluate", "POST"),
+("/api/tune/firstEvaluateResults", "GET"),
+("/api/tune/oneStepStatus", "GET"),
+("/api/tune/exception-functions", "GET"),
+("/api/tune/oneStep", "POST"),
+("/api/tune/oneStepResult", "GET"),
+("/api/tune/oneStepResult", "POST"),
+("/api/tune/applyParams", "POST"),
+("/api/tune/startTune", "POST"),
+("/api/tune/multiTuneStatus", "GET"),
+("/api/tune/getMultiTuneResult", "GET"),
+("/api/tune/getMultiTuneResult", "POST"),
+}
+assert expected <= routes
+
+def test_legacy_observation_shapes_keep_live_and_persisted_runs_equivalent():
+live = {
+"run_id": 10,
+"scenario": "sort_spill",
+"phase": "baseline",
+"timings_ms": [10.0, 11.0, 12.0],
+"median_query_time_ms": 11.0,
+"p95_query_time_ms": 11.9,
+}
+persisted = {
+"id": 10,
+"scenario": "sort_spill",
+"phase": "baseline",
+"observations": {
+"timings_ms": [10.0, 11.0, 12.0],
+"median_query_time_ms": 11.0,
+"p95_query_time_ms": 11.9,
+},
+}
+assert LegacyTuneCompatibility._observations(live) == {
+"phase": "baseline",
+"timings_ms": [10.0, 11.0, 12.0],
+"median_query_time_ms": 11.0,
+"p95_query_time_ms": 11.9,
+}
+assert LegacyTuneCompatibility._observations(persisted) == persisted["observations"]
+
+def test_multi_round_evidence_is_an_object_with_run_identity():
+summary = LegacyTuneCompatibility._round_summary(
+1,
+{"tps": 2.0, "latency": 500.0},
+{"tps": 2.0, "latency": 500.0, "run_id": 42},
+)
+assert summary["evidence"] == {"baseline_run_id": 42}
+assert isinstance(summary["evidence"], dict)
+
+candidate = {
+"action": {"id": 7},
+"after": {"run_id": 43},
+"feedback": {
+"feedback": {
+"id": 8,
+"outcome": {"observed_effect": "effective"},
+}
+},
+"rollback_performed": True,
+}
+candidate_summary = LegacyTuneCompatibility._round_summary(
+2,
+{"tps": 3.0, "latency": 333.0},
+{"tps": 2.0, "latency": 500.0, "run_id": 42},
+candidate,
+)
+assert candidate_summary["evidence"] == {
+"action_id": 7,
+"after_run_id": 43,
+"feedback_id": 8,
+"observed_effect": "effective",
+"rollback_performed": True,
+}
+
+def test_legacy_benchmark_labels_are_explicitly_mapped_to_real_scenarios():
+assert set(LEGACY_LOAD_TO_SCENARIO) == {"tpcc", "tpch", "sysbench", "custom"}
+assert all(isinstance(scenario, str) for scenario in LEGACY_LOAD_TO_SCENARIO.values())

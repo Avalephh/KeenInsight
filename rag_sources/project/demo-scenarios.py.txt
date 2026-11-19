@@ -1,0 +1,204 @@
+SOURCE_KEY: project:demo/scenarios.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: demo/scenarios.py
+SOURCE_URI: project://demo/scenarios.py
+---
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable
+
+STATS_PROBE_TOTAL_ROWS = 50_000
+STATS_PROBE_INITIAL_RARE_ROWS = 1_000
+STATS_PROBE_PRESSURE_RARE_ROWS = 46_000
+
+DEMO_DDL = [
+"CREATE SCHEMA IF NOT EXISTS keeninsight_demo",
+"""
+CREATE TABLE IF NOT EXISTS keeninsight_demo.customers (
+customer_id INTEGER PRIMARY KEY,
+region TEXT NOT NULL,
+created_at DATE NOT NULL
+)
+""",
+"""
+INSERT INTO keeninsight_demo.customers (customer_id, region, created_at)
+SELECT g,
+(ARRAY['APAC', 'EMEA', 'AMER', 'LATAM'])[((g - 1) % 4) + 1],
+DATE '2020-01-01' + ((g * 17) % 1400)
+FROM generate_series(1, 20000) AS g
+ON CONFLICT (customer_id) DO NOTHING
+""",
+"""
+CREATE TABLE IF NOT EXISTS keeninsight_demo.orders (
+order_id BIGINT PRIMARY KEY,
+customer_id INTEGER NOT NULL,
+order_date DATE NOT NULL,
+amount NUMERIC(12, 2) NOT NULL,
+status TEXT NOT NULL,
+note TEXT NOT NULL
+)
+""",
+"""
+INSERT INTO keeninsight_demo.orders
+(order_id, customer_id, order_date, amount, status, note)
+SELECT g,
+(((g::bigint * 7919) % 20000) + 1)::integer,
+DATE '2023-01-01' + ((g * 13) % 730),
+((g * 37) % 100000)::numeric / 100,
+(ARRAY['NEW', 'PAID', 'SHIPPED', 'CANCELLED'])[((g - 1) % 4) + 1],
+md5(g::text || ':keeninsight-demo')
+FROM generate_series(1, 800000) AS g
+ON CONFLICT (order_id) DO NOTHING
+""",
+"""
+CREATE TABLE IF NOT EXISTS keeninsight_demo.accounts (
+account_id INTEGER PRIMARY KEY,
+balance NUMERIC(12, 2) NOT NULL
+)
+""",
+"""
+INSERT INTO keeninsight_demo.accounts (account_id, balance)
+SELECT g, 1000.00 FROM generate_series(1, 20) AS g
+ON CONFLICT (account_id) DO NOTHING
+""",
+"ANALYZE keeninsight_demo.customers",
+"ANALYZE keeninsight_demo.orders",
+"ANALYZE keeninsight_demo.accounts",
+"""
+CREATE TABLE IF NOT EXISTS keeninsight_demo.stats_probe (
+probe_id INTEGER PRIMARY KEY,
+category TEXT NOT NULL,
+payload TEXT NOT NULL
+)
+""",
+# This table is an isolated reproducibility probe. Disable automatic
+# statistics refresh only here so the intentional post-update stale window
+# cannot disappear due to an autovacuum race on a slower host. The normal
+# demo relations keep PostgreSQL's default autovacuum behavior.
+"ALTER TABLE keeninsight_demo.stats_probe SET (autovacuum_enabled = false)",
+f"""
+INSERT INTO keeninsight_demo.stats_probe (probe_id, category, payload)
+SELECT g,
+CASE WHEN g <= {STATS_PROBE_TOTAL_ROWS - STATS_PROBE_INITIAL_RARE_ROWS}
+THEN 'common' ELSE 'rare' END,
+md5(g::text || ':keeninsight-stats-probe')
+FROM generate_series(1, {STATS_PROBE_TOTAL_ROWS}) AS g
+ON CONFLICT (probe_id) DO NOTHING
+""",
+f"""
+UPDATE keeninsight_demo.stats_probe
+SET category = CASE WHEN probe_id <= {STATS_PROBE_TOTAL_ROWS - STATS_PROBE_INITIAL_RARE_ROWS}
+THEN 'common' ELSE 'rare' END
+""",
+"ANALYZE keeninsight_demo.stats_probe",
+]
+
+@dataclass(frozen=True)
+class Scenario:
+name: str
+title: str
+description: str
+query: str | None
+parameters: dict[str, Any]
+run: Callable[..., dict[str, Any]] | None = None
+
+SCENARIO_METADATA = [
+{
+"name": "hash_join_spill",
+"title": "Hash join under work_mem pressure",
+"description": (
+"Runs a real full join with a deliberately session-scoped low work_mem for the baseline, then measures the current database setting after an explicit tuning action."
+),
+"query": (
+"SELECT count(*) FROM keeninsight_demo.orders o "
+"JOIN keeninsight_demo.customers c ON c.customer_id = o.customer_id"
+),
+"parameters": {"baseline_work_mem": "64kB"},
+},
+{
+"name": "aggregate_spill",
+"title": "Grouped aggregate under work_mem pressure",
+"description": (
+"Runs a real grouped aggregate with a session-scoped low work_mem; "
+"the baseline can spill sort/aggregate state, while the after phase "
+"checks the actual in-memory PostgreSQL plan after a typed action."
+),
+"query": (
+"SELECT sum(order_count)::bigint AS total_rows "
+"FROM (SELECT customer_id, count(*)::bigint AS order_count "
+"FROM keeninsight_demo.orders GROUP BY customer_id) g"
+),
+"parameters": {"baseline_work_mem": "64kB"},
+},
+{
+"name": "sort_spill",
+"title": "Window sort under work_mem pressure",
+"description": (
+"Runs a real windowed ordering with a session-scoped low work_mem; "
+"the baseline forces an external merge sort, while the after phase "
+"checks that the sort stays in memory after a bounded action."
+),
+"query": (
+"SELECT max(row_number) AS max_row "
+"FROM (SELECT row_number() OVER (ORDER BY amount) AS row_number "
+"FROM keeninsight_demo.orders) q"
+),
+"parameters": {"baseline_work_mem": "64kB"},
+},
+{
+"name": "parallel_query_underprovisioned",
+"title": "Parallel aggregate with workers disabled",
+"description": (
+"Runs a large aggregate with a session-only zero-worker pressure "
+"setting, then compares the same query after a bounded database "
+"worker recommendation derived from PostgreSQL and host limits."
+),
+"query": (
+"SELECT count(*)::bigint AS row_count "
+"FROM keeninsight_demo.orders"
+),
+"parameters": {"baseline_parallel_workers": 0},
+},
+{
+"name": "lock_contention",
+"title": "Concurrent row-lock contention",
+"description": (
+"Holds one real row lock and starts a second PostgreSQL session that waits for it, exposing the blocker through pg_locks and pg_stat_activity."
+),
+"query": "SELECT balance FROM keeninsight_demo.accounts WHERE account_id = 1 FOR UPDATE",
+"parameters": {"account_id": 1},
+},
+{
+"name": "missing_index",
+"title": "Filtered scan without a customer index",
+"description": (
+"Runs a real selective query against keeninsight_demo.orders and compares the observed plan before and after a validated btree index."
+),
+"query": (
+"SELECT order_id, customer_id, order_date, amount, status "
+"FROM keeninsight_demo.orders WHERE customer_id = %s ORDER BY order_id"
+),
+"parameters": {"customer_id": 1234},
+},
+{
+"name": "stale_statistics",
+"title": "Stale statistics after a distribution shift",
+"description": (
+"Shifts a namespaced probe table from 2% to 92% rare values without ANALYZE, "
+"then uses the observed estimate/actual mismatch to propose a safe statistics refresh. "
+"This maintenance case does not create or depend on an index."
+),
+"query": (
+"SELECT count(*)::bigint AS rare_rows "
+"FROM keeninsight_demo.stats_probe WHERE category = 'rare'"
+),
+"parameters": {},
+},
+]
+
+def get_scenario(name: str) -> dict[str, Any]:
+for scenario in SCENARIO_METADATA:
+if scenario["name"] == name:
+return scenario
+raise KeyError(f"unknown workload scenario: {name}")

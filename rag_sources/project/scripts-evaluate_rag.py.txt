@@ -1,0 +1,197 @@
+SOURCE_KEY: project:scripts/evaluate_rag.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/evaluate_rag.py
+SOURCE_URI: project://scripts/evaluate_rag.py
+---
+#!/usr/bin/env python3
+"""Evaluate source retrieval against a fixed, non-indexed question set.
+
+This is intentionally a retrieval evaluation, not a claim that an optional
+LLM answer is correct. Each question has a human-specified gold source key
+and optional terms that should occur in the returned evidence. The question
+set lives outside ``rag_sources`` so the index cannot retrieve its labels.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+def request(base_url: str, query: str, top_k: int, source_type: Optional[str], mode: str = "lexical") -> Dict[str, Any]:
+params = {"q": query, "top_k": str(top_k)}
+if source_type:
+params["source_type"] = source_type
+params["mode"] = mode
+path = "/api/rag/search?" + urllib.parse.urlencode(params)
+try:
+with urllib.request.urlopen(base_url.rstrip("/") + path, timeout=30) as response:
+body = json.load(response)
+except urllib.error.HTTPError as exc:
+detail = exc.read().decode("utf-8", "replace")
+raise RuntimeError(f"{path} -> HTTP {exc.code}: {detail}") from exc
+if not isinstance(body, dict):
+raise RuntimeError(f"{path} did not return a JSON object")
+return body
+
+def _text(item: Dict[str, Any]) -> str:
+return " ".join(
+str(item.get(field) or "") for field in ("title", "snippet", "content")
+).lower()
+
+def _matches(item: Dict[str, Any], question: Dict[str, Any]) -> bool:
+expected_keys = [str(value) for value in question.get("expected_source_keys") or []]
+actual_key = str(item.get("source_key") or "")
+if expected_keys and actual_key not in expected_keys:
+return False
+expected_type = question.get("source_type")
+if expected_type and item.get("source_type") != expected_type:
+return False
+return bool(expected_keys or expected_type)
+
+def _evaluation_environment(base_url: str) -> Dict[str, Any]:
+"""Capture the corpus/server identity alongside retrieval metrics."""
+path = base_url.rstrip("/") + "/api/demo/manifest"
+try:
+with urllib.request.urlopen(path, timeout=30) as response:
+manifest = json.load(response)
+if not isinstance(manifest, dict):
+raise RuntimeError("manifest response was not a JSON object")
+rag = manifest.get("rag") or {}
+return {
+"server": manifest.get("server") or {},
+"static_manifest": rag.get("static_manifest") or {},
+"rag_database": (rag.get("database") or {}),
+}
+except Exception as exc:
+return {"error": str(exc)}
+
+def evaluate_question(question: Dict[str, Any], items: List[Dict[str, Any]]) -> Dict[str, Any]:
+expected_empty = bool(question.get("expected_empty"))
+relevant_positions = [
+index for index, item in enumerate(items, start=1) if _matches(item, question)
+]
+relevant_count = len(relevant_positions)
+terms = [str(term).lower() for term in question.get("required_terms") or []]
+combined = " ".join(_text(item) for item in items)
+covered_terms = [term for term in terms if term in combined]
+if expected_empty:
+passed = not items
+reciprocal_rank = 1.0 if passed else 0.0
+precision = 1.0 if passed else 0.0
+else:
+passed = relevant_count > 0
+reciprocal_rank = 1.0 / relevant_positions[0] if relevant_positions else 0.0
+precision = relevant_count / len(items) if items else 0.0
+return {
+"id": question.get("id"),
+"query": question.get("query"),
+"source_type": question.get("source_type"),
+"expected_source_keys": question.get("expected_source_keys") or [],
+"expected_empty": expected_empty,
+"passed": passed,
+"retrieved_count": len(items),
+"relevant_count": relevant_count,
+"relevant_ranks": relevant_positions,
+"hit_at_1": bool(relevant_positions and relevant_positions[0] == 1),
+"reciprocal_rank": reciprocal_rank,
+"precision_at_k": precision,
+"required_terms": terms,
+"covered_terms": covered_terms,
+"term_coverage": len(covered_terms) / len(terms) if terms else 1.0,
+"items": [
+{
+"source_key": item.get("source_key"),
+"source_type": item.get("source_type"),
+"title": item.get("title"),
+"chunk_index": item.get("chunk_index"),
+"locator": item.get("locator"),
+}
+for item in items
+],
+}
+
+def evaluate(base_url: str, questions_path: Path, top_k: int, mode: str = "lexical") -> Dict[str, Any]:
+payload = json.loads(questions_path.read_text(encoding="utf-8"))
+questions = payload.get("questions") if isinstance(payload, dict) else None
+if not isinstance(questions, list) or not questions:
+raise ValueError("evaluation file must contain a non-empty questions list")
+cases: List[Dict[str, Any]] = []
+errors: List[Dict[str, Any]] = []
+started = time.time()
+environment = _evaluation_environment(base_url)
+for question in questions:
+try:
+response = request(
+base_url,
+str(question.get("query") or ""),
+top_k,
+question.get("source_type"),
+mode,
+)
+items = response.get("items") or []
+cases.append(evaluate_question(question, items))
+except Exception as exc:
+errors.append({"id": question.get("id"), "error": str(exc)})
+positives = [case for case in cases if not case["expected_empty"]]
+negatives = [case for case in cases if case["expected_empty"]]
+def mean(cases_to_average: List[Dict[str, Any]], field: str) -> float:
+if not cases_to_average:
+return 0.0
+return sum(float(case[field]) for case in cases_to_average) / len(cases_to_average)
+return {
+"format": "keeninsight-rag-evaluation-report-v1",
+"evaluated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+"base_url": base_url,
+"question_file": str(questions_path),
+"top_k": top_k,
+"mode": mode,
+"duration_seconds": round(time.time() - started, 3),
+"environment": environment,
+"summary": {
+"question_count": len(questions),
+"evaluated_count": len(cases),
+"error_count": len(errors),
+"pass_count": sum(case["passed"] for case in cases),
+"pass_rate": mean(cases, "passed"),
+"positive_question_count": len(positives),
+"source_recall_at_1": mean(positives, "hit_at_1"),
+"source_recall_at_k": mean(positives, "passed"),
+"mean_reciprocal_rank": mean(positives, "reciprocal_rank"),
+"mean_precision_at_k": mean(positives, "precision_at_k"),
+"mean_term_coverage": mean(positives, "term_coverage"),
+"negative_no_hit_accuracy": mean(negatives, "passed"),
+},
+"errors": errors,
+"cases": cases,
+}
+
+def main() -> None:
+parser = argparse.ArgumentParser()
+parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+parser.add_argument(
+"--questions", type=Path, default=Path("evaluation/rag_questions.json")
+)
+parser.add_argument("--top-k", type=int, default=5)
+parser.add_argument("--mode", choices=("lexical", "vector", "hybrid"), default="lexical")
+parser.add_argument("--output", type=Path, default=Path("artifacts/rag-evaluation.json"))
+args = parser.parse_args()
+if not 1 <= args.top_k <= 10:
+parser.error("--top-k must be between 1 and 10")
+report = evaluate(args.base_url, args.questions, args.top_k, args.mode)
+args.output.parent.mkdir(parents=True, exist_ok=True)
+args.output.write_text(
+json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+)
+print(json.dumps(report["summary"], indent=2, ensure_ascii=False))
+print(f"Wrote RAG evaluation report to {args.output}")
+if report["errors"] or report["summary"]["pass_count"] != report["summary"]["question_count"]:
+raise SystemExit(2)
+
+if __name__ == "__main__":
+main()

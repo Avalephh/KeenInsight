@@ -1,0 +1,90 @@
+SOURCE_KEY: archive:pdf-text:system-3.pdf
+SOURCE_TYPE: supplemental-pdf
+SOURCE_TITLE: system-3.pdf
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!system-3.pdf
+---
+[Page 1]
+Anomaly Resolution
+Multi-Source Knowledge Maintenance
+Anomaly Detection
+System Monitoring
+System
+Knob Tuning
+KernelSpace
+Incoming
+Query
+Kprobes
+TargetKnob
+Slow Query
+Prediction
+Historical
+Tuning Records
+SQL Lifecycle
+Reconstruction
+Threshold
+Check
+OptimizationSuggestions :apply a query hint toencourage index-based access
+Root case
+Windowed
+System
+Performance
+Summarization
+AgentAnalysis
+static analysis
+Differential Profiling
+SHAP model
+DBA Rules
+System Level
+SQL Level
+Hotspot Detection :
+buf_LRU_get_free_block
+Root case
+UserSpace
+Uprobes
+SELECT /*+ INDEX(orders idx_user_id) */ *FROM orders
+WHERE user_id = 1001 OR status = 'PAID';
+SQL Optimization
+System Level
+SQL Level
+AdaptiveMessageGeneration
+1
+2 3
+DB Execution
+Functions
+Kernel Resource
+Functions
+DB Events
+Kernel Events
+Adaptive
+Prob Attachment
+Attach
+Attach
+1.(Hint Rule) IF a query contains OR predicates and the EXPLAIN plan showstype=ALL, THEN recommend using INDEX or INDEX_MERGE query hints toguide the optimizer toward an index-based access path.2.(Index Rule) ....3.(Rewrite Rule) ....
+ClusteringAnalysis
+Tuning
+Experience
+Data FLow Control FLowDB Source
+Code
+LLVMAnalysis
+Workload Pattern: High scanRoot Cause: Ineffective index usageAction: Add indexObserved Gain: Latency reduced by 37%
++
+Structured
+RepresentationManuals
+Multiclass Scoring Model
+Cost
+Model
+CodeMaunalSys-LevelTuningExperience
+Knowledge Retrieval
+CodeMaunalSQL-LevelTuningExperience
+Knowledge Retrieval
+Cost
+Model
+Hotspot Function:buf_LRU_get_free_block
+Related Knobs:innodb_buffer_pool_sizeinnodb_old_blocks_pct
+DataFlow & ControlFlow Analysis
+Syntax
+&
+Semantic Validation
+Code Retrieve
+Agent
+ProcessingPipelineCode

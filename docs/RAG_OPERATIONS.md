@@ -1,0 +1,198 @@
+# RAG operations and provenance
+
+This document describes the grounded RAG path shipped with the PostgreSQL
+artifact.  It is designed for a reviewer to inspect the source and the
+runtime evidence used in an answer, not to hide a recommendation behind an
+opaque generated response.
+
+## Source inventory
+
+Run the collector from the repository root when the supplied files are
+available:
+
+```bash
+python scripts/collect_sources.py \
+  --output rag_sources \
+  --paper-zip /root/demo/KeenInsight_VLDB_Demo.zip \
+  --legacy-demo-zip /root/demo/English.zip \
+  --review-pdf "/root/demo/Conference Management Toolkit - View review.pdf" \
+  --project-root .
+```
+
+The collector emits UTF-8 text with a small header:
+
+```text
+SOURCE_KEY: archive:paper:main.tex
+SOURCE_TYPE: paper
+SOURCE_TITLE: main.tex
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!main.tex
+---
+...
+```
+
+The static inventory includes the paper's `.tex`/`.bib` source, text extracted
+from the review PDF, visible text from the 12 legacy HTML pages, and the
+current project's documentation, Python, UI, SQL, test, dependency, and
+deployment files.  Nine text-bearing PDF design assets are also extracted;
+blank diagram PDFs are skipped, while both supplied archives receive complete
+asset inventories with byte sizes and SHA-256 digests.  Compact summaries of
+the raw final regression, A/A control, preflight, PG16 status, standalone
+statistics-case, and post-change regression JSON are included as
+`evaluation-data`; the raw JSON remains in `artifacts/`.  `manifest.json`
+records the source identity and SHA-256
+digest.  The API also exposes its SHA-256 and per-source-type counts through
+`GET /api/demo/manifest`.  The original
+archive/PDF paths are provenance labels only; the service reads the generated
+text files shipped in the artifact.
+
+## Runtime collection
+
+`RagIndexer` runs once during application startup and then every
+`KI_RAG_SYNC_INTERVAL_SECONDS` seconds (default 60; minimum 15).  Each sync
+reads only persisted application evidence and the static source directory.
+It creates stable documents for:
+
+- the newest 100 workload runs;
+- the newest 100 tuning actions;
+- the newest 100 measured feedback records;
+- the newest 100 incidents;
+- the latest snapshot;
+- the newest 100 empirical knowledge entries;
+- recent eBPF/Kafka observability status and event delivery records;
+- recent SQL lifecycle reconstructions;
+- recent model runs, predictions, TreeSHAP attributions, and differential profiles;
+- recent optimizer runs/candidates, LLVM/source-analysis records, and
+  compiler-backed `code_knowledge` hypotheses/validation;
+- mined tuning experiences.
+
+The current numbers are intentionally dynamic.  `GET /api/rag/status` exposes
+the document/chunk counts, source-type counts, last successful sync, and any
+last error.  `POST /api/rag/sync` performs an explicit refresh and records a
+`rag_sync_completed` audit event.  Static content is SHA-256 idempotent;
+runtime keys such as `runtime:workload_run:123` make later experiments
+searchable without duplicating the document.  After each sync, the derived
+runtime index is pruned to those current keys; this bounds each dynamic
+category at its configured window without deleting the original PostgreSQL
+history.
+
+## Storage and retrieval
+
+The schema contains:
+
+```text
+keeninsight.rag_documents  source identity, provenance, normalized content
+keeninsight.rag_chunks     bounded overlapping chunks and tsvector index
+keeninsight.rag_embeddings one BGE passage vector per chunk, content-hash guarded
+```
+
+Chunks are bounded at 2,200 characters with a 280-character overlap and retain
+character offsets and token counts.  PostgreSQL's `simple` full-text
+configuration and `websearch_to_tsquery` provide the candidate pool through the
+GIN index.  A deterministic query-term coverage re-ranker then downweights
+generic question words and uses the native FTS rank as a tie-breaker.  If a
+query produces no full-text hit, a parameterized exact/term `ILIKE` fallback is
+used.  Search returns at most one chunk per document to keep the context
+diverse, and caps the user-selected result count at ten.
+
+Every returned chunk carries a provenance locator.  Character and line
+coordinates use the normalized source text shown to the retriever; extracted
+PDF sources additionally retain `[Page N]` markers, so a reviewer can jump
+from an answer to a page and normalized line interval without relying on an
+unverifiable generated citation.
+
+The HTTP surface is:
+
+```text
+GET  /api/rag/status
+GET  /api/rag/search?q=...&top_k=5&source_type=review
+POST /api/rag/ask       {"query":"...", "top_k":5, "source_type":"paper"}
+POST /api/rag/sync
+POST /api/source-analysis/knowledge {"knobs":["work_mem"],"limit":50}
+GET  /api/demo/manifest
+```
+
+`/api/rag/ask` returns the query, answer, generator type, `R1`/`R2` citation
+metadata, exact result chunks, and retrieval time.  With no optional model
+configuration it returns a source-labelled extractive brief.  If
+`KI_RAG_LLM_URL` and `KI_RAG_LLM_MODEL` are set, an OpenAI-compatible chat
+completion endpoint receives only the retrieved context and is instructed to
+cite `[R#]`; timeout or endpoint errors fall back to the extractive brief.
+The same shared client is exposed at `GET /api/llm/status` and is reused by
+the display-only diagnosis/source summaries and the validated optimizer
+candidate adapter.
+The `mode` field selects PostgreSQL lexical FTS, exact cosine retrieval over
+the persisted BGE vectors, or hybrid reciprocal-rank fusion.  Vector sync is
+explicitly separate from lexical sync:
+
+```bash
+curl -sS -X POST 'http://127.0.0.1:8000/api/rag/sync'
+curl -sS -X POST 'http://127.0.0.1:8000/api/rag/vector/sync?limit=50000'
+curl -sS 'http://127.0.0.1:8000/api/rag/search?mode=hybrid&top_k=5&q=how%20does%20work_mem%20avoid%20hash%20spill'
+```
+
+`/api/rag/vector/status` reports model, dimension, coverage, and the last
+sync error.  The search path serializes model inference and holds the corpus
+advisory lock while reading chunks, so a concurrent lexical/runtime refresh
+cannot produce a dangling embedding row.  An exact domain-token evidence gate
+is applied before accepting an out-of-domain semantic hit; this is a safety
+check, not a replacement for the embedding similarity score.
+
+## Fixed retrieval evaluation
+
+The checked-in `evaluation/rag_questions.json` contains 20 questions with
+human-specified source keys, source types, required terms, and one deliberately
+unmatched negative query.  It is outside `rag_sources/`, so its labels are not
+retrievable corpus content.  Run the evaluation against the live service:
+
+```bash
+python scripts/evaluate_rag.py \
+  --base-url http://127.0.0.1:8000 \
+  --questions evaluation/rag_questions.json \
+  --top-k 5 \
+  --output artifacts/rag-evaluation.json
+```
+
+The report records every query and returned source/locator.  The summary
+reports Recall@1, Recall@5, mean reciprocal rank, precision@5, required-term
+coverage, negative no-hit accuracy, errors, and pass rate.  This evaluates
+retrieval/source attribution only.  Run the same fixed set in all three modes
+to compare lexical, semantic, and hybrid retrieval; the strict vector and
+hybrid reports are the supplied semantic-retrieval evidence.  It is not an
+LLM answer-quality evaluation.  `/api/rag/evaluation` exposes the checked-in
+lexical report to the UI and evidence export.
+
+The latest local PostgreSQL 12.22 run after the upstream-branch audit passed
+all 20 cases in each mode.  Lexical retrieval measured Recall@1 0.7895,
+Recall@5 1.0, MRR 0.8860, and negative no-hit accuracy 1.0; vector retrieval
+measured Recall@1 0.6316, Recall@5 1.0, and negative no-hit accuracy 1.0;
+hybrid retrieval measured Recall@1 0.8421, Recall@5 1.0, MRR 0.8833, and
+negative no-hit accuracy 1.0.  These are
+corpus/version-specific retrieval measurements, not a general claim about
+embedding quality.  The exact query-level records are in
+`artifacts/rag-evaluation.json`, `artifacts/rag-vector-evaluation-strict.json`,
+and `artifacts/rag-hybrid-evaluation-strict.json`.
+
+## Operational safety and performance boundary
+
+The indexer has its own thread and synchronization lock.  It never reads the
+`keeninsight_demo` workload tables and never executes retrieved text.  A RAG
+answer cannot apply a tuning action.  The opt-in automatic workload endpoint
+is a separate server-side orchestrator around the typed action handlers: it
+reuses a completed baseline, measures the same SQL, records feedback, and can
+roll back.  Static source writes happen before indexing, and malformed sources
+are reported individually without stopping the service.
+
+`POST /api/source-analysis/knowledge` is the code-retrieval boundary.  It
+returns exact snippets from the analyzed PostgreSQL source tree, compiler
+relation types and locators, a deterministic grounded hypothesis, and the
+persisted record ID.  Every hypothesis carries
+`requires_targeted_experiment=true`; the automatic endpoint or a normal
+feedback call adds the real same-SQL validation rather than marking the source
+relationship successful from text alone.
+
+RAG status, search, sync, UI rendering, export metadata, and startup indexing
+are outside the timed workload request.  The interval worker may use database
+resources while it refreshes persisted evidence, so benchmark runs should
+record its interval and status.  The shipped A/A control and final repeated
+experiment are the regression guard: they require equal results and plan
+signatures under identical arms and preserve the raw timing distributions.

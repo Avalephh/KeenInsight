@@ -1,0 +1,128 @@
+{
+  "format": "keeninsight-ebpf-long-query-strict-v1",
+  "base_url": "http://127.0.0.1:8000",
+  "started_at": 1788779157.9792676,
+  "finished_at": 1788779163.6096716,
+  "session_id": 42,
+  "query_result": [
+    "",
+    1
+  ],
+  "monitor_start": {
+    "available": false,
+    "running": true,
+    "session_id": 42,
+    "binary_path": "/usr/lib/postgresql/12/bin/postgres",
+    "attached_probes": [],
+    "selected_probes": [
+      "PortalRun",
+      "standard_ExecutorRun",
+      "vfs_write"
+    ],
+    "target_pid_count": 1,
+    "event_count": 0,
+    "lost_count": 0,
+    "last_event_at": null,
+    "last_error": null,
+    "transport": {
+      "configured": true,
+      "bootstrap_servers": "127.0.0.1:9092",
+      "topic": "keeninsight.events",
+      "transport": "kafka",
+      "available": true,
+      "sent_count": 957,
+      "failed_count": 0,
+      "last_error": null,
+      "last_publish_at": "2026-09-07T11:05:43.131091+00:00"
+    },
+    "long_query_threshold_seconds": 1.0,
+    "adaptive": {
+      "enabled": false,
+      "max_event_rate_per_user_probe": 1000.0,
+      "observed_event_rates": {},
+      "pruned_probes": [],
+      "check_count": 0,
+      "last_check": null
+    }
+  },
+  "monitor_stop": {
+    "available": false,
+    "running": false,
+    "session_id": 42,
+    "binary_path": "/usr/lib/postgresql/12/bin/postgres",
+    "attached_probes": [],
+    "selected_probes": [
+      "PortalRun",
+      "standard_ExecutorRun",
+      "vfs_write"
+    ],
+    "target_pid_count": 0,
+    "event_count": 1,
+    "lost_count": 0,
+    "last_event_at": "2026-09-07T11:06:03.363402+00:00",
+    "last_error": null,
+    "transport": {
+      "configured": true,
+      "bootstrap_servers": "127.0.0.1:9092",
+      "topic": "keeninsight.events",
+      "transport": "kafka",
+      "available": true,
+      "sent_count": 958,
+      "failed_count": 0,
+      "last_error": null,
+      "last_publish_at": "2026-09-07T11:06:03.372875+00:00"
+    },
+    "long_query_threshold_seconds": 1.0,
+    "adaptive": {
+      "enabled": false,
+      "max_event_rate_per_user_probe": 1000.0,
+      "observed_event_rates": {
+        "standard_ExecutorRun": 1000.0
+      },
+      "pruned_probes": [],
+      "check_count": 0,
+      "last_check": null
+    }
+  },
+  "timeline": {
+    "items": [
+      {
+        "id": 33,
+        "session_id": 42,
+        "query_id": "ki:75f4a5248bafc29ec7e9a7a0",
+        "query_text": "SELECT pg_sleep(3.0), 1",
+        "query_id_source": "local_sql_fingerprint",
+        "function_name": "standard_ExecutorRun",
+        "first_observed_at": "2026-09-07T19:06:03.363402+08:00",
+        "last_observed_at": "2026-09-07T19:06:03.363402+08:00",
+        "event_count": 1,
+        "duration_ns": 3002479700,
+        "bytes": 0,
+        "anomaly_count": 1,
+        "source_event_ids": [
+          4761
+        ],
+        "metadata": {
+          "query_ids_seen": [],
+          "immediate_emission_reasons": [
+            "long_query",
+            "long_function_or_duration"
+          ]
+        },
+        "created_at": "2026-09-07T19:06:03.607580+08:00"
+      }
+    ],
+    "immediate_emission_reasons": [
+      "long_function_or_duration",
+      "long_query"
+    ]
+  },
+  "checks": {
+    "session_stopped": true,
+    "real_long_query_completed": true,
+    "real_events_observed": true,
+    "no_perf_buffer_loss": true,
+    "long_query_immediate_emission": true,
+    "lifecycle_contains_anomaly": true
+  }
+}

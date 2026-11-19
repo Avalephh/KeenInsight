@@ -1,0 +1,163 @@
+SOURCE_KEY: project:scripts/collect_external_knowledge.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/collect_external_knowledge.py
+SOURCE_URI: project://scripts/collect_external_knowledge.py
+---
+#!/usr/bin/env python3
+"""Collect live, attributed PostgreSQL operational knowledge for RAG.
+
+The collector records retrieval time, source URL and source digest in a
+portable text header. It is deliberately small and rate-limited: official
+PostgreSQL manuals are the primary references, while DBA StackExchange
+answers are supplemental community evidence and never treated as verified
+facts without a primary-source citation.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import html
+import json
+import re
+import time
+from datetime import datetime, timezone
+from html.parser import HTMLParser
+from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import Request, urlopen
+
+class VisibleText(HTMLParser):
+def __init__(self) -> None:
+super().__init__(convert_charrefs=True)
+self.parts = []
+self.depth = 0
+
+def handle_starttag(self, tag, attrs):
+if tag.lower() in {"script", "style", "svg", "noscript"}:
+self.depth += 1
+if tag.lower() in {"p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "br"}:
+self.parts.append("\n")
+
+def handle_endtag(self, tag):
+if tag.lower() in {"script", "style", "svg", "noscript"} and self.depth:
+self.depth -= 1
+if tag.lower() in {"p", "li", "h1", "h2", "h3", "h4", "h5", "h6"}:
+self.parts.append("\n")
+
+def handle_data(self, data):
+if not self.depth:
+self.parts.append(data)
+
+def normalize(value: str) -> str:
+value = html.unescape(value).replace("\r", "\n")
+lines = [" ".join(line.split()) for line in value.split("\n")]
+output = []
+blank = False
+for line in lines:
+if line:
+output.append(line)
+blank = False
+elif not blank:
+output.append("")
+blank = True
+return "\n".join(output).strip()
+
+def fetch(url: str) -> tuple[str, dict[str, str]]:
+request = Request(url, headers={"User-Agent": "KeenInsight-RAG-collector/1.0"})
+with urlopen(request, timeout=30) as response:
+raw = response.read()
+content_type = response.headers.get("Content-Type", "")
+text = raw.decode("utf-8", "replace")
+if "html" in content_type or "<html" in text[:1000].lower():
+parser = VisibleText()
+parser.feed(text)
+text = "\n".join(parser.parts)
+return normalize(text), {"content_type": content_type, "sha256": hashlib.sha256(raw).hexdigest()}
+
+def write_source(output: Path, name: str, *, key: str, source_type: str, title: str, uri: str, content: str, metadata: dict) -> dict:
+content = normalize(content)
+if not content:
+return {"status": "empty", "name": name}
+target = output / name
+target.parent.mkdir(parents=True, exist_ok=True)
+digest = hashlib.sha256(content.encode("utf-8")).hexdigest()
+header = "\n".join(
+[
+"SOURCE_KEY: %s" % key,
+"SOURCE_TYPE: %s" % source_type,
+"SOURCE_TITLE: %s" % title,
+"SOURCE_URI: %s" % uri,
+"RETRIEVED_AT: %s" % datetime.now(timezone.utc).isoformat(),
+"CONTENT_SHA256: %s" % digest,
+"SOURCE_METADATA: %s" % json.dumps(metadata, ensure_ascii=False, sort_keys=True),
+"---",
+]
+)
+target.write_text(header + "\n" + content + "\n", encoding="utf-8")
+return {"status": "written", "name": name, "title": title, "uri": uri, "sha256": digest, "source_type": source_type}
+
+OFFICIAL_URLS = [
+("postgresql-12-runtime-config-query", "PostgreSQL 12 query planning configuration", "https://www.postgresql.org/docs/12/runtime-config-query.html"),
+("postgresql-12-runtime-config-resource", "PostgreSQL 12 resource consumption configuration", "https://www.postgresql.org/docs/12/runtime-config-resource.html"),
+("postgresql-12-sql-explain", "PostgreSQL 12 EXPLAIN reference", "https://www.postgresql.org/docs/12/sql-explain.html"),
+("postgresql-12-monitoring-stats", "PostgreSQL 12 statistics views", "https://www.postgresql.org/docs/12/monitoring-stats.html"),
+("postgresql-12-runtime-config-logging", "PostgreSQL 12 logging configuration", "https://www.postgresql.org/docs/12/runtime-config-logging.html"),
+]
+
+def collect_stackexchange(output: Path, limit: int) -> list[dict]:
+query = urlencode({"order": "desc", "sort": "relevance", "q": "postgresql work_mem query tuning", "site": "dba", "filter": "withbody", "pagesize": str(max(1, min(limit, 20)))})
+url = "https://api.stackexchange.com/2.3/search/advanced?" + query
+request = Request(url, headers={"User-Agent": "KeenInsight-RAG-collector/1.0"})
+with urlopen(request, timeout=30) as response:
+payload = json.loads(response.read().decode("utf-8", "replace"))
+records = []
+for index, item in enumerate(payload.get("items") or [], 1):
+body = VisibleText()
+body.feed(item.get("body") or "")
+content = "Question: %s\n\n%s\n\nTags: %s\nScore: %s\nAnswer count: %s" % (
+item.get("title") or "",
+"\n".join(body.parts),
+", ".join(item.get("tags") or []),
+item.get("score"),
+item.get("answer_count"),
+)
+records.append(
+write_source(
+output,
+"external/stackexchange-dba-%03d.txt" % index,
+key="external:stackexchange:dba:%s" % item.get("question_id"),
+source_type="external-community",
+title="DBA StackExchange · %s" % item.get("title"),
+uri=item.get("link") or url,
+content=content,
+metadata={"question_id": item.get("question_id"), "license": "CC BY-SA; verify current primary documentation", "api": "Stack Exchange API 2.3"},
+)
+)
+return records
+
+def main() -> None:
+parser = argparse.ArgumentParser()
+parser.add_argument("--output", default="rag_sources")
+parser.add_argument("--stackexchange-limit", type=int, default=8)
+args = parser.parse_args()
+output = Path(args.output)
+output.mkdir(parents=True, exist_ok=True)
+records = []
+for key, title, url in OFFICIAL_URLS:
+try:
+content, metadata = fetch(url)
+records.append(write_source(output, "external/%s.txt" % key, key="external:official:%s" % key, source_type="external-official", title=title, uri=url, content=content, metadata={"authority": "PostgreSQL Global Development Group", "version": "12", **metadata}))
+except Exception as exc:
+records.append({"status": "error", "uri": url, "error": str(exc)})
+time.sleep(0.2)
+try:
+records.extend(collect_stackexchange(output, args.stackexchange_limit))
+except Exception as exc:
+records.append({"status": "error", "uri": "https://api.stackexchange.com/2.3/", "error": str(exc)})
+manifest_path = output / "external-manifest.json"
+manifest_path.write_text(json.dumps({"format": "keeninsight-external-rag-v1", "retrieved_at": datetime.now(timezone.utc).isoformat(), "records": records}, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+print(json.dumps({"output": str(output), "records": records}, ensure_ascii=False))
+
+if __name__ == "__main__":
+main()

@@ -1,0 +1,134 @@
+SOURCE_KEY: archive:legacy-demo:English/alert-detail.html
+SOURCE_TYPE: legacy-demo
+SOURCE_TITLE: alert-detail.html
+SOURCE_URI: English.zip!English/alert-detail.html
+---
+KeenInsight - Alert Details
+
+KeenInsight
+
+Console
+
+Help
+
+User
+
+Overview
+
+Clusters
+
+Real-time Monitor
+
+System level
+
+Alert List
+
+Alert Rules
+
+SQL level
+
+SQL Logs
+
+Diagnosis Rules
+
+System Settings
+
+System Config
+
+User Management
+
+Knowledge Base
+
+Manual
+
+Code Source
+
+Tuning-derived Knowledge
+
+Alert Details
+
+Back to List
+
+Related Knowledge Base
+
+Maunal
+
+Redo Log Buffer Working Principle
+
+innodb_log_buffer_size controls the InnoDB redo log buffer size. The default value is 16MB. Increasing this value can reduce disk I/O, especially suitable for large transaction scenarios. When the buffer is full, it triggers the log_buffer_flush_to_disk() function to flush logs to disk.
+
+Log Flush Trigger Conditions
+
+log_buffer_flush_to_disk() is triggered when the log buffer is full, when a transaction commits, or during periodic flushes every second. Frequent calls indicate that insufficient buffer is a typical symptom of performance bottlenecks.
+
+Tuning-derived Knowledge
+
+2026-03-20 Order System IO Optimization
+
+Similar scenario: log_buffer_flush_to_disk() call frequency too high. Tuned innodb_log_buffer_size from 16MB to 64MB.
+
+Effect: IO wait time reduced by 68%, QPS increased by 132%
+
+2026-03-05 Analysis Platform Performance Tuning
+
+Similar scenario: large transactions causing frequent flushes. Tuned innodb_log_buffer_size to 128MB, while also adjusting innodb_log_file_size.
+
+Effect: flush count reduced by 75%, transaction average response time reduced by 52%
+
+Code Source
+
+log_buffer_flush_to_disk()
+
+static void log_buffer_flush_to_disk(bool flush) {
+if (log_sys->buf_free > log_sys->buf_size / 2 || flush) {
+log_write_up_to(log_sys->lsn, flush);
+}
+}
+
+log_write_up_to()
+
+void log_write_up_to(lsn_t lsn, bool flush) {
+while (log_sys->write_lsn
+<
+lsn) {
+ulint len = log_sys->buf_free - log_sys->buf_next_to_write;
+if (len > 0) {
+fil_io(IO_WRITE, log_sys->file, log_sys->write_lsn,
+(byte*)log_sys->buf + log_sys->buf_next_to_write, len);
+log_sys->write_lsn += len;
+log_sys->buf_next_to_write += len;
+}
+}
+if (flush) {
+fil_flush(log_sys->file);
+}
+}
+
+innobase_commit()
+
+int innobase_commit(THD* thd, bool all) {
+trx_t* trx = thd_to_trx(thd);
+trx_commit_for_mysql(trx);
+if (all) {
+trx_start_if_not_started(trx);
+}
+return 0;
+}
+
+trx_commit_complete_for_mysql()
+
+void trx_commit_complete_for_mysql(trx_t* trx) {
+if (trx->flush_log_later) {
+log_buffer_flush_to_disk(true);
+}
+trx->flush_log_later = false;
+}
+
+fil_flush()
+
+void fil_flush(fil_node_t* node) {
+if (node->type != FIL_NODE_FILE) {
+return;
+}
+os_file_flush(node->handle);
+}

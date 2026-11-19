@@ -1,0 +1,423 @@
+/* Live data views for the original English.zip page set. */
+(function () {
+    'use strict';
+
+    const page = (window.location.pathname.split('/').pop() || '').toLowerCase();
+    const live = window.KeenInsightLegacy || {};
+    const api = live.api || (async (path, options) => {
+        const response = await fetch(`/api${path}`, options);
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+        return payload;
+    });
+    const notify = live.notify || ((message) => window.alert(message));
+
+    const state = { incidents: [], rules: [], logs: [], source: [], knowledge: [], experiences: [], selectedIncident: null, selectedLog: null, flameGraph: null };
+    const esc = (value) => String(value === null || value === undefined ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const num = (value) => { const result = Number(value); return Number.isFinite(result) ? result : null; };
+    const fixed = (value, digits = 2) => { const result = num(value); return result === null ? '—' : result.toFixed(digits); };
+    const dateText = (value) => {
+        if (!value) return '—';
+        const result = new Date(value);
+        return Number.isNaN(result.getTime()) ? String(value).replace('T', ' ').slice(0, 19) : result.toLocaleString([], { hour12: false }).replace(',', '');
+    };
+    const queryParameter = (name) => new URLSearchParams(window.location.search).get(name);
+    const jsonText = (value, max = 2600) => {
+        let text;
+        try { text = typeof value === 'string' ? value : JSON.stringify(value, null, 2); } catch (error) { text = String(value); }
+        return text.length > max ? `${text.slice(0, max)}\n…` : text;
+    };
+    const backendMeta = (meta) => (meta && meta.server) || {};
+    const pageTitle = (text) => { const element = document.querySelector('.page-title'); if (element && text) element.textContent = text; };
+    const sourceTag = (text) => `<span class="ki-source-tag">${esc(text)}</span>`;
+    const kindName = {
+        connection_saturation: '连接数饱和',
+        lock_wait: '锁等待',
+        slow_query: '慢查询',
+        temp_spill: '临时空间溢出',
+        cache_hit_ratio: '缓存命中率',
+        hash_join_spill: '哈希连接溢出',
+        aggregate_spill: '分组聚合溢出',
+        sort_spill: '窗口排序溢出',
+        parallel_query_underprovisioned: '并行工作进程不足',
+        stale_statistics: '统计信息过期',
+        missing_index: '缺少索引',
+        filtered_sequential_scan: '过滤顺序扫描',
+        temporary_file_spill: '临时文件溢出'
+    };
+    const labelForKind = (kind) => kindName[kind] || String(kind || '数据库信号').replace(/_/g, ' ');
+    const sourceName = (value) => ({
+        'postgresql-documentation': 'PostgreSQL 官方文档',
+        'tuning-feedback': '调优实测反馈',
+        'runtime-workload': '运行时工作负载',
+        'runtime-action': '运行时调优操作',
+        'runtime-feedback': '运行时反馈',
+        'runtime-differential': '运行时差分画像',
+        'runtime-experience': '运行时调优经验',
+        'runtime-lifecycle': '运行时生命周期',
+        'runtime-model': '运行时模型',
+        'runtime-observability': '运行时可观测性',
+        'runtime-optimizer': '运行时优化器'
+    }[String(value)] || String(value || 'PostgreSQL 知识'));
+    const actionName = (value) => ({
+        set_database_parameter: '设置数据库参数',
+        set_parameter: '设置参数',
+        create_index: '创建索引',
+        drop_index: '删除索引',
+        refresh_statistics: '刷新统计信息',
+        query_hint: '查询提示',
+        query_rewrite: '查询改写'
+    }[String(value)] || String(value || '未指定'));
+    const incidentSummary = (incident) => {
+        const evidence = incident && incident.evidence || {};
+        if (incident && incident.kind === 'lock_wait') return `当前有 ${fixed((evidence.locks || []).length || evidence.waiting_sessions || 0, 0)} 个会话正在等待锁`;
+        if (incident && incident.kind === 'slow_query') return `语句 ${evidence.query_id || '—'} 平均耗时 ${fixed(evidence.mean_exec_time_ms)} 毫秒，共调用 ${fixed(evidence.calls, 0)} 次`;
+        if (incident && incident.kind === 'temp_spill') return `语句 ${evidence.query_id || '—'} 写入 ${fixed(evidence.temp_blks_written, 0)} 个临时块`;
+        if (incident && incident.kind === 'connection_saturation' && evidence.numbackends !== undefined) return `当前连接数 ${fixed(evidence.numbackends, 0)}，已达到连接上限阈值`;
+        if (incident && incident.kind === 'cache_hit_ratio' && evidence.ratio !== undefined) return `缓存命中率 ${fixed(Number(evidence.ratio) * 100, 1)}%，低于配置阈值`;
+        return String(incident && incident.summary || '当前观测到数据库异常');
+    };
+    const setSelectedHost = (host) => { try { localStorage.setItem('selectedHost', JSON.stringify(host)); } catch (error) { /* private mode */ } };
+
+    const incidentToDetailShape = (incident) => {
+        const evidence = incident.evidence || {};
+        const diagnosis = incident.diagnosis || {};
+        const actions = incident.actions || [];
+        const firstEvidence = Object.entries(evidence).find(([key, value]) => !['query', 'locks'].includes(key) && value !== null && typeof value !== 'object');
+        const triggeredRules = [{
+            name: (incident.metadata || {}).rule_name || labelForKind(incident.kind),
+            field: firstEvidence ? firstEvidence[0] : '观测信号',
+            period: '采集周期',
+            threshold: evidence.threshold_ms || evidence.threshold || evidence.minimum_waiting_sessions || '已配置规则',
+            actual: firstEvidence ? firstEvidence[1] : incident.summary
+        }];
+        const functions = [];
+        if (evidence.function_name) functions.push({ name: evidence.function_name, file: evidence.file_path || '运行时证据', line: evidence.line_number || '—', sources: ['eBPF 事件'] });
+        (evidence.functions || []).slice(0, 8).forEach((item) => functions.push({ name: item.function_name || item.name || String(item), file: item.file_path || '运行时证据', line: item.line_number || '—', sources: ['eBPF 事件'] }));
+        const knobs = actions.filter((action) => action && action.target).map((action) => ({
+            name: action.target.setting || action.target.index_name || action.action_type,
+            current: (action.before_state || {}).setting || (action.before_state || {}).value || '应用时记录',
+            recommended: action.target.value || action.target.setting_value || action.target.index_name || action.action_type
+        }));
+        return {
+            id: incident.id,
+            detailAnalysis: {
+                triggeredRules,
+                differentialProfiling: [],
+                shapAnalysis: { features: [] },
+                hotFunctions: functions,
+                knobs,
+                costModelPrediction: {
+                    beforeTuning: { cpu_usage: '未记录', io_wait: '未记录', tps: '未记录' },
+                    afterTuning: { cpu_usage: '未记录', io_wait: '未记录', tps: '未记录' }
+                },
+                liveExplanation: diagnosis && Object.keys(diagnosis).length ? jsonText(diagnosis, 1800) : incident.summary
+            }
+        };
+    };
+
+    const renderAlertRows = (items) => {
+        const tbody = document.getElementById('alertTableBody');
+        if (!tbody) return;
+        document.getElementById('totalCount').textContent = items.length;
+        if (!items.length) {
+            tbody.classList.remove('ki-live-pending');
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#86909c;">当前筛选条件没有匹配的持久化异常</td></tr>';
+            return;
+        }
+        tbody.innerHTML = items.map((incident) => {
+            const severity = ['critical', 'warning', 'info'].includes(incident.severity) ? incident.severity : 'info';
+            const status = incident.status === 'active' ? 'active' : 'resolved';
+            return `<tr>
+                <td><span class="severity-icon ${severity}">${severity === 'info' ? 'i' : '!'}</span></td>
+                <td class="alert-id">${esc(incident.id)}</td>
+                <td>${esc(dateText(incident.last_seen || incident.first_seen))}</td>
+                <td><span class="alert-host" data-host-link="${esc(incident.id)}">当前 PostgreSQL 实例</span></td>
+                <td class="alert-reason">${esc(labelForKind(incident.kind))}<br><span class="ki-live-muted">${esc(incidentSummary(incident))}</span></td>
+                <td><span class="status-badge ${status === 'active' ? 'critical' : 'resolved'}">${status === 'active' ? '活跃' : '已解决'}</span></td>
+                <td><span class="action-link" data-alert-detail="${esc(incident.id)}">查看详情</span>${status === 'active' ? `<span class="action-link" data-alert-resolve="${esc(incident.id)}">解决</span>` : '<span class="ki-live-muted">已保留证据</span>'}</td>
+            </tr>`;
+        }).join('');
+        tbody.classList.remove('ki-live-pending');
+        tbody.classList.add('ki-live-ready');
+        tbody.querySelectorAll('[data-alert-detail]').forEach((element) => element.addEventListener('click', () => showIncidentDetail(element.dataset.alertDetail)));
+        tbody.querySelectorAll('[data-alert-resolve]').forEach((element) => element.addEventListener('click', () => resolveIncident(element.dataset.alertResolve)));
+        tbody.querySelectorAll('[data-host-link]').forEach((element) => element.addEventListener('click', () => { setSelectedHost({ name: '当前 PostgreSQL 实例', ip: '本地套接字', type: 'PostgreSQL' }); window.location.href = 'realtime-monitor.html'; }));
+    };
+
+    const filteredIncidents = () => {
+        const severity = (document.getElementById('severityFilter') || {}).value || '';
+        const status = (document.getElementById('statusFilter') || {}).value || '';
+        const reason = (document.getElementById('reasonFilter') || {}).value || '';
+        const host = ((document.getElementById('hostFilter') || {}).value || '').toLowerCase();
+        return state.incidents.filter((incident) => (!severity || incident.severity === severity)
+            && (!status || incident.status === status)
+            && (!reason || incident.kind === reason)
+            && (!host || `${incidentSummary(incident)} 当前 PostgreSQL 实例`.toLowerCase().includes(host)));
+    };
+
+    const showIncidentDetail = async (id) => {
+        try {
+            const incident = await api(`/incidents/${encodeURIComponent(id)}`);
+            state.selectedIncident = incident;
+            const modal = document.getElementById('alertDetailModal');
+            const title = document.getElementById('modalTitle');
+            const body = document.getElementById('modalBody');
+            if (!modal || !title || !body) return;
+            const severityText = { critical: '严重', warning: '警告', info: '信息' }[incident.severity] || incident.severity || '信息';
+            title.innerHTML = `<span class="status-badge ${esc(incident.severity || 'info')}" style="margin-right:12px;">${esc(severityText)}</span> 异常 ${esc(incident.id)}`;
+            const actions = incident.actions || [];
+            body.innerHTML = `<div class="ki-detail-grid">
+                <div class="ki-detail-card"><div class="ki-detail-label">信号</div><div class="ki-detail-value">${esc(labelForKind(incident.kind))}</div></div>
+                <div class="ki-detail-card"><div class="ki-detail-label">状态</div><div class="ki-detail-value">${esc({ active: '活跃', resolved: '已解决', ignored: '已忽略' }[incident.status] || incident.status)}</div></div>
+                <div class="ki-detail-card"><div class="ki-detail-label">首次发现</div><div class="ki-detail-value">${esc(dateText(incident.first_seen))}</div></div>
+                <div class="ki-detail-card"><div class="ki-detail-label">最近发现</div><div class="ki-detail-value">${esc(dateText(incident.last_seen))}</div></div>
+            </div>
+            <div style="margin-top:16px"><strong>观测摘要</strong><p style="margin-top:6px;line-height:1.7">${esc(incidentSummary(incident))}</p></div>
+            <div style="margin-top:16px"><strong>已持久化证据</strong><pre class="ki-live-pre">${esc(jsonText(incident.evidence, 4200))}</pre></div>
+            <div style="margin-top:16px"><strong>类型化操作</strong><div class="ki-live-note">${actions.length ? actions.map((action) => `${sourceTag(action.action_type)} ${esc(action.description || action.status)}`).join(' ') : '当前异常尚未创建调优操作。'}</div></div>
+            <div style="margin-top:16px;display:flex;gap:12px;align-items:center"><span class="action-link" data-incident-diagnose="${esc(incident.id)}">运行诊断</span>${incident.status === 'active' ? `<span class="action-link" data-incident-resolve="${esc(incident.id)}">解决异常</span>` : ''}<span class="action-link" data-incident-full="${esc(incident.id)}">打开完整详情</span></div>`;
+            body.querySelector('[data-incident-diagnose]').onclick = () => diagnoseIncident(incident.id);
+            const resolve = body.querySelector('[data-incident-resolve]'); if (resolve) resolve.onclick = () => resolveIncident(incident.id);
+            const full = body.querySelector('[data-incident-full]'); if (full) full.onclick = () => { window.location.href = `alert-detail.html?id=${encodeURIComponent(incident.id)}`; };
+            modal.classList.add('active');
+        } catch (error) { notify(`无法加载异常：${error.message}`, 'error'); }
+    };
+
+    const diagnoseIncident = async (id) => {
+        try { await api(`/incidents/${id}/diagnose`, { method: 'POST' }); notify('诊断完成，类型化建议已持久化。'); await showIncidentDetail(id); } catch (error) { notify(`诊断失败：${error.message}`, 'error'); }
+    };
+
+    const resolveIncident = async (id) => {
+        if (!window.confirm('确定要在 PostgreSQL 中解决这个观测异常吗？')) return;
+        try { await api(`/incidents/${id}/resolve`, { method: 'POST' }); notify('异常已解决。'); await loadAlerts(); } catch (error) { notify(`解决失败：${error.message}`, 'error'); }
+    };
+
+    const loadAlerts = async () => {
+        try {
+            const result = await api('/incidents?limit=200'); state.incidents = result.items || [];
+            const reason = document.getElementById('reasonFilter');
+            if (reason) reason.innerHTML = '<option value="">全部</option>' + [...new Set(state.incidents.map((item) => item.kind))].map((kind) => `<option value="${esc(kind)}">${esc(labelForKind(kind))}</option>`).join('');
+            renderAlertRows(filteredIncidents());
+        } catch (error) { const tbody = document.getElementById('alertTableBody'); if (tbody) { tbody.classList.remove('ki-live-pending'); tbody.innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`; } }
+    };
+
+    const initAlertList = async () => {
+        pageTitle('异常列表 · PostgreSQL 实时证据');
+        window.filterAlerts = () => renderAlertRows(filteredIncidents());
+        window.resetFilter = () => { ['severityFilter', 'statusFilter', 'reasonFilter', 'hostFilter'].forEach((id) => { const element = document.getElementById(id); if (element) element.value = ''; }); renderAlertRows(state.incidents); };
+        window.goToHost = () => { setSelectedHost({ name: '当前 PostgreSQL 实例', ip: '本地套接字', type: 'PostgreSQL' }); window.location.href = 'realtime-monitor.html'; };
+        window.rollbackAlert = (id) => notify(`异常 ${id} 没有可逆数据库操作，请在证据控制台中使用类型化操作。`, 'error');
+        window.showAlertDetail = showIncidentDetail;
+        window.closeAlertDetail = () => { const modal = document.getElementById('alertDetailModal'); if (modal) modal.classList.remove('active'); };
+        ['severityFilter', 'statusFilter', 'reasonFilter', 'hostFilter'].forEach((id) => { const element = document.getElementById(id); if (element) element.addEventListener('change', () => renderAlertRows(filteredIncidents())); });
+        await loadAlerts();
+    };
+
+    const initAlertDetail = async () => {
+        try {
+            let id = queryParameter('id');
+            if (!id) { const result = await api('/incidents?limit=1'); id = result.items && result.items[0] && result.items[0].id; }
+            if (!id) throw new Error('尚未选择持久化异常');
+            const incident = await api(`/incidents/${encodeURIComponent(id)}`);
+            const shape = incidentToDetailShape(incident);
+            if (typeof window.renderDetail === 'function') window.renderDetail(shape);
+            const explanation = document.querySelector('.explanation-analysis > div');
+            if (explanation) explanation.textContent = incident.diagnosis && Object.keys(incident.diagnosis).length ? jsonText(incident.diagnosis, 2600) : `${incidentSummary(incident)}。该解释以页面上方的持久化证据为依据，不宣称使用模型归因。`;
+            document.querySelectorAll('.tuning-section-title').forEach((element) => { if (element.textContent.includes('Before Tuning')) element.textContent = '调优前实测'; if (element.textContent.includes('After Tuning')) element.textContent = '调优后实测'; });
+            await bindKnowledgeModal(incident.summary);
+        } catch (error) { const target = document.getElementById('detailContent'); if (target) target.innerHTML = `<div style="text-align:center;padding:80px;color:#86909c">${esc(error.message)}</div>`; }
+    };
+
+    const liveKnowledgeHtml = (items, heading) => `<div class="kb-section"><div class="kb-section-title">${esc(heading || '检索到的 PostgreSQL 证据')}</div>${(items || []).length ? items.map((item) => `<div class="kb-item"><div class="kb-item-title">${esc(item.title || item.source_key || '证据段落')}</div><div class="kb-item-desc">${esc(item.content || item.snippet || '')}</div><div class="kb-item-meta">${sourceTag(sourceName(item.source_type || 'RAG'))} ${esc(item.citation_id || item.uri || '')}</div></div>`).join('') : '<div class="kb-item"><div class="kb-item-desc">没有返回匹配的持久化知识段落。</div></div>'}</div>`;
+
+    const bindKnowledgeModal = async (query) => {
+        const overlay = document.getElementById('kbModalOverlay');
+        if (!overlay) return;
+        const content = overlay.querySelector('.kb-modal-content');
+        window.showKnowledgeBaseModal = async () => {
+            overlay.classList.add('show');
+            if (content) content.innerHTML = '<div class="ki-live-loading">正在检索带引用的 PostgreSQL 知识…</div>';
+            try {
+                const result = await api(`/rag/search?q=${encodeURIComponent(query || 'PostgreSQL tuning')}&top_k=5&mode=hybrid`);
+                if (content) content.innerHTML = liveKnowledgeHtml(result.items, '相关知识 · 带引用检索');
+            } catch (error) { if (content) content.innerHTML = `<div class="ki-live-error">${esc(error.message)}</div>`; }
+        };
+        window.hideKnowledgeBaseModal = () => overlay.classList.remove('show');
+        overlay.onclick = (event) => { if (event.target === overlay) overlay.classList.remove('show'); };
+    };
+
+    const queryToLog = (item) => {
+        const mean = num(item.mean_exec_time_ms);
+        const temp = num(item.temp_blks_written) || 0;
+        const slow = mean !== null && mean >= 1000;
+        return { ...item, id: String(item.query_id || 'unknown'), sql: item.query || '', type: String(item.query || '').trim().split(/\s+/)[0].toUpperCase() || 'SQL', executionTime: mean || 0, hasError: false, warning: slow || temp > 0, result: slow ? `观测到慢语句 · ${fixed(mean, 2)} 毫秒` : temp > 0 ? `观测到临时空间溢出 · ${temp} 个块` : `观测到成功语句 · ${fixed(mean, 2)} 毫秒` };
+    };
+
+    const renderLogRows = (items) => {
+        const tbody = document.getElementById('logTableBody'); if (!tbody) return;
+        const shown = items || []; document.getElementById('totalCount').textContent = shown.length;
+        if (!shown.length) { tbody.classList.remove('ki-live-pending'); tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:#86909c;">当前筛选条件没有匹配的 PostgreSQL 语句</td></tr>'; return; }
+        tbody.innerHTML = shown.map((log) => `<tr>
+            <td class="sql-id">${esc(log.id)}</td>
+            <td><span class="sql-text" data-log-detail="${esc(log.id)}" title="${esc(log.sql)}">${esc(log.sql.length > 80 ? `${log.sql.slice(0, 80)}…` : log.sql)}</span></td>
+            <td>${esc(log.type)}</td>
+            <td><span class="status-badge ${log.warning ? 'warning' : 'success'}">${log.warning ? '需关注' : '成功'}</span></td>
+            <td><span class="action-link" data-log-detail="${esc(log.id)}">详情</span></td>
+        </tr>`).join('');
+        tbody.classList.remove('ki-live-pending');
+        tbody.classList.add('ki-live-ready');
+        tbody.querySelectorAll('[data-log-detail]').forEach((element) => element.addEventListener('click', () => showSqlDetail(element.dataset.logDetail)));
+    };
+
+    const filteredLogs = () => {
+        const status = (document.getElementById('statusFilter') || {}).value || '';
+        const time = (document.getElementById('timeFilter') || {}).value || '';
+        const type = (document.getElementById('typeFilter') || {}).value || '';
+        const keyword = ((document.getElementById('keywordFilter') || {}).value || '').toLowerCase();
+        return state.logs.filter((log) => (!status || (status === 'warning' ? log.warning : status === 'success' ? !log.warning : false))
+            && (!time || (time === 'fast' ? log.executionTime < 100 : time === 'medium' ? log.executionTime >= 100 && log.executionTime < 1000 : log.executionTime >= 1000))
+            && (!type || log.type === type) && (!keyword || log.sql.toLowerCase().includes(keyword)));
+    };
+
+    const showSqlDetail = (id) => {
+        const log = state.logs.find((item) => item.id === String(id)); if (!log) return;
+        state.selectedLog = log;
+        const modal = document.getElementById('sqlModal'); const body = document.getElementById('sqlModalBody'); if (!modal || !body) return;
+        body.innerHTML = `<div class="ki-detail-grid"><div class="ki-detail-card"><div class="ki-detail-label">查询 ID</div><div class="ki-detail-value">${esc(log.id)}</div></div><div class="ki-detail-card"><div class="ki-detail-label">平均执行耗时</div><div class="ki-detail-value">${fixed(log.executionTime, 2)} 毫秒</div></div><div class="ki-detail-card"><div class="ki-detail-label">调用次数</div><div class="ki-detail-value">${esc(log.calls)}</div></div><div class="ki-detail-card"><div class="ki-detail-label">返回行数</div><div class="ki-detail-value">${esc(log.rows)}</div></div><div class="ki-detail-card"><div class="ki-detail-label">写入临时块</div><div class="ki-detail-value">${esc(log.temp_blks_written || 0)}</div></div><div class="ki-detail-card"><div class="ki-detail-label">共享块读取 / 命中</div><div class="ki-detail-value">${esc(log.shared_blks_read || 0)} / ${esc(log.shared_blks_hit || 0)}</div></div></div><div style="margin-top:16px"><strong>观测结果</strong><p style="margin-top:6px">${esc(log.result)}</p></div><pre class="ki-live-pre" style="margin-top:16px">${esc(log.sql)}</pre><div style="margin-top:16px"><span class="action-link" data-open-sql-detail="${esc(log.id)}">打开完整 SQL 详情</span></div>`;
+        body.querySelector('[data-open-sql-detail]').onclick = () => { window.location.href = `sql-detail.html?id=${encodeURIComponent(log.id)}`; };
+        modal.classList.add('active');
+    };
+
+    const initSqlLog = async () => {
+        pageTitle('SQL 日志 · PostgreSQL 实时证据');
+        window.showDetail = showSqlDetail; window.showDetailOld = showSqlDetail; window.closeModal = () => { const modal = document.getElementById('sqlModal'); if (modal) modal.classList.remove('active'); };
+        window.filterLogs = () => renderLogRows(filteredLogs());
+        window.resetFilter = () => { ['statusFilter', 'timeFilter', 'typeFilter', 'keywordFilter'].forEach((id) => { const element = document.getElementById(id); if (element) element.value = ''; }); renderLogRows(state.logs); };
+        ['statusFilter', 'timeFilter', 'typeFilter', 'keywordFilter'].forEach((id) => { const element = document.getElementById(id); if (element) { element.addEventListener('change', () => renderLogRows(filteredLogs())); element.addEventListener('input', () => renderLogRows(filteredLogs())); } });
+        try {
+            const result = await api('/queries?limit=200'); state.logs = (result.items || []).map(queryToLog);
+            const meta = await api('/meta'); const server = backendMeta(meta); ['hostName', 'hostIP', 'hostType'].forEach((id, index) => { const element = document.getElementById(id); if (element) element.textContent = [server.database_name || '当前 PostgreSQL 实例', server.server_address || '本地套接字', `PostgreSQL ${String(server.server_version || '').split(' ')[0] || ''}`.trim() || 'PostgreSQL'][index]; });
+            renderLogRows(state.logs);
+        } catch (error) { const tbody = document.getElementById('logTableBody'); if (tbody) { tbody.classList.remove('ki-live-pending'); tbody.innerHTML = `<tr><td colspan="5">${esc(error.message)}</td></tr>`; } }
+    };
+
+    const buildActualFlameGraph = async (queryId) => {
+        try {
+            const result = await api('/ebpf/events?limit=1000');
+            const matching = (result.items || []).filter((item) => String(item.query_id || '') === String(queryId));
+            const children = {};
+            matching.forEach((item) => { const ms = (num(item.duration_ns) || 0) / 1000000; if (ms > 0) children[item.function_name || item.probe_kind || 'observed function'] = (children[item.function_name || item.probe_kind || 'observed function'] || 0) + ms; });
+            const nodes = Object.entries(children).map(([name, value]) => ({ name, value: Number(value.toFixed(3)), color: '#8da0cb' }));
+            const total = nodes.reduce((sum, item) => sum + item.value, 0);
+            return total > 0 ? { name: 'SQL lifecycle (eBPF)', value: Number(total.toFixed(3)), color: '#3370ff', children: nodes } : null;
+        } catch (error) { return null; }
+    };
+
+    const initSqlDetail = async () => {
+        try {
+            const id = queryParameter('id'); const result = await api('/queries?limit=200'); const item = (result.items || []).find((query) => String(query.query_id) === String(id)) || (result.items || [])[0]; if (!item) throw new Error('没有找到 SQL 证据');
+            const log = queryToLog(item); state.selectedLog = log; state.flameGraph = await buildActualFlameGraph(log.id);
+            const rootCause = log.warning ? (num(log.temp_blks_written) > 0 ? '观测到临时空间溢出' : '观测到慢语句') : '没有匹配已配置的慢查询/溢出规则';
+            const mapped = {
+                id: log.id,
+                sql: log.sql,
+                time: `${fixed(log.executionTime, 2)} 毫秒（pg_stat_statements 平均值）`,
+                type: log.type,
+                flameGraph: state.flameGraph,
+                diagnosis_results: { rule_matches_detail: [{ Principle: `${rootCause}；本页面展示持久化 PostgreSQL 证据，不构造虚假诊断。` }], root_causes: log.warning ? [rootCause] : [], confidence: log.warning ? { [rootCause]: 1 } : {} },
+                tuning_results: { rewrite_sql: log.sql, beforeTuning: { avg_query_time: `${fixed(log.executionTime, 2)} 毫秒` }, afterTuning: { avg_query_time: '尚未测量' }, tuning_suggestions: [rootCause] },
+                lifecycle: { parsing: { time: '—', cpu: '—', memory: '—' }, optimization: { time: '—', cpu: '—', memory: '—' }, execution: { time: '—', cpu: '—', memory: '—' }, network: { time: '—', cpu: '—', memory: '—' } }
+            };
+            if (typeof window.renderDetail === 'function') window.renderDetail(mapped);
+            document.querySelectorAll('.detail-title').forEach((element) => { if (element.textContent.includes('Multiclass scoring model')) element.childNodes.forEach((node) => { if (node.nodeType === Node.TEXT_NODE) node.textContent = node.textContent.replace('Multiclass scoring model', '基于规则的证据'); }); });
+            document.querySelectorAll('#detailContent *').forEach((element) => { if (element.children.length === 0 && element.textContent.trim() === 'Optimized SQL') element.textContent = '观测 SQL（未执行改写）'; });
+            document.querySelectorAll('.detail-card').forEach((element) => { if (element.textContent.includes('Frequent calls to HashJoinIterator')) element.textContent = `${rootCause}。当前页面由查询统计支撑，并保留完整 SQL 文本。`; });
+            window.zoomFlameGraph = () => { const modal = document.getElementById('flameGraphModal'); const content = document.getElementById('flameGraphModalContent'); if (content) content.innerHTML = state.flameGraph && typeof window.renderFlameGraph === 'function' ? window.renderFlameGraph(state.flameGraph) : '<div class="ki-live-loading">没有与该查询关联的带耗时 eBPF 事件。</div>'; if (modal) modal.style.display = 'flex'; };
+            window.closeFlameGraphModal = () => { const modal = document.getElementById('flameGraphModal'); if (modal) modal.style.display = 'none'; };
+            await bindKnowledgeModal(rootCause);
+        } catch (error) { const target = document.getElementById('detailContent'); if (target) target.innerHTML = `<div style="text-align:center;padding:80px;color:#86909c">${esc(error.message)}</div>`; }
+    };
+
+    const mapAlertRule = (rule) => {
+        const config = rule.config || {};
+        const threshold = config.ratio !== undefined ? config.ratio : config.mean_exec_time_ms !== undefined ? `${config.mean_exec_time_ms} 毫秒` : config.minimum_waiting_sessions !== undefined ? config.minimum_waiting_sessions : config.minimum_temp_blocks_written !== undefined ? config.minimum_temp_blocks_written : '已配置';
+        const severity = { critical: '严重', warning: '警告', info: '信息' }[rule.severity] || rule.severity || '信息';
+        return { id: rule.id, name: ({ connection_saturation: '连接数饱和', lock_wait: '阻塞会话', slow_query: '慢语句', temp_spill: '临时文件溢出', cache_hit_ratio: '数据库缓存命中率过低' }[rule.kind] || rule.name), desc: `PostgreSQL ${labelForKind(rule.kind)}规则`, reason: `根据持久化采集观测评估${labelForKind(rule.kind)}`, alertField: rule.kind, threshold, period: '采集周期', enabled: rule.enabled, category: rule.kind === 'lock_wait' ? '高可用' : '监控与异常', description: `规则配置：${jsonText(config, 800)}`, detail: `级别：${severity}。变更已存储在 keeninsight.alert_rules。`, suggestion: '请通过已校验的规则接口调整。', sqlExample: 'SELECT ... FROM PostgreSQL 监控视图;' };
+    };
+
+    const initAlertRules = async () => {
+        pageTitle('异常规则 · PostgreSQL 实时配置');
+        window.toggleRule = async (id, enabled) => { try { await api(`/rules/${id}`, { method: 'PATCH', body: JSON.stringify({ enabled }) }); notify(`规则 ${id} 已${enabled ? '启用' : '停用'}。`); await loadAlertRules(); } catch (error) { notify(`规则更新失败：${error.message}`, 'error'); } };
+        const button = document.querySelector('.page-actions .action-btn, .page-header .action-btn'); if (button) button.onclick = () => notify('新规则请通过类型化 API 创建，浏览器不会提交任意 SQL。');
+        await loadAlertRules();
+    };
+    const loadAlertRules = async () => { try { const result = await api('/rules'); state.rules = (result.items || []).map(mapAlertRule); if (typeof window.renderRules === 'function') window.renderRules(state.rules); const body = document.getElementById('ruleTableBody'); if (body) { body.classList.remove('ki-live-pending'); body.classList.add('ki-live-ready'); } } catch (error) { const body = document.getElementById('ruleTableBody'); if (body) { body.classList.remove('ki-live-pending'); body.innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`; } } };
+
+    const mapDbaRule = (rule) => { const mapped = mapAlertRule(rule); return { ...mapped, id: `DBA-${rule.id}`, category: mapped.category, status: rule.enabled ? 'enabled' : 'disabled', severity: rule.severity === 'critical' ? 'high' : rule.severity === 'warning' ? 'medium' : 'low', description: mapped.desc, judgeField: rule.kind, threshold: String(mapped.threshold), detail: mapped.description, suggestion: mapped.suggestion, sqlExample: mapped.sqlExample }; };
+    const initDbaRules = async () => {
+        pageTitle('诊断规则 · PostgreSQL 实时配置');
+        window.toggleRuleStatus = async (id) => {
+            const numeric = String(id).replace(/^DBA-/, '');
+            const rule = state.rules.find((item) => String(item.id) === String(id));
+            if (!rule) return;
+            try {
+                await api(`/rules/${numeric}`, { method: 'PATCH', body: JSON.stringify({ enabled: rule.status !== 'enabled' }) });
+                notify(`规则 ${numeric} 已${rule.status !== 'enabled' ? '启用' : '停用'}。`);
+                await loadDbaRules();
+            } catch (error) { notify(`规则更新失败：${error.message}`, 'error'); }
+        };
+        window.showDetail = (id) => { const rule = state.rules.find((item) => item.id === id); const modal = document.getElementById('ruleModal'); const body = document.getElementById('ruleModalBody'); if (!rule || !modal || !body) return; body.innerHTML = `<div class="rule-detail-row"><div class="rule-detail-label">规则 ID</div><div class="rule-detail-value">${esc(rule.id)}</div></div><div class="rule-detail-row"><div class="rule-detail-label">规则名称</div><div class="rule-detail-value">${esc(rule.name)}</div></div><div class="rule-detail-row"><div class="rule-detail-label">说明</div><div class="rule-detail-value">${esc(rule.description)}</div></div><div class="rule-detail-row"><div class="rule-detail-label">配置</div><div class="rule-detail-value code">${esc(rule.detail)}</div></div>`; modal.classList.add('active'); };
+        window.closeModal = () => { const modal = document.getElementById('ruleModal'); if (modal) modal.classList.remove('active'); };
+        window.filterRules = () => {
+            const category = (document.getElementById('categoryFilter') || {}).value || '';
+            const status = (document.getElementById('statusFilter') || {}).value || '';
+            const keyword = ((document.getElementById('keywordFilter') || {}).value || '').toLowerCase();
+            const filtered = state.rules.filter((rule) => (!category || rule.category === category)
+                && (!status || rule.status === status)
+                && (!keyword || `${rule.name} ${rule.description} ${rule.judgeField}`.toLowerCase().includes(keyword)));
+            if (typeof window.renderRules === 'function') window.renderRules(filtered);
+            const total = document.getElementById('totalCount'); if (total) total.textContent = filtered.length;
+            const body = document.getElementById('ruleTableBody'); if (body) { body.classList.remove('ki-live-pending'); body.classList.add('ki-live-ready'); }
+        };
+        window.resetFilter = () => { ['categoryFilter', 'statusFilter', 'keywordFilter'].forEach((id) => { const element = document.getElementById(id); if (element) element.value = ''; }); window.filterRules(); };
+        ['categoryFilter', 'statusFilter', 'keywordFilter'].forEach((id) => { const element = document.getElementById(id); if (element) { element.addEventListener('change', window.filterRules); element.addEventListener('input', window.filterRules); } });
+        await loadDbaRules();
+    };
+    const loadDbaRules = async () => { try { const result = await api('/rules'); state.rules = (result.items || []).map(mapDbaRule); const category = document.getElementById('categoryFilter'); if (category) { const categories = [...new Set(state.rules.map((rule) => rule.category).filter(Boolean))]; category.innerHTML = '<option value="">全部</option>' + categories.map((item) => `<option value="${esc(item)}">${esc(item)}</option>`).join(''); } if (typeof window.renderRules === 'function') window.renderRules(state.rules); const total = document.getElementById('totalCount'); if (total) total.textContent = state.rules.length; const body = document.getElementById('ruleTableBody'); if (body) { body.classList.remove('ki-live-pending'); body.classList.add('ki-live-ready'); } } catch (error) { const body = document.getElementById('ruleTableBody'); if (body) { body.classList.remove('ki-live-pending'); body.innerHTML = `<tr><td colspan="8">${esc(error.message)}</td></tr>`; } } };
+
+    const sourceCategory = (row) => { const text = `${row.file_path || ''} ${row.relation_type || ''}`.toLowerCase(); return text.includes('lock') ? 'lock' : text.includes('sort') || text.includes('buf') || text.includes('io') ? 'io' : text.includes('transaction') || text.includes('xact') ? 'transaction' : text.includes('plan') || text.includes('executor') || text.includes('agg') || text.includes('hash') ? 'query' : 'buffer'; };
+    const mapSource = (row) => { const evidence = row.evidence || {}; const path = evidence.path || []; return { ...row, id: `SRC-${row.id}`, name: row.function_name || row.ir_symbol || '源码引用', db: 'pg', category: sourceCategory(row), functionFlow: path.length ? path.join(' → ') : `${row.relation_type || '源码引用'} @ ${row.file_path}:${row.line_number}`, dataFlow: row.ir_symbol || evidence.line || '已持久化编译器源码定位', description: `${row.relation_type || '源码证据'}：${row.knob || '数据库行为'}`, detail: jsonText(evidence, 3000), codeSnippet: evidence.line || `// ${row.file_path}:${row.line_number}` }; };
+    const renderSourceRows = (items) => { if (typeof window.renderTable === 'function') window.renderTable(items); else { const body = document.getElementById('functionTableBody'); if (body) body.innerHTML = ''; } const body = document.getElementById('functionTableBody'); if (body) { body.classList.remove('ki-live-pending'); body.classList.add('ki-live-ready'); } };
+    const filterSource = () => { const db = (document.getElementById('dbFilter') || {}).value || ''; const category = (document.getElementById('categoryFilter') || {}).value || ''; const keyword = ((document.getElementById('keywordFilter') || {}).value || '').toLowerCase(); renderSourceRows(state.source.filter((row) => (!db || row.db === db) && (!category || row.category === category) && (!keyword || row.name.toLowerCase().includes(keyword)))); };
+    const showSourceDetail = async (id) => { const row = state.source.find((item) => item.id === id); const modal = document.getElementById('codeModal'); const body = document.getElementById('codeModalBody'); if (!row || !modal || !body) return; body.innerHTML = `<div class="ki-live-loading">正在读取聚焦的源码上下文…</div>`; modal.classList.add('show'); try { const result = await api('/source-analysis/knowledge', { method: 'POST', body: JSON.stringify({ knobs: row.knob ? [row.knob] : [], functions: row.function_name ? [row.function_name] : [], limit: 5 }) }); const context = (result.contexts || []).find((item) => item.file_path === row.file_path) || (result.contexts || [])[0]; body.innerHTML = `<div class="detail-section"><div class="detail-title">编译器定位的源码记录</div><div class="detail-item"><span class="detail-label">函数：</span><span class="detail-value">${esc(row.name)}</span></div><div class="detail-item"><span class="detail-label">数据库：</span><span class="detail-value">PostgreSQL</span></div><div class="detail-item"><span class="detail-label">关系：</span><span class="detail-value">${esc(row.relation_type)}</span></div><div class="detail-item"><span class="detail-label">定位：</span><span class="detail-value">${esc(row.file_path)}:${esc(row.line_number)}</span></div></div><div class="detail-section"><div class="detail-title">函数流</div><div class="detail-code">${esc(row.functionFlow)}</div></div><div class="detail-section"><div class="detail-title">数据流 / 源码上下文</div><pre class="ki-live-pre">${esc(context && context.source_context ? context.source_context.text : row.codeSnippet)}</pre></div><div class="detail-section"><div class="detail-title">证据</div><pre class="ki-live-pre">${esc(jsonText(row.evidence, 3600))}</pre></div>`; } catch (error) { body.innerHTML = `<div class="ki-live-error">${esc(error.message)}</div>`; } };
+    const initCodeSource = async () => { pageTitle('源码分析 · 编译器定位的 PostgreSQL 流'); window.filterFunctions = filterSource; window.resetFilter = () => { ['dbFilter', 'categoryFilter', 'keywordFilter'].forEach((id) => { const element = document.getElementById(id); if (element) element.value = ''; }); renderSourceRows(state.source); }; window.showDetail = showSourceDetail; window.closeModal = () => { const modal = document.getElementById('codeModal'); if (modal) modal.classList.remove('show'); }; ['dbFilter', 'categoryFilter', 'keywordFilter'].forEach((id) => { const element = document.getElementById(id); if (element) { element.addEventListener('change', filterSource); element.addEventListener('input', filterSource); } }); try { const result = await api('/source-analysis?limit=100'); state.source = (result.items || []).map(mapSource); renderSourceRows(state.source); } catch (error) { const body = document.getElementById('functionTableBody'); if (body) body.innerHTML = `<tr><td colspan="7">${esc(error.message)}</td></tr>`; } };
+
+    const knowledgeText = (item) => { const action = item.action_template || {}; return `${labelForKind(item.root_cause) || 'PostgreSQL 证据'}\n\n操作：${actionName(item.action_type)}\n${jsonText(action, 800)}\n\n置信度：${item.confidence == null ? '—' : Number(item.confidence).toFixed(2)}\n来源：${item.provenance || '持久化数据库记录'}`; };
+    const initManual = async () => { pageTitle('知识片段 · 实时 RAG 语料'); const upload = document.querySelector('.page-actions .action-btn, .page-header .action-btn'); if (upload) upload.onclick = () => notify('知识导入由 RAG 来源清单管理，请在证据控制台的“RAG 知识”页面同步。'); try { const result = await api('/knowledge'); state.knowledge = (result.items || []).slice(0, 30).map((item) => ({ source: sourceName(item.source_type), title: item.title || labelForKind(item.root_cause) || '知识条目', content: knowledgeText(item), tags: [labelForKind(item.root_cause), actionName(item.action_type), item.verified ? '已验证' : '未验证'].filter(Boolean), time: dateText(item.updated_at || item.created_at) })); if (typeof window.renderSnippets === 'function') window.renderSnippets(state.knowledge); } catch (error) { const target = document.getElementById('snippetsContainer'); if (target) target.innerHTML = `<div class="ki-live-error">${esc(error.message)}</div>`; } };
+
+    const initTuningKnowledge = async () => { pageTitle('调优经验知识 · 实测反馈'); const refresh = document.querySelector('.page-actions .action-btn, .page-header .action-btn'); if (refresh) refresh.onclick = () => loadTuningKnowledge(); await loadTuningKnowledge(); };
+    const loadTuningKnowledge = async () => { try { const result = await api('/experiences?limit=50'); state.experiences = (result.items || []).map((item) => { const context = item.context || {}; const gain = num(context.median_improvement_pct); return { id: `EXP-${item.id}`, condition: `实测场景：${labelForKind(item.root_cause)}`, recommendation: `观测关联支持：${actionName(item.action && item.action.action_type)}`, action: `支持度=${item.support}；成功反馈=${item.success_count}；来源表=${((item.provenance || {}).source_tables || []).join(', ')}`, confidence: num(item.confidence) || 0, performanceGain: gain === null ? 0 : Number(gain.toFixed(1)), clusterSize: item.support || 0, database: 'PostgreSQL', time: dateText(item.updated_at || item.created_at) }; }); if (typeof window.renderTuningKnowledge === 'function') window.renderTuningKnowledge(state.experiences); } catch (error) { const target = document.getElementById('tuningContainer'); if (target) target.innerHTML = `<div class="ki-live-error">${esc(error.message)}</div>`; } };
+
+    const init = () => {
+        if (page === 'alert-list.html') return initAlertList();
+        if (page === 'alert-detail.html') return initAlertDetail();
+        if (page === 'sql-log.html') return initSqlLog();
+        if (page === 'sql-detail.html') return initSqlDetail();
+        if (page === 'alert-rules.html') return initAlertRules();
+        if (page === 'dba-rules.html') return initDbaRules();
+        if (page === 'code-source.html') return initCodeSource();
+        if (page === 'manual.html') return initManual();
+        if (page === 'tuning-knowledge.html') return initTuningKnowledge();
+        return null;
+    };
+    const runInit = () => {
+        const result = init();
+        Promise.resolve(result).finally(() => { if (typeof live.translate === 'function') live.translate(); });
+        return result;
+    };
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', runInit);
+    else runInit();
+})();

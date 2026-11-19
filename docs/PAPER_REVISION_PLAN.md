@@ -1,0 +1,106 @@
+# ICDE implementation verification plan
+
+The old HTML package is retained as collected provenance only; its local arrays
+are not measurements.  The current implementation is the executable
+PostgreSQL port of the paper architecture, with real eBPF/Kafka, learned
+analysis, LLVM/source evidence, tuning agents, and retrieval/experience
+feedback.  This file is an implementation verification plan, not a proposal to
+remove capabilities from the paper.
+
+The paper source does not contain a numerical evaluation table that can be
+reproduced from the submitted HTML.  Values shown by the old pages therefore
+must not be reused as measurements.  Report the new artifact's raw repeated
+experiments, including failures and environment details.  For the PostgreSQL
+port, use the corresponding PostgreSQL symbols and plan evidence; do not call a
+PostgreSQL function a MySQL function merely to match a screenshot.
+
+## Capabilities to verify in the artifact
+
+Use the strict matrix in `docs/ICDE_CLAIM_AUDIT.md` as the checklist:
+
+- live BCC eBPF probes with anomaly-aware batching and measured adaptive
+  selection;
+- Kafka producer/consumer transport with durable outbox and UUID de-duplication;
+- SQL lifecycle reconstruction from event identity and time intervals;
+- temporal XGBoost latency/root-cause models, Lasso selection, differential
+  profiling, and TreeSHAP attributions;
+- compiler-backed LLVM source/call-graph propagation and typed system tuning;
+- compiler-emitted CFG/SSA/data-flow evidence, exact source-context retrieval,
+  grounded semantic summaries, and targeted experiment validation;
+- measured query hints, conservative rewrite, pairwise candidate ranking, and
+  reviewed index add/remove proposals;
+- static/runtime embedding RAG, grounded optional LLM adapter, and feedback-
+  mined experience clusters/rules.
+
+The code-retrieval stage is executable through
+`POST /api/source-analysis/knowledge`.  It reads source snippets from the
+same PostgreSQL checkout used for clang compilation, groups compiler evidence
+by knob, and emits an experiment-required hypothesis.  The opt-in
+`POST /api/workload-runs/{id}/auto-resolve` endpoint then runs the full
+generate → typed deploy → same-SQL measurement → feedback → rollback path and
+records the result back into `code_knowledge`.  These are implementation
+requirements and should be shown in the ICDE system sequence; they are not
+reasons to weaken the paper's architecture claims.
+
+The implementation keeps explicit review gates for persistent mutations.  This
+is compatible with the paper's validated closed loop: generation, verification,
+deployment, feedback, and rollback are all executable, while the browser makes
+the final persistent apply auditable.
+
+## Suggested paper organization
+
+1. **Problem and requirements.** State why a static dashboard is insufficient:
+   a demo must trigger a workload, observe a server-side effect, expose the
+   evidence, and leave an auditable change trail.
+2. **PostgreSQL-native architecture.** Show the collector, persisted
+   snapshots, detector, diagnosis/knowledge layer, typed action validator,
+   workload runner, and UI. Label every arrow with its PostgreSQL source.
+3. **Evidence semantics.** Define counter rates, query deltas, first-seen
+   handling, statistics resets, lock signatures, and the exact plan fields
+   used by diagnosis.
+4. **Safety model.** Explain read-only EXPLAIN validation, allowlisted action
+   types, catalog checks, database scope, concurrent index creation, identity
+   checks, rollback, and audit events.
+5. **Interactive demonstration.** Demonstrate the real scenarios:
+   filtered scan/index, hash-join spill, grouped-aggregate spill, window-sort
+   spill, under-provisioned parallel workers, and two-session row locking.
+   Make the operator-specific `work_mem` cases and parallel recovery the
+   primary walkthrough; retain the index case as a secondary comparison.
+   Include the user knob, the actual request, the observed plan, and the
+   resulting state transition.
+   Add the stale-statistics case separately and state that its completed
+   maintenance action has no inverse; do not include it in the latency table.
+   Add the compiler-backed code retrieval/summary view and the opt-in
+   automatic closed-loop workload flow.  Show the source locator, CFG/SSA or
+   bounded cross-translation-unit path, the targeted experiment, and the
+   persisted validation record alongside the action result.
+6. **Evaluation and limitations.** Report repeated measurements with hardware,
+   PostgreSQL version/image digest, dataset cardinality, configuration, cache
+   state, repetition count, raw output, and failures. Separate plan changes
+   from timing changes and discuss noise. State that the bundled fixture is a
+   reproducibility aid, not evidence of production workload generality.
+
+## Review issue to artifact evidence
+
+| Earlier concern | Current evidence to show live | Where it is persisted |
+| --- | --- | --- |
+| Static HTML / unclear interaction | Workload buttons execute SQL and return actual plan/timing | `workload_runs` |
+| No workload trigger | Baseline/after runs and two-session lock start/stop | `app/workload.py` |
+| No user knob | repetitions, `customer_id`, baseline session `work_mem`, baseline parallel workers, alert rules | API/UI validation |
+| Simplistic diagnosis | raw counters, query deltas, lock rows, plan nodes, source links | snapshots/incidents/KB |
+| Unsafe tuning story | typed proposal, catalog validation, apply verification, rollback identity | `tuning_actions`/audit |
+| No learning/feedback path | measured before/after comparison and empirical aggregate | `tuning_feedback`/KB |
+| Hard-to-reproduce results | clean Compose setup plus JSON experiment exporter | `docs/ICDE_ARTIFACT.md` |
+| RAG claims not independently checkable | fixed non-indexed question set, source keys, terms, locators, and retrieval report | `evaluation/rag_questions.json` / `artifacts/rag-evaluation.json` |
+
+The concrete mapping and deployment requirements are listed in
+`docs/PAPER_POSTGRESQL_ALIGNMENT.md`, `docs/EBPF_OPERATIONS.md`, and
+`docs/RAG_OPERATIONS.md`.  Keep the PostgreSQL symbol mapping explicit: a
+PostgreSQL plan signal and a PostgreSQL eBPF function are real evidence, but
+they are not renamed to the original MySQL symbols.
+
+Figures should be redrawn as vector diagrams or large-font screenshots.  A
+system figure should include the evidence source and persistence boundary; a
+sequence figure should show baseline → proposal → review/apply → after →
+feedback → rollback.  Avoid screenshots whose only content is a prefilled
+dashboard.

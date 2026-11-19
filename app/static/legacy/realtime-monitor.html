@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - Real-time Monitoring</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-focus: #ccdbff;
+            --success-color: #0fbf60;
+            --warning-color: #ff8b07;
+            --danger-color: #ee4d38;
+            --info-color: #16c5ff;
+            --purple-color: #722ed1;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* 主内容区域 */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        /* 监控面板样式 */
+        .monitor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 20px;
+            padding: 20px 0;
+        }
+
+        .monitor-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1d2129;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #1d2129 0%, #4e5969 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .host-info {
+            font-size: 14px;
+            color: #4e5969;
+            background: linear-gradient(135deg, #fff 0%, #fafbfc 100%);
+            padding: 12px 20px;
+            border-radius: 12px;
+            border: 1px solid #e5e6eb;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .host-info span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .host-info strong {
+            color: #1d2129;
+            font-weight: 700;
+        }
+
+        .time-range {
+            display: flex;
+            gap: 8px;
+            background: linear-gradient(135deg, #fff 0%, #fafbfc 100%);
+            padding: 6px;
+            border-radius: 12px;
+            border: 1px solid #e5e6eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .time-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #4e5969;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+
+        .time-btn:hover {
+            background: var(--primary-color-light);
+            color: var(--primary-color);
+            transform: translateY(-1px);
+        }
+
+        .time-btn.active {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #165DFF 100%);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(51, 112, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .chart-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .chart-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #e5e6eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .chart-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+        }
+
+        .chart-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #f2f3f5;
+        }
+
+        .chart-card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1d2129;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chart-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        .chart-wrapper {
+            flex: 1;
+        }
+
+        .chart-container {
+            height: 220px;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 图例样式 */
+        .legend-panel {
+            width: 160px;
+            flex-shrink: 0;
+            padding: 12px;
+            background: #fafbfc;
+            border-radius: 12px;
+            border: 1px solid #e5e6eb;
+        }
+
+        .legend-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .legend-item:hover {
+            opacity: 0.8;
+        }
+
+        .legend-item.disabled {
+            opacity: 0.4;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .legend-label {
+            font-size: 13px;
+            color: #4e5969;
+            flex: 1;
+        }
+
+        .legend-value {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        /* 悬停提示框 */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            pointer-events: none;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-width: 280px;
+        }
+
+        .tooltip-time {
+            font-weight: 600;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .tooltip-item {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            margin: 4px 0;
+        }
+
+        .tooltip-label {
+            color: #e5e6eb;
+        }
+
+        .tooltip-value {
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo" onclick="location.href='template.html'">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                        <path d="M23.0072 2.82796C23.6226 2.47593 24.3782 2.47593 24.9936 2.82796L41.994 12.554C42.6166 12.9102 43.0008 13.5726 43.0008 14.29V33.7106C43.0008 34.4279 42.6166 35.0903 41.994 35.4466L24.9936 45.1726C24.3782 45.5246 23.6226 45.5246 23.0072 45.1726L6.00683 35.4466C5.38418 35.0903 5 34.4279 5 33.7106V14.29C5 13.5726 5.38418 12.9102 6.00683 12.554L23.0072 2.82796Z" fill="url(#gradient)"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M24.0001 32.5286C28.7103 32.5286 32.5286 28.7103 32.5286 24.0001C32.5286 19.29 28.7103 15.4717 24.0001 15.4717C19.29 15.4717 15.4717 19.29 15.4717 24.0001C15.4717 28.7103 19.29 32.5286 24.0001 32.5286ZM24.0001 35.5286C30.3671 35.5286 35.5286 30.3671 35.5286 24.0001C35.5286 17.6332 30.3671 12.4717 24.0001 12.4717C17.6332 12.4717 12.4717 17.6332 12.4717 24.0001C12.4717 30.3671 17.6332 35.5286 24.0001 35.5286Z" fill="#fff"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="24" y1="5" x2="24" y2="43" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3370ff"/>
+                                <stop offset="1" stop-color="#165DFF"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    KeenInsight
+                </div>
+
+            </div>
+            <div class="navbar-right">
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <path d="M24 44c11.046 0 20-8.954 20-20S35.046 4 24 4 4 12.954 4 24s8.954 20 20 20Z"/>
+                        <path d="M16 24h16"/>
+                    </svg>
+                    Console
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="18"/>
+                        <path d="M24 14v10l7 7"/>
+                    </svg>
+                    Help
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    User
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <div class="menu-item" onclick="location.href='host-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </div>
+                            <div class="menu-item active">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14v10l7 7"/>
+                                </svg>
+                                Real-time Monitoring
+                            </div>
+                            
+                            <div class="menu-group-title">System level</div>
+                            <div class="menu-item" onclick="location.href='alert-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </div>
+                            <div class="menu-item" onclick="location.href='alert-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </div>
+                            
+                            <div class="menu-group-title">SQL level</div>
+                            <div class="menu-item" onclick="location.href='sql-log.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </div>
+                            <div class="menu-item" onclick="location.href='dba-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </div>
+                            
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+                            
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <div class="menu-item" onclick="location.href='manual.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </div>
+                            <div class="menu-item" onclick="location.href='code-source.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </div>
+                            <div class="menu-item" onclick="location.href='tuning-knowledge.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner">
+                    <!-- 监控面板头部 -->
+                    <div class="monitor-header">
+                        <div>
+                            <h1 class="monitor-title">
+                                Database Real-time Monitoring
+                            </h1>
+                            <div class="host-info" id="hostInfo">
+                                <span><strong>Host:</strong> <span id="hostName">-</span></span>
+                                <span><strong>IP:</strong> <span id="hostIP">-</span></span>
+                                <span><strong>Type:</strong> <span id="hostType">-</span></span>
+                            </div>
+                        </div>
+                        <div class="time-range">
+                            <button class="time-btn" data-range="today">Today</button>
+                            <button class="time-btn" data-range="1h">Last 1 Hour</button>
+                            <button class="time-btn" data-range="6h">Last 6 Hours</button>
+                            <button class="time-btn active" data-range="24h">last day</button>
+                            <button class="time-btn" data-range="7d">Last 7 Days</button>
+                        </div>
+                    </div>
+
+                    <!-- 图表区域 -->
+                    <div class="chart-grid">
+                        <!-- 系统资源监控图 -->
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <div class="chart-card-title">System Resources Overview</div>
+                            </div>
+                            <div class="chart-content">
+                                <div class="chart-wrapper">
+                                    <div class="chart-container">
+                                        <canvas id="systemChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="legend-panel" id="systemLegend">
+                                    <div class="legend-title">Legend</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 数据库监控图 -->
+                        <div class="chart-card">
+                            <div class="chart-card-header">
+                                <div class="chart-card-title">Database Performance Metrics</div>
+                            </div>
+                            <div class="chart-content">
+                                <div class="chart-wrapper">
+                                    <div class="chart-container">
+                                        <canvas id="databaseChart"></canvas>
+                                    </div>
+                                </div>
+                                <div class="legend-panel" id="databaseLegend">
+                                    <div class="legend-title">Legend</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 悬停提示框 -->
+    <div class="tooltip" id="tooltip" style="display: none;"></div>
+
+    <script>
+        let selectedHost = null;
+        let currentRange = '24h';
+        let systemChartInstance = null;
+        let databaseChartInstance = null;
+
+        // System resource metrics config
+        const systemMetrics = [
+            { name: 'CPU Usage', color: '#3370ff', unit: '%', baseValue: 45 },
+            { name: 'Memory Usage', color: '#0fbf60', unit: '%', baseValue: 68 },
+            { name: 'Disk IO', color: '#ff8b07', unit: '%', baseValue: 42 },
+            { name: 'Network In', color: '#ee4d38', unit: 'MB/s', baseValue: 35 },
+            { name: 'Network Out', color: '#722ed1', unit: 'MB/s', baseValue: 28 },
+            { name: 'Disk Usage', color: '#16c5ff', unit: '%', baseValue: 72 }
+        ];
+
+        // Database metrics config
+        const databaseMetrics = [
+            { name: 'QPS', color: '#3370ff', unit: '', baseValue: 1250 },
+            { name: 'TPS', color: '#0fbf60', unit: '', baseValue: 820 },
+            { name: 'Connections', color: '#ff8b07', unit: '', baseValue: 385 },
+            { name: 'Cache Hit Rate', color: '#ee4d38', unit: '%', baseValue: 92 },
+            { name: 'Slow Queries', color: '#722ed1', unit: '', baseValue: 15 },
+            { name: 'Lock Wait Time', color: '#16c5ff', unit: 'ms', baseValue: 8 }
+        ];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSelectedHost();
+            setupTimeRangeButtons();
+            drawAllCharts();
+        });
+
+        function loadSelectedHost() {
+            const hostData = localStorage.getItem('selectedHost');
+            document.getElementById('hostName').textContent = 'db-prod-master-01';
+            document.getElementById('hostIP').textContent = '192.168.10.101';
+            document.getElementById('hostType').textContent = 'MySQL 8.0';
+        }
+
+        function setupTimeRangeButtons() {
+            const buttons = document.querySelectorAll('.time-btn');
+            buttons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentRange = this.getAttribute('data-range');
+                    drawAllCharts();
+                });
+            });
+        }
+
+        function getTimeRangeConfig(range) {
+            const configs = {
+                'today': { count: 48, label: 'Today', format: 'HH:mm' },
+                '1h': { count: 60, label: 'Last 1 Hour', format: 'HH:mm' },
+                '6h': { count: 120, label: 'Last 6 Hours', format: 'HH:mm' },
+                '24h': { count: 96, label: 'last day', format: 'HH:mm' },
+                '7d': { count: 42, label: 'Last 7 Days', format: 'MM-DD' }
+            };
+            return configs[range] || configs['6h'];
+        }
+
+        function generateTimeLabels(range, count) {
+            const labels = [];
+            const baseTime = new Date();
+            baseTime.setHours(18, 53, 0, 0);
+            
+            for (let i = 0; i < count; i++) {
+                // For "last day" show x-axis as 00:00 -> 24:00 (24-hour clock).
+                // This only affects displayed labels, not the chart data itself.
+                if (range === '24h') {
+                    const totalMinutes = (i === count - 1) ? 24 * 60 : i * 15;
+                    const hours = Math.floor(totalMinutes / 60);
+                    const minutes = totalMinutes % 60;
+                    labels.push(String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0'));
+                    continue;
+                }
+
+                const time = new Date(baseTime);
+                if (range === 'today') {
+                    time.setMinutes(time.getMinutes() + i * 30);
+                } else if (range === '1h') {
+                    time.setMinutes(time.getMinutes() + i * 1);
+                } else if (range === '6h') {
+                    time.setMinutes(time.getMinutes() + i * 3);
+                } else if (range === '7d') {
+                    time.setDate(time.getDate() + i * 4);
+                }
+                
+                if (range === '7d') {
+                    labels.push((time.getMonth() + 1) + '-' + String(time.getDate()).padStart(2, '0'));
+                } else {
+                    // Always render x-axis time as 24-hour format (HH:mm).
+                    labels.push(String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0'));
+                }
+            }
+            return labels;
+        }
+
+        let globalAnomalyStartIndex = 0;
+        let globalAnomalyEndIndex = 0;
+        
+        function generateMetricData(baseValue, count, metricType) {
+            const result = [];
+            let prevValue = baseValue;
+            
+            if (globalAnomalyStartIndex === 0) {
+                globalAnomalyStartIndex = Math.floor(count * 0.45);
+                globalAnomalyEndIndex = Math.floor(count * 0.50);
+            }
+            
+            for (let i = 0; i < count; i++) {
+                const progress = i / count;
+                
+                let variation = 0;
+                
+                const dailyPattern = Math.sin(progress * Math.PI * 4) * 0.15;
+                variation += dailyPattern;
+                
+                const highFreqNoise = (Math.random() - 0.5) * 0.25;
+                variation += highFreqNoise;
+                
+                const mediumFreqNoise = Math.sin(progress * Math.PI * 12) * 0.1;
+                variation += mediumFreqNoise;
+                
+                const spikeChance = Math.random();
+                if (spikeChance < 0.08) {
+                    const spikeDirection = Math.random() > 0.5 ? 1 : -1;
+                    const spikeMagnitude = 0.3 + Math.random() * 0.5;
+                    variation += spikeDirection * spikeMagnitude;
+                }
+                
+                if (Math.random() < 0.03) {
+                    variation += (Math.random() > 0.5 ? 0.8 : -0.4);
+                }
+                
+                if (i >= globalAnomalyStartIndex && i <= globalAnomalyEndIndex) {
+                    const anomalyProgress = (i - globalAnomalyStartIndex) / (globalAnomalyEndIndex - globalAnomalyStartIndex);
+                    
+                    let anomalyCurve = Math.sin(anomalyProgress * Math.PI);
+                    
+                    if (metricType === 'cpu') {
+                        const unstableWave = Math.sin(anomalyProgress * Math.PI * 6) * 0.25;
+                        const baseRise = anomalyCurve * 0.35;
+                        variation += 0.3 + baseRise + unstableWave;
+                    } else if (metricType === 'memory') {
+                        variation += 0.35 * anomalyProgress;
+                    } else if (metricType === 'disk_io') {
+                        variation += 2.5 + anomalyCurve * 1.5;
+                    } else if (metricType === 'network') {
+                        anomalyCurve = Math.sin((anomalyProgress + 0.05) * Math.PI);
+                        variation -= 0.2 + anomalyCurve * 0.15;
+                    } else if (metricType === 'qps') {
+                        anomalyCurve = Math.sin((anomalyProgress + 0.08) * Math.PI);
+                        variation -= 0.6 + anomalyCurve * 0.4;
+                    } else if (metricType === 'tps') {
+                        anomalyCurve = Math.sin((anomalyProgress + 0.12) * Math.PI);
+                        variation -= 0.65 + anomalyCurve * 0.45;
+                    } else if (metricType === 'cache') {
+                        anomalyCurve = Math.sin((anomalyProgress - 0.03) * Math.PI);
+                        variation -= 0.55 + anomalyCurve * 0.35;
+                    } else if (metricType === 'slow_query') {
+                        anomalyCurve = Math.sin((anomalyProgress + 0.15) * Math.PI);
+                        variation += 2.5 + anomalyCurve * 1.5;
+                    } else if (metricType === 'lock_wait') {
+                        anomalyCurve = Math.sin((anomalyProgress - 0.08) * Math.PI);
+                        variation += 2.2 + anomalyCurve * 1.3;
+                    } else if (metricType === 'connections') {
+                        anomalyCurve = Math.sin((anomalyProgress + 0.2) * Math.PI * 0.85);
+                        variation += 0.4 + anomalyCurve * 0.3;
+                    } else if (metricType === 'disk_usage') {
+                    } else {
+                        variation += 0.3 + anomalyCurve * 0.2;
+                    }
+                }
+                
+                let value = baseValue * (1 + variation);
+                value = prevValue * 0.4 + value * 0.6;
+                prevValue = value;
+                
+                if (metricType === 'cpu' || metricType === 'memory' || metricType === 'disk' || metricType === 'cache') {
+                    value = Math.max(5, Math.min(98, value));
+                } else {
+                    value = Math.max(0, value);
+                }
+                
+                result.push(Math.round(value * 10) / 10);
+            }
+            
+            return result;
+        }
+
+        class MultiLineChart {
+            constructor(canvasId, metrics, legendContainerId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                this.metrics = metrics;
+                this.legendContainer = document.getElementById(legendContainerId);
+                this.data = [];
+                this.timeLabels = [];
+                this.visibleMetrics = metrics.map(() => true);
+                this.tooltip = document.getElementById('tooltip');
+                this.hoverIndex = -1;
+                
+                this.setupCanvas();
+                this.setupEventListeners();
+            }
+
+            setupCanvas() {
+                const rect = this.canvas.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 2;
+                this.canvas.width = rect.width * dpr;
+                this.canvas.height = rect.height * dpr;
+                this.ctx.scale(dpr, dpr);
+                this.width = rect.width;
+                this.height = rect.height;
+            }
+
+            setData(timeLabels, data) {
+                this.timeLabels = timeLabels;
+                this.data = data;
+                this.render();
+                this.renderLegend();
+            }
+
+            setupEventListeners() {
+                this.canvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+                this.canvas.addEventListener('mouseleave', () => this.handleMouseLeave());
+            }
+
+            handleMouseMove(e) {
+                const rect = this.canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                
+                const padding = { top: 40, right: 25, bottom: 50, left: 70 };
+                const chartWidth = this.width - padding.left - padding.right;
+                
+                if (x >= padding.left && x <= this.width - padding.right && this.timeLabels.length > 1) {
+                    const index = Math.round((x - padding.left) / chartWidth * (this.timeLabels.length - 1));
+                    this.hoverIndex = Math.max(0, Math.min(this.timeLabels.length - 1, index));
+                    this.showTooltip(e);
+                    this.render();
+                }
+            }
+
+            handleMouseLeave() {
+                this.hoverIndex = -1;
+                this.tooltip.style.display = 'none';
+                this.render();
+            }
+
+            showTooltip(e) {
+                if (this.hoverIndex < 0) return;
+                
+                let tooltipHtml = `<div class="tooltip-time">${this.timeLabels[this.hoverIndex]}</div>`;
+                
+                this.metrics.forEach((metric, i) => {
+                    if (this.visibleMetrics[i] && this.data[i]) {
+                        const value = this.data[i][this.hoverIndex];
+                        tooltipHtml += `
+                            <div class="tooltip-item">
+                                <span class="tooltip-label">
+                                    <span style="display:inline-block;width:10px;height:10px;background:${metric.color};margin-right:6px;border-radius:2px;"></span>
+                                    ${metric.name}
+                                </span>
+                                <span class="tooltip-value">${value}${metric.unit}</span>
+                            </div>
+                        `;
+                    }
+                });
+                
+                this.tooltip.innerHTML = tooltipHtml;
+                this.tooltip.style.display = 'block';
+                this.tooltip.style.left = (e.pageX + 15) + 'px';
+                this.tooltip.style.top = (e.pageY - 10) + 'px';
+            }
+
+            renderLegend() {
+                this.legendContainer.innerHTML = '<div class="legend-title">Legend</div>';
+                
+                this.metrics.forEach((metric, i) => {
+                    const item = document.createElement('div');
+                    item.className = 'legend-item' + (this.visibleMetrics[i] ? '' : ' disabled');
+                    
+                    item.innerHTML = `
+                        <div class="legend-color" style="background: ${metric.color}"></div>
+                        <span class="legend-label">${metric.name}</span>
+                    `;
+                    
+                    item.addEventListener('click', () => {
+                        this.visibleMetrics[i] = !this.visibleMetrics[i];
+                        this.render();
+                        this.renderLegend();
+                    });
+                    
+                    this.legendContainer.appendChild(item);
+                });
+            }
+
+            render() {
+                const padding = { top: 15, right: 15, bottom: 30, left: 15 };
+                const chartWidth = this.width - padding.left - padding.right;
+                const chartHeight = this.height - padding.top - padding.bottom;
+                
+                this.ctx.clearRect(0, 0, this.width, this.height);
+                
+                let allVisibleValues = [];
+                this.data.forEach((series, i) => {
+                    if (this.visibleMetrics[i]) {
+                        allVisibleValues = allVisibleValues.concat(series);
+                    }
+                });
+                
+                if (allVisibleValues.length === 0) return;
+                
+                const maxValue = Math.max(...allVisibleValues) * 1.1;
+                const minValue = Math.max(0, Math.min(...allVisibleValues) * 0.9);
+                const valueRange = maxValue - minValue || 1;
+                
+                this.ctx.fillStyle = '#f8fafc';
+                this.ctx.fillRect(padding.left, padding.top, chartWidth, chartHeight);
+                
+                if (globalAnomalyStartIndex > 0 && this.timeLabels.length > 0) {
+                    const anomalyStartX = padding.left + (chartWidth / (this.timeLabels.length - 1)) * globalAnomalyStartIndex;
+                    const anomalyEndX = padding.left + (chartWidth / (this.timeLabels.length - 1)) * globalAnomalyEndIndex;
+                    
+                    const gradient = this.ctx.createLinearGradient(anomalyStartX, 0, anomalyEndX, 0);
+                    gradient.addColorStop(0, 'rgba(238, 77, 56, 0)');
+                    gradient.addColorStop(0.1, 'rgba(238, 77, 56, 0.15)');
+                    gradient.addColorStop(0.5, 'rgba(238, 77, 56, 0.25)');
+                    gradient.addColorStop(0.9, 'rgba(238, 77, 56, 0.15)');
+                    gradient.addColorStop(1, 'rgba(238, 77, 56, 0)');
+                    
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fillRect(anomalyStartX, padding.top, anomalyEndX - anomalyStartX, chartHeight);
+                }
+                
+                this.ctx.strokeStyle = '#e2e8f0';
+                this.ctx.lineWidth = 1;
+                
+                const yGridLines = 4;
+                for (let i = 0; i <= yGridLines; i++) {
+                    const y = padding.top + (chartHeight / yGridLines) * i;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(padding.left, y);
+                    this.ctx.lineTo(this.width - padding.right, y);
+                    this.ctx.stroke();
+                }
+                
+                this.ctx.fillStyle = '#94a3b8';
+                this.ctx.font = '11px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                this.ctx.textAlign = 'center';
+                const labelStep = Math.max(1, Math.floor(this.timeLabels.length / 10));
+                for (let i = 0; i < this.timeLabels.length; i += labelStep) {
+                    const x = padding.left + (chartWidth / (this.timeLabels.length - 1)) * i;
+                    this.ctx.fillText(this.timeLabels[i], x, this.height - 10);
+                }
+                
+                this.data.forEach((series, i) => {
+                    if (!this.visibleMetrics[i]) return;
+                    
+                    const color = this.metrics[i].color;
+                    const points = series.map((value, index) => ({
+                        x: padding.left + (chartWidth / (this.timeLabels.length - 1)) * index,
+                        y: padding.top + chartHeight - ((value - minValue) / valueRange) * chartHeight,
+                        value: value
+                    }));
+                    
+                    const gradient = this.ctx.createLinearGradient(0, padding.top, 0, this.height - padding.bottom);
+                    gradient.addColorStop(0, color + '20');
+                    gradient.addColorStop(1, color + '05');
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(points[0].x, this.height - padding.bottom);
+                    points.forEach(p => this.ctx.lineTo(p.x, p.y));
+                    this.ctx.lineTo(points[points.length - 1].x, this.height - padding.bottom);
+                    this.ctx.closePath();
+                    this.ctx.fillStyle = gradient;
+                    this.ctx.fill();
+                    
+                    this.ctx.beginPath();
+                    this.ctx.strokeStyle = color;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.lineJoin = 'round';
+                    points.forEach((p, idx) => {
+                        if (idx === 0) this.ctx.moveTo(p.x, p.y);
+                        else this.ctx.lineTo(p.x, p.y);
+                    });
+                    this.ctx.stroke();
+                    
+                    if (this.hoverIndex >= 0 && this.hoverIndex < points.length) {
+                        const p = points[this.hoverIndex];
+                        this.ctx.beginPath();
+                        this.ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                        this.ctx.fillStyle = color;
+                        this.ctx.fill();
+                        this.ctx.beginPath();
+                        this.ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+                        this.ctx.fillStyle = '#fff';
+                        this.ctx.fill();
+                        this.ctx.beginPath();
+                        this.ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+                        this.ctx.strokeStyle = color + '40';
+                        this.ctx.lineWidth = 3;
+                        this.ctx.stroke();
+                    }
+                });
+                
+                if (this.hoverIndex >= 0 && this.timeLabels.length > 1) {
+                    const x = padding.left + (chartWidth / (this.timeLabels.length - 1)) * this.hoverIndex;
+                    this.ctx.beginPath();
+                    this.ctx.strokeStyle = '#94a3b8';
+                    this.ctx.lineWidth = 1.5;
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.moveTo(x, padding.top);
+                    this.ctx.lineTo(x, this.height - padding.bottom);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
+                }
+            }
+        }
+
+        function drawAllCharts() {
+            const storageKey = 'monitorData_' + currentRange;
+            let systemData, databaseData, timeLabels, config;
+            
+            const savedData = localStorage.getItem(storageKey);
+            if (savedData) {
+                const parsedData = JSON.parse(savedData);
+                systemData = parsedData.systemData;
+                databaseData = parsedData.databaseData;
+                globalAnomalyStartIndex = parsedData.anomalyStartIndex;
+                globalAnomalyEndIndex = parsedData.anomalyEndIndex;
+                config = { ...getTimeRangeConfig(currentRange) };
+                config.count = parsedData.count;
+                timeLabels = generateTimeLabels(currentRange, config.count);
+            } else {
+                config = { ...getTimeRangeConfig(currentRange) };
+                timeLabels = generateTimeLabels(currentRange, config.count);
+                globalAnomalyStartIndex = 0;
+                globalAnomalyEndIndex = 0;
+                
+                // System resource data
+                systemData = systemMetrics.map(metric => {
+                    let type = 'default';
+                    if (metric.name.includes('CPU')) type = 'cpu';
+                    if (metric.name.includes('Memory')) type = 'memory';
+                    if (metric.name.includes('Disk IO')) type = 'disk_io';
+                    if (metric.name.includes('Network')) type = 'network';
+                    if (metric.name.includes('Disk Usage')) type = 'disk_usage';
+                    return generateMetricData(metric.baseValue, config.count, type);
+                });
+                
+                // Database data
+                databaseData = databaseMetrics.map(metric => {
+                    let type = 'default';
+                    if (metric.name.includes('QPS')) type = 'qps';
+                    if (metric.name.includes('TPS')) type = 'tps';
+                    if (metric.name.includes('Cache')) type = 'cache';
+                    if (metric.name.includes('Slow')) type = 'slow_query';
+                    if (metric.name.includes('Lock')) type = 'lock_wait';
+                    if (metric.name.includes('Connections')) type = 'connections';
+                    return generateMetricData(metric.baseValue, config.count, type);
+                });
+                
+                // Save to localStorage
+                localStorage.setItem(storageKey, JSON.stringify({ 
+                    systemData, 
+                    databaseData, 
+                    anomalyStartIndex: globalAnomalyStartIndex, 
+                    anomalyEndIndex: globalAnomalyEndIndex,
+                    count: config.count
+                }));
+            }
+            
+            // Initialize or update charts
+            if (!systemChartInstance) {
+                systemChartInstance = new MultiLineChart('systemChart', systemMetrics, 'systemLegend');
+            }
+            systemChartInstance.setData(timeLabels, systemData);
+            
+            if (!databaseChartInstance) {
+                databaseChartInstance = new MultiLineChart('databaseChart', databaseMetrics, 'databaseLegend');
+            }
+            databaseChartInstance.setData(timeLabels, databaseData);
+        }
+
+        function clearSavedData() {
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('monitorData_')) {
+                    localStorage.removeItem(key);
+                }
+            });
+            globalAnomalyStartIndex = 0;
+            globalAnomalyEndIndex = 0;
+            drawAllCharts();
+        }
+
+        window.addEventListener('resize', () => {
+            if (systemChartInstance) {
+                systemChartInstance.setupCanvas();
+                systemChartInstance.render();
+            }
+            if (databaseChartInstance) {
+                databaseChartInstance.setupCanvas();
+                databaseChartInstance.render();
+            }
+        });
+    </script>
+    <script src="/static/legacy-runtime.js"></script>
+    <script src="/static/legacy-pages.js"></script>
+</body>
+</html>

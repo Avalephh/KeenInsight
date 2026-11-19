@@ -1,0 +1,132 @@
+SOURCE_KEY: project:docs/EBPF_OPERATIONS.md
+SOURCE_TYPE: design
+SOURCE_TITLE: docs/EBPF_OPERATIONS.md
+SOURCE_URI: project://docs/EBPF_OPERATIONS.md
+---
+# eBPF and Kafka operations
+
+The eBPF path is a real optional host adapter, not a simulated dashboard
+stream. It attaches BCC uprobes/uretprobes to a visible PostgreSQL executable
+and a kprobe to `vfs_write`. The PostgreSQL collector and rule diagnosis do
+not depend on tracing privileges.
+
+## Preconditions
+
+The tracing process needs:
+
+- a Linux kernel with BPF/perf support and BCC userspace bindings;
+- permission to read the PostgreSQL backend `/proc/<pid>/exe` and attach
+uprobes/kprobes (root or the equivalent `CAP_BPF`/`CAP_PERFMON`/system
+policy, depending on the kernel);
+- a PostgreSQL server process visible in the same process namespace;
+- `clang`/LLVM for BCC compilation; and
+- a Kafka broker if the transport should be Kafka rather than the explicit
+database fallback.
+
+The checked-in host validation uses PostgreSQL 12.22, BCC 0.12, clang 10 and
+Kafka 3.7.2. A Docker Compose deployment must provide the corresponding BCC,
+kernel capabilities and PostgreSQL process visibility; ordinary unprivileged
+containers should report eBPF unavailable rather than be granted tracing
+privileges implicitly.
+
+## Live sequence
+
+Start the API with the broker configured:
+
+```bash
+KI_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
+KI_RAG_EMBEDDING_CACHE_DIR=/tmp/fastembed_cache \
+python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+`KI_EBPF_LONG_QUERY_THRESHOLD_SECONDS` controls the query-age threshold used
+by the monitor (the default is one second). A long query is evaluated from
+the observed PostgreSQL function duration and the live
+`pg_stat_activity.query_start` age; it is not generated from a synthetic
+timer.
+
+Start a selected probe set:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/ebpf/start \
+-H 'Content-Type: application/json' \
+-d '{"functions":["BufFileWrite","PortalRun"],"adaptive":true,"max_event_rate":1000}'
+```
+
+Run a workload, then stop the session:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/workloads/hash_join_spill/runs \
+-H 'Content-Type: application/json' \
+-d '{"phase":"baseline","repetitions":3,"warmup_repetitions":1,"parameters":{"baseline_work_mem":"64kB"}}'
+curl -sS -X POST http://127.0.0.1:8000/api/ebpf/stop
+curl -sS 'http://127.0.0.1:8000/api/ebpf/timelines?session_id=<id>'
+```
+
+`/api/ebpf/status` exposes attachment, target-PID, event, lost-record and
+Kafka status. `/api/ebpf/events` exposes raw persisted records. The lifecycle
+endpoint materializes records by query fingerprint/query ID and function;
+batched normal events retain exact invocation counts.
+
+## Adaptive selection and overhead
+
+After at least four stopped probe sessions matched to completed workload runs,
+call:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/ebpf/adapt \
+-H 'Content-Type: application/json' \
+-d '{"min_sessions":4,"max_probes":8,"alpha":0.001,"max_event_rate":1000}'
+```
+
+The selector fits `StandardScaler + Lasso` on real function event vectors and
+latency labels. It then applies the requested measured invocation-rate budget
+to optional user-space probes and reports selected/rejected names and rates.
+The mandatory kernel `vfs_write` probe is attached independently. Adaptation
+stops the old BPF session and dynamically starts the new set; it does not
+restart PostgreSQL.
+
+When `adaptive=true` is supplied to `/api/ebpf/start` (or
+`KI_EBPF_AUTO_ADAPT=true` is set for an environment-started session), the live
+monitor also enforces the rate budget during the session. At each reporting
+interval it computes the exact invocation rate from received kernel aggregate
+counts and calls BCC's uprobe/uretprobe detach operations for an over-budget
+user probe. The detach decision, measured rate, and retained kernel signal are
+persisted in the probe-session configuration. This online guard is separate
+from, and complementary to, the historical Lasso selection.
+
+Run the reproducible controls:
+
+```bash
+python scripts/ebpf_strict_smoke.py
+python scripts/ebpf_overhead_smoke.py
+python scripts/ebpf_auto_adapt_smoke.py
+python scripts/ebpf_long_query_smoke.py
+```
+
+The current local artifact found that directly tracing high-frequency
+`BufFileWrite` was lossless but added 4,520.49% median overhead. The measured
+budget rejected it, and the adaptive set retained zero-loss monitoring with
+9.63% median / 10.88% p95 overhead. Both the expensive result and the adaptive
+result remain in the raw artifact; the latter is not a hand-picked timing
+claim.
+
+The long-query check runs a real `SELECT pg_sleep(3.0), 1` while probes are
+attached. `artifacts/ebpf-long-query-strict.json` requires the query result,
+an event, zero lost records, and lifecycle anomaly reasons including
+`long_function_or_duration` and `long_query`. Immediate emission is a
+transport behavior for the observed event; it does not replace the persisted
+duration and query-age evidence.
+
+## Failure behavior
+
+The monitor never fabricates an event when BCC compilation or attachment
+fails. It records the error in the probe session and status endpoint. Kafka
+publishes use `acks=all` and an outbox record; a configured but unreachable
+broker is reported as failed, while an intentionally unconfigured broker is
+reported as `database-fallback`. Producer/consumer materialization is
+deduplicated by the event UUID.
+
+Stop the API cleanly after a live session. The service explicitly unregisters
+the BCC exit callback after performing its own cleanup to avoid double-closing
+perf descriptors during shutdown.

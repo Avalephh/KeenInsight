@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""Run the reproducible demo workflow and save measured observations.
+
+This script never inserts expected timings or expected improvements.  It asks
+the running service to execute each workload, records the returned PostgreSQL
+plan/timing, applies only the action proposed from that observation, measures
+the after phase, and rolls the action back at the end.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+
+def request(base: str, path: str, method: str = "GET", body: dict[str, Any] | None = None) -> Any:
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(
+        base.rstrip("/") + path,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(f"{method} {path} -> HTTP {exc.code}: {detail}") from exc
+
+
+def run_scenario(
+    base: str,
+    scenario: str,
+    repetitions: int,
+    warmups: int,
+    parameters: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    request_parameters = parameters or {}
+    baseline = request(
+        base,
+        f"/api/workloads/{scenario}/runs",
+        "POST",
+        {
+            "phase": "baseline",
+            "repetitions": repetitions,
+            "warmup_repetitions": warmups,
+            "parameters": request_parameters,
+        },
+    )
+    record: dict[str, Any] = {"scenario": scenario, "baseline": baseline}
+    proposal = baseline.get("action_proposal")
+    if proposal:
+        action = request(
+            base,
+            f"/api/workload-runs/{baseline['run_id']}/propose",
+            "POST",
+        )
+        record["action"] = action
+        applied = request(base, f"/api/actions/{action['id']}/apply", "POST")
+        record["applied"] = applied
+        record["after"] = request(
+            base,
+            f"/api/workloads/{scenario}/runs",
+            "POST",
+            {
+                "phase": "after",
+                "repetitions": repetitions,
+                "warmup_repetitions": warmups,
+                "parameters": request_parameters,
+            },
+        )
+        record["feedback"] = request(
+            base,
+            f"/api/actions/{action['id']}/feedback",
+            "POST",
+            {
+                "baseline_run_id": baseline["run_id"],
+                "after_run_id": record["after"]["run_id"],
+            },
+        )
+        record["rollback"] = request(
+            base, f"/api/actions/{action['id']}/rollback", "POST"
+        )
+        # A reversible intervention should also reverse the observed plan.
+        # Re-run the pressure arm after rollback so the artifact can show
+        # baseline -> tuned -> baseline, rather than stopping at a one-way
+        # before/after comparison.  This check is outside the reported
+        # before/after timing pair and is never used to improve a result.
+        rollback_check = request(
+            base,
+            f"/api/workloads/{scenario}/runs",
+            "POST",
+            {
+                "phase": "baseline",
+                "repetitions": repetitions,
+                "warmup_repetitions": warmups,
+                "parameters": request_parameters,
+            },
+        )
+        record["rollback_check"] = rollback_check
+        record["rollback_verification"] = verify_rollback(
+            base,
+            baseline,
+            rollback_check,
+            record["rollback"],
+            scenario,
+        )
+    else:
+        record["note"] = "The observed baseline did not produce an applyable proposal; no action was invented."
+    return record
+
+
+def _observations(result: dict[str, Any]) -> dict[str, Any]:
+    return result.get("observations") or result
+
+
+def _plan_signature(observations: dict[str, Any]) -> dict[str, Any]:
+    summary = observations.get("plan_summary") or {}
+    nodes = (observations.get("plan") or {}).get("nodes") or []
+    return {
+        "root_node": summary.get("root_node"),
+        "scan_nodes": summary.get("scan_nodes") or [],
+        "join_nodes": summary.get("join_nodes") or [],
+        "sort_methods": summary.get("sort_methods") or [],
+        "sort_space_types": summary.get("sort_space_types") or [],
+        "aggregate_strategies": summary.get("aggregate_strategies") or [],
+        "has_temp_blocks": bool(summary.get("has_temp_blocks")),
+        "hash_batches": sorted(
+            str(node.get("Hash Batches", node.get("Batches")))
+            for node in nodes
+            if node.get("Node Type") == "Hash"
+            and node.get("Hash Batches", node.get("Batches")) is not None
+        ),
+        "indexes": sorted(
+            str(node.get("Index Name"))
+            for node in nodes
+            if node.get("Index Name")
+        ),
+        "workers_planned": max(
+            [int(node.get("Workers Planned") or 0) for node in nodes] or [0]
+        ),
+        "workers_launched": max(
+            [int(node.get("Workers Launched") or 0) for node in nodes] or [0]
+        ),
+    }
+
+
+def verify_rollback(
+    base: str,
+    baseline: dict[str, Any],
+    rollback_check: dict[str, Any],
+    rollback: dict[str, Any],
+    scenario: str,
+) -> dict[str, Any]:
+    before = _observations(baseline)
+    restored = _observations(rollback_check)
+    state = request(base, "/api/workloads")
+    state_payload = state.get("state") or {}
+    plan_before = _plan_signature(before)
+    plan_restored = _plan_signature(restored)
+    verification: dict[str, Any] = {
+        "scenario": scenario,
+        "rollback_status": rollback.get("status"),
+        "same_plan_signature_as_original_baseline": plan_before == plan_restored,
+        "same_result_as_original_baseline": before.get("result") == restored.get("result"),
+        "plan_before": plan_before,
+        "plan_after_rollback": plan_restored,
+        "result_before": before.get("result"),
+        "result_after_rollback": restored.get("result"),
+        "database_state": {
+            "missing_index_exists": state_payload.get("missing_index_exists"),
+            "work_mem": state_payload.get("work_mem"),
+            "parallel_workers": state_payload.get("parallel_workers"),
+        },
+    }
+    verification["passed"] = (
+        verification["rollback_status"] == "rolled_back"
+        and verification["same_plan_signature_as_original_baseline"]
+        and verification["same_result_as_original_baseline"]
+    )
+    return verification
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--output", default="experiment-results.json")
+    parser.add_argument("--repetitions", type=int, default=7)
+    parser.add_argument("--warmups", type=int, default=2)
+    parser.add_argument("--customer-id", type=int, default=None)
+    parser.add_argument("--baseline-work-mem", default=None)
+    parser.add_argument("--baseline-parallel-workers", type=int, default=None)
+    args = parser.parse_args()
+    if not 1 <= args.repetitions <= 50:
+        parser.error("--repetitions must be between 1 and 50")
+    if not 0 <= args.warmups <= 10:
+        parser.error("--warmups must be between 0 and 10")
+    if args.baseline_parallel_workers is not None and args.baseline_parallel_workers < 0:
+        parser.error("--baseline-parallel-workers cannot be negative")
+
+    output: dict[str, Any] = {
+        "started_at": time.time(),
+        "protocol": {
+            "timed_repetitions": args.repetitions,
+            "warmup_repetitions": args.warmups,
+            "customer_id": args.customer_id,
+            "baseline_work_mem": args.baseline_work_mem,
+            "baseline_parallel_workers": args.baseline_parallel_workers,
+        },
+        "health": request(args.base_url, "/api/health"),
+        "meta": request(args.base_url, "/api/meta"),
+        "manifest": request(args.base_url, "/api/demo/manifest"),
+    }
+    output["bootstrap"] = request(args.base_url, "/api/demo/bootstrap", "POST")
+    missing_parameters = {}
+    if args.customer_id is not None:
+        missing_parameters["customer_id"] = args.customer_id
+    hash_parameters = {}
+    if args.baseline_work_mem is not None:
+        hash_parameters["baseline_work_mem"] = args.baseline_work_mem
+    output["missing_index"] = run_scenario(
+        args.base_url,
+        "missing_index",
+        args.repetitions,
+        args.warmups,
+        missing_parameters,
+    )
+    output["hash_join_spill"] = run_scenario(
+        args.base_url,
+        "hash_join_spill",
+        args.repetitions,
+        args.warmups,
+        hash_parameters,
+    )
+    output["aggregate_spill"] = run_scenario(
+        args.base_url,
+        "aggregate_spill",
+        args.repetitions,
+        args.warmups,
+        hash_parameters,
+    )
+    output["sort_spill"] = run_scenario(
+        args.base_url,
+        "sort_spill",
+        args.repetitions,
+        args.warmups,
+        hash_parameters,
+    )
+    parallel_parameters = {}
+    if args.baseline_parallel_workers is not None:
+        parallel_parameters["baseline_parallel_workers"] = args.baseline_parallel_workers
+    output["parallel_query_underprovisioned"] = run_scenario(
+        args.base_url,
+        "parallel_query_underprovisioned",
+        args.repetitions,
+        args.warmups,
+        parallel_parameters,
+    )
+
+    lock_start = request(args.base_url, "/api/workloads/lock_contention/start", "POST")
+    output["lock_contention_start"] = lock_start
+    output["lock_incidents"] = wait_for_lock_incident(args.base_url)
+    output["lock_rows"] = request(args.base_url, "/api/locks")
+    output["lock_contention_stop"] = request(
+        args.base_url,
+        f"/api/workloads/lock_contention/{lock_start['run_id']}/stop",
+        "POST",
+    )
+    output["finished_at"] = time.time()
+
+    target = Path(args.output)
+    target.write_text(json.dumps(output, indent=2, ensure_ascii=False, default=str) + "\n")
+    print(f"Wrote measured observations to {target}")
+
+
+def wait_for_lock_incident(base: str, timeout_seconds: float = 20.0) -> dict[str, Any]:
+    """Wait for the collector to observe a real lock wait, without inventing one."""
+    deadline = time.monotonic() + timeout_seconds
+    latest: dict[str, Any] = {"items": []}
+    while time.monotonic() < deadline:
+        latest = request(base, "/api/incidents?kind=lock_wait&status=active")
+        if latest.get("items"):
+            return latest
+        time.sleep(1)
+    latest["wait_timeout_seconds"] = timeout_seconds
+    return latest
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,9 @@
+SOURCE_KEY: project:demo/bootstrap.sql
+SOURCE_TYPE: deployment
+SOURCE_TITLE: demo/bootstrap.sql
+SOURCE_URI: project://demo/bootstrap.sql
+---
+-- This file can be executed against an existing PostgreSQL database with
+-- psql, or through POST /api/demo/bootstrap. It creates only the namespaced
+-- KeenInsight demo relations and does not fabricate measurements.
+\ir ../db/init/10_demo.sql

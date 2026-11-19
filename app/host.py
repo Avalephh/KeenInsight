@@ -1,0 +1,114 @@
+"""Read-only host/container telemetry used by the live dashboard.
+
+These values are intentionally collected from the operating system rather
+than generated in the browser.  In a container they describe the container's
+visible namespace/cgroup view; they are not presented as eBPF function-level
+signals.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+from typing import Any
+
+
+class HostProbe:
+    """Keep the previous CPU counter needed for an interval utilization rate."""
+
+    def __init__(self, disk_path: str = "/") -> None:
+        self.disk_path = disk_path
+        self._previous_cpu: tuple[int, int] | None = None
+
+    def sample(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"source": "procfs", "available": True}
+        try:
+            result.update(_memory())
+            result.update(_load())
+            result.update(self._cpu())
+            result.update(_disk(self.disk_path))
+            result.update(_network())
+            result["cpu_count"] = os.cpu_count()
+        except (OSError, ValueError) as exc:
+            # A restricted container can expose only part of procfs.  Keep the
+            # database observation usable and make the missing host evidence
+            # explicit in the payload.
+            result["available"] = False
+            result["error"] = str(exc)
+        return result
+
+    def _cpu(self) -> dict[str, Any]:
+        with open("/proc/stat", "r", encoding="utf-8") as stream:
+            line = next((item for item in stream if item.startswith("cpu ")), "")
+        values = [int(value) for value in line.split()[1:]]
+        if len(values) < 4:
+            raise ValueError("/proc/stat did not contain a complete aggregate CPU row")
+        total = sum(values)
+        idle = values[3] + (values[4] if len(values) > 4 else 0)
+        current = (total, idle)
+        previous = self._previous_cpu
+        self._previous_cpu = current
+        if not previous:
+            return {"cpu_usage_pct": None, "cpu_counter_jiffies": total}
+        total_delta = total - previous[0]
+        idle_delta = idle - previous[1]
+        usage = None if total_delta <= 0 else max(0.0, min(100.0, (1 - idle_delta / total_delta) * 100))
+        return {"cpu_usage_pct": usage, "cpu_counter_jiffies": total}
+
+
+def _memory() -> dict[str, Any]:
+    values: dict[str, int] = {}
+    with open("/proc/meminfo", "r", encoding="utf-8") as stream:
+        for line in stream:
+            key, separator, raw = line.partition(":")
+            if not separator:
+                continue
+            parts = raw.strip().split()
+            if parts and parts[0].isdigit():
+                # Linux reports these fields in kB.  Preserve bytes in the
+                # payload so the UI does not need to infer a unit.
+                values[key] = int(parts[0]) * 1024
+    total = values.get("MemTotal", 0)
+    available = values.get("MemAvailable", values.get("MemFree", 0))
+    used = max(0, total - available)
+    return {
+        "memory_total_bytes": total,
+        "memory_available_bytes": available,
+        "memory_used_pct": (used / total * 100) if total else None,
+    }
+
+
+def _load() -> dict[str, Any]:
+    with open("/proc/loadavg", "r", encoding="utf-8") as stream:
+        raw = stream.read().split()
+    return {"load1": float(raw[0]) if raw else None}
+
+
+def _disk(path: str) -> dict[str, Any]:
+    usage = shutil.disk_usage(path)
+    return {
+        "disk_path": path,
+        "disk_total_bytes": usage.total,
+        "disk_free_bytes": usage.free,
+        "disk_used_pct": ((usage.total - usage.free) / usage.total * 100) if usage.total else None,
+    }
+
+
+def _network() -> dict[str, Any]:
+    received = 0
+    transmitted = 0
+    with open("/proc/net/dev", "r", encoding="utf-8") as stream:
+        for line in stream:
+            if ":" not in line:
+                continue
+            interface, raw = line.split(":", 1)
+            if interface.strip() == "lo":
+                continue
+            fields = raw.split()
+            if len(fields) >= 9:
+                received += int(fields[0])
+                transmitted += int(fields[8])
+    return {
+        "network_received_bytes": received,
+        "network_transmitted_bytes": transmitted,
+    }

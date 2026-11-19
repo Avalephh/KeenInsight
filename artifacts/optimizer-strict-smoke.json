@@ -1,0 +1,327 @@
+{
+  "format": "keeninsight-optimizer-strict-smoke-v1",
+  "base_url": "http://127.0.0.1:8000",
+  "elapsed_seconds": 7.072,
+  "queries": [
+    {
+      "name": "hash_join_hint",
+      "run_id": 9,
+      "status": "completed",
+      "selected_candidate": "hint:max_parallel_workers_per_gather=4",
+      "ranking_methods": [
+        "pairwise-logistic"
+      ],
+      "candidate_count": 4,
+      "knowledge_count": 5,
+      "source_evidence_count": 50,
+      "candidates": [
+        {
+          "candidate_key": "hint:enable_hashjoin=off",
+          "action_type": "query_hint",
+          "hints": {
+            "enable_hashjoin": "off"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "enable_hashjoin",
+            "value": "off"
+          },
+          "median_query_time_ms": 114.26091403700411,
+          "p95_query_time_ms": 114.3051597988233,
+          "result_count": 1,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:enable_seqscan=off",
+          "action_type": "query_hint",
+          "hints": {
+            "enable_seqscan": "off"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "enable_seqscan",
+            "value": "off"
+          },
+          "median_query_time_ms": 122.44818988256156,
+          "p95_query_time_ms": 135.92095153871924,
+          "result_count": 1,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:work_mem=16MB",
+          "action_type": "query_hint",
+          "hints": {
+            "work_mem": "16MB"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "work_mem",
+            "value": "16MB"
+          },
+          "median_query_time_ms": 53.61149390228093,
+          "p95_query_time_ms": 53.69232122320682,
+          "result_count": 1,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:max_parallel_workers_per_gather=4",
+          "action_type": "query_hint",
+          "hints": {
+            "max_parallel_workers_per_gather": "4"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "max_parallel_workers_per_gather",
+            "value": "4"
+          },
+          "median_query_time_ms": 51.73777393065393,
+          "p95_query_time_ms": 54.374647117219865,
+          "result_count": 1,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        }
+      ]
+    },
+    {
+      "name": "provable_or_to_in_rewrite",
+      "run_id": 10,
+      "status": "completed",
+      "selected_candidate": "hint:max_parallel_workers_per_gather=4",
+      "ranking_methods": [
+        "pairwise-logistic"
+      ],
+      "candidate_count": 4,
+      "knowledge_count": 5,
+      "source_evidence_count": 50,
+      "candidates": [
+        {
+          "candidate_key": "hint:enable_seqscan=off",
+          "action_type": "query_hint",
+          "hints": {
+            "enable_seqscan": "off"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "enable_seqscan",
+            "value": "off"
+          },
+          "median_query_time_ms": 37.890332052484155,
+          "p95_query_time_ms": 48.27335299924016,
+          "result_count": 80,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:work_mem=16MB",
+          "action_type": "query_hint",
+          "hints": {
+            "work_mem": "16MB"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "work_mem",
+            "value": "16MB"
+          },
+          "median_query_time_ms": 23.474576883018017,
+          "p95_query_time_ms": 23.83850822225213,
+          "result_count": 80,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:max_parallel_workers_per_gather=4",
+          "action_type": "query_hint",
+          "hints": {
+            "max_parallel_workers_per_gather": "4"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "max_parallel_workers_per_gather",
+            "value": "4"
+          },
+          "median_query_time_ms": 23.032380966469646,
+          "p95_query_time_ms": 23.37871806230396,
+          "result_count": 80,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "rewrite:or-to-in",
+          "action_type": "query_rewrite",
+          "hints": {},
+          "proposal": {
+            "kind": "provably_equivalent",
+            "rewrite": "OR equality predicates -> IN list",
+            "original_query": "SELECT order_id FROM keeninsight_demo.orders WHERE customer_id = 1 OR customer_id = 2 ORDER BY order_id"
+          },
+          "median_query_time_ms": 24.341469164937735,
+          "p95_query_time_ms": 24.752443097531796,
+          "result_count": 80,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        }
+      ]
+    },
+    {
+      "name": "typed_index_proposal",
+      "run_id": 11,
+      "status": "completed",
+      "selected_candidate": null,
+      "ranking_methods": [],
+      "candidate_count": 3,
+      "knowledge_count": 5,
+      "source_evidence_count": 50,
+      "candidates": [
+        {
+          "candidate_key": "hint:enable_seqscan=off",
+          "action_type": "query_hint",
+          "hints": {
+            "enable_seqscan": "off"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "enable_seqscan",
+            "value": "off"
+          },
+          "median_query_time_ms": 22.385760908946395,
+          "p95_query_time_ms": 22.56540353409946,
+          "result_count": 20,
+          "semantic_equivalent": false,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:max_parallel_workers_per_gather=4",
+          "action_type": "query_hint",
+          "hints": {
+            "max_parallel_workers_per_gather": "4"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "max_parallel_workers_per_gather",
+            "value": "4"
+          },
+          "median_query_time_ms": 13.43113905750215,
+          "p95_query_time_ms": 14.918094757013023,
+          "result_count": 20,
+          "semantic_equivalent": false,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "index-selection:orders.orders_customer_id_idx",
+          "action_type": "index_selection",
+          "hints": {},
+          "proposal": {
+            "action_type": "create_index",
+            "target": {
+              "schema": "keeninsight_demo",
+              "table": "orders",
+              "index": "orders_customer_id_idx",
+              "columns": [
+                "customer_id"
+              ]
+            },
+            "description": "Create a btree index on the equality predicate observed in the sequential-scan plan, then validate the query again.",
+            "proposal_evidence": {
+              "node_type": "Seq Scan",
+              "relation": "keeninsight_demo.orders",
+              "filter": "(orders.customer_id = 1)",
+              "plan_rows": 17,
+              "actual_rows": null,
+              "predicate_column": "customer_id",
+              "calculation": "derive_single_column_btree_from_observed_simple_equality_filter"
+            },
+            "requires_explicit_reviewed_action": true
+          },
+          "median_query_time_ms": null,
+          "p95_query_time_ms": null,
+          "result_count": null,
+          "semantic_equivalent": false,
+          "measurement_status": "proposal_only"
+        }
+      ]
+    },
+    {
+      "name": "aggregate_and_parallel_hints",
+      "run_id": 12,
+      "status": "completed",
+      "selected_candidate": "hint:max_parallel_workers_per_gather=4",
+      "ranking_methods": [
+        "pairwise-logistic"
+      ],
+      "candidate_count": 3,
+      "knowledge_count": 5,
+      "source_evidence_count": 50,
+      "candidates": [
+        {
+          "candidate_key": "hint:enable_seqscan=off",
+          "action_type": "query_hint",
+          "hints": {
+            "enable_seqscan": "off"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "enable_seqscan",
+            "value": "off"
+          },
+          "median_query_time_ms": 237.63656499795616,
+          "p95_query_time_ms": 282.76379709132016,
+          "result_count": 20000,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:work_mem=16MB",
+          "action_type": "query_hint",
+          "hints": {
+            "work_mem": "16MB"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "work_mem",
+            "value": "16MB"
+          },
+          "median_query_time_ms": 73.33447178825736,
+          "p95_query_time_ms": 116.3373836548999,
+          "result_count": 20000,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        },
+        {
+          "candidate_key": "hint:max_parallel_workers_per_gather=4",
+          "action_type": "query_hint",
+          "hints": {
+            "max_parallel_workers_per_gather": "4"
+          },
+          "proposal": {
+            "kind": "session_local_hint",
+            "parameter": "max_parallel_workers_per_gather",
+            "value": "4"
+          },
+          "median_query_time_ms": 75.86771692149341,
+          "p95_query_time_ms": 81.52929563075304,
+          "result_count": 20000,
+          "semantic_equivalent": true,
+          "measurement_status": null
+        }
+      ]
+    }
+  ],
+  "index_proposal_review": {
+    "candidate_key": "index-selection:orders.orders_customer_id_idx",
+    "action_id": 183,
+    "action_status": "proposed",
+    "action_type": "create_index",
+    "provenance": null,
+    "rejected_status": "rejected"
+  },
+  "checks": {
+    "all_runs_completed": true,
+    "all_runs_used_knowledge": true,
+    "all_runs_used_source_evidence": true,
+    "at_least_one_verified_hint_or_rewrite": true,
+    "index_proposal_was_reviewed_then_rejected": true
+  }
+}

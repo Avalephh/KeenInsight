@@ -1,0 +1,65 @@
+SOURCE_KEY: archive:paper:1intro.tex
+SOURCE_TYPE: paper
+SOURCE_TITLE: 1intro.tex
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!1intro.tex
+---
+\label{sec:intro}
+Modern database systems are increasingly complex, making timely diagnosis and resolution of performance anomalies a challenging task.
+% In practice, database administrators (DBAs) rely on manual troubleshooting, which is costly, hard to scale across a large number of database instances, and fails to respond to incidents in a timely manner.
+However, database administrators (DBAs) still rely on manual troubleshooting, which is costly, hard to scale, and often fails to respond to incidents in a timely manner.
+
+To alleviate this burden, many semi-automated database maintenance tools have been developed.
+%However, these systems still face several significant challenges.
+However, existing approaches fundamentally suffer from two key limitations: they rely on \textbf{\emph{coarse-grained runtime signals}} and treat optimization as a \textbf{\emph{black-box process}}, leading to unreliable and non-interpretable decisions.
+For example, observing a drop in throughput accompanied by increased I/O, existing methods may resort to trial-and-error (exploring combinations of tuning actions) or rule-of-thumb strategies, such as increasing buffer pool size. However, such actions often fail to resolve the issue, as they do not address the true root cause.
+In contrast, fine-grained observability reveals frequent \texttt{log\_buffer\_flush\_to\_disk()} calls, indicating insufficient redo log buffering that triggers excessive flushes. This enables targeted optimization by increasing \texttt{innodb\_log\_buffer\_size}, effectively improving throughput.
+
+While fine-grained execution signals are essential for understanding performance issues, collecting them (e.g., execution stacks~\cite{perf} or per-query statistics~\cite{pg_stat_statements}) incurs substantial overhead, making them impractical for continuous use in production.
+Even when such signals are available, it remains challenging to translate them into actionable optimization decisions---for example, failing to recognize that frequent \texttt{log\_buffer\_flush\_to\_disk()} calls imply increasing \texttt{innodb\_log\_buffer\_size}.
+This difficulty stems from the fact that the mapping from fine-grained execution behaviors to effective tuning actions is weakly supervised, highly context-dependent, and requires a deep understanding of system semantics that cannot be captured by surface-level statistics.
+Existing approaches rely on small-scale learned models that are agnostic to system semantics, failing to capture the causal relationship between execution behavior and performance impact~\cite{DBLP:journals/tkde/ZhouCLS22}.
+Although LLM-based approaches exhibit strong reasoning capabilities, they remain grounded in static and coarse-grained knowledge sources such as database manuals~\cite{DBLP:journals/pvldb/LaoWLWZCCTW24}, making it difficult to diagnose fine-grained runtime signals for reliable optimization.
+% Besides, current approaches either optimize isolated tasks or generate recommendation-only outputs, lacking a principled mechanism to translate runtime signals into interpretable and optimization actions, and often requiring manual validation and deployment~\cite{DBLP:journals/pvldb/LaoWLWZCCTW24,DBLP:journals/pvldb/SunZLYFZ25,DBLP:journals/corr/abs-2506-23322}.
+
+These limitations highlight a fundamental challenge: database runtime signals are both \emph{hard to collect efficiently at fine granularity} and \emph{hard to translate into reliable and interpretable tuning decisions}.
+% To bridge this gap, we present \sys, an end-to-end LLM-empowered system that offers fine-grained observability with semantics-aware optimization grounded in code-level insights.
+To bridge this gap, we present \sys, an end-to-end LLM-empowered system that provides fine-grained, low-overhead observability via adaptive function-level probes, and enables semantics-aware optimization grounded in deep code-level understanding.
+Unlike existing approaches that rely on heuristic knowledge, \sys leverages code-driven insight by understanding database source code at the LLVM IR (Intermediate Representation) level, capturing system execution behavior and configuration propagation semantics~\cite{zhang2026manuals}.
+% grounded in reliable tuning rules derived from multi-source knowledge.
+It offers the following features:
+% \vspace{-0.5em}
+% \textbf{C2. Ineffective and non-adaptive diagnosis.}
+% Most tools rely on heuristic rules or small-scale learned models. Heuristics often fail to reveal true root causes, while learned approaches~\cite{DBLP:journals/tkde/ZhouCLS22} are semantics-agnostic and require costly retraining or expensive trial-and-error, making them difficult to deploy in online settings.
+
+% While some studies have investigated LLM-based database maintenance, they remain standalone and static.
+% \textbf{C3. Isolated and semi-automatic optimization.}
+% Existing approaches either target isolated tasks such as knob tuning~\cite{DBLP:journals/pvldb/LaoWLWZCCTW24} and query rewrite~\cite{DBLP:journals/pvldb/SunZLYFZ25}, or depend on user queries and provide recommendation-only outputs that require manual validation and deployment~\cite{DBLP:journals/corr/abs-2506-23322}, resulting in semi-automatic workflows.
+% Moreover, they heavily rely on pre-trained knowledge or external documentation (e.g., via RAG), which limits their effectiveness in systems with sparse documentation or rapidly evolving workloads not covered by existing knowledge
+
+% To address these challenges, we present \sys, an end-to-end LLM-empowered database maintenance system that supports online, closed-loop monitoring, anomaly detection, root cause identification, and automated resolution. \sys offers the following key features:
+\begin{itemize}[leftmargin=*]
+
+\item \textbf{Adaptive Fine-grained Monitoring.}
+% Instead of frequent metric sampling, \sys attaches eBPF probes to carefully selected key database functions, which triggers metric collection only upon predefined events, enabling lightweight and lossless monitoring.
+% It identifies critical functions for instrumentation and construct SQL-level metrics from raw eBPF data. Furthermore, an adaptive attachment strategy is employed to dynamically control probe activation, thereby reducing runtime overhead.
+\sys leverages eBPF (extended Berkeley Packet Filter), a lightweight in-kernel technology to enable non-intrusive collection of fine-grained database events.
+To reduce overhead while preserving anomaly-critical signals, it instruments critical execution paths by adaptively attaching probes to functions indicative of performance anomalies, and employs anomaly-aware message aggregation.
+%The collected signals are unified into SQL-level metrics, providing execution-aware observability across the query lifecycle.
+
+\item \textbf{Hierarchical Interpretable Anomaly Diagnosis.}
+% Based on streamed runtime metrics, \sys performs anomaly detection in a coarse-to-fine manner across both system and SQL levels.
+\sys performs coarse-to-fine anomaly diagnosis over the streamed event flow.
+Lightweight checks identify abnormal signals which trigger a diagnosis agent combining model-driven reasoning and DBA-defined rules to uncover interpretable root causes.
+
+% \item \textbf{A self-evolving dual-path optimization framework (addressing C3).}
+\item\textbf{Reliable Tuning via Code-level Insight.}
+\sys translates fine-grained signals into tuning actions grounded in \emph{causal knowledge} derived from database source code, documentation and historical observations. It maintains feedback-driven confidence scores and validates actions before deployment.
+% It unifies diverse tuning tasks within a single framework, where tuning agents generate optimization actions validated before deployment.
+% To ensure reliability, it derives tuning rules from multiple sources (documentation, DBMS code, and historical experience) with feedback-driven confidence scores.
+% It unifies tuning tasks within a single framework, generating optimization actions validated before deployment.
+% To ensure reliability, it derives rules from database source code and tuning observations, and maintains feedback-driven confidence scores.
+% \sys unifies diverse tuning tasks within a single framework, where tuning agents are triggered to perform optimization actions and coordinated with a validation module to automatically generate, verify, and deploy configurations.
+% It integrates multi-source knowledge, including documentation, code-derived insights from DBMS source code, and evolving experience distilled from historical tuning.
+
+% Given the identified root cause, a resolution agent performs system-level tuning via configuration adjustments or SQL-level optimization via query rewriting, hint injection, and index selection. Beyond static knowledge retrieval, it reflects on tuning feedback, clusters similar experiences, and quantifies their confidence, enabling reliable and continuously improving optimization.
+\end{itemize}

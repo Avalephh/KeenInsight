@@ -1,0 +1,41 @@
+SOURCE_KEY: archive:paper:2overview.tex
+SOURCE_TYPE: paper
+SOURCE_TITLE: 2overview.tex
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!2overview.tex
+---
+\subsection{System Overview}
+
+% Figure~\ref{fig:architecture} presents the overview of \sys, which is designed as a closed-loop framework for database performance anomaly detection and automatic resolution.
+
+Figure~\ref{fig:architecture} presents the overview of \sys, that converts fine-grained runtime signals into optimization decisions through unified monitoring, diagnosis, and knowledge-grounded tuning.
+
+\noindent\textbf{System Monitoring.}
+\sys attaches eBPF probes to critical database (Uprobes) and kernel (Kprobes) functions to capture fine-grained database events and associate resource consumption. The probe set is adaptively attached based on each function’s importance to anomaly diagnosis.
+To further balance observability with overhead, \sys adopts anomaly-aware message generation: metrics are aggregated and reported periodically by default, while anomalous behaviors trigger immediate message emission without aggregation.
+% metrics are aggregated by default and emitted immediately only upon anomaly detection.
+Collected signals are reconstructed into SQL-level metrics by aligning resource usage with database events using query IDs and time intervals, thereby capturing query execution semantics, while focusing on critical execution paths.
+% that reveal performance root causes.
+
+\noindent\textbf{Anomaly Diagnosis.}
+Based on streamed runtime events, anomaly detection is conducted at both the system and SQL levels in a coarse-to-fine manner.
+At the system level, it uses threshold-based checks over performance metrics to quickly detect anomalies, and then invokes differential profiling and SHAP-based analysis to pinpoint abnormal functions responsible for the degradation. At the SQL level, it first predicts whether an incoming query would become a slow query based on similar historical queries. For abnormal queries, a detection agent further combines DBA rules with a multi-class prediction model to infer root causes with interpretable reasoning.
+
+\noindent\textbf{Anomaly Resolution.}
+% \sys generates targeted optimization recommendations based on the identified root causes. For system-level anomalies, it conducts static analysis on hotspot functions to identify relevant configuration knobs and applies targeted knob tuning. It further retrieves similar cases from historical tuning experience and uses a large language model to produce context-aware tuning recommendations. For SQL-level anomalies, it retrieves similar historical cases and employs a large language model to generate optimizer actions that correspond to the identified root causes.
+% Based on the diagnosed root causes and execution context, \sys retrieves relevant tuning knowledge and generates targeted optimization actions.
+Based on the diagnosed root causes and execution context, \sys translates fine-grained runtime signals into targeted optimization actions through \emph{causally grounded knowledge}.
+For system-level anomalies, it performs static analysis over abnormal functions to identify governing configuration knobs and applies knowledge-guided adjustments~\cite{zhang2026manuals}.
+For SQL-level anomalies, it reasons over execution behavior and generates operator-level optimizations (e.g., query hints, rewriting, and index addition/removal), enabling precise and interpretable tuning.
+
+\noindent\textbf{Multi-Source Knowledge Base.}
+% \sys maintains a continuously evolving knowledge base to manage historical records and confidence-aware optimization experience in a unified manner. It analyzes past anomaly handling and tuning records through agent-based analysis, summarizes key information, and further organizes them via clustering analysis into structured experiences associated with confidence scores. The knowledge base supports runtime similar-case retrieval for anomaly resolution, enabling \sys to reuse validated tuning experience in new scenarios. Meanwhile, the historical records also serve as training data for models used in the anomaly diagnosis stage.
+\sys maintains a unified knowledge base that supports causal grounding of tuning decisions.
+It integrates:
+\textit{(1) Manuals-derived knowledge} capturing expert-curated descriptions of tuning practices with system context.
+\textit{(2) Code-derived knowledge} extracted from system source code via LLVM-based static analysis and agent-assisted reasoning, capturing fine-grained control logic.
+\textit{(3) Tuning-derived knowledge} distilled from historical tuning cases, where similar cases are clustered.
+% Each rule is associated with a feedback-driven confidence metric, which is updated based on the observed performance impact of its application, enabling reliable and continuously improving optimization.
+Each entry is associated with a feedback-driven confidence score, enabling reliable and continuously improving reasoning.
+
+% \textbf{visualization interface.}
+% \sys provides a unified visualization interface for database monitoring, anomaly diagnosis, and tuning. It presents runtime system status, anomaly detection results, SQL lifecycle information, and optimization processes in an intuitive manner, enabling users to inspect system behavior and diagnose performance issues efficiently. It also exposes diagnostic evidence and tuning outcomes to help users understand optimization decisions and track the effectiveness of applied actions.

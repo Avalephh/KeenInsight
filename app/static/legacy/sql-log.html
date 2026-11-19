@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - SQL Logs</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-focus: #ccdbff;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Navigation Bar */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* Main Content Area */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .host-info {
+            font-size: 14px;
+            color: #4e5969;
+            background: #fff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: 1px solid #e5e6eb;
+        }
+
+        .host-info span {
+            margin-right: 16px;
+        }
+
+        .host-info strong {
+            color: #1d2129;
+        }
+
+        .filter-section {
+            background: #fff;
+            border-radius: 4px;
+            padding: 16px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .filter-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filter-label {
+            font-size: 14px;
+            color: #4e5969;
+        }
+
+        .filter-select,
+        .filter-input {
+            padding: 6px 12px;
+            border: 1px solid #e5e6eb;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1d2129;
+            background: #fff;
+            outline: none;
+        }
+
+        .filter-select:focus,
+        .filter-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        .filter-btn {
+            padding: 6px 20px;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .filter-btn:hover {
+            background: var(--primary-color-hover);
+        }
+
+        .filter-btn.reset {
+            background: #fff;
+            color: #4e5969;
+            border: 1px solid #e5e6eb;
+        }
+
+        .filter-btn.reset:hover {
+            background: #f7f8fa;
+        }
+
+        .data-container {
+            background: #fff;
+            border-radius: 4px;
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px 20px;
+            text-align: left;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .data-table th {
+            font-size: 12px;
+            font-weight: 500;
+            color: #86909c;
+            background: #f7f8fa;
+        }
+
+        .data-table td {
+            font-size: 14px;
+            color: #1d2129;
+        }
+
+        .data-table tr:hover td {
+            background: #f7f8fa;
+        }
+
+        .sql-id {
+            font-family: 'Courier New', monospace;
+            color: #4e5969;
+            font-size: 13px;
+        }
+
+        .sql-text {
+            max-width: 500px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .sql-text:hover {
+            color: var(--primary-color);
+        }
+
+        .execution-time {
+            font-family: 'Courier New', monospace;
+            font-weight: 500;
+        }
+
+        .execution-time.fast {
+            color: #0fbf60;
+        }
+
+        .execution-time.medium {
+            color: #ff8b07;
+        }
+
+        .execution-time.slow {
+            color: #ee4d38;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.success {
+            background: #e8fff3;
+            color: #0fbf60;
+        }
+
+        .status-badge.error {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .status-badge.warning {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .action-link {
+            color: var(--primary-color);
+            cursor: pointer;
+            margin-right: 16px;
+            font-size: 14px;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .action-link:last-child {
+            margin-right: 0;
+        }
+
+        .action-link:hover {
+            text-decoration: underline;
+        }
+
+        /* Action Column Container */
+        .data-table td:nth-child(5) {
+            white-space: nowrap;
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 16px 20px;
+            gap: 12px;
+        }
+
+        .page-info {
+            font-size: 14px;
+            color: #4e5969;
+        }
+
+        .page-btn {
+            padding: 6px 12px;
+            border: 1px solid #e5e6eb;
+            background: #fff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #4e5969;
+            transition: all 0.2s;
+        }
+
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .page-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .page-btn.active {
+            background: var(--primary-color);
+            color: #fff;
+            border-color: var(--primary-color);
+        }
+
+        .sql-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sql-modal.active {
+            display: flex;
+        }
+
+        .sql-modal-content {
+            background: #fff;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 900px;
+            max-height: 80%;
+            overflow: auto;
+        }
+
+        .sql-modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sql-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .sql-modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #86909c;
+            line-height: 1;
+        }
+
+        .sql-modal-body {
+            padding: 20px;
+        }
+
+        .sql-detail-row {
+            margin-bottom: 16px;
+        }
+
+        .sql-detail-label {
+            font-size: 14px;
+            color: #86909c;
+            margin-bottom: 4px;
+        }
+
+        .sql-detail-value {
+            font-size: 14px;
+            color: #1d2129;
+            font-family: 'Courier New', monospace;
+            background: #f7f8fa;
+            padding: 12px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .sql-modal-content {
+            background: #fff;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 1200px;
+            max-height: 90%;
+            overflow: auto;
+        }
+
+        .lifecycle-section {
+            margin-bottom: 24px;
+        }
+
+        .lifecycle-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 16px;
+        }
+
+        .lifecycle-timeline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .lifecycle-timeline::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #e5e6eb;
+            z-index: 1;
+        }
+
+        .lifecycle-node {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            position: relative;
+            z-index: 2;
+            transition: transform 0.2s;
+        }
+
+        .lifecycle-node:hover {
+            transform: translateY(-5px);
+        }
+
+        .lifecycle-node.active .node-circle {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: scale(1.2);
+        }
+
+        .node-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+
+        .lifecycle-node.active .node-circle svg {
+            fill: #fff;
+        }
+
+        .node-circle svg {
+            width: 20px;
+            height: 20px;
+            fill: #86909c;
+            transition: fill 0.2s;
+        }
+
+        .node-label {
+            font-size: 12px;
+            color: #4e5969;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .lifecycle-node.active .node-label {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .resource-detail {
+            margin-top: 20px;
+            padding: 16px;
+            background: #f7f8fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .resource-detail.active {
+            display: block;
+        }
+
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+
+        .resource-item {
+            background: #fff;
+            padding: 16px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .resource-label {
+            font-size: 12px;
+            color: #86909c;
+            margin-bottom: 8px;
+        }
+
+        .resource-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .resource-value.cpu {
+            color: #3370ff;
+        }
+
+        .resource-value.memory {
+            color: #0fbf60;
+        }
+
+        .resource-value.io {
+            color: #ff8b07;
+        }
+
+        .analysis-section {
+            margin-top: 24px;
+        }
+
+        .analysis-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 16px;
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .analysis-card {
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .analysis-card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .analysis-card-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .analysis-card-icon.blue {
+            background: #e8f7ff;
+        }
+
+        .analysis-card-icon.red {
+            background: #ffece8;
+        }
+
+        .analysis-card-icon.green {
+            background: #e8fff3;
+        }
+
+        .analysis-card-icon.orange {
+            background: #fff3e8;
+        }
+
+        .analysis-card-icon svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .analysis-card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1d2129;
+        }
+
+        .analysis-card-content {
+            font-size: 14px;
+            color: #4e5969;
+            line-height: 1.8;
+            white-space: pre-line;
+        }
+
+        .analysis-tag {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-top: 8px;
+        }
+
+        .analysis-tag.success {
+            background: #e8fff3;
+            color: #0fbf60;
+        }
+
+        .analysis-tag.warning {
+            background: #fff3e8;
+            color: #ff8b07;
+        }
+
+        .analysis-tag.error {
+            background: #ffece8;
+            color: #ee4d38;
+        }
+
+        .analysis-tag.info {
+            background: #e8f7ff;
+            color: #3370ff;
+        }
+
+        .content-block {
+            margin-bottom: 16px;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .content-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .content-block-title {
+            background: #f7f8fa;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #4e5969;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .content-block-body {
+            padding: 14px;
+            background: #fff;
+        }
+
+        .tag-item {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e8f3ff;
+            color: #3370ff;
+            border-radius: 12px;
+            font-size: 13px;
+            margin-right: 8px;
+            margin-bottom: 6px;
+        }
+
+        .confidence-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .confidence-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .confidence-label {
+            width: 160px;
+            font-size: 13px;
+            color: #4e5969;
+            flex-shrink: 0;
+        }
+
+        .confidence-bar {
+            flex: 1;
+            height: 8px;
+            background: #e5e6eb;
+            border-radius: 4px;
+            margin: 0 12px;
+            overflow: hidden;
+        }
+
+        .confidence-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #3370ff, #6694ff);
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .confidence-value {
+            width: 45px;
+            text-align: right;
+            font-size: 13px;
+            font-weight: 600;
+            color: #3370ff;
+            flex-shrink: 0;
+        }
+
+        .evidence-item,
+        .principle-item {
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .evidence-item:last-child,
+        .principle-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .evidence-label,
+        .principle-label {
+            font-weight: 600;
+            color: #4e5969;
+            font-size: 13px;
+        }
+
+        .evidence-text,
+        .principle-text {
+            color: #86909c;
+            font-size: 13px;
+        }
+
+        .explanation-content {
+            line-height: 1.8;
+        }
+
+        .explanation-paragraph {
+            margin-bottom: 14px;
+            padding-left: 24px;
+            position: relative;
+        }
+
+        .explanation-paragraph:last-child {
+            margin-bottom: 0;
+        }
+
+        .explanation-number {
+            position: absolute;
+            left: 0;
+            font-weight: 600;
+            color: #3370ff;
+            font-size: 14px;
+        }
+
+        .explanation-text {
+            color: #4e5969;
+            font-size: 13px;
+        }
+
+        .suggestion-block {
+            margin-bottom: 16px;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .suggestion-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .suggestion-type {
+            background: #e8ffea;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #0fbf60;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .suggestion-content {
+            padding: 14px;
+            background: #fff;
+        }
+
+        .suggestion-text {
+            color: #4e5969;
+            font-size: 13px;
+            line-height: 1.7;
+            margin-bottom: 12px;
+        }
+
+        .suggestion-text:last-child {
+            margin-bottom: 0;
+        }
+
+        .code-block {
+            background: #1d2129;
+            color: #f7f8fa;
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+
+        .flame-graph-section {
+            margin-bottom: 24px;
+        }
+
+        .flame-graph-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1d2129;
+            margin-bottom: 16px;
+        }
+
+        .flame-graph-container {
+            background: #f7f8fa;
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .flame-graph {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            min-width: 800px;
+        }
+
+        .flame-level {
+            display: flex;
+            align-items: stretch;
+            margin-bottom: 4px;
+            width: 100%;
+        }
+
+        .flame-bar {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .flame-bar:hover {
+            transform: scaleY(1.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        .flame-bar-text {
+            color: #1d2129;
+            font-weight: 500;
+            white-space: nowrap;
+            padding: 0 8px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        .flame-bar-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1d2129;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+
+        .flame-bar-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1d2129;
+        }
+
+        .flame-bar:hover .flame-bar-tooltip {
+            opacity: 1;
+        }
+
+        .flame-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 12px;
+            background: #fff;
+            border-radius: 4px;
+        }
+
+        .flame-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: #4e5969;
+        }
+
+        .flame-legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        .flame-timeline {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 11px;
+            color: #86909c;
+            border-top: 1px solid #e5e6eb;
+            margin-top: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo" onclick="location.href='template.html'">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                        <path d="M23.0072 2.82796C23.6226 2.47593 24.3782 2.47593 24.9936 2.82796L41.994 12.554C42.6166 12.9102 43.0008 13.5726 43.0008 14.29V33.7106C43.0008 34.4279 42.6166 35.0903 41.994 35.4466L24.9936 45.1726C24.3782 45.5246 23.6226 45.5246 23.0072 45.1726L6.00683 35.4466C5.38418 35.0903 5 34.4279 5 33.7106V14.29C5 13.5726 5.38418 12.9102 6.00683 12.554L23.0072 2.82796Z" fill="url(#gradient)"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M24.0001 32.5286C28.7103 32.5286 32.5286 28.7103 32.5286 24.0001C32.5286 19.29 28.7103 15.4717 24.0001 15.4717C19.29 15.4717 15.4717 19.29 15.4717 24.0001C15.4717 28.7103 19.29 32.5286 24.0001 32.5286ZM24.0001 35.5286C30.3671 35.5286 35.5286 30.3671 35.5286 24.0001C35.5286 17.6332 30.3671 12.4717 24.0001 12.4717C17.6332 12.4717 12.4717 17.6332 12.4717 24.0001C12.4717 30.3671 17.6332 35.5286 24.0001 35.5286Z" fill="#fff"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="24" y1="5" x2="24" y2="43" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3370ff"/>
+                                <stop offset="1" stop-color="#165DFF"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    KeenInsight
+                </div>
+
+            </div>
+            <div class="navbar-right">
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <path d="M24 44c11.046 0 20-8.954 20-20S35.046 4 24 4 4 12.954 4 24s8.954 20 20 20Z"/>
+                        <path d="M16 24h16"/>
+                    </svg>
+                    Console
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="18"/>
+                        <path d="M24 14v10l7 7"/>
+                    </svg>
+                    Help
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    User
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <div class="menu-item" onclick="location.href='host-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </div>
+                            <div class="menu-item" onclick="location.href='realtime-monitor.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14v10l7 7"/>
+                                </svg>
+                                Real-time Monitor
+                            </div>
+                            
+                            <div class="menu-group-title">System level</div>
+                            <div class="menu-item" onclick="location.href='alert-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </div>
+                            <div class="menu-item" onclick="location.href='alert-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </div>
+                            
+                            <div class="menu-group-title">SQL level</div>
+                            <div class="menu-item active">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </div>
+                            <div class="menu-item" onclick="location.href='dba-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </div>
+                            
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+                            
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <div class="menu-item" onclick="location.href='manual.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </div>
+                            <div class="menu-item" onclick="location.href='code-source.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </div>
+                            <div class="menu-item" onclick="location.href='tuning-knowledge.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner">
+                    <div class="page-header">
+                        <div>
+                            <h1 class="page-title">SQL Logs</h1>
+                            <div class="host-info" id="hostInfo" style="margin-top: 12px;">
+                                <span><strong>Host:</strong> <span id="hostName">-</span></span>
+                                <span><strong>IP:</strong> <span id="hostIP">-</span></span>
+                                <span><strong>Type:</strong> <span id="hostType">-</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 筛选区域 -->
+                    <div class="filter-section">
+                        <div class="filter-item">
+                            <span class="filter-label">Execution Status:</span>
+                            <select class="filter-select" id="statusFilter">
+                                <option value="">All</option>
+                                <option value="success">Success</option>
+                                <option value="error">Error</option>
+                                <option value="warning">Warning</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <span class="filter-label">Execution Time:</span>
+                            <select class="filter-select" id="timeFilter">
+                                <option value="">All</option>
+                                <option value="fast">&lt; 100ms</option>
+                                <option value="medium">100ms - 1s</option>
+                                <option value="slow">&gt; 1s</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <span class="filter-label">SQL Type:</span>
+                            <select class="filter-select" id="typeFilter">
+                                <option value="">All</option>
+                                <option value="SELECT">SELECT</option>
+                                <option value="INSERT">INSERT</option>
+                                <option value="UPDATE">UPDATE</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="CREATE">CREATE</option>
+                                <option value="ALTER">ALTER</option>
+                            </select>
+                        </div>
+                        <div class="filter-item">
+                            <span class="filter-label">Keyword:</span>
+                            <input type="text" class="filter-input" id="keywordFilter" placeholder="Enter SQL keyword">
+                        </div>
+                        <button class="filter-btn" onclick="filterLogs()">Search</button>
+                        <button class="filter-btn reset" onclick="resetFilter()">Reset</button>
+                    </div>
+
+                    <!-- SQL日志列表 -->
+                    <div class="data-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px;">Hash ID</th>
+                                    <th>SQL Statement</th>
+                                    <th style="width: 80px;">SQL Type</th>
+                                    <th style="width: 100px;">Result</th>
+                                    <th style="width: 100px;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTableBody">
+                            </tbody>
+                        </table>
+
+                        <!-- 分页 -->
+                        <div class="pagination">
+                            <span class="page-info">Total <span id="totalCount">0</span> records</span>
+                            <button class="page-btn" id="prevPage" disabled>&lt;</button>
+                            <button class="page-btn active">1</button>
+                            <button class="page-btn">2</button>
+                            <button class="page-btn">3</button>
+                            <button class="page-btn" id="nextPage">&gt;</button>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- SQL Detail Modal -->
+    <div class="sql-modal" id="sqlModal">
+        <div class="sql-modal-content">
+            <div class="sql-modal-header">
+                <div class="sql-modal-title">SQL Detail</div>
+                <button class="sql-modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="sql-modal-body" id="sqlModalBody">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sqlLogData = [
+            {
+                id: 'a1b2c3d4e5f67890abcdef1234567890',
+                time: '2026-03-25 14:32:15.123',
+                sql: 'SELECT o.order_id, c.customer_name, o.total_amount \n FROM orders o \n JOIN customers c ON o.customer_id = c.customer_id \n WHERE o.order_date BETWEEN \'2023-01-01\' AND \'2023-12-31\';',
+                type: 'SELECT',
+                executionTime: 18622,
+                hasError: true,
+                result: 'Executed successfully, returned query results',
+                lifecycle: {
+                    parsing: { time: 1, cpu: 3, memory: 8, io: 0 },
+                    optimization: { time: 5, cpu: 8, memory: 6, io: 0 },
+                    execution: { time: 18601, cpu: 99.9, memory: 78, io: 18 },
+                    network: { time: 15, cpu: 2, memory: 4, io: 10 }
+                },
+                flameGraph: {
+                    name: 'sql_executor',
+                    value: 18622,
+                    children: [
+                        {
+                            name: 'parse_sql',
+                            value: 2,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'optimize_query',
+                            value: 12,
+                            color: '#8da0cb',
+                            children: [
+                                {
+                                    name: 'or_predicate_analysis',
+                                    value: 7,
+                                    color: '#b3de69'
+                                },
+                                {
+                                    name: 'index_selection',
+                                    value: 3,
+                                    color: '#fdb462'
+                                },
+                                {
+                                    name: 'plan_generation',
+                                    value: 2,
+                                    color: '#fccde5'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'query_execute',
+                            value: 18592,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'full_table_scan',
+                                    value: 17800,
+                                    color: '#8dd3c7',
+                                    children: [
+                                        {
+                                            name: 'read_tuple',
+                                            value: 14200,
+                                            color: '#ffffb3'
+                                        },
+                                        {
+                                            name: 'or_condition_eval',
+                                            value: 3600,
+                                            color: '#bebada'
+                                        }
+                                    ]
+                                },
+                                {
+                                    name: 'result_set_build',
+                                    value: 792,
+                                    color: '#fb8072'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'network_send',
+                            value: 16,
+                            color: '#80b1d3'
+                        }
+                    ]
+                },
+                diagnosis_results: {
+                    query_id: '1',
+                    root_causes: ['suboptimal plan optimizer', 'missing query hints'],
+                    confidence: {
+                        'suboptimal plan optimizer': 0.85,
+                        'missing query hints': 0.78,
+                        'missing indexes': 0.32,
+                        'poorly written queries': 0.25
+                    },
+                    explanation: '1. Referenced Rule: 1) Hint Rule - Evidence: Query contains OR predicate (user_id = 1001 OR status = \'PAID\'), and EXPLAIN plan shows type=ALL (full table scan); Inference: Optimizer failed to select appropriate index access path for OR condition, leading to full table scan; Support: suboptimal plan optimizer.\n2. Referenced Rule: None - Evidence: Execution plan shows full table scan instead of index lookup or index merge; Inference: Can guide optimizer to choose better execution plan by adding INDEX or INDEX_MERGE query hints; Support: missing query hints.\n3. Referenced Rule: None - Evidence: Columns involved in OR condition (user_id and status) may have indexes, but optimizer didn\'t choose to use them; Inference: Query hints can force optimizer to consider index access path, avoiding full table scan; Support: missing query hints.',
+                    rule_matches_detail: [
+                        {
+                            'rule_name': 'Hint Rule',
+                            'principle': 'IF a query contains OR predicates and the EXPLAIN plan shows type=ALL, THEN recommend using INDEX or INDEX_MERGE query hints to guide the optimizer toward an index-based access path.',
+                            'evidence': 'Query contains OR condition, execution plan is full table scan (type=ALL)'
+                        }
+                    ]
+                },
+                tuning_results: {
+                    query_id: '1',
+                    fix_action: 'CREATE INDEX idx_orders_user_id ON orders(user_id);\nCREATE INDEX idx_orders_status ON orders(status);\nSELECT /*+ INDEX(orders idx_orders_user_id) */ * FROM orders WHERE user_id = 1001 OR status = \'PAID\';',
+                    rewrite_sql: 'SELECT /*+ INDEX(orders idx_orders_user_id) */ *\nFROM orders\nWHERE user_id = 1001\n  OR status = \'PAID\';',
+                    action_explanation: '1. Original query contains OR condition but no query hints were used, optimizer chose full table scan.\n2. By adding INDEX query hint, guide optimizer to use idx_orders_user_id index for access, avoiding full table scan.\n3. Alternatively, can consider using INDEX_MERGE hint to let optimizer use both indexes on user_id and status for merged access.',
+                    root_causes: ['suboptimal plan optimizer', 'missing query hints'],
+                    state_confidence: {
+                        'suboptimal plan optimizer': 0.85,
+                        'missing query hints': 0.78,
+                        'missing indexes': 0.32,
+                        'poorly written queries': 0.25
+                    },
+                    tuning_suggestions: [
+                        {
+                            'type': 'query_hint',
+                            'action': 'SELECT /*+ INDEX(orders idx_orders_user_id) */ * FROM orders WHERE user_id = 1001 OR status = \'PAID\';',
+                            'explanation': '1. Add INDEX query hint to guide optimizer to use idx_orders_user_id index.\n2. For queries containing OR predicates, query hints can help optimizer choose better index access path.\n3. Avoids type=ALL full table scan, significantly improves query performance.'
+                        },
+                        {
+                            'type': 'index_creation',
+                            'action': 'CREATE INDEX idx_orders_user_id ON orders(user_id);\nCREATE INDEX idx_orders_status ON orders(status);',
+                            'explanation': '1. Create index on user_id column to optimize first predicate in OR condition.\n2. Create index on status column to optimize second predicate in OR condition.\n3. If using INDEX_MERGE hint, both indexes can be used simultaneously.'
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7',
+                time: '2026-03-25 14:31:58.456',
+                sql: 'SELECT s_acctbal, s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment\nFROM part\nJOIN partsupp ps1 ON part.p_partkey = ps1.ps_partkey\nJOIN supplier s1 ON s1.s_suppkey = ps1.ps_suppkey\nJOIN nation n1 ON s1.s_nationkey = n1.n_nationkey\nJOIN region r1 ON n1.n_regionkey = r1.r_regionkey\nWHERE part.p_size = 4\n  AND part.p_type LIKE \'%COPPER\'\n  AND r1.r_name = \'ASIA\'\n  AND ps1.ps_supplycost = (\n    SELECT MIN(ps2.ps_supplycost)\n    FROM partsupp ps2\n    JOIN supplier s2 ON s2.s_suppkey = ps2.ps_suppkey\n    JOIN nation n2 ON s2.s_nationkey = n2.n_nationkey\n    JOIN region r2 ON n2.n_regionkey = r2.r_regionkey\n    WHERE ps2.ps_partkey = part.p_partkey AND r2.r_name = \'ASIA\'\n  )\nORDER BY s_acctbal DESC, n_name, s_name, p_partkey\nLIMIT 100;',
+                type: 'SELECT',
+                executionTime: 11387,
+                hasError: true,
+                result: 'Executed successfully, returned 100 records',
+                lifecycle: {
+                    parsing: { time: 3, cpu: 6, memory: 15, io: 0 },
+                    optimization: { time: 15, cpu: 18, memory: 12, io: 3 },
+                    execution: { time: 11354, cpu: 99.9, memory: 90, io: 48 },
+                    network: { time: 15, cpu: 4, memory: 8, io: 15 }
+                },
+                flameGraph: {
+                    name: 'sql_executor',
+                    value: 11387,
+                    children: [
+                        {
+                            name: 'parse_sql',
+                            value: 3,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'optimize_query',
+                            value: 15,
+                            color: '#8da0cb',
+                            children: [
+                                {
+                                    name: 'join_analysis',
+                                    value: 7,
+                                    color: '#b3de69'
+                                },
+                                {
+                                    name: 'subquery_analysis',
+                                    value: 8,
+                                    color: '#fdb462'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'query_execute',
+                            value: 11354,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'seq_scan_part',
+                                    value: 2500,
+                                    color: '#a6d854',
+                                    children: [
+                                        {
+                                            name: 'like_filter',
+                                            value: 2000,
+                                            color: '#ffffb3'
+                                        }
+                                    ]
+                                },
+                                {
+                                    name: 'hash_join',
+                                    value: 5000,
+                                    color: '#8dd3c7',
+                                    children: [
+                                        {
+                                            name: 'build_hash_table',
+                                            value: 2500,
+                                            color: '#bebada'
+                                        },
+                                        {
+                                            name: 'probe_hash_table',
+                                            value: 2500,
+                                            color: '#fb8072'
+                                        }
+                                    ]
+                                },
+                                {
+                                    name: 'subquery_exec',
+                                    value: 3500,
+                                    color: '#80b1d3'
+                                },
+                                {
+                                    name: 'sort_operation',
+                                    value: 354,
+                                    color: '#fccde5'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'network_send',
+                            value: 15,
+                            color: '#b3de69'
+                        }
+                    ]
+                },
+                diagnosis_results: {
+                    query_id: '2',
+                    root_causes: ['missing indexes'],
+                    confidence: {
+                        'missing indexes': 0.62,
+                        'inappropriate query knobs': 0.27,
+                        'suboptimal plan optimizer': 0.1,
+                        'poorly written queries': 0.01
+                    },
+                    explanation: '1. Referenced Rule: 1) I/O Throughput Anomaly - Evidence: Tuples Returned=10210267, Sequential Tuples Read=8131810, Sequential Scans=6360, Index Scans=57263, Hash Join+Seq Scan, indicating some large tables (like partsupp, supplier) mainly use sequential scans and Hash Join, not fully utilizing indexes leading to high scan volume and extremely high CPU utilization; Inference: High-frequency sequential scans and hash joins on large tables directly cause CPU to stay at 99%, while I/O is very low, mainly memory scans, highlighting the missing effective indexes issue; Support: missing indexes.\n2. Referenced Rule: 2) Leading Wildcard Query - Evidence: SQL has part.p_type LIKE \'%COPPER\', leading wildcard cannot use B-Tree index; Inference: The wildcard query on WHERE clause filter field part.p_type causes table part to only use sequential scan instead of index, greatly increasing scan burden; Support: missing indexes.\n3. Referenced Rule: 3) Join Without Index - Evidence: Plan shows Hash Join + Seq Scan on join inputs, especially partsupp uses Seq Scan, supplier/nation/region etc. also not fully indexed joins; Inference: Joins based on large tables lack suitable indexes, cannot take efficient Index Join path, leading to Hash Join as main approach with extremely high intermediate materialization cost, further causing high CPU consumption; Support: missing indexes.\n4. Referenced Rule: None - Evidence: Exec Plan shows CPU at 99.9% for long time, I/O extremely low, indicating core bottleneck is not I/O, the above high scan volume is main cause; Inference: Query processing process is limited by data retrieval and join efficiency, further weakening confidence of other root causes; Support: Eliminate other candidates (like inappropriate query knobs).',
+                    rule_matches: [
+                        {
+                            'rule_name': 'I/O Throughput Anomaly',
+                            'evidence': ['seq_tup_read+idx_tup_fetch=10208082 > 100000']
+                        },
+                        {
+                            'rule_name': 'Leading Wildcard Query',
+                            'evidence': ['LIKE starts with %']
+                        },
+                        {
+                            'rule_name': 'Join Without Index',
+                            'evidence': ['Plan: Hash Join + Seq Scan']
+                        }
+                    ],
+                    rule_matches_detail: [
+                        {
+                            'rule_name': 'I/O Throughput Anomaly',
+                            'principle': 'Excessive scan volume causes CPU to be busy scanning memory pages or disk I/O to be saturated',
+                            'evidence': 'Execution_Stats: (seq_tup_read + idx_tup_fetch) > 100000'
+                        },
+                        {
+                            'rule_name': 'Leading Wildcard Query',
+                            'principle': 'LIKE \'%xxx\' cannot use B-Tree index',
+                            'evidence': 'SQL_Text: LIKE pattern starts with %'
+                        },
+                        {
+                            'rule_name': 'Join Without Index',
+                            'principle': 'Join relies on Seq Scan/Hash Join, poor performance',
+                            'evidence': 'Plan: Hash Join + Seq Scan on join inputs'
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8',
+                time: '2026-03-25 14:31:42.789',
+                sql: 'UPDATE products SET stock = stock - 1 WHERE id = 67890 AND stock > 0',
+                type: 'UPDATE',
+                executionTime: 18,
+                hasError: false,
+                result: 'Successfully updated 1 record',
+                lifecycle: {
+                    parsing: { time: 1, cpu: 2, memory: 6, io: 0 },
+                    optimization: { time: 2, cpu: 4, memory: 4, io: 1 },
+                    execution: { time: 12, cpu: 28, memory: 38, io: 15 },
+                    network: { time: 3, cpu: 2, memory: 3, io: 6 }
+                },
+                flameGraph: {
+                    name: 'sql_executor',
+                    value: 18,
+                    children: [
+                        {
+                            name: 'parse_sql',
+                            value: 1,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'optimize_query',
+                            value: 2,
+                            color: '#8da0cb'
+                        },
+                        {
+                            name: 'update_row',
+                            value: 12,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'index_lookup',
+                                    value: 3,
+                                    color: '#a6d854'
+                                },
+                                {
+                                    name: 'read_row',
+                                    value: 4,
+                                    color: '#8dd3c7'
+                                },
+                                {
+                                    name: 'write_row',
+                                    value: 5,
+                                    color: '#ffffb3'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'network_send',
+                            value: 3,
+                            color: '#80b1d3'
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'd4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9',
+                time: '2026-03-25 14:31:25.012',
+                sql: 'SELECT u.*, o.* FROM users u LEFT JOIN orders o ON u.id = o.user_id WHERE u.id = 12345',
+                type: 'SELECT',
+                executionTime: 1250,
+                hasError: false,
+                result: 'Successfully returned 25 records',
+                lifecycle: {
+                    parsing: { time: 5, cpu: 8, memory: 15, io: 0 },
+                    optimization: { time: 45, cpu: 35, memory: 20, io: 5 },
+                    execution: { time: 1180, cpu: 78, memory: 85, io: 92 },
+                    network: { time: 20, cpu: 5, memory: 10, io: 18 }
+                },
+                flameGraph: {
+                    name: 'sql_executor',
+                    value: 1250,
+                    children: [
+                        {
+                            name: 'parse_sql',
+                            value: 5,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'optimize_query',
+                            value: 45,
+                            color: '#8da0cb',
+                            children: [
+                                {
+                                    name: 'join_analysis',
+                                    value: 20,
+                                    color: '#b3de69'
+                                },
+                                {
+                                    name: 'index_selection',
+                                    value: 25,
+                                    color: '#fdb462'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'query_execute',
+                            value: 1180,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'nested_loop',
+                                    value: 1100,
+                                    color: '#8dd3c7',
+                                    children: [
+                                        {
+                                            name: 'users_index_scan',
+                                            value: 100,
+                                            color: '#ffffb3'
+                                        },
+                                        {
+                                            name: 'orders_scan',
+                                            value: 1000,
+                                            color: '#bebada'
+                                        }
+                                    ]
+                                },
+                                {
+                                    name: 'result_build',
+                                    value: 80,
+                                    color: '#a6d854'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'network_send',
+                            value: 20,
+                            color: '#80b1d3'
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1',
+                time: '2026-03-25 14:30:52.678',
+                sql: 'SELECT * FROM non_existent_table WHERE id = 1',
+                type: 'SELECT',
+                executionTime: 5,
+                hasError: true,
+                result: 'Executed successfully, returned empty result set',
+                lifecycle: {
+                    parsing: { time: 2, cpu: 3, memory: 5, io: 0 },
+                    optimization: { time: 5, cpu: 8, memory: 6, io: 1 },
+                    execution: { time: 3, cpu: 12, memory: 8, io: 2 },
+                    network: { time: 3, cpu: 1, memory: 2, io: 1 }
+                },
+                flameGraph: {
+                    name: 'sql_executor',
+                    value: 5,
+                    children: [
+                        {
+                            name: 'parse_sql',
+                            value: 2,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'optimize_query',
+                            value: 5,
+                            color: '#8da0cb'
+                        },
+                        {
+                            name: 'check_table',
+                            value: 3,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'table_exists',
+                                    value: 3,
+                                    color: '#fb8072'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'network_send',
+                            value: 3,
+                            color: '#80b1d3'
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'd3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8',
+                time: '2026-03-25 14:29:32.890',
+                sql: 'ALTER TABLE users ADD COLUMN last_login DATETIME',
+                type: 'ALTER',
+                executionTime: 1567,
+                hasError: true,
+                result: 'Executed successfully, table structure updated',
+                lifecycle: {
+                    parsing: { time: 8, cpu: 10, memory: 12, io: 0 },
+                    optimization: { time: 25, cpu: 15, memory: 8, io: 3 },
+                    execution: { time: 1500, cpu: 20, memory: 25, io: 85 },
+                    network: { time: 34, cpu: 5, memory: 8, io: 12 }
+                },
+                flameGraph: {
+                    name: 'sql_executor',
+                    value: 1567,
+                    children: [
+                        {
+                            name: 'parse_sql',
+                            value: 8,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'optimize_query',
+                            value: 25,
+                            color: '#8da0cb'
+                        },
+                        {
+                            name: 'alter_table',
+                            value: 1500,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'lock_table',
+                                    value: 20,
+                                    color: '#a6d854'
+                                },
+                                {
+                                    name: 'modify_schema',
+                                    value: 1450,
+                                    color: '#8dd3c7',
+                                    children: [
+                                        {
+                                            name: 'rewrite_table',
+                                            value: 1400,
+                                            color: '#ffffb3'
+                                        },
+                                        {
+                                            name: 'update_meta',
+                                            value: 50,
+                                            color: '#bebada'
+                                        }
+                                    ]
+                                },
+                                {
+                                    name: 'unlock_table',
+                                    value: 30,
+                                    color: '#fb8072'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'network_send',
+                            value: 34,
+                            color: '#80b1d3'
+                        }
+                    ]
+                }
+            }
+        ];
+
+        function init() {
+            loadSelectedHost();
+            renderLogs(sqlLogData);
+            document.getElementById('totalCount').textContent = sqlLogData.length;
+        }
+
+        function loadSelectedHost() {
+            const hostData = localStorage.getItem('selectedHost');
+            if (hostData) {
+                const host = JSON.parse(hostData);
+                document.getElementById('hostName').textContent = host.name;
+                document.getElementById('hostIP').textContent = host.ip;
+                document.getElementById('hostType').textContent = host.type;
+            } else {
+                document.getElementById('hostName').textContent = 'Not selected';
+                document.getElementById('hostIP').textContent = '-';
+                document.getElementById('hostType').textContent = '-';
+            }
+        }
+
+        function renderLogs(data) {
+            const tbody = document.getElementById('logTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(log => {
+                const tr = document.createElement('tr');
+                
+                const timeClass = getTimeClass(log.executionTime);
+                const statusBadge = getStatusBadge(log.hasError, log.result);
+                
+                tr.innerHTML = `
+                    <td class="sql-id">${log.id}</td>
+                    <td><span class="sql-text" onclick="showDetail('${log.id}')" title="${escapeHtml(log.sql)}">${escapeHtml(truncateSql(log.sql))}</span></td>
+                    <td>${log.type}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <span class="action-link" onclick="showDetail('${log.id}')">Details</span>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function getTimeClass(ms) {
+            if (ms < 100) return 'fast';
+            if (ms < 1000) return 'medium';
+            return 'slow';
+        }
+
+        function getStatusBadge(hasError, result) {
+            return '<span class="status-badge success">Success</span>';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function truncateSql(text, maxLength = 80) {
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        function cleanText(text) {
+            if (!text) return text;
+            return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        }
+
+        function getRandomColor(level) {
+            const colors = [
+                '#66c2a5', '#8da0cb', '#fc8d62', '#a6d854',
+                '#8dd3c7', '#ffffb3', '#bebada', '#fb8072',
+                '#b3de69', '#fdb462', '#80b1d3', '#fccde5'
+            ];
+            return colors[level % colors.length];
+        }
+
+        function renderFlameGraph(flameData) {
+            if (!flameData) return '';
+            
+            const totalTime = flameData.value;
+            const levels = [];
+            
+            function buildLevel(node, level, startPercent) {
+                if (!levels[level]) {
+                    levels[level] = [];
+                }
+                
+                const widthPercent = (node.value / totalTime) * 100;
+                const color = node.color || getRandomColor(level);
+                
+                levels[level].push({
+                    name: node.name,
+                    value: node.value,
+                    widthPercent: widthPercent,
+                    color: color,
+                    startPercent: startPercent
+                });
+                
+                if (node.children && node.children.length > 0) {
+                    let childStart = startPercent;
+                    node.children.forEach(child => {
+                        buildLevel(child, level + 1, childStart);
+                        childStart += (child.value / totalTime) * 100;
+                    });
+                }
+            }
+            
+            buildLevel(flameData, 0, 0);
+            
+            let flameHTML = '<div class="flame-graph">';
+            
+            for (let i = levels.length - 1; i >= 0; i--) {
+                const level = levels[i];
+                if (!level) continue;
+                
+                flameHTML += '<div class="flame-level">';
+                
+                let currentPosition = 0;
+                
+                level.forEach((item, index) => {
+                    const gap = item.startPercent - currentPosition;
+                    const width = Math.max(item.widthPercent, 0.3);
+                    
+                    if (gap > 0.01) {
+                        flameHTML += `<div style="width: ${gap}%; flex-shrink: 0;"></div>`;
+                    }
+                    
+                    flameHTML += `
+                        <div class="flame-bar" style="width: ${width}%; background-color: ${item.color};">
+                            <span class="flame-bar-text">${item.name} (${item.value}ms)</span>
+                            <div class="flame-bar-tooltip">${item.name}: ${item.value}ms (${item.widthPercent.toFixed(1)}%)</div>
+                        </div>
+                    `;
+                    
+                    currentPosition = item.startPercent + item.widthPercent;
+                });
+                
+                flameHTML += '</div>';
+            }
+            
+            flameHTML += '</div>';
+            
+            const timelineHTML = `
+                <div class="flame-timeline">
+                    <span>0ms</span>
+                    <span>${Math.round(totalTime * 0.25)}ms</span>
+                    <span>${Math.round(totalTime * 0.5)}ms</span>
+                    <span>${Math.round(totalTime * 0.75)}ms</span>
+                    <span>${totalTime}ms</span>
+                </div>
+            `;
+            
+            return flameHTML + timelineHTML;
+        }
+
+        function filterLogs() {
+            const status = document.getElementById('statusFilter').value;
+            const time = document.getElementById('timeFilter').value;
+            const type = document.getElementById('typeFilter').value;
+            const keyword = document.getElementById('keywordFilter').value.toLowerCase();
+
+            let filtered = sqlLogData.filter(log => {
+                if (status) {
+                    if (status === 'success' && log.hasError) return false;
+                    if (status === 'error' && !log.hasError) return false;
+                    if (status === 'warning' && !log.result.includes('warning')) return false;
+                }
+                if (time) {
+                    if (time === 'fast' && log.executionTime >= 100) return false;
+                    if (time === 'medium' && (log.executionTime < 100 || log.executionTime >= 1000)) return false;
+                    if (time === 'slow' && log.executionTime < 1000) return false;
+                }
+                if (type && log.type !== type) return false;
+                if (keyword && !log.sql.toLowerCase().includes(keyword)) return false;
+                return true;
+            });
+
+            renderLogs(filtered);
+            document.getElementById('totalCount').textContent = filtered.length;
+        }
+
+        function resetFilter() {
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('timeFilter').value = '';
+            document.getElementById('typeFilter').value = '';
+            document.getElementById('keywordFilter').value = '';
+            renderLogs(sqlLogData);
+            document.getElementById('totalCount').textContent = sqlLogData.length;
+        }
+
+        function showDetail(id) {
+            location.href = `sql-detail.html?id=${id}`;
+        }
+
+        function showDetailOld(id) {
+            const log = sqlLogData.find(l => l.id === id);
+            if (!log) return;
+
+            const modal = document.getElementById('sqlModal');
+            const body = document.getElementById('sqlModalBody');
+            
+            let flameGraphHTML = '';
+            if (log.flameGraph) {
+                flameGraphHTML = `
+                    <div class="flame-graph-section">
+                        <div class="flame-graph-title">SQL Lifecycle Flame Graph</div>
+                        <div class="flame-graph-container">
+                            ${renderFlameGraph(log.flameGraph)}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            let diagnosisHTML = '';
+            if (log.diagnosis_results) {
+                const dr = log.diagnosis_results;
+                diagnosisHTML = `
+                    <div class="analysis-section">
+                        <div class="analysis-title">Anomaly Diagnosis</div>
+                        <div class="content-block">
+                            <div class="content-block-title">Matched Diagnosis Rules</div>
+                            <div class="content-block-body">
+                                ${dr.rule_matches_detail.map(rule => `
+                                    <div class="principle-item">
+                                        <span class="principle-label">${rule['rule_name']}</span>
+                                        <span style="color: #86909c;"> - ${rule['principle']}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="content-block">
+                            <div class="content-block-title">Classification Model Prediction Results</div>
+                            <div class="content-block-body">
+                                <div style="margin-bottom: 12px;">
+                                    <strong style="color: #1d2129;">Detected Issues:</strong>
+                                    <div style="margin-top: 4px;">
+                                        ${dr.root_causes.map(cause => `<span class="tag-item">${cause}</span>`).join('')}
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong style="color: #1d2129;">Confidence:</strong>
+                                    <div style="margin-top: 8px;">
+                                        ${Object.entries(dr.confidence).map(([key, val]) => `
+                                            <div class="confidence-item">
+                                                <span class="confidence-label">${key}</span>
+                                                <div class="confidence-bar">
+                                                    <div class="confidence-progress" style="width: ${val * 100}%;"></div>
+                                                </div>
+                                                <span class="confidence-value">${(val * 100).toFixed(0)}%</span>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="content-block">
+                            <div class="content-block-title">Detailed Explanation</div>
+                            <div class="content-block-body">
+                                <div class="explanation-content">
+                                    ${dr.explanation.split('\n').filter(p => p.trim()).map((paragraph, index) => `
+                                        <div class="explanation-paragraph">
+                                            <span class="explanation-number">${index + 1}.</span>
+                                            <span class="explanation-text">${paragraph.replace(/^\d+\.\s*/, '')}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            let tuningHTML = '';
+            if (log.tuning_results) {
+                const tr = log.tuning_results;
+                tuningHTML = `
+                    <div class="analysis-section">
+                        <div class="analysis-title">Tuning Suggestions</div>
+                        <div class="content-block">
+                            <div class="content-block-title">Fix Actions</div>
+                            <div class="content-block-body">
+                                <div class="code-block">${tr.fix_action}</div>
+                                <div style="margin-top: 10px;">
+                                    <span class="analysis-tag info">Executable</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="content-block">
+                            <div class="content-block-title">Tuning Recommendations</div>
+                            <div class="content-block-body">
+                                ${tr.tuning_suggestions.map(suggestion => {
+                                    const paragraphs = suggestion.explanation.split('\n').filter(p => p.trim());
+                                    return `
+                                        <div class="suggestion-block">
+                                            <div class="suggestion-type" style="background: ${suggestion.type.includes('query_rewrite') ? '#e8fff3' : suggestion.type.includes('index') ? '#e8f7ff' : '#fff3e8'}; color: ${suggestion.type.includes('query_rewrite') ? '#0fbf60' : suggestion.type.includes('index') ? '#3370ff' : '#ff8b07'};">
+                                                ${suggestion.type}
+                                            </div>
+                                            <div class="suggestion-content">
+                                                ${paragraphs.map((paragraph, i) => `
+                                                    <div class="suggestion-text" style="margin-bottom: ${i < paragraphs.length - 1 ? '8px' : '0'};">
+                                                        ${paragraph}
+                                                    </div>
+                                                `).join('')}
+                                                ${suggestion.action ? `<div class="code-block">${suggestion.action}</div>` : ''}
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                        <div class="content-block">
+                            <div class="content-block-title">Operation Instructions</div>
+                            <div class="content-block-body">
+                                <div class="explanation-content">
+                                    ${tr.action_explanation.split('\n').filter(p => p.trim()).map((paragraph, index) => `
+                                        <div class="explanation-paragraph">
+                                            <span class="explanation-number">${index + 1}.</span>
+                                            <span class="explanation-text">${paragraph.replace(/^\d+\.\s*/, '')}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            body.innerHTML = `
+                <div class="sql-detail-row">
+                    <div class="sql-detail-label">Hash ID</div>
+                    <div class="sql-detail-value">${log.id}</div>
+                </div>
+                <div class="sql-detail-row">
+                    <div class="sql-detail-label">Execution Time</div>
+                    <div class="sql-detail-value">${log.time}</div>
+                </div>
+                <div class="sql-detail-row">
+                    <div class="sql-detail-label">SQL Statement</div>
+                    <div class="sql-detail-value">${log.sql}</div>
+                </div>
+                <div class="sql-detail-row">
+                    <div class="sql-detail-label">Result</div>
+                    <div class="sql-detail-value">${log.result}</div>
+                </div>
+                
+                ${flameGraphHTML}
+                
+                ${diagnosisHTML}
+                ${tuningHTML}
+            `;
+            
+            window.currentLog = log;
+            modal.classList.add('active');
+        }
+
+        function getNodeIcon(node) {
+            const icons = {
+                parsing: '<circle cx="12" cy="12" r="3"/><path d="M12 1v6M12 17v6M4.22 4.22l4.24 4.24M15.54 15.54l4.24 4.24M1 12h6M17 12h6M4.22 19.78l4.24-4.24M15.54 8.46l4.24-4.24"/>',
+                optimization: '<path d="M12 2v4m0 12v4m-7-9h4m12 0h4m-12.49-5.15l2.83 2.83m4.33 4.33l2.83 2.83m0-14.16l-2.83 2.83m-4.33 4.33l-2.83 2.83"/>',
+                execution: '<polygon points="5 3 19 12 5 21 5 3"/>',
+                network: '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><circle cx="12" cy="20" r="1"/>'
+            };
+            return icons[node] || '<circle cx="12" cy="12" r="10"/>';
+        }
+
+        function selectLifecycleNode(node) {
+            const nodes = document.querySelectorAll('.lifecycle-node');
+            nodes.forEach(n => n.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            
+            const resources = document.querySelectorAll('.resource-detail');
+            resources.forEach(r => r.classList.remove('active'));
+            document.getElementById(`resource-${node}`).classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('sqlModal').classList.remove('active');
+        }
+
+        document.getElementById('sqlModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+    <script src="/static/legacy-runtime.js"></script>
+    <script src="/static/legacy-pages.js"></script>
+</body>
+</html>

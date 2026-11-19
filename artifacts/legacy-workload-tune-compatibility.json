@@ -1,0 +1,66 @@
+{
+  "format": "keeninsight-legacy-workload-tune-smoke-v1",
+  "verified_at": "2026-09-07T12:52:26Z",
+  "server": {
+    "database": "keeninsight",
+    "server_version": "12.22 (Ubuntu 12.22-0ubuntu0.20.04.4)",
+    "scenario": "sort_spill",
+    "requested_load_type": "sysbench"
+  },
+  "contract": {
+    "set_config": "POST /api/tune/setConfig",
+    "baseline": "GET /api/tune/firstEvaluateResults",
+    "exception_functions": "GET /api/tune/exception-functions",
+    "one_step": "POST /api/tune/oneStep -> GET /api/tune/oneStepResult",
+    "apply": "POST /api/tune/applyParams",
+    "multi_round": "POST /api/tune/startTune -> GET /api/tune/getMultiTuneResult"
+  },
+  "one_step_measured_loop": {
+    "task_name": "compat_smoke_6",
+    "baseline_run_id": 578,
+    "after_run_id": 579,
+    "action_id": 192,
+    "feedback_id": 174,
+    "action_type": "set_database_parameter",
+    "target": {
+      "parameter": "work_mem",
+      "value": "66MB",
+      "scope": "database",
+      "database": "keeninsight"
+    },
+    "base_score": 1.283895,
+    "measured_after_score": 2.18046,
+    "median_improvement_pct": 41.11815550017954,
+    "p95_improvement_pct": 40.39940241265842,
+    "same_sql": true,
+    "observed_effect": "effective",
+    "rollback_performed": true,
+    "final_action_status": "rolled_back"
+  },
+  "multi_round_measured_loop": {
+    "task_name": "compat_smoke_5",
+    "baseline_run_id": 576,
+    "after_run_id": 577,
+    "action_id": 191,
+    "feedback_id": 173,
+    "baseline_median_latency_ms": 749.1764600854367,
+    "after_median_latency_ms": 409.04439403675497,
+    "observed_latency_change_pct": 45.4008,
+    "observed_effect": "effective",
+    "rollback_performed": true,
+    "evidence_shape": "object"
+  },
+  "operator_apply_cleanup": {
+    "task_name": "compat_smoke_6",
+    "applied_action_id": 193,
+    "rolled_back": true,
+    "work_mem_after_cleanup": "4096kB",
+    "database_override_after_cleanup": null
+  },
+  "measurement_contract": {
+    "samples": "three timed samples plus two warmups",
+    "comparison": "same SQL and scenario parameters before/after",
+    "approval": "persistent apply is operator-triggered; compatibility one-step validation rolls back automatically",
+    "prediction_field": "predicted_score is the measured after-phase compatibility score, not a fabricated model prediction"
+  }
+}

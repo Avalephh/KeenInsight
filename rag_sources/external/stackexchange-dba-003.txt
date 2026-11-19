@@ -1,0 +1,402 @@
+SOURCE_KEY: external:stackexchange:dba:226412
+SOURCE_TYPE: external-community
+SOURCE_TITLE: DBA StackExchange · Adding LEFT JOIN to a query has increased execution time 10 times
+SOURCE_URI: https://dba.stackexchange.com/questions/226412/adding-left-join-to-a-query-has-increased-execution-time-10-times
+RETRIEVED_AT: 2026-09-07T04:48:34.256605+00:00
+CONTENT_SHA256: fea2e727ccd27a9d7a754c4b9a6bb6fef2849a22e1f1ef1044add2659714ac41
+SOURCE_METADATA: {"api": "Stack Exchange API 2.3", "license": "CC BY-SA; verify current primary documentation", "question_id": 226412}
+---
+Question: Adding LEFT JOIN to a query has increased execution time 10 times
+
+On a CentOS 7.6 server (Intel Core i7-6700, 64 GB DDR4 RAM, RAID1 SSD) I run a backend written in PL/pgSQL and Java for
+a mobile and desktop word game
+with the following Linux packages:
+
+postgresql10-server-10.6-1PGDG.rhel7.x86_64
+
+pgbouncer-1.9.0-1.rhel7.x86_64
+
+postgresql-jdbc-42.2.5-1.rhel7.noarch
+
+Here are the only modified settings in postgresql.conf:
+
+max_connections = 120
+
+work_mem = 8MB
+
+maintenance_work_mem = 128MB
+
+The 90% of the backend source code are JSON-emitting stored functions and there is one function which is the main core of the game and is a SELECT query over 7 tables.
+
+It is called for every Websocket-connected client and delivers a JSON list of active games for the player.
+
+Until recently the query needed 1-2 seconds for completion, but after I have added a LEFT JOIN with the following table, the query takes 7-10 seconds for completion and makes the game unpleasant to play:
+
+# \d words_geoip;
+Table "public.words_geoip"
+Column | Type | Collation | Nullable | Default
+--------+------------------+-----------+----------+---------
+block | inet | | not null |
+lat | double precision | | |
+lng | double precision | | |
+Indexes:
+"words_geoip_pkey" PRIMARY KEY, btree (block)
+
+# select * from words_geoip order by random() limit 5;
+block | lat | lng
+-------------------+----------+-----------
+217.72.221.128/25 | 48.26 | 11.434
+71.183.37.0/24 | 40.9357 | -72.9809
+190.174.132.0/22 | -34.6033 | -58.3817
+24.72.74.128/25 | 50.5061 | -104.6752
+73.155.238.0/23 | 29.5075 | -95.0895
+(5 rows)
+
+# select count(*) from words_geoip;
+count
+---------
+3073410
+(1 row)
+
+Here is the SELECT query (I have removed the stored function and ROW_TO_JSON around it for better readability and have commented the 3 new lines out):
+
+SELECT
+g.gid,
+EXTRACT(EPOCH FROM g.created)::int AS created,
+EXTRACT(EPOCH FROM g.finished)::int AS finished,
+g.letters AS letters,
+g.values AS values,
+g.bid AS bid,
+CARDINALITY(g.pile) AS pilelen,
+m.tiles AS tiles,
+m.score AS score,
+CASE WHEN g.player1 = 5 THEN g.player1 ELSE g.player2 END AS player1,
+CASE WHEN g.player1 = 5 THEN g.player2 ELSE g.player1 END AS player2,
+CASE WHEN g.player1 = 5 THEN g.score1 ELSE g.score2 END AS score1,
+CASE WHEN g.player1 = 5 THEN g.score2 ELSE g.score1 END AS score2,
+CASE WHEN g.player1 = 5 THEN g.state1 ELSE g.state2 END AS state1,
+CASE WHEN g.player1 = 5 THEN g.hint1 ELSE g.hint2 END AS hint1,
+CASE WHEN g.player1 = 5 THEN g.chat1 ELSE g.chat2 END AS chat1,
+u1.elo AS elo1,
+u2.elo AS elo2,
+
+-- i2.lat AS lat2,
+-- i2.lng AS lng2,
+
+s1.given AS given1,
+s2.given AS given2,
+s1.photo AS photo1,
+s2.photo AS photo2,
+EXTRACT(EPOCH FROM CASE WHEN g.player1 = 5 THEN g.played1 ELSE g.played2 END)::int AS played1,
+EXTRACT(EPOCH FROM CASE WHEN g.player1 = 5 THEN g.played2 ELSE g.played1 END)::int AS played2,
+ARRAY_TO_STRING(CASE WHEN g.player1 = 5 THEN g.hand1 ELSE g.hand2 END, '') AS hand1,
+CASE
+WHEN g.finished IS NOT NULL THEN NULL
+WHEN g.player2 IS NULL THEN NULL
+WHEN g.player1 = 5 AND g.played1 < g.played2
+THEN EXTRACT(EPOCH FROM g.played2 + interval '24 hour' - CURRENT_TIMESTAMP)::int
+WHEN g.player2 = 5 AND (g.played2 IS NULL OR g.played2 < g.played1)
+THEN EXTRACT(EPOCH FROM g.played1 + interval '24 hour' - CURRENT_TIMESTAMP)::int
+ELSE NULL
+END AS left1,
+CASE
+WHEN g.finished IS NOT NULL THEN NULL
+WHEN g.player2 IS NULL THEN NULL
+WHEN g.player1 = 5 AND (g.played2 IS NULL OR g.played2 < g.played1)
+THEN EXTRACT(EPOCH FROM g.played1 + interval '24 hour' - CURRENT_TIMESTAMP)::int
+WHEN g.player2 = 5 AND g.played1 < g.played2
+THEN EXTRACT(EPOCH FROM g.played2 + interval '24 hour' - CURRENT_TIMESTAMP)::int
+ELSE NULL
+END AS left2
+FROM words_games g
+LEFT JOIN words_moves m ON m.gid = g.gid
+AND NOT EXISTS (SELECT 1
+FROM words_moves m2
+WHERE m2.gid = m.gid
+AND m2.played > m.played)
+LEFT JOIN words_users u1 ON u1.uid = 5
+LEFT JOIN words_users u2 ON u2.uid = (CASE WHEN g.player1 = 5 THEN g.player2 ELSE g.player1 END)
+
+-- LEFT JOIN words_geoip i2 ON (CASE WHEN g.player1 = 5 THEN u2.ip ELSE u1.ip END) << i2.block
+
+LEFT JOIN words_social s1 ON s1.uid = 5
+AND NOT EXISTS (SELECT 1
+FROM words_social s
+WHERE s1.uid = s.uid
+AND s.stamp > s1.stamp)
+LEFT JOIN words_social s2 ON s2.uid = (CASE WHEN g.player1 = 5 THEN g.player2 ELSE g.player1 END)
+AND NOT EXISTS (SELECT 1
+FROM words_social s
+WHERE s2.uid = s.uid
+AND s.stamp > s2.stamp)
+WHERE 5 IN (g.player1, g.player2)
+AND (g.finished IS NULL OR g.finished > CURRENT_TIMESTAMP - INTERVAL '1 day');
+
+Here the above query with EXPLAIN ANALYZE prepended:
+
+QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Hash Left Join (cost=117019.66..323100.50 rows=240 width=1414) (actual time=390.626..1518.867 rows=9 loops=1)
+Hash Cond: (CASE WHEN (g.player1 = 5) THEN g.player2 ELSE g.player1 END = s2.uid)
+-> Nested Loop Left Join (cost=115853.58..321900.39 rows=240 width=1760) (actual time=384.751..1512.913 rows=9 loops=1)
+-> Nested Loop Left Join (cost=115853.58..321042.49 rows=60 width=1672) (actual time=382.754..1510.864 rows=9 loops=1)
+-> Nested Loop Left Join (cost=115853.29..321033.43 rows=60 width=1668) (actual time=382.749..1510.850 rows=9 loops=1)
+-> Hash Right Join (cost=115853.00..320535.13 rows=60 width=1664) (actual time=382.736..1510.753 rows=9 loops=1)
+Hash Cond: (m.gid = g.gid)
+-> Hash Anti Join (cost=103356.07..305406.36 rows=1002521 width=212) (actual time=358.638..1488.564 rows=49721 loops=1)
+Hash Cond: (m.gid = m2.gid)
+Join Filter: (m2.played > m.played)
+Rows Removed by Join Filter: 3841937
+-> Seq Scan on words_moves m (cost=0.00..77215.81 rows=1503781 width=220) (actual time=0.003..233.670 rows=1499874 loops=1)
+-> Hash (cost=77215.81..77215.81 rows=1503781 width=12) (actual time=358.205..358.205 rows=1499874 loops=1)
+Buckets: 262144 Batches: 16 Memory Usage: 6706kB
+-> Seq Scan on words_moves m2 (cost=0.00..77215.81 rows=1503781 width=12) (actual time=0.003..204.397 rows=1499874 loops=1)
+-> Hash (cost=12496.89..12496.89 rows=3 width=1456) (actual time=19.316..19.316 rows=9 loops=1)
+Buckets: 1024 Batches: 1 Memory Usage: 22kB
+-> Seq Scan on words_games g (cost=0.00..12496.89 rows=3 width=1456) (actual time=15.134..19.304 rows=9 loops=1)
+Filter: (((5 = player1) OR (5 = player2)) AND ((finished IS NULL) OR (finished > (CURRENT_TIMESTAMP - '1 day'::interval))))
+Rows Removed by Filter: 49730
+-> Index Scan using words_users_pkey on words_users u2 (cost=0.29..8.30 rows=1 width=8) (actual time=0.008..0.008 rows=1 loops=9)
+Index Cond: (uid = CASE WHEN (g.player1 = 5) THEN g.player2 ELSE g.player1 END)
+-> Materialize (cost=0.29..8.31 rows=1 width=4) (actual time=0.001..0.001 rows=1 loops=9)
+-> Index Scan using words_users_pkey on words_users u1 (cost=0.29..8.30 rows=1 width=4) (actual time=0.003..0.004 rows=1 loops=1)
+Index Cond: (uid = 5)
+-> Materialize (cost=0.00..854.91 rows=4 width=88) (actual time=0.222..0.227 rows=1 loops=9)
+-> Nested Loop Anti Join (cost=0.00..854.89 rows=4 width=88) (actual time=1.995..2.039 rows=1 loops=1)
+Join Filter: ((s.stamp > s1.stamp) AND (s1.uid = s.uid))
+Rows Removed by Join Filter: 11
+-> Seq Scan on words_social s1 (cost=0.00..427.20 rows=6 width=96) (actual time=0.112..0.990 rows=6 loops=1)
+Filter: (uid = 5)
+Rows Removed by Filter: 10652
+-> Materialize (cost=0.00..427.23 rows=6 width=8) (actual time=0.015..0.174 rows=3 loops=6)
+-> Seq Scan on words_social s (cost=0.00..427.20 rows=6 width=8) (actual time=0.092..1.043 rows=6 loops=1)
+Filter: (uid = 5)
+Rows Removed by Filter: 10652
+-> Hash (cost=1077.29..1077.29 rows=7104 width=92) (actual time=5.855..5.855 rows=10552 loops=1)
+Buckets: 16384 (originally 8192) Batches: 1 (originally 1) Memory Usage: 1419kB
+-> Hash Anti Join (cost=533.76..1077.29 rows=7104 width=92) (actual time=1.918..4.456 rows=10552 loops=1)
+Hash Cond: (s2.uid = s_1.uid)
+Join Filter: (s_1.stamp > s2.stamp)
+Rows Removed by Join Filter: 10709
+-> Seq Scan on words_social s2 (cost=0.00..400.56 rows=10656 width=96) (actual time=0.002..0.576 rows=10658 loops=1)
+-> Hash (cost=400.56..400.56 rows=10656 width=8) (actual time=1.906..1.906 rows=10658 loops=1)
+Buckets: 16384 Batches: 1 Memory Usage: 545kB
+-> Seq Scan on words_social s_1 (cost=0.00..400.56 rows=10656 width=8) (actual time=0.001..1.098 rows=10658 loops=1)
+Planning time: 0.409 ms
+Execution time: 1518.996 ms
+(48 rows)
+
+And here the same query, but I have removed the
+--
+characters, so that LEFT JOIN against the
+words_geoip
+table has been added:
+
+QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+Hash Left Join (cost=117019.66..5257508.21 rows=3688092 width=1430) (actual time=1383.205..5279.226 rows=9 loops=1)
+Hash Cond: (CASE WHEN (g.player1 = 5) THEN g.player2 ELSE g.player1 END = s2.uid)
+-> Nested Loop Left Join (cost=115853.58..4733610.67 rows=3688092 width=1776) (actual time=1376.856..5272.785 rows=9 loops=1)
+-> Nested Loop Left Join (cost=115853.58..4686654.61 rows=922023 width=1688) (actual time=1374.768..5270.644 rows=9 loops=1)
+Join Filter: (CASE WHEN (g.player1 = 5) THEN u2.ip ELSE u1.ip END << i2.block)
+Rows Removed by Join Filter: 27660682
+-> Nested Loop Left Join (cost=115853.58..321042.49 rows=60 width=1686) (actual time=618.110..1531.740 rows=9 loops=1)
+-> Nested Loop Left Join (cost=115853.29..320544.19 rows=60 width=1675) (actual time=618.105..1531.642 rows=9 loops=1)
+-> Hash Right Join (cost=115853.00..320535.13 rows=60 width=1664) (actual time=618.093..1531.613 rows=9 loops=1)
+Hash Cond: (m.gid = g.gid)
+-> Hash Anti Join (cost=103356.07..305406.36 rows=1002521 width=212) (actual time=363.819..1510.167 rows=49721 loops=1)
+Hash Cond: (m.gid = m2.gid)
+Join Filter: (m2.played > m.played)
+Rows Removed by Join Filter: 4074631
+-> Seq Scan on words_moves m (cost=0.00..77215.81 rows=1503781 width=220) (actual time=0.007..235.666 rows=1499877 loops=1)
+-> Hash (cost=77215.81..77215.81 rows=1503781 width=12) (actual time=363.537..363.537 rows=1499877 loops=1)
+Buckets: 262144 Batches: 16 Memory Usage: 6706kB
+-> Seq Scan on words_moves m2 (cost=0.00..77215.81 rows=1503781 width=12) (actual time=0.002..204.827 rows=1499877 loops=1)
+-> Hash (cost=12496.89..12496.89 rows=3 width=1456) (actual time=18.521..18.521 rows=9 loops=1)
+Buckets: 1024 Batches: 1 Memory Usage: 22kB
+-> Seq Scan on words_games g (cost=0.00..12496.89 rows=3 width=1456) (actual time=12.417..18.511 rows=9 loops=1)
+Filter: (((5 = player1) OR (5 = player2)) AND ((finished IS NULL) OR (finished > (CURRENT_TIMESTAMP - '1 day'::interval))))
+Rows Removed by Filter: 49730
+-> Materialize (cost=0.29..8.31 rows=1 width=11) (actual time=0.001..0.002 rows=1 loops=9)
+-> Index Scan using words_users_pkey on words_users u1 (cost=0.29..8.30 rows=1 width=11) (actual time=0.008..0.010 rows=1 loops=1)
+Index Cond: (uid = 5)
+-> Index Scan using words_users_pkey on words_users u2 (cost=0.29..8.30 rows=1 width=15) (actual time=0.008..0.008 rows=1 loops=9)
+Index Cond: (uid = CASE WHEN (g.player1 = 5) THEN g.player2 ELSE g.player1 END)
+-> Materialize (cost=0.00..83684.15 rows=3073410 width=23) (actual time=0.004..228.492 rows=3073410 loops=9)
+-> Seq Scan on words_geoip i2 (cost=0.00..50308.10 rows=3073410 width=23) (actual time=0.008..248.647 rows=3073410 loops=1)
+-> Materialize (cost=0.00..854.91 rows=4 width=88) (actual time=0.232..0.237 rows=1 loops=9)
+-> Nested Loop Anti Join (cost=0.00..854.89 rows=4 width=88) (actual time=2.085..2.129 rows=1 loops=1)
+Join Filter: ((s.stamp > s1.stamp) AND (s1.uid = s.uid))
+Rows Removed by Join Filter: 11
+-> Seq Scan on words_social s1 (cost=0.00..427.20 rows=6 width=96) (actual time=0.114..1.029 rows=6 loops=1)
+Filter: (uid = 5)
+Rows Removed by Filter: 10652
+-> Materialize (cost=0.00..427.23 rows=6 width=8) (actual time=0.015..0.183 rows=3 loops=6)
+-> Seq Scan on words_social s (cost=0.00..427.20 rows=6 width=8) (actual time=0.087..1.094 rows=6 loops=1)
+Filter: (uid = 5)
+Rows Removed by Filter: 10652
+-> Hash (cost=1077.29..1077.29 rows=7104 width=92) (actual time=6.326..6.326 rows=10552 loops=1)
+Buckets: 16384 (originally 8192) Batches: 1 (originally 1) Memory Usage: 1419kB
+-> Hash Anti Join (cost=533.76..1077.29 rows=7104 width=92) (actual time=1.966..4.600 rows=10552 loops=1)
+Hash Cond: (s2.uid = s_1.uid)
+Join Filter: (s_1.stamp > s2.stamp)
+Rows Removed by Join Filter: 10709
+-> Seq Scan on words_social s2 (cost=0.00..400.56 rows=10656 width=96) (actual time=0.002..0.622 rows=10658 loops=1)
+-> Hash (cost=400.56..400.56 rows=10656 width=8) (actual time=1.952..1.952 rows=10658 loops=1)
+Buckets: 16384 Batches: 1 Memory Usage: 545kB
+-> Seq Scan on words_social s_1 (cost=0.00..400.56 rows=10656 width=8) (actual time=0.001..1.130 rows=10658 loops=1)
+Planning time: 0.511 ms
+Execution time: 5292.006 ms
+(53 rows)
+
+I am probably missing something minor, but I am not experienced with tuning SQL queries plus the whole query is quite extensive. Please help
+
+UPDATE:
+
+Below are the other 4 tables used in the query -
+
+# \d words_games
+Table "public.words_games"
+Column | Type | Collation | Nullable | Default
+----------+--------------------------+-----------+----------+------------------------------------------
+gid | integer | | not null | nextval('words_games_gid_seq'::regclass)
+created | timestamp with time zone | | not null |
+finished | timestamp with time zone | | |
+player1 | integer | | not null |
+player2 | integer | | |
+played1 | timestamp with time zone | | |
+played2 | timestamp with time zone | | |
+state1 | text | | |
+state2 | text | | |
+reason | text | | |
+hint1 | text | | |
+hint2 | text | | |
+score1 | integer | | not null |
+score2 | integer | | not null |
+chat1 | integer | | not null |
+chat2 | integer | | not null |
+hand1 | character(1)[] | | not null |
+hand2 | character(1)[] | | not null |
+pile | character(1)[] | | not null |
+letters | character(1)[] | | not null |
+values | integer[] | | not null |
+bid | integer | | not null |
+friendly | boolean | | |
+Indexes:
+"words_games_pkey" PRIMARY KEY, btree (gid)
+"words_games_reason_index" btree (reason)
+"words_games_state1_index" btree (state1)
+"words_games_state2_index" btree (state2)
+Check constraints:
+"words_games_chat1_check" CHECK (chat1 >= 0)
+"words_games_chat2_check" CHECK (chat2 >= 0)
+"words_games_check" CHECK (player1 <> player2)
+"words_games_score1_check" CHECK (score1 >= 0)
+"words_games_score2_check" CHECK (score2 >= 0)
+Foreign-key constraints:
+"words_games_bid_fkey" FOREIGN KEY (bid) REFERENCES words_boards(bid) ON DELETE CASCADE
+"words_games_player1_fkey" FOREIGN KEY (player1) REFERENCES words_users(uid) ON DELETE CASCADE
+"words_games_player2_fkey" FOREIGN KEY (player2) REFERENCES words_users(uid) ON DELETE CASCADE
+Referenced by:
+TABLE "words_chat" CONSTRAINT "words_chat_gid_fkey" FOREIGN KEY (gid) REFERENCES words_games(gid) ON DELETE CASCADE
+TABLE "words_moves" CONSTRAINT "words_moves_gid_fkey" FOREIGN KEY (gid) REFERENCES words_games(gid) ON DELETE CASCADE
+TABLE "words_scores" CONSTRAINT "words_scores_gid_fkey" FOREIGN KEY (gid) REFERENCES words_games(gid) ON DELETE CASCADE
+
+# \d words_users
+Table "public.words_users"
+Column | Type | Collation | Nullable | Default
+---------------+--------------------------+-----------+----------+------------------------------------------
+uid | integer | | not null | nextval('words_users_uid_seq'::regclass)
+created | timestamp with time zone | | not null |
+visited | timestamp with time zone | | not null |
+ip | inet | | not null |
+fcm | text | | |
+apns | text | | |
+adm | text | | |
+motto | text | | |
+vip_until | timestamp with time zone | | |
+grand_until | timestamp with time zone | | |
+banned_until | timestamp with time zone | | |
+banned_reason | text | | |
+elo | integer | | not null |
+medals | integer | | not null |
+coins | integer | | not null |
+Indexes:
+"words_users_pkey" PRIMARY KEY, btree (uid)
+Check constraints:
+"words_users_banned_reason_check" CHECK (length(banned_reason) > 0)
+"words_users_elo_check" CHECK (elo >= 0)
+"words_users_medals_check" CHECK (medals >= 0)
+Referenced by:
+TABLE "words_chat" CONSTRAINT "words_chat_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_games" CONSTRAINT "words_games_player1_fkey" FOREIGN KEY (player1) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_games" CONSTRAINT "words_games_player2_fkey" FOREIGN KEY (player2) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_moves" CONSTRAINT "words_moves_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_reviews" CONSTRAINT "words_reviews_author_fkey" FOREIGN KEY (author) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_reviews" CONSTRAINT "words_reviews_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_scores" CONSTRAINT "words_scores_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_social" CONSTRAINT "words_social_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+TABLE "words_stats" CONSTRAINT "words_stats_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+
+# \d words_social
+Table "public.words_social"
+Column | Type | Collation | Nullable | Default
+--------+------------------+-----------+----------+---------
+sid | text | | not null |
+social | integer | | not null |
+given | text | | not null |
+family | text | | |
+photo | text | | |
+lat | double precision | | |
+lng | double precision | | |
+stamp | integer | | not null |
+uid | integer | | not null |
+Indexes:
+"words_social_pkey" PRIMARY KEY, btree (sid, social)
+Check constraints:
+"words_social_given_check" CHECK (given ~ '\S'::text)
+"words_social_photo_check" CHECK (photo ~* '^https?://...'::text)
+"words_social_social_check" CHECK (0 < social AND social <= 64)
+Foreign-key constraints:
+"words_social_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+Referenced by:
+TABLE "words_payments" CONSTRAINT "words_payments_sid_fkey" FOREIGN KEY (sid, social) REFERENCES words_social(sid, social) ON DELETE CASCADE
+
+# \d words_moves
+Table "public.words_moves"
+Column | Type | Collation | Nullable | Default
+---------+--------------------------+-----------+----------+------------------------------------------
+mid | bigint | | not null | nextval('words_moves_mid_seq'::regclass)
+action | text | | not null |
+gid | integer | | not null |
+uid | integer | | not null |
+played | timestamp with time zone | | not null |
+tiles | jsonb | | |
+score | integer | | |
+letters | text | | |
+hand | text | | |
+puzzle | boolean | | not null | false
+Indexes:
+"words_moves_pkey" PRIMARY KEY, btree (mid)
+Check constraints:
+"words_moves_score_check" CHECK (score >= 0)
+Foreign-key constraints:
+"words_moves_gid_fkey" FOREIGN KEY (gid) REFERENCES words_games(gid) ON DELETE CASCADE
+"words_moves_uid_fkey" FOREIGN KEY (uid) REFERENCES words_users(uid) ON DELETE CASCADE
+Referenced by:
+TABLE "words_scores" CONSTRAINT "words_scores_mid_fkey" FOREIGN KEY (mid) REFERENCES words_moves(mid) ON DELETE CASCADE
+
+UPDATE 2:
+
+There are 6 times "Seq Scan" reported, I have to get rid of that by adding indices, correct?
+
+So I have added already 2 and the time has improved:
+
+CREATE INDEX words_moves_gid_index ON words_moves(gid);
+CREATE INDEX words_moves_uid_index ON words_social(uid);
+
+But unfortunately I still don't understand, which INDEX to add for words_geoip, because there is already one (the PK)?
+
+Tags: postgresql, join, performance, postgresql-10, postgresql-performance
+Score: 2
+Answer count: 1

@@ -1,0 +1,548 @@
+from datetime import datetime, timezone
+
+import pytest
+
+from app.collector import _derive_query_deltas
+from app.detect import detect
+from app.diagnose import (
+    UnsafeQuery,
+    diagnose_plan,
+    flatten_plan,
+    hash_batches,
+    summarize_plan,
+    validate_read_only_query,
+)
+from app.feedback import evaluate_runs
+from app.pg import safe_identifier
+from app.rag import _rerank_rows, chunk_locator, chunk_text
+from app.workload import _simple_equality_column, summarize_timings
+
+
+def test_read_only_query_validation_accepts_select_and_rejects_mutation():
+    assert validate_read_only_query(" SELECT 1 ") == "SELECT 1"
+    assert validate_read_only_query("WITH x AS (SELECT 1) SELECT * FROM x")
+    with pytest.raises(UnsafeQuery):
+        validate_read_only_query("UPDATE demo.accounts SET balance = 0")
+    with pytest.raises(UnsafeQuery):
+        validate_read_only_query("SELECT 1; SELECT 2")
+    with pytest.raises(UnsafeQuery):
+        validate_read_only_query("WITH x AS (DELETE FROM demo.accounts RETURNING *) SELECT * FROM x")
+
+
+def test_plan_flattening_and_summary_use_observed_plan_fields():
+    document = {
+        "Planning Time": 1.2,
+        "Execution Time": 8.4,
+        "Plan": {
+            "Node Type": "Aggregate",
+            "Plans": [
+                {
+                    "Node Type": "Hash Join",
+                    "Plans": [
+                        {"Node Type": "Seq Scan", "Relation Name": "orders", "Filter": "(customer_id = 1)"},
+                        {"Node Type": "Hash", "Batches": 4, "Temp Written Blocks": 12},
+                    ],
+                }
+            ],
+        },
+    }
+    nodes = flatten_plan(document["Plan"])
+    summary = summarize_plan(document, nodes)
+    assert len(nodes) == 4
+    assert summary["execution_time_ms"] == 8.4
+    assert summary["relations"] == ["orders"]
+    assert summary["join_nodes"] == ["Hash Join"]
+    assert summary["has_temp_blocks"] is True
+    assert hash_batches({"Hash Batches": 4}) == 4
+    assert hash_batches({"Batches": 2}) == 2
+
+
+def test_plan_diagnosis_keeps_operator_evidence_and_deduplicates_work_mem_action():
+    class FakeDatabase:
+        def fetch_one(self, statement, params=()):
+            if "pg_settings" in statement:
+                return {
+                    "name": "work_mem",
+                    "setting": "4096",
+                    "unit": "kB",
+                    "context": "user",
+                    "min_val": "64",
+                    "max_val": "2147483647",
+                }
+            return {"bytes": 4096 * 1024}
+
+    plan = {
+        "nodes": [
+            {
+                "Node Type": "Aggregate",
+                "Strategy": "Sorted",
+                "Temp Written Blocks": 12,
+            },
+            {
+                "Node Type": "Sort",
+                "Sort Method": "external merge",
+                "Sort Space Type": "Disk",
+                "Sort Space Used": 2048,
+                "Temp Written Blocks": 12,
+            },
+        ]
+    }
+    causes, evidence, actions = diagnose_plan(FakeDatabase(), plan)
+
+    assert causes == ["aggregate_spill", "sort_spill"]
+    assert {item["observed"]["node_type"] for item in evidence} == {
+        "Aggregate",
+        "Sort",
+    }
+    assert len(actions) == 1
+    assert actions[0]["target"]["parameter"] == "work_mem"
+
+
+def test_identifier_guardrail_is_conservative():
+    assert safe_identifier("orders_customer_id_idx")
+    assert safe_identifier("_private2")
+    assert not safe_identifier("orders.customer_id")
+    assert not safe_identifier("orders-customer")
+    assert not safe_identifier("1orders")
+
+
+def test_query_statistics_are_compared_as_interval_deltas():
+    previous = [{
+        "query_id": "q1",
+        "query": "SELECT 1",
+        "calls": 10,
+        "total_exec_time_ms": 100.0,
+        "rows": 10,
+        "shared_blks_hit": 20,
+        "shared_blks_read": 2,
+        "temp_blks_read": 3,
+        "temp_blks_written": 4,
+    }]
+    current = [{
+        **previous[0],
+        "calls": 12,
+        "total_exec_time_ms": 180.0,
+        "rows": 12,
+        "shared_blks_hit": 25,
+        "shared_blks_read": 3,
+        "temp_blks_read": 8,
+        "temp_blks_written": 10,
+    }]
+    delta = _derive_query_deltas(current, previous)
+    assert delta == [{
+        "query_id": "q1",
+        "query": "SELECT 1",
+        "calls": 2.0,
+        "total_exec_time_ms": 80.0,
+        "mean_exec_time_ms": 40.0,
+        "rows": 2.0,
+        "shared_blks_hit": 5.0,
+        "shared_blks_read": 1.0,
+        "temp_blks_read": 5.0,
+        "temp_blks_written": 6.0,
+        "counter_reset": False,
+    }]
+    # A newly visible top-N row is not automatically treated as fresh work.
+    assert _derive_query_deltas(current, []) == []
+
+
+def test_index_candidate_parser_declines_compound_or_unrelated_filters():
+    assert _simple_equality_column(
+        "(orders.customer_id = '1234'::smallint)", {"orders"}
+    ) == "customer_id"
+    assert _simple_equality_column(
+        "((orders.customer_id = 1) AND (orders.status = 'PAID'))", {"orders"}
+    ) is None
+    assert _simple_equality_column("(other.customer_id = 1)", {"orders"}) is None
+
+
+def test_feedback_is_derived_from_measured_timings_and_plan_change():
+    action = {
+        "action_type": "create_index",
+        "target": {"index": "orders_customer_id_idx"},
+    }
+    baseline = {
+        "scenario": "missing_index",
+        "observations": {
+            "timings_ms": [20.0, 22.0, 21.0],
+            "median_query_time_ms": 21.0,
+            "p95_query_time_ms": 21.9,
+            "result": {"row_count": 40},
+            "plan_summary": {
+                "root_node": "Gather Merge",
+                "scan_nodes": ["Seq Scan"],
+                "join_nodes": [],
+                "has_temp_blocks": False,
+            },
+            "plan": {
+                "nodes": [
+                    {"Node Type": "Seq Scan", "Relation Name": "orders", "Filter": "(customer_id = 1)"}
+                ]
+            },
+        },
+    }
+    after = {
+        "scenario": "missing_index",
+        "observations": {
+            "timings_ms": [0.3, 0.4, 0.2],
+            "median_query_time_ms": 0.3,
+            "p95_query_time_ms": 0.39,
+            "result": {"row_count": 40},
+            "plan_summary": {
+                "root_node": "Sort",
+                "scan_nodes": ["Bitmap Heap Scan", "Bitmap Index Scan"],
+                "join_nodes": [],
+                "has_temp_blocks": False,
+            },
+            "plan": {
+                "nodes": [{"Node Type": "Bitmap Index Scan", "Index Name": "orders_customer_id_idx"}]
+            },
+        },
+    }
+    outcome = evaluate_runs(action, baseline, after)
+    assert outcome["effective"] is True
+    assert outcome["observed_effect"] == "effective"
+    assert outcome["median_improvement_pct"] > 98
+    assert outcome["plan_change"]["verified_plan_change"] is True
+
+
+def test_feedback_does_not_call_a_single_sample_effective():
+    action = {
+        "action_type": "create_index",
+        "target": {"index": "orders_customer_id_idx"},
+    }
+    baseline = {
+        "scenario": "missing_index",
+        "observations": {
+                "timings_ms": [20.0, 22.0],
+                "median_query_time_ms": 21.0,
+                "p95_query_time_ms": 21.9,
+                "result": {"row_count": 40},
+                "plan_summary": {"scan_nodes": ["Seq Scan"]},
+            "plan": {"nodes": [{"Node Type": "Seq Scan"}]},
+        },
+    }
+    after = {
+        "scenario": "missing_index",
+        "observations": {
+                "timings_ms": [0.3, 0.4],
+                "median_query_time_ms": 0.3,
+                "p95_query_time_ms": 0.39,
+                "result": {"row_count": 40},
+                "plan_summary": {"scan_nodes": ["Bitmap Index Scan"]},
+            "plan": {
+                "nodes": [
+                    {"Node Type": "Bitmap Index Scan", "Index Name": "orders_customer_id_idx"}
+                ]
+            },
+        },
+    }
+    outcome = evaluate_runs(action, baseline, after)
+    assert outcome["effective"] is False
+    assert outcome["observed_effect"] == "insufficient_repetitions"
+
+
+def test_statistics_feedback_uses_estimate_accuracy_not_latency_improvement():
+    action = {
+        "action_type": "refresh_statistics",
+        "target": {"schema": "keeninsight_demo", "table": "stats_probe"},
+    }
+    baseline = {
+        "scenario": "stale_statistics",
+        "observations": {
+            "timings_ms": [4.0, 4.1, 3.9],
+            "median_query_time_ms": 4.0,
+            "p95_query_time_ms": 4.1,
+            "result": {"rare_rows": 46000},
+            "plan_summary": {"root_node": "Aggregate", "scan_nodes": ["Seq Scan"]},
+            "plan": {
+                "nodes": [
+                    {
+                        "Node Type": "Seq Scan",
+                        "Plan Rows": 1000,
+                        "Actual Rows": 46000,
+                        "Actual Loops": 1,
+                    }
+                ]
+            },
+        },
+    }
+    after = {
+        "scenario": "stale_statistics",
+        "observations": {
+            "timings_ms": [4.1, 4.0, 4.2],
+            "median_query_time_ms": 4.1,
+            "p95_query_time_ms": 4.2,
+            "result": {"rare_rows": 46000},
+            "plan_summary": {"root_node": "Aggregate", "scan_nodes": ["Seq Scan"]},
+            "plan": {
+                "nodes": [
+                    {
+                        "Node Type": "Seq Scan",
+                        "Plan Rows": 46008,
+                        "Actual Rows": 46000,
+                        "Actual Loops": 1,
+                    }
+                ]
+            },
+        },
+    }
+    outcome = evaluate_runs(action, baseline, after)
+    assert outcome["effective"] is True
+    assert outcome["observed_effect"] == "effective"
+    assert outcome["median_improvement_pct"] < 0
+    assert outcome["measurement"]["effectiveness_criterion"] == "estimate_accuracy_and_result_preservation"
+    assert outcome["measurement"]["latency_threshold_applied"] is False
+    assert outcome["plan_change"]["verified_plan_change"] is True
+
+
+def test_parallel_feedback_requires_actual_workers_in_after_plan():
+    action = {
+        "action_type": "set_database_parameter",
+        "target": {
+            "parameter": "max_parallel_workers_per_gather",
+            "value": "3",
+            "scope": "database",
+        },
+    }
+    baseline = {
+        "scenario": "parallel_query_underprovisioned",
+        "observations": {
+            "timings_ms": [30.0, 32.0, 31.0],
+            "median_query_time_ms": 31.0,
+            "p95_query_time_ms": 31.9,
+            "phase_parallel_workers": "0",
+            "result": {"row_count": 800000},
+            "plan_summary": {"root_node": "Aggregate", "scan_nodes": ["Seq Scan"]},
+            "plan": {"nodes": [{"Node Type": "Aggregate"}, {"Node Type": "Seq Scan"}]},
+        },
+    }
+    after = {
+        "scenario": "parallel_query_underprovisioned",
+        "observations": {
+            "timings_ms": [14.0, 15.0, 14.5],
+            "median_query_time_ms": 14.5,
+            "p95_query_time_ms": 14.95,
+            "phase_parallel_workers": "3",
+            "result": {"row_count": 800000},
+            "plan_summary": {"root_node": "Aggregate", "scan_nodes": ["Gather", "Parallel Seq Scan"]},
+            "plan": {
+                "nodes": [
+                    {"Node Type": "Aggregate"},
+                    {"Node Type": "Gather", "Workers Planned": 1, "Workers Launched": 1},
+                    {"Node Type": "Parallel Seq Scan", "Workers Planned": 1, "Workers Launched": 1},
+                ]
+            },
+        },
+    }
+    outcome = evaluate_runs(action, baseline, after)
+    assert outcome["effective"] is True
+    assert outcome["plan_change"]["verified_plan_change"] is True
+    assert outcome["plan_before"]["max_workers_launched"] == 0
+    assert outcome["plan_after"]["max_workers_launched"] == 1
+
+
+def test_parallel_feedback_rejects_timing_only_improvement():
+    action = {
+        "action_type": "set_database_parameter",
+        "target": {"parameter": "max_parallel_workers_per_gather", "value": "3"},
+    }
+    base_observations = {
+        "timings_ms": [30.0, 32.0, 31.0],
+        "median_query_time_ms": 31.0,
+        "p95_query_time_ms": 31.9,
+        "result": {"row_count": 800000},
+        "plan": {"nodes": [{"Node Type": "Aggregate"}]},
+    }
+    after_observations = {
+        "timings_ms": [14.0, 15.0, 14.5],
+        "median_query_time_ms": 14.5,
+        "p95_query_time_ms": 14.95,
+        "result": {"row_count": 800000},
+        "plan": {"nodes": [{"Node Type": "Aggregate"}]},
+    }
+    outcome = evaluate_runs(
+        action,
+        {"scenario": "parallel_query_underprovisioned", "observations": base_observations},
+        {"scenario": "parallel_query_underprovisioned", "observations": after_observations},
+    )
+    assert outcome["effective"] is False
+    assert outcome["observed_effect"] == "timing_improved_without_expected_plan_change"
+
+
+def test_work_mem_feedback_verifies_operator_specific_spill_recovery():
+    action = {
+        "action_type": "set_database_parameter",
+        "target": {"parameter": "work_mem", "value": "8MB", "scope": "database"},
+    }
+    cases = [
+        (
+            "aggregate_spill",
+            [
+                {
+                    "Node Type": "Aggregate",
+                    "Strategy": "Sorted",
+                    "Temp Written Blocks": 10,
+                }
+            ],
+            [
+                {
+                    "Node Type": "Aggregate",
+                    "Strategy": "Hashed",
+                    "Temp Written Blocks": 0,
+                }
+            ],
+            "aggregate changed",
+        ),
+        (
+            "sort_spill",
+            [
+                {
+                    "Node Type": "Sort",
+                    "Sort Method": "external merge",
+                    "Sort Space Type": "Disk",
+                    "Temp Written Blocks": 10,
+                }
+            ],
+            [
+                {
+                    "Node Type": "Sort",
+                    "Sort Method": "quicksort",
+                    "Sort Space Type": "Memory",
+                    "Temp Written Blocks": 0,
+                }
+            ],
+            "window sort changed",
+        ),
+    ]
+    for scenario, before_nodes, after_nodes, reason in cases:
+        baseline = {
+            "scenario": scenario,
+            "observations": {
+                "timings_ms": [100.0, 102.0, 101.0],
+                "median_query_time_ms": 101.0,
+                "p95_query_time_ms": 101.9,
+                "phase_work_mem": "64kB",
+                "result": {"value": 800000},
+                "plan": {"nodes": before_nodes},
+            },
+        }
+        after = {
+            "scenario": scenario,
+            "observations": {
+                "timings_ms": [50.0, 51.0, 49.0],
+                "median_query_time_ms": 50.0,
+                "p95_query_time_ms": 50.9,
+                "phase_work_mem": "8MB",
+                "result": {"value": 800000},
+                "plan": {"nodes": after_nodes},
+            },
+        }
+        outcome = evaluate_runs(action, baseline, after)
+        assert outcome["effective"] is True
+        assert outcome["plan_change"]["verified_plan_change"] is True
+        assert reason in outcome["plan_change"]["reason"]
+
+
+def test_timing_summary_reports_distribution_without_synthetic_values():
+    summary = summarize_timings([1.0, 2.0, 3.0, 4.0])
+    assert summary["count"] == 4
+    assert summary["median_ms"] == 2.5
+    assert summary["p95_ms"] == pytest.approx(3.85)
+    assert summary["min_ms"] == 1.0
+    assert summary["max_ms"] == 4.0
+
+
+def test_detector_does_not_report_collector_observation_sql():
+    rules = [{
+        "id": 1,
+        "name": "slow",
+        "kind": "slow_query",
+        "severity": "warning",
+        "config": {"mean_exec_time_ms": 1, "minimum_calls": 1},
+    }]
+    snapshot = {
+        "query_deltas": [
+            {"query_id": "observer", "query": "SELECT * FROM pg_stat_activity", "calls": 1, "mean_exec_time_ms": 100},
+            {"query_id": "user", "query": "SELECT expensive_value()", "calls": 1, "mean_exec_time_ms": 100},
+        ]
+    }
+    incidents = detect(snapshot, rules)
+    assert [incident.evidence["query_id"] for incident in incidents] == ["user"]
+
+
+def test_rag_chunking_is_bounded_and_preserves_overlap_context():
+    text = "\n\n".join(f"Paragraph {index}: work_mem and PostgreSQL evidence." for index in range(40))
+    chunks = chunk_text(text, max_chars=500, overlap_chars=80)
+    assert len(chunks) > 3
+    assert all(0 < len(chunk["content"]) <= 500 for chunk in chunks)
+    assert all(chunk["token_count"] > 0 for chunk in chunks)
+    assert chunks[0]["metadata"]["char_start"] == 0
+    assert chunks[-1]["metadata"]["char_end"] <= len(text)
+
+
+def test_rag_locator_exposes_normalized_lines_and_pdf_pages():
+    text = "[Page 3]\nfirst evidence line\nsecond evidence line\n\n[Page 4]\nnext page"
+    locator = chunk_locator(text, 10, 76)
+    assert locator["coordinate_system"] == "normalized_source"
+    assert locator["line_start"] == 2
+    assert locator["line_end"] >= locator["line_start"]
+    assert locator["page_start"] == 3
+    assert locator["page_end"] == 4
+
+
+def test_rag_reranker_prefers_discriminative_query_terms_over_common_words():
+    rows = [
+        {
+            "chunk_id": 1,
+            "content": "The worker is in the design and the system is safe.",
+            "rank": 9.0,
+        },
+        {
+            "chunk_id": 2,
+            "content": "The RAG worker performance and safety boundary uses typed allowlists.",
+            "rank": 3.0,
+        },
+    ]
+    ranked = _rerank_rows(
+        rows, "What is the performance and safety boundary of the RAG worker?"
+    )
+    assert [row["chunk_id"] for row in ranked] == [2, 1]
+
+
+def test_feedback_rejects_missing_result_or_unverified_setting_intervention():
+    action = {
+        "action_type": "set_database_parameter",
+        "target": {"parameter": "work_mem", "value": "8MB", "scope": "database"},
+    }
+    baseline = {
+        "scenario": "aggregate_spill",
+        "observations": {
+            "timings_ms": [100.0, 101.0, 102.0],
+            "median_query_time_ms": 101.0,
+            "p95_query_time_ms": 101.9,
+            "phase_work_mem": "64kB",
+            "result": {"total_rows": 800000},
+            "plan": {"nodes": [{"Node Type": "Sort", "Temp Written Blocks": 10}]},
+        },
+    }
+    after = {
+        "scenario": "aggregate_spill",
+        "observations": {
+            "timings_ms": [50.0, 51.0, 52.0],
+            "median_query_time_ms": 51.0,
+            "p95_query_time_ms": 51.9,
+            "phase_work_mem": "4MB",
+            "result": {"total_rows": 800000},
+            "plan": {"nodes": [{"Node Type": "HashAggregate", "Temp Written Blocks": 0}]},
+        },
+    }
+    outcome = evaluate_runs(action, baseline, after)
+    assert outcome["effective"] is False
+    assert outcome["observed_effect"] == "timing_improved_without_expected_plan_change"
+    assert outcome["measurement"]["intervention_verified"] is False
+
+    after["observations"].pop("result")
+    outcome = evaluate_runs(action, baseline, after)
+    assert outcome["effective"] is False
+    assert outcome["observed_effect"] == "missing_result"

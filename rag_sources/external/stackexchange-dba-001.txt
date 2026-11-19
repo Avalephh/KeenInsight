@@ -1,0 +1,82 @@
+SOURCE_KEY: external:stackexchange:dba:27893
+SOURCE_TYPE: external-community
+SOURCE_TITLE: DBA StackExchange · Increasing work_mem and shared_buffers on Postgres 9.2 significantly slows down queries
+SOURCE_URI: https://dba.stackexchange.com/questions/27893/increasing-work-mem-and-shared-buffers-on-postgres-9-2-significantly-slows-down
+RETRIEVED_AT: 2026-09-07T04:48:34.255584+00:00
+CONTENT_SHA256: ea893d0f59936e4243b0805ee9055dfb49b714c77ad0b0d682982e0540c2e8ca
+SOURCE_METADATA: {"api": "Stack Exchange API 2.3", "license": "CC BY-SA; verify current primary documentation", "question_id": 27893}
+---
+Question: Increasing work_mem and shared_buffers on Postgres 9.2 significantly slows down queries
+
+I have a PostgreSQL 9.2 instance running on RHEL 6.3, 8-core machine with 16GB of RAM. The server is dedicated to this database. Given that the default postgresql.conf is quite conservative regarding memory settings, I thought it might be a good idea to allow Postgres to use more memory. To my surprise, following advice on
+wiki.postgresql.org/wiki/Tuning_Your_PostgreSQL_Server
+significantly slowed down practically every query I run but it's obviously more noticeable on the more complex queries.
+
+I also tried running pgtune which gave the following recommendation with more parameters tuned, but that didn't change anything. It suggests shared_buffers of 1/4 of RAM size which seems to in line with advice elsewhere (and on PG wiki in particular).
+
+default_statistics_target = 50
+maintenance_work_mem = 960MB
+constraint_exclusion = on
+checkpoint_completion_target = 0.9
+effective_cache_size = 11GB
+work_mem = 96MB
+wal_buffers = 8MB
+checkpoint_segments = 16
+shared_buffers = 3840MB
+max_connections = 80
+
+I tried reindexing the whole database after changing the settings (using
+reindex database
+), but that didn't help either. I played around with shared_buffers and work_mem. Gradually changing them from the very conservative default values (128k / 1MB) gradually decreased performance.
+
+I ran
+EXPLAIN (ANALYZE,BUFFERS)
+on a few queries and the culprit seems to be that Hash Join is significantly slower. It's not clear to me why.
+
+To give some specific example, I have the following query. It runs in ~2100ms on the default configuration and ~3300ms on the configuration with increased buffer sizes:
+
+select count(*) from contest c
+left outer join contestparticipant cp on c.id=cp.contestId
+left outer join teammember tm on tm.contestparticipantid=cp.id
+left outer join staffmember sm on cp.id=sm.contestparticipantid
+left outer join person p on p.id=cp.personid
+left outer join personinfo pi on pi.id=cp.personinfoid
+where pi.lastname like '%b%' or pi.firstname like '%a%';
+
+EXPLAIN (ANALYZE,BUFFERS)
+for the query above:
+
+Default buffers:
+http://explain.depesz.com/s/xaHJ
+
+Bigger buffers:
+http://explain.depesz.com/s/Plk
+
+The question is
+why am I observing decreased performance when I increase buffer sizes?
+The machine is definitely not running out of memory. Allocation if shared memory in OS is (
+shmmax
+and
+shmall
+) is set to very large values, that should not be a problem. I'm not getting any errors in the Postgres log either. I'm running autovacuum in the default configuration but I don't expect that has anything to do with it. All queries were run on the same machine few seconds apart, just with changed configuration (and restarted PG).
+
+Edit:
+I just found one particularly interesting fact: when I perform the same test on my mid-2010 iMac (OSX 10.7.5) also with Postgres 9.2.1 and 16GB RAM, I don't experience the slow down.
+Specifically:
+
+set work_mem='1MB';
+select ...; // running time is ~1800 ms
+set work_mem='96MB';
+select ...' // running time is ~1500 ms
+
+When I do exactly the same query (the one above) with exactly the same data on the server I get 2100 ms with work_mem=1MB and 3200 ms with 96 MB.
+
+The Mac has SSD so it's understandably faster, but it exhibits a behavior I would expect.
+
+See also the
+follow-up discussion on pgsql-performance
+.
+
+Tags: postgresql, performance, query-performance
+Score: 48
+Answer count: 2

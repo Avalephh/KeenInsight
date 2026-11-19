@@ -1,0 +1,145 @@
+{
+  "format": "keeninsight-rag-evaluation-v1",
+  "description": "Fixed retrieval-only questions for the source-attributed PostgreSQL RAG artifact. Gold labels identify the source that should be retrieved; they are kept outside rag_sources to avoid evaluation leakage.",
+  "questions": [
+    {
+      "id": "review-interactivity",
+      "query": "What did the review say about demo interactivity and changing a system knob?",
+      "source_type": "review",
+      "expected_source_keys": ["file:review/pvldb-demo-review.txt"],
+      "required_terms": ["interactivity", "system knob"]
+    },
+    {
+      "id": "review-live-pressure",
+      "query": "What kind of live workload pressure did the reviewer want the audience to trigger?",
+      "source_type": "review",
+      "expected_source_keys": ["file:review/pvldb-demo-review.txt"],
+      "required_terms": ["live", "flush-heavy"]
+    },
+    {
+      "id": "paper-system-monitoring",
+      "query": "How does the paper describe system monitoring with probes and anomaly-aware messages?",
+      "source_type": "paper",
+      "expected_source_keys": ["archive:paper:2overview.tex"],
+      "required_terms": ["System Monitoring", "anomaly-aware"]
+    },
+    {
+      "id": "paper-diagnosis",
+      "query": "How does the paper combine threshold checks and SQL-level diagnosis?",
+      "source_type": "paper",
+      "expected_source_keys": ["archive:paper:2overview.tex"],
+      "required_terms": ["Anomaly Diagnosis", "threshold"]
+    },
+    {
+      "id": "paper-knowledge",
+      "query": "What three knowledge sources does the paper integrate?",
+      "source_type": "paper",
+      "expected_source_keys": ["archive:paper:2overview.tex"],
+      "required_terms": ["Manuals-derived", "Code-derived", "Tuning-derived"]
+    },
+    {
+      "id": "paper-boundary",
+      "query": "What operator-level optimizations are mentioned for SQL-level anomalies?",
+      "source_type": "paper",
+      "expected_source_keys": ["archive:paper:2overview.tex"],
+      "required_terms": ["query hints", "rewriting", "index addition"]
+    },
+    {
+      "id": "legacy-monitor",
+      "query": "What monitoring views and navigation did the original demo show?",
+      "source_type": "legacy-demo",
+      "expected_source_keys": ["archive:legacy-demo:English/realtime-monitor.html"],
+      "required_terms": ["Real-time Monitoring", "System Resources Overview"]
+    },
+    {
+      "id": "legacy-tuning-knowledge",
+      "query": "Where did the original demo expose tuning-derived knowledge?",
+      "source_type": "legacy-demo",
+      "expected_source_keys": ["archive:legacy-demo:English/tuning-knowledge.html"],
+      "required_terms": ["Tuning-derived Knowledge"]
+    },
+    {
+      "id": "implementation-action-guardrail",
+      "query": "How are tuning actions typed, validated, and persisted before application?",
+      "source_type": "implementation",
+      "expected_source_keys": ["project:app/tuning.py"],
+      "required_terms": ["typed action allowlist", "requires_user_apply"]
+    },
+    {
+      "id": "implementation-index-rollback",
+      "query": "How does the implementation verify an index identity before rollback?",
+      "source_type": "implementation",
+      "expected_source_keys": ["project:app/tuning.py"],
+      "required_terms": ["index_oid", "index_definition"]
+    },
+    {
+      "id": "implementation-workload-evidence",
+      "query": "timings_ms EXPLAIN ANALYZE workload",
+      "source_type": "implementation",
+      "expected_source_keys": ["project:app/workload.py"],
+      "required_terms": ["timings_ms", "EXPLAIN", "plan"]
+    },
+    {
+      "id": "implementation-feedback",
+      "query": "What conditions must measured feedback satisfy before an action is effective?",
+      "source_type": "implementation",
+      "expected_source_keys": ["project:app/feedback.py"],
+      "required_terms": ["minimum", "plan", "improvement"]
+    },
+    {
+      "id": "deployment-statements",
+      "query": "How is pg_stat_statements enabled and made queryable in the PostgreSQL deployment?",
+      "source_type": "deployment",
+      "expected_source_keys": ["project:docker-compose.yml", "project:db/init/00_extensions.sql"],
+      "required_terms": ["pg_stat_statements", "shared_preload_libraries"]
+    },
+    {
+      "id": "deployment-preflight",
+      "query": "waiting_locks pg_stat_statements queryable",
+      "source_type": "implementation",
+      "expected_source_keys": ["project:scripts/preflight.py"],
+      "required_terms": ["pg_stat_statements", "waiting_locks"]
+    },
+    {
+      "id": "design-rag-boundary",
+      "query": "What is the performance and safety boundary of the RAG worker?",
+      "source_type": "design",
+      "expected_source_keys": ["project:docs/RAG_OPERATIONS.md"],
+      "required_terms": ["demo tables", "typed server-side allowlists"]
+    },
+    {
+      "id": "evaluation-regression",
+      "query": "What protocol and repeated measurements support the final regression result?",
+      "source_type": "evaluation-data",
+      "expected_source_keys": ["artifact:artifacts/final-regression-pg12.json"],
+      "required_terms": ["Protocol", "effective", "rollback_completed"]
+    },
+    {
+      "id": "evaluation-aa",
+      "query": "A/A control same_plan_signature same_result",
+      "source_type": "evaluation-data",
+      "expected_source_keys": ["artifact:artifacts/aa-control-results.json"],
+      "required_terms": ["same_plan_signature", "same_result"]
+    },
+    {
+      "id": "design-pdf-sql",
+      "query": "What root cause and tuning result does the SQL design screen illustrate?",
+      "source_type": "supplemental-pdf",
+      "expected_source_keys": ["archive:pdf-text:SQL.pdf"],
+      "required_terms": ["Hash Join", "Before Tuning", "After Tuning"]
+    },
+    {
+      "id": "supplemental-inventory",
+      "query": "Where can I verify the supplied archive asset sizes and SHA-256 digests?",
+      "source_type": "supplemental",
+      "expected_source_keys": ["archive:asset-inventory:KeenInsight_VLDB_Demo.zip"],
+      "required_terms": ["bytes", "sha256"]
+    },
+    {
+      "id": "negative-unknown",
+      "query": "zxqv_849103_aurora qrm_7721",
+      "expected_empty": true,
+      "required_terms": []
+    }
+  ]
+}

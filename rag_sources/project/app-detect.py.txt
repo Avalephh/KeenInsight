@@ -1,0 +1,295 @@
+SOURCE_KEY: project:app/detect.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: app/detect.py
+SOURCE_URI: project://app/detect.py
+---
+from __future__ import annotations
+
+import hashlib
+import json
+from dataclasses import dataclass
+from typing import Any
+
+from .db import Database
+
+@dataclass(frozen=True)
+class Candidate:
+signature: str
+kind: str
+severity: str
+summary: str
+evidence: dict[str, Any]
+metadata: dict[str, Any]
+
+def enabled_rules(db: Database) -> list[dict[str, Any]]:
+return db.fetch_all(
+"""
+SELECT id, name, kind, severity, enabled, config
+FROM keeninsight.alert_rules
+WHERE enabled
+ORDER BY id
+"""
+)
+
+def detect(snapshot: dict[str, Any], rules: list[dict[str, Any]]) -> list[Candidate]:
+database = snapshot.get("database") or {}
+settings = snapshot.get("settings") or {}
+lock_rows = snapshot.get("locks") or []
+# The collector provides interval deltas for detection. Keep the
+# fallback so unit callers and older snapshots remain inspectable.
+queries = (
+snapshot["query_deltas"]
+if "query_deltas" in snapshot
+else snapshot.get("top_queries") or []
+)
+# The collector itself queries these views. Do not turn its own
+# observation SQL into a customer incident when a compatibility server
+# exposes it through pg_stat_statements.
+queries = [row for row in queries if not _is_observer_query(row.get("query"))]
+result: list[Candidate] = []
+
+for rule in rules:
+kind = rule["kind"]
+config = rule.get("config") or {}
+severity = rule["severity"]
+if kind == "connection_saturation":
+max_connections = _number(settings.get("max_connections", {}).get("setting"))
+active = _number(database.get("numbackends"))
+ratio = active / max_connections if max_connections else 0.0
+threshold = _number(config.get("ratio"), 0.8)
+if max_connections and ratio >= threshold:
+result.append(
+Candidate(
+# The condition signature is stable while the evidence
+# changes. Otherwise every small metric fluctuation
+# would create a new incident row.
+signature="connection_saturation",
+kind=kind,
+severity=severity,
+summary=(
+f"{int(active)} of {int(max_connections)} connection slots are in use"
+),
+evidence={
+"numbackends": active,
+"max_connections": max_connections,
+"ratio": ratio,
+"threshold": threshold,
+},
+metadata={"rule_id": rule["id"], "rule_name": rule["name"]},
+)
+)
+elif kind == "lock_wait":
+minimum = int(_number(config.get("minimum_waiting_sessions"), 1))
+waiting_pids = sorted(
+{row.get("waiting_pid") for row in lock_rows if row.get("waiting_pid") is not None}
+)
+if len(waiting_pids) >= minimum:
+result.append(
+Candidate(
+signature="lock_wait:" + _lock_signature(lock_rows),
+kind=kind,
+severity=severity,
+summary=f"{len(waiting_pids)} session(s) are waiting for a lock",
+evidence={
+"waiting_sessions": len(waiting_pids),
+"waiting_pids": waiting_pids,
+"locks": lock_rows[:20],
+},
+metadata={"rule_id": rule["id"], "rule_name": rule["name"]},
+)
+)
+elif kind == "slow_query":
+threshold = _number(config.get("mean_exec_time_ms"), 1000.0)
+minimum_calls = _number(config.get("minimum_calls"), 1)
+for query in queries:
+mean_ms = _number(query.get("mean_exec_time_ms"))
+calls = _number(query.get("calls"))
+if mean_ms >= threshold and calls >= minimum_calls:
+query_id = query.get("query_id") or "unknown"
+result.append(
+Candidate(
+signature=f"slow_query:{query_id}",
+kind=kind,
+severity=severity,
+summary=(
+f"Statement {query_id} averages {mean_ms:.2f} ms over {int(calls)} call(s)"
+),
+evidence={
+"query_id": query_id,
+"query": query.get("query"),
+"calls": calls,
+"mean_exec_time_ms": mean_ms,
+"total_exec_time_ms": _number(query.get("total_exec_time_ms")),
+"threshold_ms": threshold,
+},
+metadata={
+"rule_id": rule["id"],
+"rule_name": rule["name"],
+},
+)
+)
+elif kind == "temp_spill":
+minimum = _number(config.get("minimum_temp_blocks_written"), 1)
+for query in queries:
+temp_written = _number(query.get("temp_blks_written"))
+if temp_written >= minimum:
+query_id = query.get("query_id") or "unknown"
+result.append(
+Candidate(
+signature=f"temp_spill:{query_id}",
+kind=kind,
+severity=severity,
+summary=(
+f"Statement {query_id} has written {int(temp_written)} temporary block(s)"
+),
+evidence={
+"query_id": query_id,
+"query": query.get("query"),
+"temp_blks_written": temp_written,
+"temp_blks_read": _number(query.get("temp_blks_read")),
+},
+metadata={"rule_id": rule["id"], "rule_name": rule["name"]},
+)
+)
+elif kind == "cache_hit_ratio":
+hit = _number(database.get("blks_hit"))
+read = _number(database.get("blks_read"))
+total = hit + read
+ratio = hit / total if total else 1.0
+threshold = _number(config.get("ratio"), 0.90)
+minimum_reads = _number(config.get("minimum_block_reads"), 100)
+if read >= minimum_reads and ratio < threshold:
+result.append(
+Candidate(
+signature="cache_hit_ratio",
+kind=kind,
+severity=severity,
+summary=f"Database cache hit ratio is {ratio:.2%}",
+evidence={
+"blks_hit": hit,
+"blks_read": read,
+"ratio": ratio,
+"threshold": threshold,
+},
+metadata={"rule_id": rule["id"], "rule_name": rule["name"]},
+)
+)
+
+return result
+
+def persist_candidates(
+db: Database,
+candidates: list[Candidate],
+*,
+observed_kinds: set[str] | None = None,
+) -> list[dict[str, Any]]:
+"""Upsert current matches and resolve only fully observed, absent kinds.
+
+A missing query-statistics view must not make old slow-query incidents look
+healthy, so callers explicitly identify which rule kinds had a complete
+source observation in this cycle.
+"""
+saved: list[dict[str, Any]] = []
+with db.connection() as conn:
+with conn.cursor() as cur:
+for candidate in candidates:
+cur.execute(
+"""
+INSERT INTO keeninsight.incidents
+(signature, kind, severity, status, summary, evidence, metadata)
+VALUES (%s, %s, %s, 'active', %s, %s::jsonb, %s::jsonb)
+ON CONFLICT (signature) DO UPDATE SET
+kind = EXCLUDED.kind,
+severity = EXCLUDED.severity,
+summary = EXCLUDED.summary,
+last_seen = now(),
+status = CASE
+WHEN keeninsight.incidents.status = 'resolved'
+THEN 'active' ELSE keeninsight.incidents.status END,
+resolved_at = CASE
+WHEN keeninsight.incidents.status = 'resolved'
+THEN NULL ELSE keeninsight.incidents.resolved_at END,
+evidence = EXCLUDED.evidence,
+metadata = EXCLUDED.metadata
+RETURNING id, signature, kind, severity, status, summary,
+first_seen, last_seen, resolved_at, evidence, diagnosis, metadata
+""",
+(
+candidate.signature,
+candidate.kind,
+candidate.severity,
+candidate.summary,
+json.dumps(candidate.evidence),
+json.dumps(candidate.metadata),
+),
+)
+saved.append(cur.fetchone())
+for kind in sorted(observed_kinds or set()):
+signatures = sorted(
+candidate.signature for candidate in candidates if candidate.kind == kind
+)
+if signatures:
+cur.execute(
+"""
+UPDATE keeninsight.incidents
+SET status = 'resolved', resolved_at = now()
+WHERE kind = %s AND status = 'active'
+AND NOT (signature = ANY(%s))
+RETURNING id
+""",
+(kind, signatures),
+)
+else:
+cur.execute(
+"""
+UPDATE keeninsight.incidents
+SET status = 'resolved', resolved_at = now()
+WHERE kind = %s AND status = 'active'
+RETURNING id
+""",
+(kind,),
+)
+for resolved in cur.fetchall():
+cur.execute(
+"""
+INSERT INTO keeninsight.audit_events
+(event_type, entity_type, entity_id, payload)
+VALUES ('incident_auto_resolved', 'incident', %s, %s::jsonb)
+""",
+(
+resolved["id"],
+json.dumps({"kind": kind, "reason": "condition_absent_in_observed_cycle"}),
+),
+)
+return saved
+
+def _number(value: Any, default: float = 0.0) -> float:
+if value is None:
+return default
+try:
+return float(value)
+except (TypeError, ValueError):
+return default
+
+def _lock_signature(rows: list[dict[str, Any]]) -> str:
+parts = sorted(
+f"{row.get('waiting_pid')}:{row.get('blocking_pid')}:{row.get('relation')}"
+for row in rows
+)
+return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:20]
+
+def _is_observer_query(query: Any) -> bool:
+normalized = " ".join(str(query or "").lower().split())
+return any(
+fragment in normalized
+for fragment in (
+"keeninsight.",
+"pg_stat_activity",
+"pg_locks",
+"pg_stat_database",
+"pg_settings",
+"pg_stat_statements",
+"pg_stat_bgwriter",
+"pg_stat_wal",
+)
+)

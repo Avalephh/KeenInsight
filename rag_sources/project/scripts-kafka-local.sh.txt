@@ -1,0 +1,57 @@
+SOURCE_KEY: project:scripts/kafka-local.sh
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/kafka-local.sh
+SOURCE_URI: project://scripts/kafka-local.sh
+---
+#!/usr/bin/env bash
+set -euo pipefail
+
+KAFKA_HOME="${KI_KAFKA_HOME:-/tmp/keeninsight-kafka/kafka_2.13-3.7.2}"
+CONFIG="${KI_KAFKA_CONFIG:-$(dirname "$0")/kafka-local.properties}"
+DATA_DIR="${KI_KAFKA_DATA_DIR:-/tmp/keeninsight-kafka/data}"
+PID_FILE="${KI_KAFKA_PID_FILE:-/tmp/keeninsight-kafka/kafka.pid}"
+LOG_FILE="${KI_KAFKA_LOG_FILE:-/tmp/keeninsight-kafka/kafka.log}"
+
+case "${1:-status}" in
+start)
+test -x "$KAFKA_HOME/bin/kafka-server-start.sh"
+mkdir -p "$DATA_DIR" "$(dirname "$PID_FILE")" "$(dirname "$LOG_FILE")"
+"$KAFKA_HOME/bin/kafka-storage.sh" format --ignore-formatted \
+-t "${KI_KAFKA_CLUSTER_ID:-$("$KAFKA_HOME/bin/kafka-storage.sh" random-uuid)}" \
+-c "$CONFIG" >/tmp/keeninsight-kafka/format.log 2>&1 || {
+if ! rg -q "already formatted|already exists" /tmp/keeninsight-kafka/format.log; then
+cat /tmp/keeninsight-kafka/format.log
+exit 1
+fi
+}
+if test -f "$PID_FILE" && kill -0 "$(<"$PID_FILE")" 2>/dev/null; then
+echo "Kafka already running as PID $(<"$PID_FILE")"
+exit 0
+fi
+nohup "$KAFKA_HOME/bin/kafka-server-start.sh" "$CONFIG" >"$LOG_FILE" 2>&1 &
+echo $! >"$PID_FILE"
+echo "Kafka starting as PID $(<"$PID_FILE")"
+;;
+stop)
+if test -f "$PID_FILE" && kill -0 "$(<"$PID_FILE")" 2>/dev/null; then
+kill -TERM "$(<"$PID_FILE")"
+for _ in $(seq 1 30); do
+kill -0 "$(<"$PID_FILE")" 2>/dev/null || break
+sleep 1
+done
+fi
+rm -f "$PID_FILE"
+;;
+status)
+if test -f "$PID_FILE" && kill -0 "$(<"$PID_FILE")" 2>/dev/null; then
+echo "Kafka running as PID $(<"$PID_FILE")"
+else
+echo "Kafka stopped"
+exit 1
+fi
+;;
+*)
+echo "usage: $0 {start|stop|status}" >&2
+exit 2
+;;
+esac

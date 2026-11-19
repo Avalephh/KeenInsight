@@ -1,0 +1,1125 @@
+"""Real eBPF probe management for PostgreSQL processes.
+
+The monitor uses BCC to attach kernel ``vfs_write`` kprobes and PostgreSQL
+user-space uprobe/uretprobe pairs.  It filters events by the live PostgreSQL
+backend PIDs, emits anomalous/long events immediately, and aggregates normal
+events for the reporting interval before sending them through the Kafka bus.
+
+The module is deliberately optional: a service without BPF privileges reports
+the compiler/attach error and leaves the existing PostgreSQL collector usable.
+It never fabricates probe events when attachment failed.
+"""
+
+from __future__ import annotations
+
+import ctypes as ct
+import atexit
+import hashlib
+import json
+import logging
+import os
+import re
+import subprocess
+import threading
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Callable
+
+from .db import Database
+from .eventing import KafkaEventBus
+
+LOG = logging.getLogger(__name__)
+
+DEFAULT_USER_FUNCTIONS = (
+    "standard_ExecutorRun",
+    "PortalRun",
+    "PortalRunFetch",
+    "tuplesort_begin_heap",
+    "BufFileWrite",
+)
+
+# High-frequency storage calls can otherwise fill a perf ring buffer faster
+# than Python can persist individual records.  Normal calls are aggregated in
+# the BPF program; long/large calls are emitted immediately.  The aggregate
+# carries exact invocation count and duration/bytes totals, so the user-space
+# event vector does not mistake batching for sampling.
+KERNEL_NORMAL_BATCH_SIZE = 64
+
+
+class EBPFUnavailable(RuntimeError):
+    pass
+
+
+class EbpfMonitor:
+    """Manage one event-driven eBPF session at a time."""
+
+    def __init__(
+        self,
+        db: Database,
+        bus: KafkaEventBus,
+        *,
+        reporting_interval_seconds: float = 10.0,
+        anomaly_duration_ns: int = 10_000_000,
+        auto_adapt: bool = False,
+        max_event_rate: float = 1000.0,
+        long_query_threshold_seconds: float = 1.0,
+    ) -> None:
+        self.db = db
+        self.bus = bus
+        self.reporting_interval_seconds = max(1.0, reporting_interval_seconds)
+        self.anomaly_duration_ns = max(1, anomaly_duration_ns)
+        self.auto_adapt = bool(auto_adapt)
+        self.max_event_rate = max(1.0, float(max_event_rate))
+        self.long_query_threshold_seconds = max(0.001, float(long_query_threshold_seconds))
+        self._lock = threading.RLock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._bpf: Any = None
+        self._session_id: int | None = None
+        self._binary_path: str | None = None
+        self._functions: list[dict[str, Any]] = []
+        self._function_by_id: dict[int, dict[str, Any]] = {}
+        self._aggregates: dict[tuple[str, int], dict[str, Any]] = {}
+        self._last_error: str | None = None
+        self._last_event_at: datetime | None = None
+        self._event_count = 0
+        self._lost_count = 0
+        self._attached: list[str] = []
+        self._last_target_refresh = 0.0
+        self._activity_by_pid: dict[int, dict[str, Any]] = {}
+        self._accept_events = False
+        self._adaptive_enabled = False
+        self._adaptive_budget = self.max_event_rate
+        self._adaptive_pruned: list[dict[str, Any]] = []
+        self._adaptive_check_requested = False
+        self._adaptive_check_count = 0
+        self._adaptive_last_check: dict[str, Any] | None = None
+        self._session_started_monotonic = 0.0
+        self._function_event_counts: dict[str, int] = {}
+        self._function_first_event_monotonic: dict[str, float] = {}
+        self._function_last_event_monotonic: dict[str, float] = {}
+
+    def discover_postgres_binary(self) -> str | None:
+        row = self.db.fetch_one(
+            """
+            SELECT pid FROM pg_stat_activity
+            WHERE datname = current_database()
+            ORDER BY CASE WHEN backend_type = 'client backend' THEN 0 ELSE 1 END, pid
+            LIMIT 1
+            """
+        )
+        if not row:
+            return None
+        try:
+            return os.path.realpath(f"/proc/{int(row['pid'])}/exe")
+        except (OSError, ValueError):
+            return None
+
+    def discover_symbols(self, binary_path: str | None = None) -> list[dict[str, Any]]:
+        binary = binary_path or self.discover_postgres_binary()
+        if not binary or not Path(binary).is_file():
+            return []
+        try:
+            completed = subprocess.run(
+                ["readelf", "-Ws", binary],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return []
+        seen: set[str] = set()
+        symbols: list[dict[str, Any]] = []
+        for line in completed.stdout.splitlines():
+            fields = line.split()
+            if len(fields) < 8 or fields[3] != "FUNC":
+                continue
+            name = fields[7].split("@", 1)[0]
+            if not name or name in seen or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", name):
+                continue
+            seen.add(name)
+            if name in DEFAULT_USER_FUNCTIONS or any(
+                token in name.lower()
+                for token in ("executor", "portal", "tuple", "sort", "hash", "buf", "lock")
+            ):
+                try:
+                    offset = int(fields[1], 16)
+                except ValueError:
+                    offset = None
+                symbols.append(
+                    {
+                        "probe_kind": "uprobe",
+                        "function_name": name,
+                        "binary_path": binary,
+                        "symbol_offset": offset,
+                        "metadata": {"discovery": "readelf", "raw_symbol": line.strip()},
+                    }
+                )
+        return sorted(symbols, key=lambda item: (item["function_name"], item["symbol_offset"] or 0))
+
+    def catalog(self, binary_path: str | None = None) -> list[dict[str, Any]]:
+        binary = binary_path or self.discover_postgres_binary()
+        candidates = self.discover_symbols(binary)
+        candidates.append(
+            {
+                "probe_kind": "kprobe",
+                "function_name": "vfs_write",
+                "binary_path": "",
+                "metadata": {"discovery": "paper_kernel_candidate"},
+            }
+        )
+        rows: list[dict[str, Any]] = []
+        for item in candidates:
+            row = self.db.fetch_one(
+                """
+                INSERT INTO keeninsight.probe_catalog
+                    (probe_kind, function_name, binary_path, symbol_offset, metadata)
+                VALUES (%s, %s, %s, %s, %s::jsonb)
+                ON CONFLICT (probe_kind, function_name, binary_path) DO UPDATE
+                SET symbol_offset = COALESCE(EXCLUDED.symbol_offset, probe_catalog.symbol_offset),
+                    metadata = probe_catalog.metadata || EXCLUDED.metadata,
+                    updated_at = now()
+                RETURNING id, probe_kind, function_name, binary_path, symbol_offset,
+                          source_file, source_line, selected, attached,
+                          lasso_coefficient, importance, metadata
+                """,
+                (
+                    item["probe_kind"],
+                    item["function_name"],
+                    item.get("binary_path") or "",
+                    item.get("symbol_offset"),
+                    json.dumps(item.get("metadata") or {}),
+                ),
+            )
+            if row:
+                rows.append(row)
+        return rows
+
+    def start(
+        self,
+        *,
+        session_id: int | None = None,
+        binary_path: str | None = None,
+        functions: list[str] | None = None,
+        target_pids: list[int] | None = None,
+        adaptive: bool | None = None,
+        max_event_rate: float | None = None,
+    ) -> dict[str, Any]:
+        with self._lock:
+            if self._thread and self._thread.is_alive():
+                raise RuntimeError("an eBPF session is already running")
+            binary = binary_path or self.discover_postgres_binary()
+            if not binary:
+                raise EBPFUnavailable("could not discover a live PostgreSQL executable")
+            catalog = self.catalog(binary)
+            selected = [
+                row
+                for row in catalog
+                if row["probe_kind"] == "kprobe"
+                or row["function_name"] in (functions or DEFAULT_USER_FUNCTIONS)
+            ]
+            if not selected:
+                raise EBPFUnavailable("no attachable PostgreSQL symbols were discovered")
+            pids = target_pids or self._target_pids()
+            # The target set is refreshed while the session is running.  A
+            # user may deliberately start monitoring before applying load, so
+            # an empty initial set is valid; newly-created workload backends
+            # will be inserted on the next refresh.
+            if session_id is None:
+                created = self.db.fetch_one(
+                    """
+                    INSERT INTO keeninsight.probe_sessions
+                        (status, transport, target_pids, selected_probes, config)
+                    VALUES ('starting', %s, %s::jsonb, %s::jsonb, %s::jsonb)
+                    RETURNING id
+                    """,
+                    (
+                        self.bus.transport,
+                        json.dumps(pids),
+                        json.dumps([row["id"] for row in selected]),
+                        json.dumps(
+                            {
+                                "binary_path": binary,
+                                "anomaly_duration_ns": self.anomaly_duration_ns,
+                                "long_query_threshold_seconds": self.long_query_threshold_seconds,
+                                "reporting_interval_seconds": self.reporting_interval_seconds,
+                                "normal_kernel_batch_size": KERNEL_NORMAL_BATCH_SIZE,
+                                "adaptive_enabled": bool(self.auto_adapt if adaptive is None else adaptive),
+                                "max_event_rate": max(1.0, float(max_event_rate or self.max_event_rate)),
+                            }
+                        ),
+                    ),
+                )
+                session_id = int(created["id"]) if created else None
+            if session_id is None:
+                raise RuntimeError("could not create eBPF probe session")
+            self._session_id = session_id
+            self._binary_path = binary
+            self._functions = selected
+            self._function_by_id = {
+                index: row for index, row in enumerate(selected)
+            }
+            for row in selected:
+                if row.get("probe_kind") == "kprobe":
+                    self._function_by_id[0xFFFFFFFF] = row
+            self.db.execute(
+                "UPDATE keeninsight.probe_catalog SET attached = FALSE WHERE binary_path = %s OR probe_kind = 'kprobe'",
+                (binary,),
+            )
+            self.db.execute(
+                "UPDATE keeninsight.probe_catalog SET selected = FALSE WHERE binary_path = %s OR probe_kind = 'kprobe'",
+                (binary,),
+            )
+            for row in selected:
+                self.db.execute(
+                    "UPDATE keeninsight.probe_catalog SET selected = TRUE, attached = FALSE, updated_at = now() WHERE id = %s",
+                    (row["id"],),
+                )
+            self._aggregates.clear()
+            self._attached = []
+            self._event_count = 0
+            self._lost_count = 0
+            self._last_event_at = None
+            self._last_target_refresh = 0.0
+            self._activity_by_pid.clear()
+            self._last_error = None
+            self._adaptive_enabled = bool(self.auto_adapt if adaptive is None else adaptive)
+            self._adaptive_budget = max(1.0, float(max_event_rate or self.max_event_rate))
+            self._adaptive_pruned = []
+            self._adaptive_check_requested = False
+            self._adaptive_check_count = 0
+            self._adaptive_last_check = None
+            self._session_started_monotonic = time.monotonic()
+            self._function_event_counts.clear()
+            self._function_first_event_monotonic.clear()
+            self._function_last_event_monotonic.clear()
+            self._accept_events = True
+            self._stop.clear()
+            self.db.execute(
+                "UPDATE keeninsight.probe_sessions SET status = 'starting', started_at = now(), transport = %s WHERE id = %s",
+                (self.bus.transport, session_id),
+            )
+            self._thread = threading.Thread(
+                target=self._run,
+                name="keeninsight-ebpf-monitor",
+                daemon=True,
+            )
+            self._thread.start()
+            return self.status()
+
+    def stop(self) -> dict[str, Any]:
+        with self._lock:
+            self._accept_events = False
+            self._stop.set()
+            thread = self._thread
+        if thread:
+            thread.join(timeout=10)
+        with self._lock:
+            self._thread = None
+            if self._session_id:
+                self.db.execute(
+                    "UPDATE keeninsight.probe_sessions SET status = %s, stopped_at = now(), error = %s WHERE id = %s",
+                    ("failed" if self._last_error else "stopped", self._last_error, self._session_id),
+                )
+            for row in self._functions:
+                self.db.execute(
+                    "UPDATE keeninsight.probe_catalog SET attached = FALSE, updated_at = now() WHERE id = %s",
+                    (row.get("id"),),
+                )
+            self._attached = []
+            return self.status()
+
+    def adapt(self, functions: list[str], *, max_event_rate: float | None = None) -> dict[str, Any]:
+        """Restart the live attachment set using a measured selector result."""
+        requested = [str(name) for name in functions if str(name).strip()]
+        if not requested:
+            raise EBPFUnavailable("adaptive selection returned no attachable functions")
+        with self._lock:
+            binary = self._binary_path
+            was_running = bool(self._thread and self._thread.is_alive())
+        if was_running:
+            self.stop()
+        # A selector adaptation is itself a live monitoring decision. Carry the
+        # measured budget into the new session so a historically useful but
+        # currently hot uprobe cannot dominate the observed workload.
+        return self.start(
+            binary_path=binary,
+            functions=requested,
+            adaptive=True,
+            max_event_rate=max_event_rate,
+        )
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "available": self._bpf is not None,
+                "running": bool(self._thread and self._thread.is_alive()),
+                "session_id": self._session_id,
+                "binary_path": self._binary_path,
+                "attached_probes": list(self._attached),
+                "selected_probes": [row.get("function_name") for row in self._functions],
+                "target_pid_count": len(self._target_pids()),
+                "event_count": self._event_count,
+                "lost_count": self._lost_count,
+                "last_event_at": self._last_event_at.isoformat()
+                if self._last_event_at
+                else None,
+                "last_error": self._last_error,
+                "transport": self.bus.status(),
+                "long_query_threshold_seconds": self.long_query_threshold_seconds,
+                "adaptive": {
+                    "enabled": self._adaptive_enabled,
+                    "max_event_rate_per_user_probe": self._adaptive_budget,
+                    "observed_event_rates": self._observed_event_rates(),
+                    "pruned_probes": list(self._adaptive_pruned),
+                    "check_count": self._adaptive_check_count,
+                    "last_check": self._adaptive_last_check,
+                },
+            }
+
+    def recent_events(self, limit: int = 100) -> list[dict[str, Any]]:
+        return self.db.fetch_all(
+            """
+            SELECT id, session_id, observed_at, event_type, probe_kind,
+                   function_name, binary_path, pid, tid, cpu, cgroup_id, cid,
+                   query_id, duration_ns, bytes, is_anomaly, transport, payload
+            FROM keeninsight.ebpf_events
+            ORDER BY observed_at DESC, id DESC LIMIT %s
+            """,
+            (max(1, min(limit, 1000)),),
+        )
+
+    def reconstruct_sql_lifecycle(
+        self, session_id: int, *, limit: int = 500
+    ) -> list[dict[str, Any]]:
+        """Materialize SQL/function timelines from the persisted event stream.
+
+        PostgreSQL 12 installations without ``compute_query_id`` use the
+        explicit local SQL fingerprint emitted by the monitor.  Aggregated
+        normal events retain their counts, interval endpoints and the list of
+        query IDs seen in the reporting window; anomaly events retain their
+        individual duration.  The reconstruction therefore remains faithful
+        to the anomaly-aware transport instead of inventing per-invocation
+        samples that were never emitted.
+        """
+        rows = self.db.fetch_all(
+            """
+            SELECT id, observed_at, function_name, pid, query_id, duration_ns,
+                   bytes, is_anomaly, payload
+            FROM keeninsight.ebpf_events
+            WHERE session_id = %s
+            ORDER BY observed_at, id
+            """,
+            (int(session_id),),
+        )
+        grouped: dict[tuple[str, str], dict[str, Any]] = {}
+        for row in rows:
+            payload = row.get("payload") or {}
+            if not isinstance(payload, dict):
+                payload = {}
+            query_id = row.get("query_id") or payload.get("query_id")
+            query_id_source = payload.get("query_id_source") or (
+                "postgresql_pg_stat_activity" if query_id else "pid_fallback"
+            )
+            if not query_id:
+                query_id = "unattributed:pid:%s" % str(row.get("pid") or "unknown")
+            query_id = str(query_id)
+            function_name = str(row.get("function_name") or "unknown")
+            key = (query_id, function_name)
+            observed_at = row.get("observed_at") or datetime.now(timezone.utc)
+            count_value = payload.get("count", 1)
+            duration_value = row.get("duration_ns")
+            if duration_value is None:
+                duration_value = payload.get("duration_ns_total", 0)
+            bytes_value = row.get("bytes")
+            if bytes_value is None:
+                bytes_value = payload.get("bytes_total", 0)
+            try:
+                count_value = max(0, int(float(count_value or 0)))
+            except (TypeError, ValueError):
+                count_value = 0
+            try:
+                duration_value = max(0, int(float(duration_value or 0)))
+            except (TypeError, ValueError):
+                duration_value = 0
+            try:
+                bytes_value = max(0, int(float(bytes_value or 0)))
+            except (TypeError, ValueError):
+                bytes_value = 0
+            item = grouped.setdefault(
+                key,
+                {
+                    "session_id": int(session_id),
+                    "query_id": query_id,
+                    "query_text": row.get("payload", {}).get("query_text") if isinstance(row.get("payload"), dict) else None,
+                    "query_id_source": query_id_source,
+                    "function_name": function_name,
+                    "first_observed_at": observed_at,
+                    "last_observed_at": observed_at,
+                    "event_count": 0,
+                    "duration_ns": 0,
+                    "bytes": 0,
+                    "anomaly_count": 0,
+                    "source_event_ids": [],
+                    "metadata": {
+                        "query_ids_seen": list(payload.get("query_ids") or []),
+                        "immediate_emission_reasons": [],
+                    },
+                },
+            )
+            item["first_observed_at"] = min(item["first_observed_at"], observed_at)
+            item["last_observed_at"] = max(item["last_observed_at"], observed_at)
+            item["event_count"] += count_value
+            item["duration_ns"] += duration_value
+            item["bytes"] += bytes_value
+            item["anomaly_count"] += 1 if row.get("is_anomaly") else 0
+            item["source_event_ids"].append(int(row["id"]))
+            for reason in (payload.get("metadata") or {}).get("immediate_emission_reason") or []:
+                if reason not in item["metadata"]["immediate_emission_reasons"]:
+                    item["metadata"]["immediate_emission_reasons"].append(reason)
+            query_text = payload.get("query_text")
+            if query_text:
+                item["query_text"] = str(query_text)
+            for seen_id in payload.get("query_ids") or []:
+                if seen_id not in item["metadata"]["query_ids_seen"]:
+                    item["metadata"]["query_ids_seen"].append(seen_id)
+
+        materialized = []
+        for item in grouped.values():
+            row = self.db.fetch_one(
+                """
+                INSERT INTO keeninsight.sql_lifecycle_events
+                    (session_id, query_id, query_text, query_id_source,
+                     function_name, first_observed_at, last_observed_at,
+                     event_count, duration_ns, bytes, anomaly_count,
+                     source_event_ids, metadata)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                ON CONFLICT (session_id, query_id, function_name)
+                DO UPDATE SET query_text = EXCLUDED.query_text,
+                              query_id_source = EXCLUDED.query_id_source,
+                              first_observed_at = EXCLUDED.first_observed_at,
+                              last_observed_at = EXCLUDED.last_observed_at,
+                              event_count = EXCLUDED.event_count,
+                              duration_ns = EXCLUDED.duration_ns,
+                              bytes = EXCLUDED.bytes,
+                              anomaly_count = EXCLUDED.anomaly_count,
+                              source_event_ids = EXCLUDED.source_event_ids,
+                              metadata = EXCLUDED.metadata
+                RETURNING id, session_id, query_id, query_text, query_id_source,
+                          function_name, first_observed_at, last_observed_at,
+                          event_count, duration_ns, bytes, anomaly_count,
+                          source_event_ids, metadata, created_at
+                """,
+                (
+                    item["session_id"],
+                    item["query_id"],
+                    item.get("query_text"),
+                    item["query_id_source"],
+                    item["function_name"],
+                    item["first_observed_at"],
+                    item["last_observed_at"],
+                    item["event_count"],
+                    item["duration_ns"],
+                    item["bytes"],
+                    item["anomaly_count"],
+                    item["source_event_ids"],
+                    json.dumps(item["metadata"], ensure_ascii=False, default=str),
+                ),
+            )
+            if row:
+                materialized.append(row)
+        materialized.sort(
+            key=lambda item: (int(item.get("event_count") or 0), int(item.get("duration_ns") or 0)),
+            reverse=True,
+        )
+        return materialized[: max(1, min(int(limit), 2000))]
+
+    def _target_pids(self) -> list[int]:
+        rows = self.db.fetch_all(
+            """
+            SELECT pid FROM pg_stat_activity
+            WHERE datname = current_database()
+              AND backend_type = 'client backend'
+              AND COALESCE(application_name, '') <> 'keeninsight-api'
+            """
+        )
+        return [int(row["pid"]) for row in rows if row.get("pid")]
+
+    def _run(self) -> None:
+        events = None
+        try:
+            bpf = self._build_bpf()
+            self._bpf = bpf
+            self._install_targets(bpf)
+            self._attach_probes(bpf)
+            if not self._attached:
+                raise EBPFUnavailable("BCC loaded but no requested probe could be attached")
+            self.db.execute(
+                "UPDATE keeninsight.probe_sessions SET status = 'running', error = NULL WHERE id = %s",
+                (self._session_id,),
+            )
+            events = bpf["events"]
+            events.open_perf_buffer(self._on_event, page_cnt=256, lost_cb=self._on_lost)
+            while not self._stop.is_set():
+                try:
+                    bpf.perf_buffer_poll(timeout=100)
+                except KeyboardInterrupt:
+                    break
+                now = time.monotonic()
+                if (
+                    self._adaptive_check_requested
+                    or now - self._last_target_refresh >= self.reporting_interval_seconds
+                ):
+                    self._install_targets(bpf)
+                    self._prune_over_budget_probes(bpf)
+                    self._adaptive_check_requested = False
+                    self._flush_aggregates()
+                    self._last_target_refresh = now
+            self._flush_kernel_aggregates(bpf)
+            self._flush_aggregates()
+        except Exception as exc:
+            self._last_error = str(exc)
+            LOG.warning("eBPF monitor failed: %s", exc)
+            if self._session_id:
+                try:
+                    self.db.execute(
+                        "UPDATE keeninsight.probe_sessions SET status = 'failed', error = %s WHERE id = %s",
+                        (self._last_error, self._session_id),
+                    )
+                except Exception:
+                    LOG.exception("could not persist eBPF failure")
+        finally:
+            with self._lock:
+                bpf = self._bpf
+                self._bpf = None
+            # PerfEventArray.__del__ closes per-CPU file descriptors.  Drop
+            # this table reference before BCC tears down the maps; otherwise
+            # older BCC releases can report a spurious KeyError during normal
+            # shutdown after the descriptors have already been removed.
+            events = None
+            if bpf is not None:
+                try:
+                    # BCC registers every BPF object with ``atexit``.  We
+                    # explicitly clean up at the end of a live session, so
+                    # leave no second callback that would close already
+                    # released probe/perf descriptors during service exit.
+                    atexit.unregister(bpf.cleanup)
+                    bpf.cleanup()
+                except Exception:
+                    LOG.debug("BCC cleanup failed", exc_info=True)
+
+    def _observed_event_rates(self) -> dict[str, float]:
+        """Return rates computed from exact kernel aggregate invocation counts."""
+        now = time.monotonic()
+        rates: dict[str, float] = {}
+        for name, count in self._function_event_counts.items():
+            first = self._function_first_event_monotonic.get(name, self._session_started_monotonic)
+            last = self._function_last_event_monotonic.get(name, now)
+            elapsed = max(0.001, last - first)
+            rates[name] = float(count) / elapsed
+        return rates
+
+    def _prune_over_budget_probes(self, bpf: Any) -> None:
+        """Detach optional user probes whose measured rate exceeds the budget.
+
+        This is deliberately a one-way online safety guard for the current
+        session.  Lasso remains responsible for historical importance ranking;
+        the guard prevents a predictive but extremely hot uprobe from making
+        the live observer itself the dominant workload.  Kernel resource
+        probes are never pruned.
+        """
+        if not self._adaptive_enabled:
+            return
+        rates = self._observed_event_rates()
+        self._adaptive_check_count += 1
+        self._adaptive_last_check = {
+            "observed_event_rates": rates,
+            "attached_probes": list(self._attached),
+            "checked_at": datetime.now(timezone.utc).isoformat(),
+        }
+        for row in list(self._functions):
+            name = str(row.get("function_name") or "")
+            if row.get("probe_kind") == "kprobe" or name in {item.get("function_name") for item in self._adaptive_pruned}:
+                continue
+            if rates.get(name, 0.0) <= self._adaptive_budget:
+                continue
+            try:
+                bpf.detach_uprobe(name=row["binary_path"], sym=name, pid=-1)
+                bpf.detach_uretprobe(name=row["binary_path"], sym=name, pid=-1)
+                marker = {
+                    "function_name": name,
+                    "observed_event_rate": float(rates[name]),
+                    "max_event_rate": float(self._adaptive_budget),
+                    "reason": "measured invocation-rate budget exceeded",
+                    "detached_at": datetime.now(timezone.utc).isoformat(),
+                }
+                self._adaptive_pruned.append(marker)
+                self._attached = [item for item in self._attached if item != "uprobe:%s" % name]
+                self.db.execute(
+                    "UPDATE keeninsight.probe_catalog SET attached = FALSE, updated_at = now() WHERE id = %s",
+                    (row.get("id"),),
+                )
+                self.db.execute(
+                    "UPDATE keeninsight.probe_sessions SET config = config || %s::jsonb WHERE id = %s",
+                    (
+                        json.dumps(
+                            {
+                                "adaptive_enabled": True,
+                                "max_event_rate": self._adaptive_budget,
+                                "observed_event_rates": rates,
+                                "adaptive_pruned_probes": self._adaptive_pruned,
+                            },
+                            ensure_ascii=False,
+                        ),
+                        self._session_id,
+                    ),
+                )
+                LOG.info("detached over-budget eBPF probe %s at %.2f invocations/s", name, rates[name])
+            except Exception as exc:
+                self._last_error = "adaptive detach failed for %s: %s" % (name, exc)
+                LOG.warning("could not detach over-budget probe %s: %s", name, exc)
+
+    def _build_bpf(self) -> Any:
+        try:
+            from bcc import BPF
+        except Exception as exc:
+            raise EBPFUnavailable(f"BCC import failed: {exc}") from exc
+        handlers: list[str] = []
+        for index, row in enumerate(self._functions):
+            event_id = "0xffffffff" if row.get("probe_kind") == "kprobe" else str(index)
+            handlers.append(
+                f"int trace_enter_{index}(struct pt_regs *ctx) {{ return start_probe(ctx, {event_id}); }}"
+            )
+            handlers.append(
+                f"int trace_return_{index}(struct pt_regs *ctx) {{ return finish_probe(ctx, {event_id}); }}"
+            )
+        text = r'''
+#include <uapi/linux/ptrace.h>
+
+struct probe_key_t { u64 tid; u32 function_id; };
+struct probe_start_t { u64 timestamp_ns; u64 bytes; };
+struct probe_event_t {
+    u64 timestamp_ns;
+    u64 duration_ns;
+    u64 tid;
+    u32 tgid;
+    u32 cpu;
+    u32 function_id;
+    u64 bytes;
+    u64 sample_count;
+    u64 duration_ns_total;
+    u64 duration_ns_max;
+    u64 bytes_total;
+    u32 aggregate;
+};
+struct aggregate_key_t { u64 tid; u32 function_id; };
+struct aggregate_value_t {
+    u64 count;
+    u64 duration_ns_total;
+    u64 duration_ns_max;
+    u64 bytes_total;
+};
+BPF_HASH(target_pids, u32, u8, 1024);
+BPF_HASH(probe_starts, struct probe_key_t, struct probe_start_t, 8192);
+BPF_HASH(probe_aggregates, struct aggregate_key_t, struct aggregate_value_t, 16384);
+BPF_PERF_OUTPUT(events);
+
+#define NORMAL_KERNEL_BATCH_SIZE 64
+#define ANOMALY_DURATION_NS 10000000ULL
+#define ANOMALY_BYTES 1048576ULL
+
+static int start_probe(struct pt_regs *ctx, u32 function_id) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 tgid = pid_tgid >> 32;
+    u8 *allowed = target_pids.lookup(&tgid);
+    if (!allowed) return 0;
+    struct probe_key_t key = {};
+    key.tid = pid_tgid;
+    key.function_id = function_id;
+    struct probe_start_t start = {};
+    start.timestamp_ns = bpf_ktime_get_ns();
+    if (function_id == 0xffffffff) {
+        start.bytes = (u64)PT_REGS_PARM3(ctx);
+    }
+    probe_starts.update(&key, &start);
+    return 0;
+}
+
+static int finish_probe(struct pt_regs *ctx, u32 function_id) {
+    u64 pid_tgid = bpf_get_current_pid_tgid();
+    u32 tgid = pid_tgid >> 32;
+    u8 *allowed = target_pids.lookup(&tgid);
+    if (!allowed) return 0;
+    struct probe_key_t key = {};
+    key.tid = pid_tgid;
+    key.function_id = function_id;
+    struct probe_start_t *start = probe_starts.lookup(&key);
+    if (!start) return 0;
+    struct probe_event_t event = {};
+    event.timestamp_ns = bpf_ktime_get_ns();
+    u64 duration_ns = event.timestamp_ns - start->timestamp_ns;
+    u64 bytes = start->bytes;
+    event.tid = (u32)pid_tgid;
+    event.tgid = tgid;
+    event.cpu = bpf_get_smp_processor_id();
+    event.function_id = function_id;
+    struct aggregate_key_t aggregate_key = {};
+    aggregate_key.tid = pid_tgid;
+    aggregate_key.function_id = function_id;
+    struct aggregate_value_t zero = {};
+    struct aggregate_value_t *aggregate = probe_aggregates.lookup_or_init(&aggregate_key, &zero);
+    if (!aggregate) {
+        probe_starts.delete(&key);
+        return 0;
+    }
+    aggregate->count += 1;
+    aggregate->duration_ns_total += duration_ns;
+    if (duration_ns > aggregate->duration_ns_max)
+        aggregate->duration_ns_max = duration_ns;
+    aggregate->bytes_total += bytes;
+    if (duration_ns >= ANOMALY_DURATION_NS || bytes >= ANOMALY_BYTES ||
+        aggregate->count >= NORMAL_KERNEL_BATCH_SIZE) {
+        event.duration_ns = aggregate->duration_ns_total;
+        event.bytes = aggregate->bytes_total;
+        event.sample_count = aggregate->count;
+        event.duration_ns_total = aggregate->duration_ns_total;
+        event.duration_ns_max = aggregate->duration_ns_max;
+        event.bytes_total = aggregate->bytes_total;
+        event.aggregate = aggregate->count > 1;
+        events.perf_submit(ctx, &event, sizeof(event));
+        probe_aggregates.delete(&aggregate_key);
+    }
+    probe_starts.delete(&key);
+    return 0;
+}
+''' + "\n".join(handlers) + "\n"
+        return BPF(text=text)
+
+    def _install_targets(self, bpf: Any) -> None:
+        table = bpf["target_pids"]
+        current = set(self._target_pids())
+        for pid in current:
+            key = ct.c_uint(pid)
+            table[key] = ct.c_ubyte(1)
+        # Remove backends that exited so their PID cannot be accidentally
+        # reused while this probe session is still alive.
+        for pid in list(self._activity_by_pid):
+            if pid not in current:
+                try:
+                    del table[ct.c_uint(pid)]
+                except Exception:
+                    pass
+        try:
+            rows = self.db.fetch_all(
+                """
+                SELECT pid, query_id::text AS query_id, left(query, 2000) AS query,
+                       state, query_start, wait_event_type, wait_event
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND backend_type = 'client backend'
+                  AND COALESCE(application_name, '') <> 'keeninsight-api'
+                """
+            )
+        except Exception as exc:
+            # PostgreSQL 12 installations without compute_query_id expose no
+            # query_id column in pg_stat_activity.  Preserve SQL text/state
+            # correlation and make the missing field explicit.
+            if "query_id" not in str(exc):
+                raise
+            rows = self.db.fetch_all(
+                """
+                SELECT pid, NULL::text AS query_id, left(query, 2000) AS query,
+                       state, query_start, wait_event_type, wait_event
+                FROM pg_stat_activity
+                WHERE datname = current_database()
+                  AND backend_type = 'client backend'
+                  AND COALESCE(application_name, '') <> 'keeninsight-api'
+                """
+            )
+        self._activity_by_pid = {}
+        for row in rows:
+            if not row.get("pid"):
+                continue
+            # PostgreSQL 12 builds without compute_query_id do not expose a
+            # native query_id column.  Preserve lifecycle identity with a
+            # deterministic fingerprint of the observed SQL text and record
+            # its provenance instead of pretending it came from PostgreSQL.
+            if not row.get("query_id") and row.get("query"):
+                normalized = re.sub(r"\s+", " ", str(row["query"]).strip().lower())
+                row["query_id"] = "ki:%s" % hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:24]
+                row["query_id_source"] = "local_sql_fingerprint"
+            else:
+                row["query_id_source"] = "postgresql_pg_stat_activity"
+            self._activity_by_pid[int(row["pid"])] = row
+
+    def _attach_probes(self, bpf: Any) -> None:
+        # A kernel probe uses the reserved event id 0xffffffff inside BPF,
+        # but its generated handler still has the ordinary selected-list
+        # index.  Do not iterate over the alias in _function_by_id and try to
+        # attach a non-existent trace_enter_4294967295 program.
+        for index, row in enumerate(self._functions):
+            try:
+                if row["probe_kind"] == "kprobe":
+                    bpf.attach_kprobe(event=row["function_name"], fn_name=f"trace_enter_{index}")
+                    bpf.attach_kretprobe(event=row["function_name"], fn_name=f"trace_return_{index}")
+                    self._attached.append(f"kprobe:{row['function_name']}")
+                else:
+                    bpf.attach_uprobe(
+                        name=row["binary_path"],
+                        sym=row["function_name"],
+                        fn_name=f"trace_enter_{index}",
+                        pid=-1,
+                    )
+                    bpf.attach_uretprobe(
+                        name=row["binary_path"],
+                        sym=row["function_name"],
+                        fn_name=f"trace_return_{index}",
+                        pid=-1,
+                    )
+                    self._attached.append(f"uprobe:{row['function_name']}")
+                self.db.execute(
+                    "UPDATE keeninsight.probe_catalog SET selected = TRUE, attached = TRUE, updated_at = now() WHERE id = %s",
+                    (row["id"],),
+                )
+            except Exception as exc:
+                LOG.warning("probe attach failed for %s: %s", row.get("function_name"), exc)
+
+    def _on_lost(self, count: int) -> None:
+        # BCC's lost callback receives only the number of lost records (the
+        # CPU is not passed, unlike the raw event callback).
+        if not self._accept_events:
+            return
+        self._lost_count += int(count)
+
+    def _is_long_running_query(self, query_start: Any, now: datetime) -> bool:
+        """Check the live pg_stat_activity query age for anomaly-aware emission."""
+        if not query_start:
+            return False
+        try:
+            started = query_start
+            if isinstance(started, str):
+                started = datetime.fromisoformat(started.replace("Z", "+00:00"))
+            if not isinstance(started, datetime):
+                return False
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            return (now - started).total_seconds() >= self.long_query_threshold_seconds
+        except (TypeError, ValueError, OverflowError):
+            return False
+
+    def _on_event(self, _cpu: int, data: Any, size: int) -> None:
+        if not self._accept_events:
+            return
+        bpf = self._bpf
+        if bpf is None:
+            return
+        event = bpf["events"].event(data)
+        function = self._function_by_id.get(int(event.function_id)) or {}
+        name = function.get("function_name") or f"probe_{event.function_id}"
+        duration = int(event.duration_ns)
+        sample_count = max(1, int(getattr(event, "sample_count", 1) or 1))
+        duration_total = int(getattr(event, "duration_ns_total", 0) or duration)
+        duration_max = int(getattr(event, "duration_ns_max", 0) or duration)
+        bytes_total = int(getattr(event, "bytes_total", 0) or int(event.bytes))
+        now = datetime.now(timezone.utc)
+        activity = self._activity_by_pid.get(int(event.tgid)) or {}
+        query_start = activity.get("query_start")
+        if hasattr(query_start, "isoformat"):
+            query_start = query_start.isoformat()
+        long_query = self._is_long_running_query(query_start, now)
+        is_anomaly = (
+            duration_max >= self.anomaly_duration_ns
+            or bytes_total >= 1024 * 1024
+            or long_query
+        )
+        payload = {
+            "session_id": self._session_id,
+            "observed_at": now.isoformat(),
+            "event_type": "kernel_io" if function.get("probe_kind") == "kprobe" else "database_function",
+            "probe_kind": function.get("probe_kind") or "unknown",
+            "function_name": name,
+            "binary_path": function.get("binary_path") or None,
+            "pid": int(event.tgid),
+            "tid": int(event.tid),
+            "cpu": int(event.cpu),
+            "duration_ns": duration_total,
+            "bytes": bytes_total,
+            "is_anomaly": is_anomaly,
+            "query_id": activity.get("query_id"),
+            "query_text": activity.get("query"),
+            "query_state": activity.get("state"),
+            "query_start": query_start,
+            "query_id_source": activity.get("query_id_source"),
+            "metadata": {
+                "collection": "bcc_perf_buffer",
+                "event_size": size,
+                "kernel_batch": bool(getattr(event, "aggregate", 0)),
+                "sample_count": sample_count,
+                "duration_ns_max": duration_max,
+                "duration_ns_total": duration_total,
+                "bytes_total": bytes_total,
+                "sql_lifecycle_correlation": "pg_stat_activity PID/query_id snapshot",
+                "immediate_emission_reason": [
+                    reason
+                    for reason, matched in (
+                        ("long_query", long_query),
+                        ("long_function_or_duration", duration_max >= self.anomaly_duration_ns),
+                        ("large_io", bytes_total >= 1024 * 1024),
+                    )
+                    if matched
+                ],
+            },
+        }
+        payload["count"] = sample_count
+        payload["duration_ns_total"] = duration_total
+        payload["duration_ns_max"] = duration_max
+        payload["bytes_total"] = bytes_total
+        self._event_count += sample_count
+        self._last_event_at = now
+        monotonic_now = time.monotonic()
+        self._function_event_counts[name] = self._function_event_counts.get(name, 0) + sample_count
+        self._function_first_event_monotonic.setdefault(name, monotonic_now)
+        self._function_last_event_monotonic[name] = monotonic_now
+        if (
+            self._adaptive_enabled
+            and function.get("probe_kind") == "uprobe"
+            and self._function_event_counts[name] > self._adaptive_budget
+        ):
+            # A high-rate perf buffer can keep BCC's poll call busy draining
+            # callbacks, so the owning loop may not regain control at its
+            # reporting tick. Evaluate and detach here, after the exact
+            # aggregate count has been recorded, then retain the loop flag as a
+            # fallback for implementations whose callback cannot detach.
+            self._adaptive_check_requested = True
+            try:
+                self._prune_over_budget_probes(bpf)
+            finally:
+                self._adaptive_check_requested = False
+        if is_anomaly:
+            self.bus.publish(payload, event_key=name)
+            return
+        key = (name, int(event.tgid))
+        aggregate = self._aggregates.setdefault(
+            key,
+            {
+                "session_id": self._session_id,
+                "observed_at": now.isoformat(),
+                "event_type": "probe_aggregate",
+                "probe_kind": function.get("probe_kind") or "unknown",
+                "function_name": name,
+                "binary_path": function.get("binary_path") or None,
+                "pid": int(event.tgid),
+                "query_id": activity.get("query_id"),
+                "query_text": activity.get("query"),
+                "query_state": activity.get("state"),
+                "query_start": query_start,
+                "query_id_source": activity.get("query_id_source"),
+                "query_ids": [activity.get("query_id")] if activity.get("query_id") else [],
+                "metadata": {
+                    "collection": "bcc_perf_buffer",
+                    "sql_lifecycle_correlation": "pg_stat_activity PID/query_id snapshot",
+                },
+                "count": 0,
+                "duration_ns_total": 0,
+                "duration_ns_max": 0,
+                "bytes_total": 0,
+                "is_anomaly": False,
+            },
+        )
+        aggregate["count"] += sample_count
+        aggregate["duration_ns_total"] += duration_total
+        aggregate["duration_ns_max"] = max(aggregate["duration_ns_max"], duration_max)
+        aggregate["bytes_total"] += bytes_total
+        current_query_id = activity.get("query_id")
+        if current_query_id and current_query_id not in aggregate["query_ids"]:
+            aggregate["query_ids"].append(current_query_id)
+        if current_query_id and current_query_id != aggregate.get("query_id"):
+            aggregate["query_id"] = current_query_id
+            aggregate["query_text"] = activity.get("query")
+            aggregate["query_state"] = activity.get("state")
+            aggregate["query_start"] = query_start
+
+    def _flush_aggregates(self) -> None:
+        pending = list(self._aggregates.values())
+        self._aggregates.clear()
+        for aggregate in pending:
+            try:
+                self.bus.publish(aggregate, event_key=aggregate["function_name"])
+            except Exception as exc:
+                self._last_error = str(exc)
+                LOG.warning("could not publish aggregated eBPF event: %s", exc)
+
+    def _flush_kernel_aggregates(self, bpf: Any) -> None:
+        """Persist the sub-batch tails still held in the BPF hash map."""
+        try:
+            table = bpf["probe_aggregates"]
+            pending = list(table.items())
+        except Exception as exc:
+            LOG.debug("could not read kernel eBPF aggregate map: %s", exc)
+            return
+        for key, value in pending:
+            try:
+                raw_tid = int(key.tid)
+                tgid = raw_tid >> 32
+                tid = raw_tid & 0xFFFFFFFF
+                function_id = int(key.function_id)
+                function = self._function_by_id.get(function_id) or {}
+                name = function.get("function_name") or f"probe_{function_id}"
+                count = max(1, int(value.count))
+                duration_total = int(value.duration_ns_total)
+                duration_max = int(value.duration_ns_max)
+                bytes_total = int(value.bytes_total)
+                now = datetime.now(timezone.utc)
+                activity = self._activity_by_pid.get(tgid) or {}
+                query_start = activity.get("query_start")
+                long_query = self._is_long_running_query(query_start, now)
+                payload = {
+                    "session_id": self._session_id,
+                    "observed_at": now.isoformat(),
+                    "event_type": "probe_aggregate",
+                    "probe_kind": function.get("probe_kind") or "unknown",
+                    "function_name": name,
+                    "binary_path": function.get("binary_path") or None,
+                    "pid": tgid,
+                    "tid": tid,
+                    "cpu": 0,
+                    "duration_ns": duration_total,
+                    "bytes": bytes_total,
+                    "is_anomaly": long_query or duration_max >= self.anomaly_duration_ns or bytes_total >= 1024 * 1024,
+                    "query_id": activity.get("query_id"),
+                    "query_text": activity.get("query"),
+                    "query_state": activity.get("state"),
+                    "query_id_source": activity.get("query_id_source"),
+                    "count": count,
+                    "duration_ns_total": duration_total,
+                    "duration_ns_max": duration_max,
+                    "bytes_total": bytes_total,
+                    "metadata": {
+                        "collection": "bcc_kernel_aggregate_tail",
+                        "kernel_batch": True,
+                        "sample_count": count,
+                        "duration_ns_max": duration_max,
+                        "sql_lifecycle_correlation": "pg_stat_activity PID/query_id snapshot",
+                        "immediate_emission_reason": [
+                            reason
+                            for reason, matched in (
+                                ("long_query", long_query),
+                                ("long_function_or_duration", duration_max >= self.anomaly_duration_ns),
+                                ("large_io", bytes_total >= 1024 * 1024),
+                            )
+                            if matched
+                        ],
+                    },
+                }
+                self.bus.publish(payload, event_key=name)
+                self._event_count += count
+                self._last_event_at = now
+                monotonic_now = time.monotonic()
+                self._function_event_counts[name] = self._function_event_counts.get(name, 0) + count
+                self._function_first_event_monotonic.setdefault(name, monotonic_now)
+                self._function_last_event_monotonic[name] = monotonic_now
+            except Exception as exc:
+                self._last_error = str(exc)
+                LOG.warning("could not publish kernel eBPF aggregate tail: %s", exc)

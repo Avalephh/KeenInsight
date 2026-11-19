@@ -1,0 +1,133 @@
+SOURCE_KEY: external:stackexchange:dba:95602
+SOURCE_TYPE: external-community
+SOURCE_TITLE: DBA StackExchange · Poor query performance due to recheck condition on index scan
+SOURCE_URI: https://dba.stackexchange.com/questions/95602/poor-query-performance-due-to-recheck-condition-on-index-scan
+RETRIEVED_AT: 2026-09-07T04:48:34.256047+00:00
+CONTENT_SHA256: 22cc2b5d3cbcd27a3e9fd1659fdc0ccab810e4b1183cff6f27ae7d3d04abbfa9
+SOURCE_METADATA: {"api": "Stack Exchange API 2.3", "license": "CC BY-SA; verify current primary documentation", "question_id": 95602}
+---
+Question: Poor query performance due to recheck condition on index scan
+
+We are testing the performance of metadata when stored in JSONB compared to a traditional EAV catalogue (commonly used in biomedical scenarios), using a PostgreSQL 9.4 server.
+
+I get a problem when trying to improve the EAV performance with proper indexing. This is an issue that I have encountered also with other queries on other tables so I fear we are making some fundamental mistake.
+
+To model the EAV I have three tables:
+
+1)
+data
+that contains all the Entities (not shown)
+
+2)
+eav_attribute
+that contains all the Attributes
+
+CREATE TABLE eav_attribute (
+id serial PRIMARY KEY,
+data_type integer NOT NULL,
+loop integer,
+name text NOT NULL,
+field_type text NOT NULL,
+has_unit boolean,
+created_at timestamp with time zone NOT NULL,
+updated_at timestamp with time zone NOT NULL
+);
+
+2)
+eav_value_text_data
+that contains all the Values
+
+CREATE TABLE eav_value_text_data (
+id serial PRIMARY KEY,
+entity integer NOT NULL,
+attribute integer NOT NULL,
+value text NOT NULL,
+created_at timestamp with time zone NOT NULL,
+updated_at timestamp with time zone NOT NULL
+);
+
+With the following foreign key constraint that associates the last two tables (other foreign keys not shown as they are not employed in the query I tried):
+
+ALTER TABLE ONLY eav_value_text_data
+ADD CONSTRAINT eav_value_text_data_attribute_fkey
+FOREIGN KEY (attribute) REFERENCES eav_attribute(id);
+
+I have populated the two tables with a huge dataset of genomic variations.
+I have over 250 million rows on the
+eav_value_text_data
+table for 25 million rows in the
+data
+table and 49 different attributes (rows in
+eav_attribute
+).
+
+Now I am checking the cost and performance of the following query:
+
+SELECT count(*) FROM eav_value_text_data v
+INNER JOIN eav_attribute a ON a.id = v.attribute
+WHERE a.data_type = 11
+AND a.name = 'id'
+AND v.value = 'rs145368920';
+
+The value 'rs145368920' appears only 15 times in
+eav_value_text_data
+
+First I ran EXPLAIN ANALYZE without adding any index to the two tables:
+
+QUERY PLAN
+
+Aggregate (cost=5109969.74..5109969.75 rows=1 width=0) (actual time=351086.638..351086.639 rows=1 loops=1)
+-> Nested Loop (cost=0.00..5109969.32 rows=168 width=0) (actual time=34814.603..351086.541 rows=15 loops=1)
+Join Filter: (a.attribute = b.id)
+-> Seq Scan on eav_attribute b (cost=0.00..1.73 rows=1 width=4) (actual time=0.027..0.034 rows=1 loops=1)
+Filter: ((data_type = 11) AND (name = 'id'::text))
+Rows Removed by Filter: 48
+-> Seq Scan on eav_value_text_data a (cost=0.00..5109864.40 rows=8255 width=4) (actual time=34814.555..351086.380 rows=15 loops=1)
+Filter: (value = 'rs145368920'::text)
+Rows Removed by Filter: 252054702
+Planning time: 145.614 ms
+Execution time: 351096.291 ms
+
+It performs to sequential scans on both tables and it requires the quite abysmal time of 350 seconds. Now, I add an index on the column attribute of
+eav_value_text_data
+to improve the query performance:
+
+CREATE INDEX eav_value_text_data_attribute_index ON eav_value_text_data (attribute);
+
+And I run again the EXPLAIN ANALYZE:
+
+QUERY PLAN
+
+Aggregate (cost=2726067.17..2726067.18 rows=1 width=0) (actual time=1262829.858..1262829.859 rows=1 loops=1)
+-> Nested Loop (cost=423172.71..2726066.76 rows=166 width=0) (actual time=113152.884..1262829.758 rows=15 loops=1)
+-> Seq Scan on eav_attribute b (cost=0.00..1.73 rows=1 width=4) (actual time=0.027..0.062 rows=1 loops=1)
+Filter: ((data_type = 11) AND (name = 'id'::text))
+Rows Removed by Filter: 48
+-> Bitmap Heap Scan on eav_value_text_data a (cost=423172.71..2726057.61 rows=741 width=4) (actual time=113152.821..1262829.557 rows=15 loops=1)
+Recheck Cond: (attribute = b.id)
+Rows Removed by Index Recheck: 223460596
+Filter: (value = 'rs145368920'::text)
+Rows Removed by Filter: 24188192
+Heap Blocks: exact=37881 lossy=1921273
+-> Bitmap Index Scan on eav_value_text_data_attribute_index (cost=0.00..423172.52 rows=22914127 width=0) (actual time=14177.368..14177.368 rows=24188207 loops=1)
+Index Cond: (attribute = b.id)
+Planning time: 126.846 ms
+Execution time: 1262840.302 ms
+
+Even though it is now performing an index scan, it takes now over 1260 seconds which is nearly 4 times worse than without indexes.
+What is the issue here? Is it related to the high number of lossy heap blocks? Could it be solved just by tuning the work_mem?
+All the queries were run with cold cache (stopping the Postgres server and
+flushing the cache) to avoid caching effects.
+
+Currently we have 4GB of RAM on the system where we are running the queries.
+We have allocated:
+
+work_mem = 4 MB
+
+shared_buffers = 950 MB (about 25% total RAM)
+
+effective_cache_size = 2600 MB (about 70% total RAM)
+
+Tags: postgresql, performance, index, index-tuning, explain
+Score: 2
+Answer count: 1

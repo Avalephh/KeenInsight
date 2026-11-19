@@ -1,0 +1,437 @@
+SOURCE_KEY: archive:paper:main.tex
+SOURCE_TYPE: paper
+SOURCE_TITLE: main.tex
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!main.tex
+---
+% VLDB template version of 2020-08-03 enhances the ACM template, version 1.7.0:
+% https://www.acm.org/publications/proceedings-template
+% The ACM Latex guide provides further information about the ACM template
+
+\documentclass[sigconf, nonacm]{acmart}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{enumitem}
+\usepackage{subcaption}
+%% The following content must be adapted for the final version
+% paper-specific
+\newcommand\vldbdoi{XX.XX/XXX.XX}
+\newcommand\vldbpages{XXX-XXX}
+% issue-specific
+\newcommand\vldbvolume{14}
+\newcommand\vldbissue{1}
+\newcommand\vldbyear{2020}
+% should be fine as it is
+\newcommand\vldbauthors{\authors}
+\newcommand\vldbtitle{\shorttitle}
+% leave empty if no availability url should be set
+\newcommand\vldbavailabilityurl{URL_TO_YOUR_ARTIFACTS}
+% whether page numbers should be shown or not, use 'plain' for review versions, 'empty' for camera ready
+\newcommand\vldbpagestyle{plain}
+\newcommand{\xy}[1]{\textcolor{blue}{[ZXY: #1]}}
+\newcommand{\sys}{\texttt{KeenInsight}\xspace}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tikz}
+\newcommand{\stepnum}[1]{\tikz[baseline=(char.base)]{
+\node[shape=circle,draw,inner sep=1pt] (char) {\small #1};}}
+
+\lstset{
+basicstyle=\ttfamily\small,
+frame=single,
+breaklines=true,
+columns=fullflexible,
+aboveskip=4pt,
+belowskip=4pt
+}
+\begin{document}
+
+% \title{KeenInsight: A Real-Time Database Anomaly Diagnosis and Automated Tuning System}
+%\title{KeenInsight: An End-to-End Database Maintenance System Empowered by LLMs}
+\title{KeenInsight: From Fine-Grained Signals to Reliable DBMS Self-Tuning via Code-Level Insights}
+\settopmatter{authorsperrow=4}
+%%
+%% The "author" command and its associated commands are used to define the authors and their affiliations.
+\author{Zhentao Han}
+
+\affiliation{%
+\institution{Renmin University, China}
+}
+\email{avaleph@ruc.edu.cn}
+
+\author{Zhaoyan Hong}
+
+\affiliation{%
+\institution{Renmin University, China}
+}
+\email{hongzhaoyan@ruc.edu.cn}
+
+\author{Tiantian Chen}
+\affiliation{%
+\institution{Renmin University, China}
+}
+\email{chenentt@ruc.edu.cn}
+
+\author{Xinyue Shi}
+\affiliation{%
+\institution{Renmin University, China }
+}
+\email{xinyueshi@ruc.edu.cn}
+
+% \author{Jia Wang}
+
+% \affiliation{%
+% \institution{Renmin University, China}
+% }
+% \email{2025001097@ruc.edu.cn}
+
+\author{Xinyi Zhang}
+\affiliation{%
+\institution{Renmin University, China }
+}
+\email{xinyizhang.info@ruc.edu.cn}
+
+\author{Shuang Liu}
+
+\affiliation{%
+\institution{Renmin University, China}
+}
+\email{shuang.liu@ruc.edu.cn}
+
+\author{Wei Lu}
+\affiliation{%
+\institution{Renmin University, China}
+}
+\email{lu-wei@ruc.edu.cn}
+
+\author{Xiaoyong Du}
+\affiliation{%
+\institution{Renmin University, China}
+}
+\email{duyong@ruc.edu.cn}
+
+%%
+%% The abstract is a short summary of the work to be presented in the
+%% article.
+\begin{abstract}
+% Diagnosing and resolving performance anomalies in modern database systems is challenging. Existing tools suffer from limited observability, static heuristics, and semi-automated ad-hoc workflows.
+Diagnosing and resolving performance anomalies in modern database systems remains challenging. Existing approaches rely on coarse-grained runtime signals and black-box optimization, leading to unreliable and non-interpretable decisions. While fine-grained signals are essential, they are costly to collect and difficult to translate into actionable optimization.
+We present \sys, an end-to-end LLM-empowered system that bridges this gap by tightly coupling low-overhead fine-grained monitoring with reliable, interpretable self-tuning.
+\sys enables adaptive eBPF-based monitoring of database key events, performs interpretable anomaly diagnosis, and conducts causally grounded tuning via code-level insights derived from LLVM-based analysis of database source
+code.
+%database source code, documentation, and historical observations.
+% \sys enables adaptive fine-grained monitoring via eBPF, performs hierarchical interpretable anomaly diagnosis, and conducts reliable tuning using multi-source rules derived from documentation, source code, and historical experience.
+We demonstrate \sys in an interactive dashboard, with a demonstration video available at \url{https://youtu.be/w_eneJaQVXI}.
+% Database systems are critical infrastructure for modern data-intensive applications, yet diagnosing performance anomalies in production environments remains challenging. Existing monitoring tools often expose only coarse-grained system metrics and rely heavily on manual analysis by database administrators (DBAs), making it difficult to quickly identify root causes and apply effective optimizations.
+
+% In this demonstration, we present KeenInsight, a real-time database anomaly diagnosis and tuning system that provides an end-to-end closed-loop optimization workflow. Built on a lightweight eBPF-based monitoring framework, KeenInsight continuously observes database runtime behavior with minimal overhead. The system adopts a dual-pipeline optimization design that distinguishes between system-level resource anomalies and SQL-level query inefficiencies, enabling targeted diagnosis and optimization strategies.
+
+% Through an interactive visualization interface, the demo illustrates how KeenInsight performs real-time monitoring, anomaly detection, root-cause analysis, and automated tuning under realistic workloads.
+\end{abstract}
+
+\maketitle
+
+%%% do not modify the following VLDB block %%
+%%% VLDB block start %%%
+\pagestyle{\vldbpagestyle}
+\begingroup\small\noindent\raggedright\textbf{PVLDB Reference Format:}\\
+\vldbauthors. \vldbtitle. PVLDB, \vldbvolume(\vldbissue): \vldbpages, \vldbyear.\\
+\href{https://doi.org/\vldbdoi}{doi:\vldbdoi}
+\endgroup
+\begingroup
+\renewcommand\thefootnote{}\footnote{\noindent
+This work is licensed under the Creative Commons BY-NC-ND 4.0 International License. Visit \url{https://creativecommons.org/licenses/by-nc-nd/4.0/} to view a copy of this license. For any use beyond those covered by this license, obtain permission by emailing \href{mailto:info@vldb.org}{info@vldb.org}. Copyright is held by the owner/author(s). Publication rights licensed to the VLDB Endowment. \\
+\raggedright Proceedings of the VLDB Endowment, Vol. \vldbvolume, No. \vldbissue\ %
+ISSN 2150-8097. \\
+\href{https://doi.org/\vldbdoi}{doi:\vldbdoi} \\
+}\addtocounter{footnote}{-1}\endgroup
+%%% VLDB block end %%%
+
+%%% do not modify the following VLDB block %%
+%%% VLDB block start %%%
+\ifdefempty{\vldbavailabilityurl}{}{
+\vspace{.3cm}
+\begingroup\small\noindent\raggedright\textbf{PVLDB Artifact Availability:}\\
+The source code, data, and/or other artifacts have been made available at \url{https://github.com/Avalephh/KeenInsight.git}.
+\endgroup
+}
+
+% \begin{figure*}[t]
+% \centering
+% \includegraphics[width=\textwidth, clip, trim=0 575 0 25]{system-4.pdf}
+% \caption{Overview of \sys.}
+% \label{fig:architecture}
+% \end{figure*}
+
+\begin{figure*}[t]
+\centering\scalebox{0.91}{
+\includegraphics{system-7.pdf}}
+\caption{Overview of \sys.}
+\vspace{-0.1em}
+\label{fig:architecture}
+\vspace{-0.3em}
+\end{figure*}
+
+\section{Introduction}
+
+\input{1intro}
+
+% With the rapid growth of data-intensive applications, database systems have become critical infrastructure for modern information systems. Ensuring the stable and efficient operation of database systems is therefore essential for supporting a wide range of application services. However, in complex production environments, database systems inevitably encounter various performance anomalies, such as sudden increases in query latency or significant drops in system throughput. Database performance is influenced not only by query execution plans but also by multiple factors including operating system resource conditions, database configuration, and workload patterns. Since performance degradation is often caused by the interaction of multiple factors, identifying the root cause of performance issues is typically challenging.
+
+% In current production environments, database anomaly diagnosis and performance tuning still rely heavily on the experience of database administrators (DBAs). Operational staff usually need to analyze system monitoring metrics, database logs, and query execution information to gradually locate potential problems. Even with the assistance of modern database monitoring and diagnostic tools, substantial manual analysis is still required. One major reason is that existing monitoring systems typically provide only coarse-grained system metrics, such as CPU utilization, memory usage, and disk I/O throughput. Although these metrics can reflect the overall system status, they are often insufficient for directly identifying the root causes of database performance anomalies. Moreover, many existing diagnostic tools operate as independent utilities that require manual invocation and interpretation by operators, lacking an integrated and automated diagnosis workflow.
+
+% More importantly, most existing database diagnosis approaches adopt a post-hoc analysis paradigm. Database administrators usually start investigating logs and monitoring data only after system performance has already degraded significantly. Such reactive diagnosis not only prolongs system recovery time but also makes it difficult to detect and mitigate potential performance risks in a timely manner. Therefore, constructing a system that can continuously monitor database runtime behavior, detect performance anomalies in real time, and automatically trigger optimization strategies is of great importance for improving system reliability and operational efficiency.
+
+% To address these challenges, we present \textbf{KeenInsight}, a real-time database anomaly diagnosis and intelligent tuning system. KeenInsight establishes an end-to-end closed-loop optimization workflow that integrates runtime monitoring, anomaly detection, root-cause analysis, and automated tuning. By continuously observing database runtime behavior, KeenInsight is able to detect performance anomalies and automatically trigger appropriate optimization strategies, significantly reducing the reliance on manual DBA intervention.
+
+% The core idea of KeenInsight is a \textit{dual-path optimization framework} that categorizes database performance issues into two types: \textit{system-level anomalies} and \textit{SQL-level anomalies}. For each type of anomaly, KeenInsight applies different diagnostic and optimization strategies. Through this layered analysis mechanism, the system can identify performance bottlenecks from two complementary perspectives: system resource behavior and query execution behavior, and then automatically select appropriate optimization actions.
+
+% In this demonstration, we showcase how KeenInsight performs real-time detection, root-cause diagnosis, and automated optimization of database performance anomalies under realistic database workloads. Through an interactive visualization interface, users can observe the complete closed-loop optimization process—from anomaly detection to diagnosis and optimization—in an intuitive and transparent manner.
+
+% The main contributions of this paper are summarized as follows:
+
+% \begin{itemize}
+
+% \item \textbf{A real-time database anomaly diagnosis and automated tuning system.}
+% We present KeenInsight, which provides an end-to-end closed-loop optimization workflow that integrates runtime monitoring, anomaly detection, root-cause analysis, and automated tuning. The system can continuously detect performance anomalies during database execution and automatically trigger optimization strategies, significantly reducing the reliance on manual DBA intervention.
+
+% \item \textbf{A dual-path database performance optimization framework.}
+% We design a framework that categorizes database performance issues into system-level anomalies and SQL-level anomalies. Correspondingly, KeenInsight constructs two analysis pipelines—\textit{System-level pipeline} and \textit{SQL-level pipeline}—to diagnose performance problems from both system resource behavior and query execution behavior, improving the accuracy of performance diagnosis.
+
+% \item \textbf{A low-overhead fine-grained monitoring mechanism based on eBPF.}
+% We implement a monitoring mechanism using eBPF that can dynamically capture system resource usage and SQL execution events without modifying the database source code, providing fine-grained runtime data support for real-time anomaly detection and performance analysis.
+
+% \item \textbf{An interactive demonstration system for database performance optimization.}
+% We build a visual demonstration platform that presents the entire optimization workflow—from anomaly detection to root-cause analysis and automated tuning—allowing users to intuitively observe how the closed-loop optimization mechanism improves database performance under realistic workloads.
+
+% \end{itemize}
+
+% \begin{figure*}[t]
+% \centering
+% \includegraphics[width=\textwidth]{show.png}
+% \caption{Workload of KeenInsight.}
+% \label{fig:UI}
+% \end{figure*}
+
+\section{System Implementation}
+\input{2overview}
+
+\subsection{eBPF-Based Adaptive Monitoring}
+% \sys uses eBPF to support event-driven monitoring, adaptive probe activation, and SQL-lifecycle reconstruction.
+\sys leverages eBPF to enable fine-grained monitoring with low overhead by employing the following strategies.
+
+\noindent\textbf{Event-Driven Monitoring.}
+Existing monitoring tools, general-purpose~\cite{Prometheus,perf} or DBMS-specific~\cite{pg_stat_statements}, collect metrics through periodic sampling, which introduces an unfavorable trade-off between observability and overhead: low-frequency sampling may miss transient root cause events, while high-frequency sampling incurs significant runtime cost.
+In contrast, \sys adopts event-driven monitoring by attaching eBPF probes to critical functions and emitting signals only upon relevant invocations, thereby eliminating the sampling trade-off.
+% KeenInsight collects two classes of eBPF messages. The first is resource usage messages, collected via kprobes attached to kernel functions to capture CPU, memory, and network resource consumption. The second is database event messages, collected via uprobes attached to user-space functions inside the DBMS process to capture SQL execution events, including resource-related operations, lock acquisition, waiting, and release, as well as background activities.
+The monitored functions fall into two categories: (1) kernel functions (e.g., \textit{vfs\_write()}) that capture resource usage signals (e.g., I/O, memory, and network consumption), and (2) user-space database functions that capture execution events, such as SQL operations, lock waiting, and background activities.
+
+\noindent\textbf{Adaptive Probe Attachment.}
+While event-driven monitoring reduces overhead, naively instrumenting all database functions remains prohibitive.
+\sys selectively instruments user-space functions based on their importance to anomaly diagnosis. Specifically, it quantifies each function’s contribution using Lasso-based analysis and attaches probes only to the informative ones.
+Leveraging eBPF’s dynamic attach/detach capability, the probe set is adjusted online, pruning less important probes when monitoring overhead exceeds a predefined threshold.
+% In contrast, probes on kernel functions are attached exhaustively, as their number is small and they provide indispensable system-level signals with negligible overhead.
+% To balance monitoring overhead and observability, \sys combines offline candidate-function identification with online probe prediction.
+% In the offline phase, \sys constructs a candidate function set from the DBMS symbol table and source-level analysis, covering functions related to resource consumption, SQL dependencies, and background activities.
+% It then profiles these functions under representative normal and anomalous workloads to train a machine learning model that captures the relationship between lightweight runtime signals and function-level diagnostic importance. In the online phase, \sys periodically collects simple system status information and coarse-grained query execution statistics to infer potential bottlenecks and rank candidate functions accordingly. Based on the prediction results, \sys dynamically attaches probes only to the most informative functions and updates the probe set as execution evolves, without restarting the database process. This design enables targeted fine-grained observability with controlled overhead. In contrast, probes on kernel functions are attached exhaustively, since the number of relevant kernel functions is relatively small and these probes provide indispensable system-level resource usage information with negligible overhead.
+
+\noindent\textbf{Anomaly-Aware Message Generation.}
+Metrics collected by probes are packaged into eBPF messages and emitted to a user-space Kafka queue.
+\sys adopts an anomaly-aware message generation strategy to adaptively control the generation frequency.
+% By default, metrics are aggregated and reported periodically, while anomalous behaviors trigger immediate message emission.
+At each probe invocation, \sys checks whether the observed metrics indicate an anomaly (e.g., resource usage exceeding a predefined threshold) or are associated with a long-running query. If so, the metrics are immediately encapsulated and emitted. Otherwise, they are aggregated with buffered values and emitted as a single message at the end of the reporting interval.
+
+% \textbf{SQL-lifecycle reconstruction.}
+% For queries whose execution time exceeds the predefined threshold, \sys reconstructs SQL-level execution contexts in user space by linking kernel resource messages with database event messages.
+% The two types of eBPF messages collected by kernel-space and user-space probes each contain an association identifier cid and a time interval. If a resource interval and a database event share the same cid and satisfy the temporal containment relationship, then the resource interval is attributed to that database event. In addition, each database event records the unique identifier of the SQL query that triggered it. By classifying events according to this identifier, the system can obtain the states of the SQL query across different lifecycle stages.
+% Based on these associations, \sys builds a timeline for each SQL statement or SQL template by aggregating resource consumption within each time slice and labeling it with the database function being executed at that time. The reconstructed timeline provides structured evidence for subsequent SQL-level diagnosis and root cause localization.
+
+\subsection{Hierarchical Anomaly Diagnosis}
+\sys adopts a hierarchical framework that progresses from lightweight anomaly detection to fine-grained root-cause diagnosis.
+% Database anomalies include both known issues with clear thresholds and expert priors, and complex anomaly patterns formed by the interaction of multidimensional runtime features. The former are suitable for low-cost, interpretable, and fast screening through rules, whereas the latter require models to learn implicit decision boundaries from historical data and predict potential root causes. Since a single method cannot effectively cover both, \sys adopts a hybrid approach for anomaly detection and root cause localization, combining rule matching with model-based prediction.
+
+\noindent\textbf{Lightweight Anomaly Detection.}
+% \sys adopts a lightweight design for fast, low-overhead anomaly screening. We classify anomalies into two categories: \emph{system-level anomalies}, caused by suboptimal configurations (e.g., an undersized buffer pool leading to excessive I/O), and \emph{query-level anomalies} from particular SQL executions.
+To enable fast and low-overhead screening, anomalies are categorized into system-level anomalies, caused by suboptimal configurations (e.g., an undersized buffer pool leading to excessive I/O), and query-level anomalies arising from individual SQL executions.
+For system-level anomalies, threshold-based checks on key metrics (e.g., TPS, resource utilization, and queueing signals) are used to quickly detect global performance degradation.
+For query-level anomalies, \sys employs a lightweight pre-execution detection approach for proactive slow queries resolution.
+For each incoming query, plan-based features are extracted and fed into an XGBoost model trained on recent execution logs to estimate latency~\cite{DBLP:conf/sigmod/SaxenaRCLCCMKPN23}. Queries predicted to violate latency objectives are further examined: if matching sub-plan templates exist in historical tuning cases, the system directly reuses the best-known optimization actions (e.g., query rewriting); otherwise, the query is marked for fine-grained root-cause analysis.
+
+% for deferred analysis. \sys performs diagnosis and optimization on the marked queries in the background, enabling future reuse when similar queries reappear, while avoiding expensive process in the critical query execution path.
+
+\noindent\textbf{Rule--model Fusion Diagnosis.}
+For detected system-level anomalies, \sys localizes root causes at the function level. A rule-based differential profiling step first identifies bottleneck functions whose resource usage deviates from normal behavior, followed by SHAP-based attribution to quantify and rank each function’s contribution to performance degradation~\cite{zhang2026manuals}.
+For marked queries, \sys performs root-cause localization in a similar manner. Rule-based differential profiling determines whether each operator is associated with abnormal function executions (e.g., frequent spill events during hash join).
+Diagnosis rules further capture suspicious operator interaction patterns (e.g., queries with OR predicates and full table scans).
+A scoring model trained on historical data~\cite{DBLP:journals/pvldb/OuyangZCSGYWFJ24} predicts potential anomaly types (e.g., suboptimal query plans or poorly written queries), guiding subsequent tuning decisions.
+
+% \begin{figure*}[t]
+% \centering
+% \includegraphics[width=\textwidth, keepaspectratio]{show.pdf}
+% \caption{\sys Demonstration.}
+% \label{fig:UI}
+% % \vspace{-0.5em}
+% \end{figure*}
+
+\begin{figure*}[t]
+\centering
+
+% -------- (a)：由两个PDF组成 --------
+\begin{subfigure}[t]{\textwidth}
+\centering
+\begin{minipage}{0.5\textwidth}
+\centering
+\includegraphics[width=\textwidth]{left_cropped.pdf}
+\end{minipage}%
+\hfill
+\begin{minipage}{0.5\textwidth}
+\centering
+\includegraphics[width=\textwidth]{right_cropped.pdf}
+\end{minipage}
+\caption{Monitoring Dashboard}
+\label{fig:UI:a}
+\end{subfigure}
+
+% -------- (b) 和 (c) --------
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{SYS.pdf}
+\caption{System-Level}
+\label{fig:UI:b}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.49\textwidth}
+\centering
+\includegraphics[width=\textwidth]{SQL.pdf}
+\caption{SQL-Level}
+\label{fig:UI:c}
+\end{subfigure}
+\vspace{-0.7em}
+\caption{KeenInsight Demonstration.}
+\label{fig:UI}
+
+\end{figure*}
+
+\subsection{Anomaly Resolution}
+\sys addresses identified root causes through system-level tuning and query-level optimization with validated actions.
+
+\noindent\textbf{System-Level Tuning.}
+\sys identifies configuration knobs governing the identified bottleneck functions via static code analysis, tracing parameter propagation~\cite{zhang2026manuals}.
+For example, for the anomalous event \texttt{log\_buffer\_flush\_to\_disk} in Section~\ref{sec:intro},
+the code path
+\begin{lstlisting}
+if (log->buf_free + len_upper_limit > log->buf_size) {
+log_buffer_flush_to_disk();}
+\end{lstlisting}
+% \texttt{if (log->buf\_free + len\_upper\_limit > log->buf\_size) \{ log\_buffer\_flush\_to\_disk(); \}}
+reveals that \texttt{log->buf\_size} (controlled by \texttt{innodb\_log\_buffer\_size}) governs flush triggering; thus, frequent flushes suggest increasing \texttt{innodb\_log\_buffer\_size}.
+Given the identified knob and context, a tuning agent retrieves relevant knowledge (Section~\ref{sec:knowledge-base}) to generate a configuration, which is validated via a pairwise ranking cost model before deployment to avoid performance regression.
+
+%when hotspots are concentrated in modules such as buffer management, lock management, or I/O scheduling, KeenInsight can narrow the candidate parameter adjustment space according to which parameters control key functions in these modules.
+% On this basis, the system first constructs a structured representation of the current anomaly using its anomaly context, hot-function information, and candidate parameter states, and retrieves the top-k most relevant entries from the experience repository through similarity matching. Then, under the parameter-space constraints identified in the previous stage, it combines the retrieved experience entries with the current anomaly context and hot-function information to construct structured prompts for the large language model, which in turn generates targeted tuning suggestions.
+
+\noindent\textbf{Query-Level Optimization.}
+Given query context and root cause, \sys employs a SQL optimization agent to retrieve relevant knowledge (Section~\ref{sec:knowledge-base}) and synthesize candidate actions, including hint tuning, query rewriting, or index optimization.
+Candidate actions are validated via syntax checking, semantic equivalence verification,
+%~\cite{DBLP:journals/pacmmod/DingWYZXCPL23},
+and cost model estimation from query optimizer, avoiding potential performance degradation.
+% Unlike system-level anomalies, SQL-level performance problems usually stem from inefficient query execution, such as poor query structure or missing indexes. During the optimization stage, KeenInsight first retrieves SQL-related information, including execution plans, table schemas, and index metadata, and then searches the knowledge base for experience entries that are most relevant to the current query. These retrieved experience entries contain historical optimization records for similar SQL queries, including their execution characteristics, adopted optimization strategies, and actual outcomes. By combining the current SQL information with these experience entries, the system identifies potential performance bottlenecks, such as full table scans, low-selectivity filters, or costly join operations, and selects a more appropriate optimization direction.
+% Based on the above analysis, KeenInsight derives SQL optimization recommendations from three complementary aspects: query rewriting, index optimization, and execution plan optimization. Query rewriting focuses on transforming inefficient query formulations, such as redundant predicates or nested subqueries, into semantically equivalent but more efficient forms. Index optimization identifies missing or suboptimal indexes on attributes that are frequently used in filtering or join conditions, thereby reducing data access overhead. Execution plan optimization further improves performance by guiding the optimizer toward more efficient plan choices, for example through appropriate query hints. Together, these optimization strategies enable KeenInsight to mitigate slow-query problems in an automated manner, leading to lower query latency and better overall database performance.
+
+% \textbf{Knowledge Extraction \& Maintenance}
+% To support the anomaly detection and automated tuning pipeline, KeenInsight maintains a continuously evolving knowledge base, which fulfills three roles at different stages of the system workflow. First, at the SQL pre-execution stage, it retrieves similar SQL statements based on feature similarity to construct reference performance distributions for anomaly screening. Second, at the tuning stage for both SQL-level and system-level anomalies, it retrieves similar historical cases and corresponding tuning experience to support root-cause analysis and targeted optimization. Third, at the model maintenance stage, it stores the training samples and feedback records required by the detection and root-cause prediction models, thereby enabling continual model updates.
+
+% Notably, for the historical tuning experience knowledge used at the tuning stage, the system first employ an agent to extract key information from historical tuning records, including anomaly context, root-cause categories, tuning actions, and gain feedback. Based on the extracted features, we perform clustering analysis to group records into clusters, each representing a set of similar environmental characteristics and anomaly patterns. Within each cluster, corresponding tuning experiences are distilled, along with associated confidence scores, enabling the system to capture reliable and scenario-specific optimization knowledge.
+
+% For system-level anomaly detection, KeenInsight aggregates runtime metrics over fixed time windows and compares them with predefined thresholds. Once an anomalous window is identified, KeenInsight performs hotspot analysis for root-cause localization using differential profiling and SHAP-based analysis.
+% Differential profiling is applied when representative normal and degraded performance states are available. In this case, KeenInsight compares the profiling statistics of each function across the two states, and functions that exhibit substantial variations under degraded performance are flagged as likely hotspots.
+% SHAP-based profiling is adopted when a clear normal baseline is unavailable. Specifically, KeenInsight fits a prediction model on historical system observations and computes SHAP values for the current time-window features to quantify the marginal contribution of each feature and associated function to performance degradation. Functions with large negative contributions are ranked as hotspot functions.
+% The localized hotspot functions provide the diagnostic evidence for the subsequent tuning module to generate targeted tuning actions.
+
+% For SQL-level anomaly detection, When a new SQL query arrives, KeenInsight first extracts a lightweight feature representation and retrieves similar SQL cases from the historical SQL feature knowledge base based on feature similarity. It then computes a weighted score by combining the similarity between the incoming query and the retrieved historical SQL cases with the execution complexity of those cases. If the score exceeds a predefined threshold, the query is predicted as a potential slow SQL and enters the subsequent diagnosis and optimization pipeline before execution.
+% For SQL queries identified as slow SQL, KeenInsight performs root-cause localization by combining DBA-defined rules with a multiclass classification model. The DBA-defined rules encode expert knowledge about which execution characteristics and lifecycle patterns correspond to specific anomaly types, while the multiclass model is trained on historical diagnosis data to predict the root-cause category of a slow SQL query. In KeenInsight, the root causes are categorized into three anomaly types: execution plan anomalies, query formulation anomalies, and index-related anomalies. Based on the identified anomaly type, the subsequent tuning module selects the corresponding optimization strategy, such as hint-based tuning, query rewriting, or index optimization.
+
+% \subsection{Anomaly Resolution with Multi-Source Knowledge Base}
+% Anomaly handling also needs to distinguish between SQL tuning and system tuning, because anomalies at different levels differ in their root causes, scope of impact, and applicable optimization methods. SQL-level anomalies are usually caused by query structure, indexes, or execution plans, and should be handled through query rewriting, index optimization, or plan optimization. System-level anomalies are more often caused by resource contention, parameter configuration, or runtime imbalance, and should be mitigated through system parameter adjustment, resource management, or concurrency control. Without distinguishing between these levels, optimization actions may become misaligned with root causes, making effective results difficult to achieve.
+
+\subsection{Multi-Source Knowledge Base}\label{sec:knowledge-base}
+
+\sys supports reliable resolution by integrating the heterogeneous sources into a unified and structured knowledge base.
+
+\noindent\textbf{Knowledge Base Abstraction.}
+% \sys maintains a unified and continuously evolving knowledge base by integrating heterogeneous knowledge from documentation, source code, and historical tuning experience.
+The knowledge base is normalized into a structured quadruple form:
+$\mathcal{K} = \{ \langle c_i, r_i, a_i, s_i\rangle \}_{i=1}^{N}$,
+where $c_i$, $r_i$, $a_i$, and $s_i$ denote anomaly context, root-cause categories, tuning action, and confidence score, respectively.
+% $c_i$ captures system metrics for
+% For system-level tuning, $c_i$ captures system metrics, $r_i$ corresponds to the identified bottle functions, and $s_i$ provides knob tuning guidance.
+% For query-level optimization, $c_i$ corresponds to the query features, $r_i$ represents the identified root cause, and $s_i$ describes the optimization strategy.
+All entries are constructed offline, with $s_i$ continuously updated during tuning.
+During resolution, \sys first filters candidates by root cause $r$, and then retrieves the top-k entries based on context similarity over $c$.
+
+\noindent\textbf{Manuals-derived Knowledge} is extracted from both official documentation and community sources (e.g., StackOverflow).
+Raw content is collected by retrieving Q\&A units and extracting structured $\langle c, r, a, s\rangle$ quadruples via LLM-based summarization.
+To ensure reliability, low-quality or conflicting content is filtered, retaining solutions with strong consensus signals.
+The content is further refined by aligning community-derived insights with relevant documentation chunks via embedding-based retrieval and LLM validation.
+% Finally, the knowledge is enhanced by aligning community-derived insights with relevant chunks from official documentation, where semantically similar content is retrieved via embedding-based matching and validated by LLMs, and incorporated into $s$, resulting in a set of high-quality, structured tuning knowledge.
+
+% \noindent\textbf{Code-derived Knowledge.}
+% \sys extracts tuning knowledge from database source code by analyzing how configuration knobs influence execution behavior~\cite{}.
+% Given a target knob, \sys identifies its associated program variables and tracks their propagation through both data and control flows using static analysis over the intermediate representation, yielding the set of affected functions.
+% Based on this, a code retrieval agent iteratively gathers relevant code context to resolve dependencies along the knob's influence path.
+% A summary agent then performs structured reasoning to formulate semantic tuning hypotheses that capture how knob changes affect system performance.
+% Finally, \sys validates these hypotheses through targeted experiments and distills them into tuning suggestions via association analysis, specifying in which contexts and how knobs should be adjusted (e.g., direction and step size).
+
+\noindent\textbf{Code-derived Knowledge} is extracted from database source code by code summarization and targeted experiments~\cite{zhang2026manuals}.
+Given a target knob, static analysis traces its propagation through data and control flows to identify affected functions.
+A code retrieval agent then gathers relevant context along the influence path, based on which a summary agent formulates semantic tuning hypotheses.
+These hypotheses are validated through targeted experiments and distilled into tuning actions via association rule mining, specifying applicable contexts, adjustment strategies, and confidence scores.
+
+\noindent\textbf{Tuning-derived Knowledge.}
+While knowledge from manuals and source code is relatively static, effective strategies often emerge during tuning and remain undocumented.
+To capture such evolving knowledge, \sys extracts $(c, r, a)$ entries from historical tuning records and groups similar entries via clustering.
+Within each cluster, LLMs abstracts common patterns to derive a more generalizable $(c, r, a)$ entry, with confidence scores estimated from observed performance gains.
+This process is performed periodically.
+% as new records accumulate, enabling continuous evolving.
+
+% We demonstrate \sys with interactive dashboards and showcase how it detects, diagnoses, and resolves database anomalies.
+% \noindent\textbf{Visualization and Interaction.}
+\section{Demonstration}
+% \sys performs real-time monitoring and automatically detects, diagnoses, and resolves performance anomalies.
+
+% that supports a
+% closed-loop monitoring-to-optimization workflow.
+
+% The dashboards provide (1) \textbf{a monitoring interface} that visualizes key performance metrics (e.g., I/O and QPS), and (2) \textbf{a detection interface} that presents each detected anomaly, along with performance before and after resolution, where each anomaly is linked to (3) \textbf{a dedicated resolution view} that details how it is addressed.The dedicated view offers interpretability by exposing root-cause analysis, tuning actions, explanations, and the supporting knowledge behind each decision.
+% Users can optionally apply or roll back tuning actions, enabling an intuitive closed-loop diagnosis-and-optimization workflow.
+
+% \sys performs real-time monitoring and automatically detects, diagnoses, and resolves performance anomalies.
+We demonstrate \sys through an interactive dashboard that supports a closed-loop diagnosis-and-optimization workflow.
+
+% We demonstrate the \sys through an interactive dashboard.
+The demonstration follows a user-centric workflow. \stepnum{1} Users monitor real-time system performance through \textbf{a monitoring interface}, which visualizes key metrics such as I/O, QPS, and resource utilization. \stepnum{2} When anomalies occur, the system highlights abnormal signals and presents them in \textbf{a detection interface}, where each detected anomaly is associated with performance degradation before and after resolution. \stepnum{3} Users can then drill down into \textbf{a dedicated resolution view}, which provides interpretable insights into how each anomaly is addressed. This view exposes root-cause analysis, recommended tuning actions, explanations, and the supporting knowledge behind each decision. Users can interactively apply or roll back optimization actions and observe their impact.
+% , enabling an intuitive and interpretable tuning experience.
+
+\noindent\textbf{System-Level Anomaly.}
+Figure~\ref{fig:UI:b} illustrates the resolution process for a TPS drop. \sys identifies frequent invocations of \texttt{log\_buffer\_flush\_to\_disk()} as the root cause and associates this behavior with the knob \texttt{innodb\_log\_buffer\_size}. It recommends increasing this knob by 10\%, which resolves the anomaly.
+% We then demonstrate how KeenInsight handles system-level performance degradation caused by abnormal resource usage, such as high CPU utilization or I/O bottlenecks. KeenInsight continuously collects runtime system metrics and detects anomalous behavior through threshold-based analysis. Once an anomaly is detected, the system performs hotspot localization using differential profiling or SHAP-based analysis to identify the functions most related to performance degradation. It then maps the identified hotspots to relevant configuration knobs and combines historical tuning experience with LLM-based reasoning to generate tuning recommendations. The diagnosis and tuning process, together with the performance changes before and after optimization, are presented through the interactive dashboard.
+
+\noindent\textbf{SQL-Level Anomaly.}
+Figure~\ref{fig:UI:c} shows the resolution process for a slow query. \sys identifies frequent invocations of \texttt{Write\allowbreak BuildTableToChunkFiles()} under the query's join operator and potential suboptimal query plan as the root cause. Based on retrieved knowledge, it infers that the hash join is not suitable for this operator, leading to excessive intermediate tuple materialization.
+It therefore recommends disabling the hash join for this operator via a query hint \texttt{HashJoin(off)}, which resolves the anomaly.
+
+% , for the marked slow query, a diagnosis rule is hit (query with \texttt{OR} predicates and a full table scan), \sys identifies insufficient index usage as the root cause and assigns high confidence to hint-based optimization. It then retrieves relevant suggestions from the knowledge base, and generates a candidate query with optimizer hints (e.g., \texttt{INDEX()}) to encourage index-based access.
+% The optimized query is further validated before being applied, ensuring both correctness and performance improvement.
+% We first demonstrate how KeenInsight handles potential slow SQL queries. When a query is identified as potentially slow, the system analyzes its execution characteristics, retrieves similar historical cases, and determines the likely root cause, such as query formulation issues, execution plan problems, or index-related anomalies. Based on the diagnosis results, KeenInsight generates targeted optimization recommendations, including query rewriting, index creation, or optimizer hint selection. The visualization interface presents the detected anomaly, diagnostic evidence, and optimization suggestions in an intuitive way.
+
+% \section{Citations}
+
+% \begin{acks}
+% This work was supported by the [...] Research Fund of [...] (Number [...]). Additional funding was provided by [...] and [...]. We also thank [...] for contributing [...].
+% \end{acks}
+
+%\clearpage
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{sample}
+\end{document}
+\endinput

@@ -1,0 +1,2056 @@
+SOURCE_KEY: project:app/static/console.js
+SOURCE_TYPE: implementation
+SOURCE_TITLE: app/static/console.js
+SOURCE_URI: project://app/static/console.js
+---
+(() => {
+"use strict";
+
+const state = { autoRefresh: true, timer: null, currentView: "overview", lastRun: null, baselineRuns: {}, baselineResults: {}, actionsByScenario: {}, actionRecords: {}, feedbackByScenario: {}, afterRuns: {}, afterResults: {}, diagnoses: {}, guidedCurrent: {}, workloadDefinitions: [], guidedScenario: "aggregate_spill", guidedBusy: false, runner: { runId: null, scenario: null, phase: null, repetitions: 0, warmupRepetitions: 0, startedAt: null, running: false, snapshot: null, completedResult: null, activity: [], pollTimer: null, elapsedTimer: null, pollInFlight: false, error: null } };
+state.normalLoad = { items: [], active: null };
+state.workloadReports = [];
+state.workloadFlow = { busy: false, scenario: null, runId: null, message: "等待异常触发", tone: "" };
+const $ = (id) => document.getElementById(id);
+const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({"&":"&","<":"<",">":">","\"":""","'":"'"}[c]));
+const pretty = (value) => JSON.stringify(value, null, 2);
+const scenarioText = {
+hash_join_spill: { title: "工作内存不足导致哈希连接溢出", description: "使用会话级低 work_mem 执行真实全表连接；基线会产生多批次 Hash 和临时空间，调优后再测量当前数据库设置。" },
+aggregate_spill: { title: "工作内存不足导致分组聚合溢出", description: "使用会话级低 work_mem 执行真实分组聚合；基线可能产生外部排序/临时磁盘，调优后检查实际的内存 PostgreSQL 执行计划。" },
+sort_spill: { title: "工作内存不足导致窗口排序溢出", description: "使用会话级低 work_mem 执行真实窗口排序；基线会产生外部归并排序，调优后检查排序是否回到内存中。" },
+parallel_query_underprovisioned: { title: "并行聚合的工作进程不足", description: "将会话级并行工作进程设为 0 执行大型聚合，再根据 PostgreSQL 和主机限制应用有界的数据库级建议。" },
+lock_contention: { title: "并发行锁竞争", description: "持有一个真实行锁并启动第二个 PostgreSQL 会话等待，展示 pg_locks、pg_stat_activity 和阻塞者信息。" },
+missing_index: { title: "缺少客户索引导致过滤扫描", description: "对 keeninsight_demo.orders 执行真实选择性查询，对比经过校验的 B-tree 索引创建前后的执行计划。" },
+stale_statistics: { title: "分布变化后的统计信息过期", description: "不执行 ANALYZE 的情况下改变命名空间探针表的数据分布，再根据估算/实际行数偏差提出安全的统计信息刷新。" },
+};
+const displayScenario = (scenario) => ({ ...scenario, ...(scenarioText[scenario.name] || {}) });
+const anomalyText = {
+hash_join_spill: { title: "哈希连接溢出", category: "工作内存", hint: "低 work_mem 触发多批次 Hash" },
+aggregate_spill: { title: "聚合临时溢出", category: "工作内存", hint: "低 work_mem 触发临时空间" },
+sort_spill: { title: "排序临时溢出", category: "工作内存", hint: "低 work_mem 触发外部排序" },
+parallel_query_underprovisioned: { title: "并行度不足", category: "并行执行", hint: "限制工作进程后观察执行计划" },
+lock_contention: { title: "锁竞争", category: "并发控制", hint: "真实会话互相等待行锁" },
+missing_index: { title: "选择性扫描", category: "访问路径", hint: "缺少索引时观察过滤扫描" },
+stale_statistics: { title: "统计信息过期", category: "优化器统计", hint: "改变分布后观察估算偏差" },
+};
+const anomalyTitle = (name) => anomalyText[name]?.title || scenarioText[name]?.title || name;
+const localStatus = (value) => ({ active: "活跃", idle: "空闲", "idle in transaction": "事务空闲", waiting: "等待中", resolved: "已解决", ignored: "已忽略", proposed: "待审核", applying: "应用中", applied: "已应用", completed: "已完成", rolled_back: "已回滚", failed: "失败", rejected: "已拒绝", running: "运行中", stopped: "已停止", ready: "就绪", unavailable: "不可用", enabled: "启用", disabled: "停用", effective: "有效", ineffective: "无效", recorded: "已记录", equivalent: "等价", not_equivalent: "不等价", pending: "待处理", success: "成功", warning: "警告", critical: "严重", info: "信息", baseline: "基线", after: "调优后", event: "事件", none: "无", unknown: "未知", complete: "完成" }[String(value)] || String(value ?? "—"));
+const localActionType = (value) => ({ set_parameter: "设置参数", set_database_parameter: "设置数据库参数", create_index: "创建索引", drop_index: "删除索引", refresh_statistics: "刷新统计信息", index_selection: "索引选择", index_removal: "索引删除", query_hint: "查询提示", query_rewrite: "查询改写" }[String(value)] || String(value ?? "—"));
+const localModelType = (value) => ({ latency_prediction: "耗时预测模型", root_cause: "根因模型" }[String(value)] || String(value ?? "—"));
+const localSourceType = (value) => ({ paper: "论文", review: "评审意见", design: "系统设计", implementation: "系统实现", "legacy-demo": "历史演示", deployment: "部署资料", "evaluation-data": "评估数据", supplemental: "补充资料", "supplemental-pdf": "补充 PDF", "external-official": "官方资料", "external-community": "社区资料", "knowledge-entry": "知识条目", "runtime-workload": "运行时工作负载", "runtime-action": "运行时调优", "runtime-feedback": "运行时反馈", "runtime-incident": "运行时异常", "runtime-code-knowledge": "运行时代码知识", "runtime-differential": "运行时差分画像", "runtime-experience": "运行时调优经验", "runtime-lifecycle": "运行时生命周期", "runtime-model": "运行时模型", "runtime-observability": "运行时可观测性", "runtime-optimizer": "运行时优化器", "postgresql-documentation": "PostgreSQL 官方文档", "tuning-feedback": "调优实测反馈" }[String(value)] || String(value ?? "—"));
+const localRuleName = (name, kind) => ({ connection_saturation: "连接数饱和", lock_wait: "阻塞会话", slow_query: "慢语句", temp_spill: "临时文件溢出", cache_hit_ratio: "数据库缓存命中率过低" }[String(kind)] || String(name ?? "数据库规则"));
+const localKind = (value) => ({ connection_saturation: "连接数饱和", lock_wait: "锁等待", slow_query: "慢查询", temp_spill: "临时空间溢出", cache_hit_ratio: "缓存命中率" }[String(value)] || String(value ?? "数据库信号"));
+const fmt = (value, digits = 2) => {
+if (value === null || value === undefined || value === "") return "—";
+const number = Number(value);
+return Number.isFinite(number) ? number.toLocaleString(undefined, { maximumFractionDigits: digits }) : esc(value);
+};
+const formatBytes = (value) => {
+const number = Number(value);
+if (!Number.isFinite(number)) return "—";
+const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+let amount = number, index = 0;
+while (amount >= 1024 && index < units.length - 1) { amount /= 1024; index += 1; }
+return `${amount.toLocaleString(undefined, { maximumFractionDigits: 1 })} ${units[index]}`;
+};
+const date = (value) => value ? new Date(value).toLocaleString() : "—";
+const localIncidentSummary = (incident) => {
+const evidence = incident?.evidence || {};
+const kind = String(incident?.kind || "");
+if (kind === "connection_saturation" && evidence.numbackends !== undefined) return `当前连接数 ${fmt(evidence.numbackends, 0)}，已达到配置上限的 ${fmt(Number(evidence.ratio || 0) * 100, 1)}%`;
+if (kind === "lock_wait") return `当前有 ${fmt((evidence.locks || []).length || evidence.waiting_sessions || 0, 0)} 个会话正在等待锁`;
+if (kind === "slow_query") return `语句 ${evidence.query_id || "—"} 平均耗时 ${fmt(evidence.mean_exec_time_ms)} 毫秒，共调用 ${fmt(evidence.calls, 0)} 次`;
+if (kind === "temp_spill") return `语句 ${evidence.query_id || "—"} 写入 ${fmt(evidence.temp_blks_written, 0)} 个临时块`;
+if (kind === "cache_hit_ratio" && evidence.ratio !== undefined) return `缓存命中率 ${fmt(Number(evidence.ratio) * 100, 1)}%，低于配置阈值`;
+return String(incident?.summary || "当前观测到数据库异常");
+};
+const localActionDescription = (action) => {
+const target = action?.target || {};
+const parameter = target.parameter || target.name || "数据库参数";
+const value = target.value ?? target.setting_value ?? "目标值";
+const indexName = target.index_name || target.name || "目标索引";
+if (action?.action_type === "set_database_parameter" || action?.action_type === "set_parameter") return `将数据库级 ${parameter} 调整为 ${value}，应用于新会话；保留前需复测异常查询。`;
+if (action?.action_type === "create_index") return `创建索引 ${indexName}，并在相同查询上复测执行计划与耗时。`;
+if (action?.action_type === "drop_index") return `删除索引 ${indexName}，回滚后重新验证查询计划。`;
+if (action?.action_type === "refresh_statistics") return `对目标关系刷新 PostgreSQL 统计信息，并验证估算行数变化。`;
+if (action?.action_type === "query_hint" || action?.action_type === "query_rewrite") return "生成只读候选并在 PostgreSQL 上完成结果等价性验证。";
+return String(action?.description || "类型化调优操作");
+};
+const locatorText = (value) => {
+const locator = value || {};
+if (!Object.keys(locator).length) return "";
+const pages = locator.page_start ? (locator.page_end && locator.page_end !== locator.page_start ? `第 ${locator.page_start}–${locator.page_end} 页` : `第 ${locator.page_start} 页`) : "";
+const lines = locator.line_start ? `规范化行 ${locator.line_start}–${locator.line_end || locator.line_start}` : "";
+return [pages, lines].filter(Boolean).join(" · ");
+};
+
+async function api(path, options = {}) {
+const response = await fetch(path, { headers: { "Content-Type": "application/json", ...(options.headers || {}) }, ...options });
+const body = await response.json().catch(() => ({}));
+if (!response.ok) throw new Error(body.detail || body.error || `${response.status} ${response.statusText}`);
+return body;
+}
+
+async function optionalApi(path, fallback = {}) {
+try { return await api(path); } catch (error) { return fallback; }
+}
+
+function toast(message, error = false) {
+const node = $("toast"); node.textContent = message; node.classList.add("show"); node.style.background = error ? "#9a3040" : "#202a3a";
+clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 4200);
+}
+
+function setView(view) {
+if (!document.getElementById(`view-${view}`)) view = "overview";
+state.currentView = view;
+if (window.location.hash !== `#${view}`) window.history.replaceState(null, "", `#${view}`);
+document.querySelectorAll(".view").forEach((node) => node.classList.toggle("active", node.id === `view-${view}`));
+document.querySelectorAll(".nav-item").forEach((node) => node.classList.toggle("active", node.dataset.view === view));
+const titles = { overview: "PostgreSQL 总览", incidents: "异常事件", queries: "查询证据", workloads: "工作负载", "workload-runner": "实时测量", actions: "调优操作", knowledge: "知识库", rag: "RAG 知识", observability: "eBPF 可观测性", analysis: "模型与 LLVM", agent: "调优智能体", settings: "PostgreSQL 设置", audit: "审计记录" };
+$("pageTitle").textContent = titles[view] || view;
+if (view === "incidents") loadIncidents();
+if (view === "queries") loadQueries();
+if (view === "workloads") loadWorkloads();
+if (view === "workload-runner") renderWorkloadRunner(state.runner.snapshot || {});
+if (view === "actions") loadActions();
+if (view === "knowledge") loadKnowledge();
+if (view === "rag") loadRag();
+if (view === "observability") loadObservability();
+if (view === "analysis") loadAnalysis();
+if (view === "agent") loadAgent();
+if (view === "settings") loadSettings();
+if (view === "audit") loadAudit();
+if (view === "overview" || view === "workloads") {
+window.requestAnimationFrame(() => drawOverviewCharts(state.metrics || []));
+}
+}
+
+function renderMetrics(data) {
+const snapshot = data.snapshot;
+let payload = snapshot?.payload || {};
+if (typeof payload === "string") {
+try { payload = JSON.parse(payload); } catch (error) { payload = {}; }
+}
+const db = payload.database || {};
+const rates = payload.rates?.counters_per_second || {};
+const active = data.active_incidents || [];
+const collector = data.collector || {};
+const numberOrNull = (value) => {
+if (value === null || value === undefined || value === "") return null;
+const number = Number(value);
+return Number.isFinite(number) ? number : null;
+};
+const hasRate = (key) => rates[key] !== null && rates[key] !== undefined;
+const tps = hasRate("xact_commit") || hasRate("xact_rollback")
+? Number(rates.xact_commit || 0) + Number(rates.xact_rollback || 0)
+: null;
+const connections = numberOrNull(db.numbackends);
+const hit = numberOrNull(db.blks_hit), read = numberOrNull(db.blks_read);
+const ratio = hit !== null && read !== null && hit + read > 0 ? hit / (hit + read) : null;
+const latency = payload.latency || {};
+const p95 = latency.available ? numberOrNull(latency.p95_ms) : null;
+const maxConnections = numberOrNull(payload.settings?.max_connections?.setting);
+if ($("lastUpdated")) $("lastUpdated").textContent = snapshot ? `观测时间：${date(snapshot.collected_at)}` : "尚未采集观测";
+const server = payload.server || {};
+const rows = [
+["数据库", server.database_name || db.database_name],
+["服务器版本", server.server_version],
+["最近采样", snapshot ? date(snapshot.collected_at) : "—"],
+["采集周期", collector.interval_seconds === undefined ? "—" : `${fmt(collector.interval_seconds, 1)} 秒`],
+["数据保留", collector.snapshot_retention_hours === undefined ? "滚动快照" : `${fmt(collector.snapshot_retention_hours, 1)} 小时`],
+];
+const summary = $("overviewDatabaseSummary");
+if (summary) summary.innerHTML = rows.map(([key, value]) => `<div class="detail-row"><span class="detail-key">${esc(key)}</span><span class="detail-value">${esc(value ?? "—")}</span></div>`).join("");
+renderIncidents("overviewIncidents", active.slice(0, 5), true);
+const update = (id, value) => { if ($(id)) $(id).textContent = value; };
+update("tpsChartValue", tps === null ? "—" : `${fmt(tps, 1)} /秒`);
+update("tpsChartMeta", tps === null ? "等待连续观测" : "当前原始值 · 粗线为 5 点稳态趋势");
+update("workloadTpsValue", tps === null ? "—" : `${fmt(tps, 1)} /秒`);
+update("workloadTpsMeta", tps === null ? "等待连续观测" : "当前原始值 · 突变保留红色标记");
+update("latencyChartValue", p95 === null ? "—" : `${fmt(p95)} ms`);
+update("latencyChartMeta", p95 === null ? "等待业务查询样本" : `${fmt(latency.sample_count, 0)} 个语句指纹 · ${latency.coverage_complete ? "完整观测" : "Top-N 观测"}`);
+update("workloadLatencyValue", p95 === null ? "—" : `${fmt(p95)} ms`);
+update("workloadLatencyMeta", p95 === null ? "等待业务查询样本" : `${fmt(latency.sample_count, 0)} 个语句指纹 · ${latency.coverage_complete ? "完整观测" : "Top-N 观测"}`);
+update("connectionsChartValue", connections === null ? "—" : `${fmt(connections, 0)} 个`);
+update("connectionsChartMeta", maxConnections === null ? "当前数据库后端会话" : `上限 ${fmt(maxConnections, 0)} 个`);
+update("workloadConnectionsValue", connections === null ? "—" : `${fmt(connections, 0)} 个`);
+update("workloadConnectionsMeta", maxConnections === null ? "当前数据库后端会话" : `上限 ${fmt(maxConnections, 0)} 个`);
+update("cacheChartValue", ratio === null ? "—" : `${fmt(ratio * 100, 1)}%`);
+update("cacheChartMeta", ratio === null ? "等待块访问样本" : `${fmt(hit, 0)} 命中 · ${fmt(read, 0)} 读取`);
+update("workloadCacheValue", ratio === null ? "—" : `${fmt(ratio * 100, 1)}%`);
+update("workloadCacheMeta", ratio === null ? "等待块访问样本" : `${fmt(hit, 0)} 命中 · ${fmt(read, 0)} 读取`);
+drawOverviewCharts(data.metrics || []);
+}
+
+function compactPayload(item) {
+if (!item) return {};
+if (item.payload && typeof item.payload === "object") return item.payload;
+if (typeof item.payload === "string") {
+try { return JSON.parse(item.payload); } catch (error) { return {}; }
+}
+return item;
+}
+
+function compactRates(item) {
+return compactPayload(item).rates?.counters_per_second || {};
+}
+
+function compactDatabase(item) {
+return compactPayload(item).database || {};
+}
+
+function compactLatency(item) {
+return compactPayload(item).latency || {};
+}
+
+function chartNumber(value) {
+if (value === null || value === undefined || value === "") return null;
+const number = Number(value);
+return Number.isFinite(number) ? number : null;
+}
+
+function medianNumbers(values) {
+const sorted = values.filter((value) => value !== null && value !== undefined).slice().sort((a, b) => a - b);
+if (!sorted.length) return null;
+const middle = Math.floor(sorted.length / 2);
+return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function stableChartTrend(values, radius = 2) {
+return values.map((value, index) => {
+if (value === null) return null;
+const window = values.slice(Math.max(0, index - radius), Math.min(values.length, index + radius + 1));
+return medianNumbers(window) ?? value;
+});
+}
+
+function detectChartEvents(values, options = {}) {
+const events = [];
+const historySize = options.historySize || 5;
+const absoluteThreshold = options.absoluteThreshold ?? 2;
+const relativeThreshold = options.relativeThreshold ?? .75;
+values.forEach((value, index) => {
+if (value === null) return;
+const history = values.slice(Math.max(0, index - historySize), index).filter((item) => item !== null);
+if (history.length < 3) return;
+const baseline = medianNumbers(history);
+if (baseline === null) return;
+const deviations = history.map((item) => Math.abs(item - baseline));
+const mad = medianNumbers(deviations) || 0;
+const threshold = Math.max(absoluteThreshold, Math.abs(baseline) * relativeThreshold, mad * 4);
+const delta = value - baseline;
+const rise = delta >= threshold && value >= baseline * 1.5;
+const drop = baseline > 0 && value <= baseline * .35;
+const zeroToPositive = baseline === 0 && value >= absoluteThreshold;
+if (rise || drop || zeroToPositive) {
+events.push({ index, value, baseline, delta, direction: delta >= 0 ? "up" : "down" });
+}
+});
+return events;
+}
+
+function drawSeriesPath(ctx, values, pointX, pointY, color, lineWidth, alpha = 1) {
+ctx.save();
+ctx.globalAlpha = alpha;
+ctx.strokeStyle = color;
+ctx.lineWidth = lineWidth;
+ctx.lineJoin = "round";
+ctx.lineCap = "round";
+ctx.beginPath();
+let drawing = false;
+values.forEach((value, index) => {
+if (value === null) { drawing = false; return; }
+const point = { x: pointX(index), y: pointY(value) };
+if (!drawing) { ctx.moveTo(point.x, point.y); drawing = true; } else ctx.lineTo(point.x, point.y);
+});
+ctx.stroke();
+ctx.restore();
+}
+
+function chartTimeLabel(value) {
+return value ? new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
+}
+
+function renderChartLegend(legendId, items, unit, events, rawMax, axisMax, options = {}) {
+const node = $(legendId);
+if (!node) return;
+const valid = options.values || [];
+if (!valid.some((value) => value !== null)) {
+node.innerHTML = '<span class="chart-event-muted">等待连续真实观测</span>';
+return;
+}
+const eventDetails = events.slice(-3).map((event) => {
+const arrow = event.direction === "up" ? "↑" : "↓";
+return '<span class="chart-event">' + arrow + esc(fmt(event.value, 2)) + esc(unit) + " · " + esc(chartTimeLabel(items[event.index]?.collected_at)) + "</span>";
+}).join("");
+const clipped = rawMax > axisMax * 1.05
+? '<span class="chart-event-muted">稳定纵轴；峰值原始 ' + esc(fmt(rawMax, 2)) + esc(unit) + "</span>"
+: "";
+node.innerHTML =
+'<span class="chart-key trend"><i></i>5 点稳态趋势</span>' +
+'<span class="chart-key raw"><i></i>每个真实采样</span>' +
+(events.length
+? '<span class="chart-key event"><i></i>检测到 ' + esc(String(events.length)) + " 次突变</span>" + eventDetails
+: '<span class="chart-event-muted">当前窗口未检测到突变</span>') +
+clipped;
+}
+
+function drawLineChart(canvasId, items, valueFn, color, unit = "", fixedMax = null, options = {}) {
+const canvas = $(canvasId);
+if (!canvas) return;
+const ctx = canvas.getContext("2d");
+const pixelRatio = window.devicePixelRatio || 1;
+const width = canvas.clientWidth || 600;
+const height = canvasId.includes("workload") ? 150 : 190;
+canvas.width = width * pixelRatio;
+canvas.height = height * pixelRatio;
+ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+ctx.clearRect(0, 0, width, height);
+const values = items.map((item) => chartNumber(valueFn(item)));
+const trend = stableChartTrend(values, options.smoothingRadius || 2);
+const events = options.showEvents ? detectChartEvents(values, options) : [];
+const valid = values.filter((value) => value !== null);
+const pad = { left: 42, right: 12, top: 12, bottom: 27 };
+const chartW = Math.max(1, width - pad.left - pad.right);
+const chartH = Math.max(1, height - pad.top - pad.bottom);
+ctx.font = "10px system-ui, sans-serif";
+ctx.lineWidth = 1;
+ctx.strokeStyle = "#e9edf3";
+ctx.fillStyle = "#8b96a6";
+if (!valid.length) {
+ctx.textAlign = "center";
+ctx.fillText("等待连续真实观测", width / 2, height / 2);
+ctx.textAlign = "left";
+renderChartLegend(options.legendId, items, unit, [], 0, 0, { values });
+return;
+}
+const observedMax = Math.max(0, ...valid);
+const trendValid = trend.filter((value) => value !== null);
+const trendMax = trendValid.length ? Math.max(0, ...trendValid) : observedMax;
+const stableMax = Math.max(1, trendMax * 1.15);
+const hasOutlier = options.preserveEvents && events.some((event) => event.value > stableMax * 1.8);
+const max = fixedMax === null
+? (hasOutlier ? stableMax : Math.max(1, observedMax * 1.15))
+: fixedMax;
+for (let index = 0; index <= 4; index += 1) {
+const y = pad.top + chartH * index / 4;
+ctx.beginPath();
+ctx.moveTo(pad.left, y);
+ctx.lineTo(width - pad.right, y);
+ctx.stroke();
+ctx.fillText(`${fmt(max * (1 - index / 4), max < 10 ? 2 : 1)}${unit ? ` ${unit}` : ""}`, 2, y + 3);
+}
+const pointX = (index) => pad.left + (values.length <= 1 ? chartW / 2 : chartW * index / (values.length - 1));
+const pointY = (value) => pad.top + chartH * (1 - Math.min(1, Math.max(0, value) / max));
+drawSeriesPath(ctx, values, pointX, pointY, color, options.rawLineWidth || 1.1, options.rawAlpha ?? .28);
+drawSeriesPath(ctx, trend, pointX, pointY, color, options.trendLineWidth || 2.5, 1);
+if (options.showRawPoints) {
+ctx.save();
+ctx.fillStyle = color;
+ctx.globalAlpha = .55;
+values.forEach((value, index) => {
+if (value === null) return;
+ctx.beginPath();
+ctx.arc(pointX(index), pointY(value), 1.8, 0, Math.PI * 2);
+ctx.fill();
+});
+ctx.restore();
+}
+if (options.showEvents && events.length) {
+ctx.save();
+ctx.strokeStyle = "#d65a3a";
+ctx.fillStyle = "#d65a3a";
+ctx.globalAlpha = .8;
+ctx.setLineDash([3, 4]);
+events.forEach((event) => {
+const x = pointX(event.index);
+ctx.beginPath();
+ctx.moveTo(x, pad.top);
+ctx.lineTo(x, height - pad.bottom);
+ctx.stroke();
+ctx.setLineDash([]);
+ctx.beginPath();
+ctx.arc(x, pointY(event.value), 3.3, 0, Math.PI * 2);
+ctx.fill();
+ctx.setLineDash([3, 4]);
+});
+ctx.restore();
+// Draw a small exact-value label for the most recent events. If a
+// burst is much larger than the stable axis, its point is clipped at
+// the top but the legend and label still expose the raw value.
+ctx.save();
+ctx.font = "10px system-ui, sans-serif";
+ctx.textBaseline = "middle";
+events.slice(-3).forEach((event, labelIndex) => {
+const arrow = event.direction === "up" ? "↑" : "↓";
+const label = arrow + fmt(event.value, 2) + unit;
+const textWidth = ctx.measureText(label).width;
+const x = Math.min(Math.max(pointX(event.index) - textWidth / 2, pad.left), width - pad.right - textWidth);
+const y = pad.top + 9 + (labelIndex % 2) * 13;
+ctx.fillStyle = "rgba(255,255,255,.92)";
+ctx.fillRect(x - 3, y - 7, textWidth + 6, 14);
+ctx.fillStyle = "#b14b35";
+ctx.fillText(label, x, y);
+});
+ctx.restore();
+}
+ctx.fillStyle = "#8b96a6";
+ctx.textAlign = "left";
+const first = items[0]?.collected_at;
+const last = items[items.length - 1]?.collected_at;
+ctx.fillText(chartTimeLabel(first), pad.left, height - 7);
+ctx.textAlign = "right";
+ctx.fillText(chartTimeLabel(last), width - pad.right, height - 7);
+ctx.textAlign = "left";
+renderChartLegend(options.legendId, items, unit, events, observedMax, max, { values });
+}
+
+function drawOverviewCharts(items) {
+const transactionRate = (item) => {
+const rates = compactRates(item);
+const commit = chartNumber(rates.xact_commit), rollback = chartNumber(rates.xact_rollback);
+return commit === null && rollback === null ? null : (commit || 0) + (rollback || 0);
+};
+const queryP95 = (item) => {
+const latency = compactLatency(item);
+return latency.available ? latency.p95_ms : null;
+};
+const connections = (item) => compactDatabase(item).numbackends;
+const cacheRatio = (item) => {
+const database = compactDatabase(item);
+const hit = chartNumber(database.blks_hit), read = chartNumber(database.blks_read);
+return hit === null || read === null || hit + read <= 0 ? null : (hit / (hit + read)) * 100;
+};
+const tpsOptions = {
+legendId: "tpsChartLegend",
+preserveEvents: true,
+showEvents: true,
+showRawPoints: true,
+absoluteThreshold: 2,
+};
+drawLineChart("tpsChart", items, transactionRate, "#3370ff", "/秒", null, tpsOptions);
+drawLineChart("workloadTpsChart", items, transactionRate, "#3370ff", "/秒", null, { ...tpsOptions, legendId: "workloadTpsLegend" });
+["latencyChart", "workloadLatencyChart"].forEach((id) => drawLineChart(id, items, queryP95, "#e86a2a", "ms"));
+["connectionsChart", "workloadConnectionsChart"].forEach((id) => drawLineChart(id, items, connections, "#7b61c9", "个"));
+["cacheChart", "workloadCacheChart"].forEach((id) => drawLineChart(id, items, cacheRatio, "#0f9d68", "%", 100));
+}
+
+// Keep the resize hook from older console bundles compatible.
+function drawChart(items) { drawOverviewCharts(items); }
+
+function renderIncidents(containerId, items, compact = false) {
+const node = $(containerId);
+if (!items.length) { node.innerHTML = `<div class="empty">当前观测没有匹配的异常。</div>`; return; }
+node.innerHTML = `<div class="data-table-wrap"><table><thead><tr><th>级别</th><th>类型</th><th>摘要</th><th>最近出现</th>${compact ? "" : "<th>状态</th><th>操作</th>"}</tr></thead><tbody>${items.map((incident) => `<tr><td><span class="badge ${esc(incident.severity)}">${esc(localStatus(incident.severity))}</span></td><td><code>${esc(localKind(incident.kind))}</code></td><td class="wrap">${esc(localIncidentSummary(incident))}</td><td>${date(incident.last_seen)}</td>${compact ? "" : `<td><span class="badge ${esc(incident.status)}">${esc(localStatus(incident.status))}</span></td><td><div class="action-group"><button class="button small secondary" data-diagnose="${incident.id}">诊断</button><button class="button small secondary" data-incident-detail="${incident.id}">详情</button>${incident.status === "active" ? `<button class="button small secondary" data-resolve="${incident.id}">标记已解决</button>` : ""}</div></td>`}</tr>`).join("")}</tbody></table></div>`;
+bindIncidentButtons(node);
+}
+
+function bindIncidentButtons(scope = document) {
+scope.querySelectorAll("[data-diagnose]").forEach((button) => button.onclick = async () => { button.disabled = true; try { const result = await api(`/api/incidents/${button.dataset.diagnose}/diagnose` , { method: "POST" }); showIncidentDetail(result); toast("已根据 PostgreSQL 证据刷新诊断"); } catch (e) { toast(e.message, true); } finally { button.disabled = false; } });
+scope.querySelectorAll("[data-incident-detail]").forEach((button) => button.onclick = async () => { try { showIncidentDetail(await api(`/api/incidents/${button.dataset.incidentDetail}`)); } catch (e) { toast(e.message, true); } });
+scope.querySelectorAll("[data-resolve]").forEach((button) => button.onclick = async () => { try { await api(`/api/incidents/${button.dataset.resolve}/resolve`, { method: "POST" }); toast("异常已标记为已解决"); await loadIncidents(); await refreshDashboard(); } catch (e) { toast(e.message, true); } });
+}
+
+function showIncidentDetail(result) {
+const incident = result, diagnosis = incident.diagnosis || {};
+$("incidentDetailCard").classList.remove("hidden"); $("incidentDetailTitle").textContent = `异常 #${incident.id} · ${localKind(incident.kind)}`; $("incidentDetailSummary").textContent = localIncidentSummary(incident);
+const actionRows = (result.actions || []).map((action) => action.not_persisted ? `<div class="notice">建议未持久化：${esc(action.not_persisted)}</div>` : `<div class="detail-row"><span class="detail-key">操作 #${action.id}</span><span class="detail-value"><span class="badge ${esc(action.status)}">${esc(localStatus(action.status))}</span> ${esc(action.description)}</span></div>`).join("");
+const llm = diagnosis.llm_analysis;
+const llmBlock = llm ? `<div class="result-box llm-grounded-box"><div class="eyebrow">外部模型 · 仅作证据解释</div><pre>${esc(llm.text || "")}</pre><p class="tiny muted">模型：${esc(llm.model || "—")} · 引用：${esc((llm.evidence_ids || []).join(", "))} · 未授权任何数据库动作</p></div>` : "";
+$("incidentDetail").innerHTML = `<div class="two-column"><div><h3>根因</h3><p>${(diagnosis.root_causes || []).map(esc).join("、") || "尚未确定根因"}</p><h3 class="detail-heading">证据</h3><pre class="evidence-pre">${esc(pretty(diagnosis.evidence || incident.evidence || {}))}</pre></div><div><h3>知识来源</h3><div class="detail-list">${(diagnosis.knowledge || []).map((entry) => `<div class="detail-row"><span class="detail-key">${esc(localSourceType(entry.source_type))}</span><span class="detail-value"><a href="${esc(entry.provenance)}" target="_blank" rel="noreferrer">${esc(entry.title)}</a></span></div>`).join("") || `<div class="empty">没有匹配的知识来源。</div>`}</div><h3 class="detail-heading">调优操作</h3>${actionRows || `<p class="muted">没有根据当前证据提出自动操作。</p>`}</div></div>${llmBlock}${diagnosis.plan ? `<div class="result-box"><pre>${esc(pretty(diagnosis.plan.summary))}</pre></div>` : ""}`;
+setView("incidents"); window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+
+async function refreshDashboard() {
+try {
+// Render the current cards as soon as the two critical responses arrive.
+// The full raw snapshot endpoint is intentionally not used here: the
+// overview chart only needs the compact projection, while raw snapshots
+// remain available through the audit/export APIs.
+const [dashboard, health] = await Promise.all([
+api("/api/dashboard"),
+api("/api/health"),
+]);
+const previousMetrics = state.metrics || [];
+renderMetrics({ ...dashboard, metrics: previousMetrics });
+const ok = health.ok;
+const collector = health.collector || dashboard.collector || {};
+const intervalSeconds = Number(collector.interval_seconds);
+const retentionHours = Number(collector.snapshot_retention_hours);
+const cadenceText = Number.isFinite(intervalSeconds) ? `每 ${fmt(intervalSeconds, 1)} 秒` : "按配置周期";
+const retentionText = Number.isFinite(retentionHours) ? `保留最近 ${fmt(retentionHours, 1)} 小时` : "保留滚动快照";
+$("sidebarStatus").textContent = ok ? `已连接 · ${health.server?.database_name || "数据库"}` : "数据库不可用";
+$("sidebarStatusDot").className = `status-dot ${ok ? "ok" : "bad"}`;
+if ($("overviewLiveDot")) $("overviewLiveDot").classList.toggle("offline", !ok);
+if ($("overviewLiveState")) $("overviewLiveState").textContent = ok ? "实例在线" : "实例不可用";
+if ($("overviewLiveDetail")) $("overviewLiveDetail").textContent = ok ? `${health.server?.database_name || "当前数据库"} · 最近观测 ${date(dashboard.snapshot?.collected_at)} · 后台${cadenceText}采集` : (health.error || "请检查数据库连接");
+$("systemNotice").textContent = ok ? `所有观测均读取自 PostgreSQL。后台${cadenceText}持续采集，${retentionText}，旧快照自动滚动清理。` : `PostgreSQL 不可用：${health.error || "未知错误"}`;
+if ($("workloadDashboardStatus")) {
+$("workloadDashboardStatus").textContent = ok ? `在线 · ${cadenceText}` : "数据库不可用";
+$("workloadDashboardStatus").classList.toggle("is-offline", !ok);
+}
+
+const metrics = await optionalApi("/api/dashboard/metrics?limit=120", { items: previousMetrics });
+state.metrics = metrics.items || [];
+renderMetrics({ ...dashboard, metrics: state.metrics });
+if (state.currentView === "workloads") await refreshNormalLoadStatus();
+} catch (e) {
+$("systemNotice").textContent = `总览刷新失败：${e.message}`;
+$("sidebarStatus").textContent = "数据库不可用";
+$("sidebarStatusDot").className = "status-dot bad";
+if ($("overviewLiveDot")) $("overviewLiveDot").classList.add("offline");
+if ($("overviewLiveState")) $("overviewLiveState").textContent = "无法读取实例";
+if ($("overviewLiveDetail")) $("overviewLiveDetail").textContent = e.message;
+if ($("workloadDashboardStatus")) {
+$("workloadDashboardStatus").textContent = "连接失败";
+$("workloadDashboardStatus").classList.add("is-offline");
+}
+}
+}
+
+async function loadIncidents() { try { const status = $("incidentStatusFilter").value; renderIncidents("incidentTable", (await api(`/api/incidents?limit=200${status ? `&status=${encodeURIComponent(status)}` : ""}`)).items); } catch (e) { toast(e.message, true); } }
+
+async function loadQueries() { try { const data = await api("/api/queries?limit=100"); $("queryTable").innerHTML = data.items.length ? `<div class="data-table-wrap"><table><thead><tr><th>查询 ID</th><th>调用次数</th><th>平均耗时（毫秒）</th><th>总耗时（毫秒）</th><th>写入临时块</th><th>查询</th></tr></thead><tbody>${data.items.map((row) => `<tr><td><code>${esc(row.query_id)}</code></td><td>${fmt(row.calls, 0)}</td><td>${fmt(row.mean_exec_time_ms)}</td><td>${fmt(row.total_exec_time_ms)}</td><td>${fmt(row.temp_blks_written, 0)}</td><td class="wrap"><code>${esc(row.query)}</code></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${esc(data.unavailable_reason || "暂无 pg_stat_statements 记录，请先运行工作负载或查询。")}</div>`; } catch (e) { toast(e.message, true); } }
+
+async function loadWorkloads() {
+try {
+const responses = await Promise.all([
+api("/api/workloads"),
+optionalApi("/api/normal-loads"),
+]);
+const data = responses[0];
+const normal = responses[1] || {};
+const stateText = Object.entries(data.state?.relations || {})
+.map(([name, exists]) => name + "：" + (exists ? "就绪" : "缺失"))
+.join(" · ");
+const cardinality = Object.entries(data.state?.table_stats || {})
+.map(([name, stats]) => name + "：" + fmt(stats.row_count, 0) + " 行")
+.join(" · ");
+const parallelWorkers = data.state?.parallel_workers?.setting || "—";
+const tpcc = data.state?.tpcc || {};
+state.normalLoad.tpcc = tpcc;
+const tpccText = tpcc.available
+? "TPC-C：" + fmt(tpcc.warehouses, 0) + " 仓 · " + fmt(tpcc.row_counts?.orders, 0) + " 订单 · " + fmt(tpcc.row_counts?.order_line, 0) + " 明细 · " + formatBytes(tpcc.total_bytes)
+: "TPC-C：未加载";
+const displayItems = (data.items || []).map(displayScenario);
+state.workloadDefinitions = displayItems;
+state.normalLoad.items = normal.items || [];
+if (normal.active) state.normalLoad.active = normal.active;
+if ($("demoState")) {
+$("demoState").innerHTML =
+"<strong>" + esc(stateText || "演示模式尚未初始化") + "</strong><br>" +
+'<span class="muted">' + esc(cardinality || "暂无关系表大小信息") + "</span><br>" +
+'<span class="muted">索引：' + (data.state?.missing_index_exists ? "已存在" : "未创建") +
+" · work_mem：" + esc(data.state?.work_mem?.setting || "—") +
+(data.state?.work_mem?.unit ? " " + esc(data.state.work_mem.unit) : "") +
+" · 并行工作进程：" + esc(parallelWorkers) + " · " + esc(tpccText) + "</span>";
+}
+renderNormalLoadOptions();
+renderNormalLoadStatus(state.normalLoad.active || {});
+renderAnomalyCards(displayItems);
+bindWorkloadDashboard();
+await loadWorkloadRuns();
+renderWorkloadReports();
+} catch (e) {
+toast(e.message, true);
+}
+}
+
+function renderNormalLoadOptions() {
+const selector = $("normalLoadSelect");
+if (!selector) return;
+const current = state.normalLoad.active?.name || selector.value || state.normalLoad.items[0]?.name || "";
+selector.innerHTML = state.normalLoad.items.map((item) =>
+'<option value="' + esc(item.name) + '">' + esc(item.title) + "</option>"
+).join("");
+if (state.normalLoad.items.some((item) => item.name === current)) selector.value = current;
+const selected = state.normalLoad.items.find((item) => item.name === selector.value);
+if ($("normalLoadDescription")) {
+$("normalLoadDescription").textContent =
+selected?.description || "读取真实演示关系表，保持数据库有可见但受控的业务流量。";
+}
+renderNormalLoadDataSource(selector.value);
+}
+
+function renderNormalLoadDataSource(name) {
+const node = $("normalLoadDataSource");
+if (!node) return;
+const isTpcc = String(name || "").startsWith("tpcc_");
+const tpcc = state.normalLoad.tpcc || {};
+if (isTpcc && tpcc.available) {
+node.textContent = "数据源：PostgreSQL · keeninsight_tpcc · " + fmt(tpcc.row_counts?.orders, 0) + " 订单 · " + fmt(tpcc.row_counts?.order_line, 0) + " 订单明细";
+} else if (isTpcc) {
+node.textContent = "数据源：TPC-C 数据尚未加载，请运行 scripts/bootstrap_tpcc.py";
+} else {
+node.textContent = "数据源：PostgreSQL · keeninsight_demo";
+}
+}
+
+function renderNormalLoadStatus(active = state.normalLoad.active || {}) {
+state.normalLoad.active = active;
+const running = Boolean(active.running);
+const title = active.title || state.normalLoad.items.find((item) => item.name === active.name)?.title;
+const message = running
+? "运行中 · " + (title || "正常负载") + " · " + fmt(active.calls, 0) +
+" 次 · 最近 " + fmt(active.last_latency_ms) + " 毫秒"
+: active.last_error
+? "已停止 · " + active.last_error
+: active.name
+? "已停止 · " + (title || active.name) + " · 共 " + fmt(active.calls, 0) + " 次"
+: "未启动";
+const node = $("normalLoadStatus");
+if (node) {
+node.innerHTML = '<span class="status-dot ' + (running ? "ok" : active.last_error ? "bad" : "") +
+'"></span>' + esc(message);
+}
+const selector = $("normalLoadSelect");
+if (selector && active.name && [...selector.options].some((option) => option.value === active.name)) {
+selector.value = active.name;
+}
+if ($("normalLoadStart")) $("normalLoadStart").disabled = running || state.workloadFlow.busy || !selector?.value;
+if ($("normalLoadStop")) $("normalLoadStop").disabled = !running;
+}
+
+async function refreshNormalLoadStatus() {
+if (!$("normalLoadStatus")) return;
+const data = await optionalApi("/api/normal-loads");
+if (data.active) renderNormalLoadStatus(data.active);
+}
+
+async function startNormalLoad() {
+const selector = $("normalLoadSelect");
+const button = $("normalLoadStart");
+if (!selector?.value) return toast("没有可用的正常负载，请先初始化演示数据", true);
+if (button) button.disabled = true;
+try {
+const rate = Number($("normalLoadRate")?.value);
+const result = await api("/api/normal-loads/start", {
+method: "POST",
+body: JSON.stringify({
+name: selector.value,
+rate_per_second: Number.isFinite(rate) ? rate : null,
+}),
+});
+renderNormalLoadStatus(result);
+toast((result.title || "正常负载") + "已启动，后台正在真实执行 PostgreSQL 查询");
+} catch (e) {
+toast(e.message, true);
+renderNormalLoadStatus(state.normalLoad.active || {});
+}
+}
+
+async function stopNormalLoad() {
+const button = $("normalLoadStop");
+if (button) button.disabled = true;
+try {
+const result = await api("/api/normal-loads/stop", { method: "POST" });
+renderNormalLoadStatus(result);
+toast("正常负载已停止");
+} catch (e) {
+toast(e.message, true);
+await refreshNormalLoadStatus();
+}
+}
+
+function renderAnomalyCards(scenarios) {
+const node = $("workloadGrid");
+if (!node) return;
+const items = (scenarios || []).filter((scenario) => anomalyText[scenario.name]);
+node.innerHTML = items.length
+? items.map((scenario) => {
+const meta = anomalyText[scenario.name];
+return '<div class="anomaly-card" role="button" tabindex="0" draggable="true" data-anomaly-scenario="' +
+esc(scenario.name) + '">' +
+'<div class="anomaly-card-head"><span class="scenario-level">' + esc(meta.category) +
+'</span><span class="anomaly-card-action">拖动触发</span></div>' +
+"<strong>" + esc(meta.title) + "</strong><span>" + esc(meta.hint) + "</span></div>";
+}).join("")
+: '<div class="empty">暂无可用的真实异常场景。</div>';
+bindAnomalyCards();
+}
+
+function renderWorkloadFlowStatus(message, tone = "") {
+state.workloadFlow.message = message;
+state.workloadFlow.tone = tone;
+const node = $("workloadFlowStatus");
+if (node) node.innerHTML = '<span class="status-dot ' + esc(tone) + '"></span>' + esc(message);
+const dropMessage = $("anomalyDropMessage");
+if (dropMessage) {
+dropMessage.textContent = state.workloadFlow.busy
+? "正在执行真实 PostgreSQL 测量，请等待诊断报告"
+: "系统将运行真实 PostgreSQL 压力并自动生成报告";
+}
+const zone = $("anomalyDropZone");
+if (zone) zone.classList.toggle("is-busy", Boolean(state.workloadFlow.busy));
+renderNormalLoadStatus(state.normalLoad.active || {});
+}
+
+function bindAnomalyCards() {
+document.querySelectorAll("[data-anomaly-scenario]").forEach((card) => {
+const scenario = card.dataset.anomalyScenario;
+card.ondragstart = (event) => {
+if (state.workloadFlow.busy) {
+event.preventDefault();
+return;
+}
+card.dataset.dragged = "1";
+event.dataTransfer.effectAllowed = "copy";
+event.dataTransfer.setData("text/plain", scenario);
+card.classList.add("is-dragging");
+};
+card.ondragend = () => {
+card.classList.remove("is-dragging");
+window.setTimeout(() => delete card.dataset.dragged, 0);
+};
+card.onclick = () => {
+if (card.dataset.dragged === "1") return;
+triggerAnomaly(scenario);
+};
+card.onkeydown = (event) => {
+if (event.key === "Enter" || event.key === " ") {
+event.preventDefault();
+triggerAnomaly(scenario);
+}
+};
+});
+}
+
+function bindWorkloadDashboard() {
+const selector = $("normalLoadSelect");
+if (selector) selector.onchange = () => {
+const item = state.normalLoad.items.find((row) => row.name === selector.value);
+if ($("normalLoadDescription")) {
+$("normalLoadDescription").textContent =
+item?.description || "读取真实演示关系表，保持数据库有可见但受控的业务流量。";
+}
+renderNormalLoadDataSource(selector.value);
+renderNormalLoadStatus(state.normalLoad.active || {});
+};
+if ($("normalLoadStart")) $("normalLoadStart").onclick = startNormalLoad;
+if ($("normalLoadStop")) $("normalLoadStop").onclick = stopNormalLoad;
+const zone = $("anomalyDropZone");
+if (zone) {
+zone.ondragover = (event) => {
+if (state.workloadFlow.busy) return;
+event.preventDefault();
+zone.classList.add("is-over");
+event.dataTransfer.dropEffect = "copy";
+};
+zone.ondragenter = (event) => {
+if (!state.workloadFlow.busy) {
+event.preventDefault();
+zone.classList.add("is-over");
+}
+};
+zone.ondragleave = (event) => {
+if (event.target === zone) zone.classList.remove("is-over");
+};
+zone.ondrop = (event) => {
+event.preventDefault();
+zone.classList.remove("is-over");
+if (!state.workloadFlow.busy) {
+const scenario = event.dataTransfer.getData("text/plain");
+if (scenario) triggerAnomaly(scenario);
+}
+};
+}
+bindAnomalyCards();
+}
+
+function upsertWorkloadReport(report) {
+const reportKey = String(report.run?.run_id ?? report.run?.id ?? report.incident?.id ?? "");
+state.workloadReports = [
+report,
+...state.workloadReports.filter((item) =>
+String(item.run?.run_id ?? item.run?.id ?? item.incident?.id ?? "") !== reportKey
+),
+].slice(0, 8);
+}
+
+function renderWorkloadReports() {
+const node = $("workloadReportList");
+if (!node) return;
+const reports = state.workloadReports || [];
+if ($("workloadReportCount")) $("workloadReportCount").textContent = reports.length + " 份";
+node.innerHTML = reports.length
+? reports.map((report, index) => {
+const run = report.run || {};
+const runId = run.run_id ?? run.id ?? report.incident?.id ?? "—";
+const phase = run.phase === "after" ? "调优后" : run.phase === "contention" ? "并发" : "基线";
+const status = report.error ? "需重试" : "可查看";
+return '<div class="workload-report-item"><div><strong>' + esc(anomalyTitle(run.scenario || report.incident?.kind)) +
+'</strong><span>#' + esc(runId) + " · " + phase + " · " + esc(status) +
+'</span></div><button class="text-button" data-report-index="' + index + '">' +
+(report.error ? "查看状态" : "查看报告") + "</button></div>";
+}).join("")
+: '<div class="empty">异常完成后，报告链接会出现在这里。</div>';
+node.querySelectorAll("[data-report-index]").forEach((button) => {
+button.onclick = () => showWorkloadReport(reports[Number(button.dataset.reportIndex)]);
+});
+}
+
+function showWorkloadReport(report) {
+const detail = $("workloadReportDetail");
+if (!detail || !report) return;
+const run = report.run || {};
+const diagnosis = report.diagnosis || {};
+const llm = diagnosis.llm_analysis;
+const causes = (diagnosis.root_causes || []).map((cause) =>
+'<span class="badge info">' + esc(anomalyTitle(cause)) + "</span>"
+).join(" ") || '<span class="muted">尚未确定根因</span>';
+const actions = (diagnosis.actions || []).slice(0, 4).map((action) =>
+'<div class="report-action"><code>' + esc(localActionType(action.action_type)) +
+'</code><span>' + esc(pretty(action.target || action)) + "</span></div>"
+).join("") || '<span class="muted">当前证据没有生成类型化调优建议。</span>';
+const evidence = (diagnosis.evidence || []).slice(0, 4).map((item) =>
+'<div class="report-evidence"><strong>' + esc(item.source || "PostgreSQL 证据") +
+'</strong><span>' + esc(item.interpretation || pretty(item.observed || {})) + "</span></div>"
+).join("");
+const llmBlock = llm
+? '<div class="report-llm"><div class="eyebrow">大模型分析结果</div><pre>' +
+esc(llm.text || "") + '</pre><p class="tiny muted">模型：' + esc(llm.model || "—") +
+" · 引用：" + esc((llm.evidence_ids || []).join(", ")) + " · 仅作证据解释</p></div>"
+: '<div class="report-llm report-llm-empty"><div class="eyebrow">大模型分析结果</div><p>本次没有返回外部模型分析；规则诊断和 PostgreSQL 原始证据仍然保留。</p></div>';
+detail.classList.remove("hidden");
+detail.innerHTML =
+'<div class="report-detail-head"><div><span class="eyebrow">诊断报告 · 真实运行 #' +
+esc(run.run_id ?? run.id ?? "—") + "</span><h3>" + esc(anomalyTitle(run.scenario || report.incident?.kind)) +
+'</h3></div><button class="text-button" data-report-close>关闭</button></div>' +
+(report.error ? '<div class="notice">' + esc(report.error) + "</div>" : "") +
+'<div class="report-causes"><span class="diagnosis-label">根因</span>' + causes + "</div>" +
+'<div class="report-columns"><div><span class="diagnosis-label">类型化建议</span><div class="report-actions">' +
+actions + '</div></div><div><span class="diagnosis-label">证据摘要</span><div class="report-evidence-list">' +
+(evidence || '<span class="muted">没有可折叠的诊断证据。</span>') + "</div></div></div>" +
+llmBlock +
+'<div class="report-detail-actions"><button class="button small secondary" data-report-actions>查看调优操作</button><span class="tiny muted">是否应用由审核页控制</span></div>';
+detail.querySelector("[data-report-close]").onclick = () => detail.classList.add("hidden");
+detail.querySelector("[data-report-actions]").onclick = () => setView("actions");
+}
+
+function waitForWorkload(ms) {
+return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function createWorkloadReport(result) {
+state.workloadFlow.runId = result.run_id;
+renderWorkloadFlowStatus("运行 #" + result.run_id + " 已完成，正在生成诊断报告…", "busy");
+try {
+const data = await api("/api/workload-runs/" + result.run_id + "/diagnose", { method: "POST" });
+const report = { run: result, diagnosis: data.diagnosis || data };
+state.diagnoses[result.run_id] = data;
+upsertWorkloadReport(report);
+renderWorkloadReports();
+renderWorkloadFlowStatus("报告已生成 · 点击右侧链接查看大模型分析", "ok");
+toast("诊断报告已生成，规则证据与大模型分析均已保存");
+return report;
+} catch (e) {
+const report = { run: result, error: e.message };
+upsertWorkloadReport(report);
+renderWorkloadReports();
+renderWorkloadFlowStatus("测量完成，但报告生成失败：" + e.message, "bad");
+toast("测量完成，但诊断报告生成失败：" + e.message, true);
+return report;
+}
+}
+
+async function triggerLockAnomaly() {
+const startedAt = Date.now();
+let started;
+let incident = null;
+let diagnosis = null;
+try {
+started = await api("/api/workloads/lock_contention/start", { method: "POST" });
+state.lockRunId = Number(started.run_id);
+renderWorkloadFlowStatus("锁竞争已触发，等待 pg_locks 证据…", "busy");
+for (let attempt = 0; attempt < 11 && !incident; attempt += 1) {
+const data = await optionalApi("/api/incidents?kind=lock_wait&status=active&limit=30");
+incident = (data.items || []).find((item) => {
+const seen = Date.parse(item.last_seen || item.first_seen || "");
+return !Number.isFinite(seen) || seen >= startedAt - 2000;
+});
+if (!incident) await waitForWorkload(1000);
+}
+if (incident) {
+renderWorkloadFlowStatus("锁等待已被采集，正在生成诊断报告…", "busy");
+const data = await api("/api/incidents/" + incident.id + "/diagnose", { method: "POST" });
+diagnosis = data.diagnosis || data;
+}
+} catch (e) {
+diagnosis = null;
+if (!started) throw e;
+} finally {
+if (state.lockRunId) {
+try {
+await api("/api/workloads/lock_contention/" + state.lockRunId + "/stop", { method: "POST" });
+} catch (e) {
+toast("锁竞争停止失败：" + e.message, true);
+}
+state.lockRunId = null;
+}
+await Promise.all([refreshDashboard(), loadIncidents(), loadWorkloadRuns()]);
+}
+const run = {
+run_id: started?.run_id,
+scenario: "lock_contention",
+phase: "contention",
+status: "completed",
+started_at: started?.started_at,
+message: incident ? "已采集锁等待事件" : "锁等待已真实触发并释放",
+};
+const report = incident && diagnosis
+? { run: run, incident: incident, diagnosis: diagnosis }
+: {
+run: run,
+incident: incident,
+error: "锁等待已真实触发并释放，但采集器尚未在本窗口生成 lock_wait 事件。",
+};
+upsertWorkloadReport(report);
+renderWorkloadReports();
+renderWorkloadFlowStatus(report.error ? report.error : "报告已生成 · 点击右侧链接查看大模型分析", report.error ? "bad" : "ok");
+if (report.error) toast(report.error, true);
+else toast("锁竞争诊断报告已生成");
+return report;
+}
+
+async function triggerAnomaly(scenarioName) {
+if (state.workloadFlow.busy) return toast("当前已有异常测量在运行，请等待报告完成", true);
+const scenario = state.workloadDefinitions.find((item) => item.name === scenarioName);
+if (!scenario) return toast("异常场景仍在加载，请稍候", true);
+state.workloadFlow = { busy: true, scenario: scenarioName, runId: null, message: "", tone: "busy" };
+renderWorkloadFlowStatus("正在启动 " + anomalyTitle(scenarioName) + "…", "busy");
+try {
+if (scenarioName === "lock_contention") {
+await triggerLockAnomaly();
+} else {
+const result = await runWorkloadPhase(
+scenarioName,
+"baseline",
+readWorkloadParameters(scenarioName),
+{ stayOnWorkloads: true }
+);
+await createWorkloadReport(result);
+}
+} catch (e) {
+renderWorkloadFlowStatus("异常触发失败：" + e.message, "bad");
+toast(e.message, true);
+} finally {
+state.workloadFlow.busy = false;
+renderWorkloadFlowStatus(state.workloadFlow.message || "等待异常触发", state.workloadFlow.tone || "");
+renderNormalLoadStatus(state.normalLoad.active || {});
+}
+}
+
+async function loadWorkloadsLegacy() {
+try {
+const data = await api("/api/workloads");
+const stateText = Object.entries(data.state?.relations || {})
+.map(([name, exists]) => `${name}：${exists ? "就绪" : "缺失"}`)
+.join(" · ");
+const cardinality = Object.entries(data.state?.table_stats || {}).map(([name, stats]) => `${name}：${fmt(stats.row_count, 0)} 行`).join(" · ");
+const parallelWorkers = data.state?.parallel_workers?.setting || "—";
+const displayItems = (data.items || []).map(displayScenario);
+state.workloadDefinitions = displayItems;
+renderGuidedDemo(displayItems);
+$("demoState").innerHTML = `<strong>${esc(stateText || "演示模式尚未初始化")}</strong><br><span class="muted">${esc(cardinality || "暂无关系表大小信息")}</span><br><span class="muted">orders_customer_id_idx：${data.state?.missing_index_exists ? "存在" : "不存在"}；work_mem：${esc(data.state?.work_mem?.setting || "—")}${data.state?.work_mem?.unit ? ` ${esc(data.state.work_mem.unit)}` : ""}；max_parallel_workers_per_gather：${esc(parallelWorkers)}。运行器会从当前连接的 PostgreSQL 实例读取执行计划和计数器。</span>`;
+$("workloadGrid").innerHTML = displayItems.map((scenario) => {
+const knobs = scenario.name === "missing_index"
+? `<label class="workload-knob"><span>customer_id</span><input data-workload-param="customer_id" type="number" value="${esc(scenario.parameters?.customer_id ?? "")}" min="1"></label>`
+: scenario.name === "hash_join_spill" || scenario.name === "aggregate_spill" || scenario.name === "sort_spill"
+? `<label class="workload-knob"><span>baseline work_mem</span><input data-workload-param="baseline_work_mem" value="${esc(scenario.parameters?.baseline_work_mem ?? "64kB")}" inputmode="text"></label>`
+: scenario.name === "parallel_query_underprovisioned"
+? `<label class="workload-knob"><span>baseline workers</span><input data-workload-param="baseline_parallel_workers" type="number" value="${esc(scenario.parameters?.baseline_parallel_workers ?? 0)}" min="0" step="1"></label>`
+: `<div class="workload-knob-placeholder">无需输入参数；会话由 PostgreSQL 创建。</div>`;
+const isLock = scenario.name === "lock_contention";
+const isMaintenance = scenario.name === "stale_statistics";
+const isSystemConfig = scenario.name === "hash_join_spill" || scenario.name === "aggregate_spill" || scenario.name === "sort_spill" || scenario.name === "parallel_query_underprovisioned";
+return `<div class="workload-card" data-scenario="${esc(scenario.name)}">
+<div class="workload-card-top"><span class="scenario-level ${isLock || isSystemConfig || isMaintenance ? "system" : "sql"}">${isLock ? "系统 / 锁" : isSystemConfig ? "系统 / 配置" : isMaintenance ? "维护 / 统计" : "SQL / 计划"}</span><span class="scenario-state">实时</span></div>
+<h3>${esc(scenario.title)}</h3><p>${esc(scenario.description)}</p>
+<div class="tiny muted scenario-code"><code>${esc(scenario.name)}</code></div>${knobs}
+<div class="workload-actions">${isLock ? `<button class="button small primary" data-lock-start>启动锁竞争</button>` : `<button class="button small secondary" data-run="${esc(scenario.name)}" data-phase="baseline">运行基线</button><button class="button small primary" data-run="${esc(scenario.name)}" data-phase="after">运行调优后版本</button>`}</div>
+</div>`;
+}).join("");
+bindWorkloadButtons();
+await loadWorkloadRuns();
+} catch (e) { toast(e.message, true); }
+}
+
+function readWorkloadParameters(scenarioName) {
+const definition = state.workloadDefinitions.find((scenario) => scenario.name === scenarioName);
+const parameters = { ...(definition?.parameters || {}) };
+const card = document.querySelector('.workload-card[data-scenario="' + scenarioName + '"]');
+if (card) {
+card.querySelectorAll("[data-workload-param]").forEach((input) => {
+parameters[input.dataset.workloadParam] = input.value.trim();
+});
+}
+return parameters;
+}
+
+function rememberRun(result) {
+state.lastRun = result;
+state.guidedCurrent[result.scenario] = true;
+if (result.phase === "baseline") {
+state.baselineRuns[result.scenario] = result.run_id;
+state.baselineResults[result.scenario] = result;
+state.actionsByScenario[result.scenario] = undefined;
+state.actionRecords[result.scenario] = undefined;
+state.feedbackByScenario[result.scenario] = undefined;
+state.afterRuns[result.scenario] = undefined;
+state.afterResults[result.scenario] = undefined;
+}
+if (result.phase === "after") {
+state.afterRuns[result.scenario] = result.run_id;
+state.afterResults[result.scenario] = result;
+}
+}
+
+function clearRunnerTimers() {
+if (state.runner.pollTimer) clearInterval(state.runner.pollTimer);
+if (state.runner.elapsedTimer) clearInterval(state.runner.elapsedTimer);
+state.runner.pollTimer = null;
+state.runner.elapsedTimer = null;
+state.runner.pollInFlight = false;
+}
+
+function runnerElapsedSeconds() {
+if (!state.runner.startedAt) return 0;
+return Math.max(0, (Date.now() - state.runner.startedAt) / 1000);
+}
+
+function startRunnerClock() {
+if (state.runner.elapsedTimer) clearInterval(state.runner.elapsedTimer);
+const update = () => {
+const node = $("workloadRunnerElapsed");
+if (node) node.textContent = `${runnerElapsedSeconds().toFixed(1)} 秒`;
+};
+update();
+state.runner.elapsedTimer = setInterval(update, 100);
+}
+
+function runnerStageText(stage, status) {
+if (status === "completed") return "测量完成";
+if (status === "failed") return "测量失败";
+return ({ queued: "已排队，等待后台线程", starting: "正在连接 PostgreSQL", warming_up: "正在预热真实查询", measuring: "正在持续计时样本" }[stage] || "正在运行真实 PostgreSQL 测量");
+}
+
+function renderWorkloadRunner(snapshot = {}) {
+const runner = state.runner;
+const row = snapshot && Object.keys(snapshot).length ? snapshot : (runner.snapshot || {});
+const observations = row.observations || {};
+const progress = observations.progress || {};
+const status = row.status || (runner.running ? "running" : "pending");
+const scenario = state.workloadDefinitions.find((item) => item.name === (row.scenario || runner.scenario)) || scenarioText[row.scenario || runner.scenario] || {};
+const scenarioName = row.scenario || runner.scenario || "";
+const total = Math.max(0, Number(progress.total_samples || (Number(row.repetitions || runner.repetitions || 0) + Number(row.warmup_repetitions || runner.warmupRepetitions || 0))));
+const completed = status === "completed" ? total : Math.min(total, Math.max(0, Number(progress.completed_samples || 0)));
+const percent = total ? Math.round((completed / total) * 100) : 0;
+const stage = runnerStageText(progress.stage, status);
+const phaseText = row.phase === "after" ? "调优后版本" : row.phase === "baseline" ? "基线版本" : "工作负载";
+const timingSamples = Array.isArray(progress.timings_ms) && progress.timings_ms.length ? progress.timings_ms : (Array.isArray(observations.timings_ms) ? observations.timings_ms : []);
+const warmups = Number(progress.warmup_samples || 0);
+const lastSample = progress.last_sample_ms;
+const titleNode = $("workloadRunnerTitle");
+if (!titleNode) return;
+titleNode.textContent = scenarioName ? `${scenario.title || scenarioText[scenarioName]?.title || scenarioName} · ${phaseText}` : "等待启动真实工作负载";
+$("workloadRunnerDescription").textContent = status === "failed"
+? `本次运行失败：${row.error || observations.error || runner.error || "服务端未返回错误详情"}`
+: (scenario.description || "从工作负载页选择一个场景，启动后将持续显示实际测量结果。");
+const stageNode = $("workloadRunnerStage");
+stageNode.textContent = stage;
+stageNode.className = `runner-stage ${status === "failed" ? "error" : status === "completed" ? "done" : status === "running" ? "active" : "waiting"}`;
+$("workloadRunnerProgressText").textContent = status === "completed" ? "所有真实样本和执行计划已保存" : status === "failed" ? "后台运行已停止" : (progress.stage === "warming_up" ? "预热不计入最终统计" : "正在采集计时样本");
+$("workloadRunnerProgressDetail").textContent = progress.query ? `当前 SQL：${progress.query}` : (status === "completed" ? "可以进入下一步查看诊断、生成建议或记录调优反馈。" : "状态来自 workload_runs 记录，页面每 400 毫秒刷新一次。");
+$("workloadRunnerProgressPercent").textContent = `${percent}%`;
+$("workloadRunnerProgressBar").style.width = `${percent}%`;
+$("workloadRunnerStatus").textContent = localStatus(status);
+$("workloadRunnerSamples").textContent = `${fmt(completed, 0)} / ${fmt(total, 0)}`;
+$("workloadRunnerRunId").textContent = row.run_id || row.id || "—";
+if (!runner.elapsedTimer && runner.startedAt && runner.running) startRunnerClock();
+
+if (!timingSamples.length && status !== "completed") {
+$("workloadRunnerMeasurements").innerHTML = `<div class="runner-live-note"><span class="live-pulse"></span><span>等待第一个 PostgreSQL 查询返回；这不是预估值。</span></div>`;
+} else {
+const sampleRows = timingSamples.map((sample, index) => `<div class="runner-sample-row"><span>计时样本 ${index + 1}</span><strong>${fmt(sample)} 毫秒</strong><small>${index === timingSamples.length - 1 && lastSample !== undefined ? "最近返回" : "已持久化"}</small></div>`).join("");
+const warmupNote = warmups ? `<div class="runner-sample-note">已完成预热 ${fmt(warmups, 0)} 次（不计入中位数/P95）</div>` : "";
+$("workloadRunnerMeasurements").innerHTML = warmupNote + sampleRows + (status === "running" ? '<div class="runner-sample-note">下一次样本完成后自动更新。</div>' : "");
+}
+
+const activities = runner.activity || [];
+$("workloadRunnerActivity").innerHTML = activities.length ? `<div class="runner-activity-list">${activities.slice(0, 8).map((item) => `<div class="runner-activity-row"><div><strong>PID ${esc(item.pid)}</strong><span>${esc(item.state || "—")}${item.wait_event ? " · " + esc(item.wait_event) : ""}</span></div><code>${esc(item.query || "—")}</code></div>`).join("")}</div>` : `<div class="runner-live-note"><span class="status-dot"></span><span>${status === "running" ? "当前轮询未捕获到活动会话；短查询可能已完成。" : "运行启动后，这里会显示非控制台 PostgreSQL 会话。"}</span></div>`;
+
+if (status === "completed") {
+const queryMeasurement = observations.query_measurement || {};
+$("workloadRunnerEvidence").innerHTML = `<div class="runner-evidence-grid"><div><span>中位耗时</span><strong>${fmt(observations.median_query_time_ms)} 毫秒</strong></div><div><span>P95 耗时</span><strong>${fmt(observations.p95_query_time_ms)} 毫秒</strong></div><div><span>服务器执行耗时</span><strong>${fmt(observations.server_execution_time_ms ?? observations.plan_summary?.execution_time_ms)} 毫秒</strong></div><div><span>临时块</span><strong>${observations.plan_summary?.has_temp_blocks ? "已观测" : "未观测"}</strong></div></div><div class="runner-evidence-plan"><span class="eyebrow">执行计划证据</span>${planEvidence(observations)}<p class="tiny muted">查询计数器：${esc(queryMeasurement.available ? (queryMeasurement.query_id || "可用") : "不可用")} · 参数：<code>${esc(pretty(row.parameters || observations.parameters || {}))}</code></p></div>`;
+} else if (status === "failed") {
+$("workloadRunnerEvidence").innerHTML = `<div class="notice danger-text">${esc(row.error || observations.error || runner.error || "后台运行失败")}</div>`;
+} else {
+$("workloadRunnerEvidence").innerHTML = `<div class="runner-live-note"><span class="live-pulse"></span><span>完成后才会生成 EXPLAIN ANALYZE、计数器增量和调优证据。</span></div>`;
+}
+const next = $("workloadRunnerNextButton");
+next.disabled = status !== "completed";
+next.textContent = row.phase === "after" ? "进入下一步：记录实测反馈" : "进入下一步：查看诊断与建议";
+}
+
+async function pollWorkloadRun(started) {
+const runId = Number(started.run_id);
+return new Promise((resolve, reject) => {
+let settled = false;
+const finish = (error, result) => {
+if (settled) return;
+settled = true;
+clearRunnerTimers();
+state.runner.running = false;
+if (error) reject(error); else resolve(result);
+};
+const check = async () => {
+if (settled || state.runner.pollInFlight) return;
+state.runner.pollInFlight = true;
+try {
+const snapshot = await api(`/api/workload-runs/${runId}`);
+if (state.runner.runId !== runId) return finish(new Error("当前实时测量已被另一个运行替换"));
+state.runner.snapshot = snapshot;
+const activity = await optionalApi("/api/activity?limit=12", { items: [] });
+state.runner.activity = activity.items || [];
+renderWorkloadRunner(snapshot);
+if (state.workloadFlow.busy && state.workloadFlow.scenario === state.runner.scenario) {
+const progress = snapshot.observations?.progress || {};
+const completed = Number(progress.completed_samples || 0);
+const total = Number(progress.total_samples || 0);
+renderWorkloadFlowStatus(
+anomalyTitle(state.runner.scenario) + " · 已完成 " + completed + (total ? " / " + total : "") + " 个真实样本",
+"busy"
+);
+}
+if (snapshot.status === "completed") {
+const result = rowToRunResult(snapshot);
+state.runner.completedResult = result;
+return finish(null, result);
+}
+if (snapshot.status === "failed") return finish(new Error(snapshot.error || "工作负载运行失败"));
+} catch (error) {
+state.runner.error = error.message;
+renderWorkloadRunner(state.runner.snapshot || started);
+return finish(error);
+} finally {
+state.runner.pollInFlight = false;
+}
+};
+state.runner.pollTimer = setInterval(check, 400);
+check();
+});
+}
+
+async function runWorkloadPhase(scenarioName, phase, parameters = null, options = {}) {
+if (phase === "after" && !state.baselineRuns[scenarioName]) {
+throw new Error("请先完成该场景的基线测量");
+}
+clearRunnerTimers();
+state.runner = { runId: null, scenario: scenarioName, phase, repetitions: workloadRepetitions(), warmupRepetitions: workloadWarmups(), startedAt: Date.now(), running: true, snapshot: null, completedResult: null, activity: [], pollTimer: null, elapsedTimer: null, pollInFlight: false, error: null };
+state.guidedScenario = scenarioName;
+state.guidedCurrent[scenarioName] = true;
+if (!options.stayOnWorkloads) setView("workload-runner");
+startRunnerClock();
+renderWorkloadRunner({ scenario: scenarioName, phase, status: "running", repetitions: state.runner.repetitions, warmup_repetitions: state.runner.warmupRepetitions, observations: { progress: { stage: "queued", total_samples: state.runner.repetitions + state.runner.warmupRepetitions } } });
+try {
+const started = await api(`/api/workloads/${scenarioName}/runs/start`, {
+method: "POST",
+body: JSON.stringify({ phase, repetitions: state.runner.repetitions, warmup_repetitions: state.runner.warmupRepetitions, parameters: parameters || readWorkloadParameters(scenarioName) }),
+});
+state.runner.runId = Number(started.run_id);
+if (state.workloadFlow.busy && state.workloadFlow.scenario === scenarioName) state.workloadFlow.runId = state.runner.runId;
+state.runner.snapshot = started;
+state.runner.repetitions = Number(started.repetitions || state.runner.repetitions);
+state.runner.warmupRepetitions = Number(started.warmup_repetitions || state.runner.warmupRepetitions);
+renderWorkloadRunner(started);
+const result = await pollWorkloadRun(started);
+rememberRun(result);
+state.lastRun = result;
+state.runner.completedResult = result;
+state.runner.snapshot = { ...state.runner.snapshot, ...result, status: "completed", observations: result };
+renderWorkloadRunner(state.runner.snapshot);
+if (!options.stayOnWorkloads) toast(`${phase === "baseline" ? "基线" : "调优后"}测量已完成，数据来自 PostgreSQL；请进入下一步查看证据`);
+await Promise.all([loadWorkloadRuns(), refreshDashboard()]);
+renderGuidedDemo();
+return result;
+} catch (error) {
+state.runner.running = false;
+state.runner.error = error.message;
+renderWorkloadRunner(state.runner.snapshot || {});
+throw error;
+}
+}
+
+function continueFromRunner() {
+const result = state.runner.completedResult;
+if (!result) return;
+setView("workloads");
+state.lastRun = result;
+showWorkloadResult(result);
+renderGuidedDemo();
+const nextStep = result.phase === "after" ? "反馈" : "操作建议";
+toast(`已回到工作负载流程，下一步是${nextStep}`);
+}
+
+function rememberActionRecords(items) {
+(items || []).forEach((row) => {
+const source = row.validation?.proposal_source;
+if (source?.type !== "workload_run" || !source.scenario) return;
+const currentBaseline = state.baselineRuns[source.scenario];
+if (currentBaseline !== undefined && Number(currentBaseline) !== Number(source.run_id)) return;
+const current = state.actionRecords[source.scenario];
+if (!current || Number(row.id) > Number(current.id)) {
+state.actionRecords[source.scenario] = row;
+}
+if (row.validation?.latest_feedback) {
+state.feedbackByScenario[source.scenario] = row.validation.latest_feedback;
+}
+});
+}
+
+function renderGuidedDemo(scenarios = state.workloadDefinitions) {
+const selector = $("guidedScenario");
+const timeline = $("guidedTimeline");
+if (!selector || !timeline) return;
+const choices = (scenarios || []).filter((scenario) => !["lock_contention", "stale_statistics"].includes(scenario.name));
+if (!choices.length) {
+selector.innerHTML = "";
+timeline.innerHTML = '<div class="empty">暂无可用的批处理工作负载。</div>';
+return;
+}
+if (!choices.some((scenario) => scenario.name === state.guidedScenario)) {
+state.guidedScenario = choices[0].name;
+}
+selector.innerHTML = choices.map((scenario) => (
+'<option value="' + esc(scenario.name) + '"' +
+(scenario.name === state.guidedScenario ? " selected" : "") + ">" +
+esc(scenario.title) + "</option>"
+)).join("");
+const scenario = choices.find((item) => item.name === state.guidedScenario) || choices[0];
+$("guidedDescription").textContent = scenario.description || "";
+selector.onchange = () => {
+state.guidedScenario = selector.value;
+renderGuidedDemo();
+};
+const currentFlow = Boolean(state.guidedCurrent[state.guidedScenario]);
+const action = currentFlow ? state.actionRecords[state.guidedScenario] : undefined;
+const actionStatus = action?.status || "";
+const baselineDone = currentFlow && Boolean(state.baselineRuns[state.guidedScenario]);
+const proposalDone = currentFlow && Boolean(action);
+const applyDone = currentFlow && (actionStatus === "applied" || actionStatus === "rolled_back");
+const afterDone = currentFlow && Boolean(state.afterRuns[state.guidedScenario]);
+const feedbackDone = currentFlow && Boolean(state.feedbackByScenario[state.guidedScenario]);
+const rollbackDone = currentFlow && actionStatus === "rolled_back";
+const done = [baselineDone, proposalDone, applyDone, afterDone, feedbackDone, rollbackDone];
+const currentIndex = done.findIndex((value) => !value);
+const steps = [
+{ key: "baseline", title: "基线", status: baselineDone ? "运行 #" + state.baselineRuns[state.guidedScenario] : "尚未测量", label: "运行基线" },
+{ key: "propose", title: "操作建议", status: proposalDone ? "操作 #" + action.id : "等待执行计划证据", label: "生成操作建议" },
+{ key: "apply", title: "审核 / 应用", status: applyDone ? localStatus(actionStatus) : proposalDone ? "需要明确批准" : "等待操作建议", label: "应用已审核操作" },
+{ key: "after", title: "调优后", status: afterDone ? "运行 #" + state.afterRuns[state.guidedScenario] : "等待操作应用", label: "运行调优后版本" },
+{ key: "feedback", title: "反馈", status: feedbackDone ? (state.feedbackByScenario[state.guidedScenario].observed_effect || "已记录") : "等待调优后测量", label: "记录反馈" },
+{ key: "rollback", title: "回滚", status: rollbackDone ? "已验证" : feedbackDone ? "可以恢复" : "等待反馈", label: "回滚操作" },
+];
+timeline.innerHTML = steps.map((step, index) => {
+const isDone = done[index];
+const isCurrent = index === currentIndex;
+const className = isDone ? "done" : isCurrent ? "current" : "waiting";
+const button = isCurrent && !state.guidedBusy
+? '<button class="button small ' + (step.key === "rollback" ? "danger" : "primary") + '" data-guided-step="' + step.key + '">' + step.label + "</button>"
+: "";
+return '<div class="guided-step ' + className + '"><div class="guided-step-head"><span class="guided-step-index">' +
+(isDone ? "✓" : String(index + 1)) + '</span><span class="guided-step-title">' + esc(step.title) +
+'</span></div><div class="guided-step-status">' + esc(step.status) + "</div>" + button + "</div>";
+}).join("");
+if (currentIndex < 0) {
+$("guidedMessage").innerHTML = "引导流程完成。最后一个操作已经回滚，PostgreSQL 可以开始下一次干净实验。<button class=\"button small secondary guided-restart\" data-guided-step=\"baseline\">重新运行基线</button>";
+} else if (!currentFlow) {
+const historicalRuns = Object.keys(state.baselineResults).includes(state.guidedScenario);
+$("guidedMessage").textContent = historicalRuns
+? "历史证据仍保留在下方。请开始新的基线，进入一轮新的引导实验。"
+: "请开始新的基线。引导流程与下方各工作负载按钮使用相同的 API。";
+} else {
+$("guidedMessage").textContent = "下一步：" + steps[currentIndex].label + "。引导流程与下方各工作负载按钮使用相同的 API。";
+}
+document.querySelectorAll("[data-guided-step]").forEach((button) => {
+button.onclick = async () => {
+await runGuidedStep(button.dataset.guidedStep);
+};
+});
+const autoButton = $("guidedAutoResolveButton");
+if (autoButton) {
+autoButton.disabled = state.guidedBusy || !baselineDone || proposalDone;
+autoButton.title = baselineDone
+? (proposalDone ? "请开始新的基线，或继续使用逐步审核流程" : "自动应用、验证、记录反馈，并在无效时恢复")
+: "请先运行基线";
+}
+const quickButton = $("guidedPressureAutoButton");
+if (quickButton) {
+quickButton.disabled = state.guidedBusy;
+quickButton.title = "进入实时测量页，完成真实基线后再决定下一步";
+}
+}
+
+function updateActionRecord(action) {
+const source = action?.validation?.proposal_source;
+if (!source?.scenario) return;
+state.actionsByScenario[source.scenario] = action.id;
+state.actionRecords[source.scenario] = action;
+}
+
+async function runGuidedStep(step) {
+if (state.guidedBusy) return;
+const scenario = state.guidedScenario;
+state.guidedBusy = true;
+renderGuidedDemo();
+try {
+if (step === "baseline") {
+await runWorkloadPhase(scenario, "baseline");
+} else if (step === "propose") {
+const action = await api("/api/workload-runs/" + state.baselineRuns[scenario] + "/propose", { method: "POST" });
+updateActionRecord(action);
+state.lastRun = state.baselineResults[scenario];
+showWorkloadResult(state.lastRun);
+await loadActions();
+toast("操作建议 #" + action.id + " 已生成，等待审核");
+} else if (step === "apply") {
+const action = await api("/api/actions/" + state.actionsByScenario[scenario] + "/apply", { method: "POST" });
+updateActionRecord(action);
+await loadActions();
+toast("已审核的调优操作已应用，并在 PostgreSQL 中完成验证");
+} else if (step === "after") {
+await runWorkloadPhase(scenario, "after");
+} else if (step === "feedback") {
+const data = await api("/api/actions/" + state.actionsByScenario[scenario] + "/feedback", {
+method: "POST",
+body: JSON.stringify({
+baseline_run_id: Number(state.baselineRuns[scenario]),
+after_run_id: Number(state.afterRuns[scenario]),
+}),
+});
+state.feedbackByScenario[scenario] = data.feedback?.outcome || {};
+updateActionRecord(data.action);
+await loadActions();
+await loadKnowledge();
+showWorkloadResult(state.afterResults[scenario]);
+toast("实测结果已记录：" + (data.feedback?.outcome?.observed_effect || "完成"));
+} else if (step === "rollback") {
+const action = await api("/api/actions/" + state.actionsByScenario[scenario] + "/rollback", { method: "POST" });
+updateActionRecord(action);
+await loadActions();
+await refreshDashboard();
+toast("调优操作已回滚，并已验证 PostgreSQL 状态");
+}
+} catch (e) {
+toast(e.message, true);
+} finally {
+state.guidedBusy = false;
+renderGuidedDemo();
+}
+}
+
+async function applyAutomaticResolution(scenario, baselineRunId) {
+const data = await api(`/api/workload-runs/${baselineRunId}/auto-resolve`, {
+method: "POST",
+body: JSON.stringify({ rollback_after_success: Boolean($("guidedAutoRollback")?.checked) }),
+});
+const action = data.action || {};
+const after = data.after || {};
+const feedback = data.feedback?.feedback?.outcome || {};
+state.guidedCurrent[scenario] = true;
+state.baselineRuns[scenario] = Number(data.baseline?.id || baselineRunId);
+state.baselineResults[scenario] = { ...(data.baseline || {}), run_id: state.baselineRuns[scenario], scenario, phase: "baseline", observations: data.baseline?.observations || {} };
+state.actionsByScenario[scenario] = action.id;
+state.actionRecords[scenario] = action;
+state.afterRuns[scenario] = Number(after.run_id);
+state.afterResults[scenario] = after;
+state.feedbackByScenario[scenario] = feedback;
+state.lastRun = after;
+showWorkloadResult(after);
+await Promise.all([loadWorkloadRuns(), loadActions(), loadKnowledge(), refreshDashboard()]);
+toast(`自动闭环完成：${data.resolution?.effective ? "调优有效" : "调优无效"}${data.resolution?.rollback_performed ? "；状态已恢复" : "；操作仍已部署"}`);
+return data;
+}
+
+async function autoResolveGuided() {
+if (state.guidedBusy) return;
+const scenario = state.guidedScenario;
+const baselineRunId = state.baselineRuns[scenario];
+if (!baselineRunId) return toast("请先运行基线，再执行自动处理", true);
+if (state.actionRecords[scenario]) return toast("当前基线已经有操作建议，请重新开始基线", true);
+if (!confirm("是否自动应用基于证据的操作，使用相同 SQL 复测、记录反馈，并在验证后恢复？")) return;
+state.guidedBusy = true;
+renderGuidedDemo();
+try {
+await applyAutomaticResolution(scenario, baselineRunId);
+} catch (e) { toast(e.message, true); }
+finally { state.guidedBusy = false; renderGuidedDemo(); }
+}
+
+async function runPressureAndAutoRepair() {
+if (state.guidedBusy) return;
+const scenario = state.guidedScenario;
+if (!state.workloadDefinitions.some((item) => item.name === scenario)) {
+return toast("工作负载定义仍在加载，请稍候", true);
+}
+if (!confirm("是否进入实时测量页并运行真实 PostgreSQL 压力负载？测量完成后由你决定下一步诊断、审核和调优。")) return;
+state.guidedBusy = true;
+renderGuidedDemo();
+try {
+await runWorkloadPhase(scenario, "baseline");
+} catch (e) { toast(e.message, true); }
+finally { state.guidedBusy = false; renderGuidedDemo(); }
+}
+
+function workloadRepetitions() {
+const value = Number.parseInt($("workloadRepetitions").value, 10);
+return Number.isFinite(value) ? Math.max(1, Math.min(value, 50)) : 5;
+}
+
+function workloadWarmups() {
+const value = Number.parseInt($("workloadWarmups").value, 10);
+return Number.isFinite(value) ? Math.max(0, Math.min(value, 10)) : 2;
+}
+
+function bindWorkloadButtons() {
+document.querySelectorAll("[data-run]").forEach((button) => button.onclick = async () => {
+button.disabled = true;
+try {
+const parameters = {};
+button.closest(".workload-card")?.querySelectorAll("[data-workload-param]").forEach((input) => {
+parameters[input.dataset.workloadParam] = input.value.trim();
+});
+await runWorkloadPhase(button.dataset.run, button.dataset.phase, parameters);
+} catch (e) { toast(e.message, true); }
+finally { button.disabled = false; }
+});
+$("workloadGrid").querySelectorAll("[data-lock-start]").forEach((button) => button.onclick = async () => {
+button.disabled = true;
+try {
+const result = await api("/api/workloads/lock_contention/start", { method: "POST" });
+state.lockRunId = result.run_id;
+showWorkloadResult(result);
+button.textContent = "运行中……请在下方停止";
+toast("锁持有者和等待者都是真实的 PostgreSQL 会话");
+} catch (e) { button.disabled = false; toast(e.message, true); }
+});
+}
+
+function formatPercent(value) {
+return value === null || value === undefined || !Number.isFinite(Number(value)) ? "—" : `${Number(value).toFixed(1)}%`;
+}
+
+function workloadMetric(label, value, foot, tone = "") {
+return `<div class="workload-metric ${tone}"><div class="metric-label">${esc(label)}</div><div class="workload-metric-value">${esc(value)}</div><div class="metric-foot">${esc(foot)}</div></div>`;
+}
+
+function planEvidence(observations) {
+const summary = observations?.plan_summary || {};
+const plan = observations?.plan || {};
+const nodes = plan.nodes || [];
+const hashes = nodes.filter((node) => node["Node Type"] === "Hash").map((node) => node["Hash Batches"] ?? node.Batches).filter((value) => value !== undefined);
+const indexes = nodes.map((node) => node["Index Name"]).filter(Boolean);
+const sorts = nodes.filter((node) => node["Sort Method"]).map((node) => {
+let value = String(node["Sort Method"]);
+if (node["Sort Space Type"]) value += " / " + node["Sort Space Type"];
+if (node["Sort Space Used"]) value += " (" + node["Sort Space Used"] + " kB)";
+return value;
+});
+const aggregates = nodes.filter((node) => ["Aggregate", "HashAggregate"].includes(node["Node Type"]) && node.Strategy).map((node) => String(node["Node Type"]) + ": " + String(node.Strategy));
+const workersPlanned = Math.max(0, ...nodes.map((node) => Number(node["Workers Planned"] || 0)));
+const workersLaunched = Math.max(0, ...nodes.map((node) => Number(node["Workers Launched"] || 0)));
+return `<div class="evidence-grid">
+<div class="evidence-item"><span>根节点</span><code>${esc(summary.root_node || "—")}</code></div>
+<div class="evidence-item"><span>扫描节点</span><code>${esc((summary.scan_nodes || []).join(" → ") || "—")}</code></div>
+<div class="evidence-item"><span>连接节点</span><code>${esc((summary.join_nodes || []).join(" → ") || "—")}</code></div>
+<div class="evidence-item"><span>哈希批次数</span><code>${esc(hashes.length ? hashes.join(", ") : "未观测")}</code></div>
+<div class="evidence-item"><span>排序方法</span><code>${esc(sorts.join(" → ") || "未观测")}</code></div>
+<div class="evidence-item"><span>聚合策略</span><code>${esc(aggregates.join(" → ") || "未观测")}</code></div>
+<div class="evidence-item"><span>临时块</span><code>${summary.has_temp_blocks ? "已观测" : "未观测"}</code></div>
+<div class="evidence-item"><span>使用的索引</span><code>${esc(indexes.join(", ") || "未使用")}</code></div>
+<div class="evidence-item"><span>计划工作进程</span><code>${fmt(workersPlanned, 0)}</code></div>
+<div class="evidence-item"><span>实际启动工作进程</span><code>${fmt(workersLaunched, 0)}</code></div>
+</div>`;
+}
+
+function comparisonEvidence(result) {
+const baselineResult = state.baselineResults[result.scenario];
+const baseline = baselineResult?.observations || baselineResult;
+const after = result.observations || result;
+if (!baseline || result.phase !== "after") return "";
+const baseMedian = Number(baseline.median_query_time_ms);
+const afterMedian = Number(after?.median_query_time_ms);
+const baseP95 = Number(baseline.p95_query_time_ms);
+const afterP95 = Number(after?.p95_query_time_ms);
+const improvement = (before, current) => before > 0 && Number.isFinite(before) && Number.isFinite(current) ? ((before - current) / before) * 100 : null;
+const medianImprovement = improvement(baseMedian, afterMedian);
+const p95Improvement = improvement(baseP95, afterP95);
+const recorded = state.feedbackByScenario[result.scenario];
+const status = recorded
+? `<span class="badge ${recorded.effective ? "applied" : "warning"}">${esc(localStatus(recorded.observed_effect || "recorded"))}</span>`
+: `<span class="badge info">等待服务器反馈</span>`;
+return `<div class="comparison-panel">
+<div class="comparison-header"><div><span class="eyebrow">实测对比</span><h3>基线 → 调优后</h3></div>${status}</div>
+<div class="comparison-grid">
+${workloadMetric("中位耗时", `${fmt(baseMedian)} → ${fmt(afterMedian)} 毫秒`, `实测改善 ${formatPercent(medianImprovement)}`, medianImprovement !== null && medianImprovement > 0 ? "good" : "bad")}
+${workloadMetric("P95 耗时", `${fmt(baseP95)} → ${fmt(afterP95)} 毫秒`, `实测改善 ${formatPercent(p95Improvement)}`, p95Improvement !== null && p95Improvement > 0 ? "good" : "bad")}
+</div>
+<p class="tiny muted">此处使用两次返回的实测结果。服务器只有在通过执行计划、结果、参数和重复次数校验后，才会将反馈记录为 <code>effective</code>。</p>
+</div>`;
+}
+
+function rowToRunResult(row) {
+return {
+run_id: row.id,
+scenario: row.scenario,
+phase: row.phase,
+status: row.status,
+...(row.observations || {}),
+};
+}
+
+function planSignals(observations) {
+const summary = observations?.plan_summary || {};
+const nodes = observations?.plan?.nodes || [];
+const hashes = nodes
+.filter((node) => node["Node Type"] === "Hash")
+.map((node) => node["Hash Batches"] ?? node.Batches)
+.filter((value) => value !== undefined);
+const sorts = summary.sort_methods || nodes
+.filter((node) => node["Sort Method"])
+.map((node) => node["Sort Method"]);
+const sortSpaceTypes = summary.sort_space_types || nodes
+.filter((node) => node["Sort Space Type"])
+.map((node) => node["Sort Space Type"]);
+const aggregates = summary.aggregate_strategies || nodes
+.filter((node) => ["Aggregate", "HashAggregate"].includes(node["Node Type"]) && node.Strategy)
+.map((node) => node.Strategy);
+const temporary = Boolean(summary.has_temp_blocks) || nodes.some((node) => (
+Number(node["Temp Read Blocks"] || 0) > 0 || Number(node["Temp Written Blocks"] || 0) > 0
+));
+return {
+root: summary.root_node || observations?.plan?.root?.["Node Type"] || "未观测",
+scans: (summary.scan_nodes || []).join(" → ") || "未观测",
+joins: (summary.join_nodes || []).join(" → ") || "未观测",
+hashBatches: hashes.length ? hashes.join(", ") : "未观测",
+sortMethods: sorts.length ? sorts.join(", ") : "未观测",
+sortSpaceTypes: sortSpaceTypes.length ? sortSpaceTypes.join(", ") : "未观测",
+aggregates: aggregates.length ? aggregates.join(", ") : "未观测",
+temporary: temporary ? "已观测" : "未观测",
+workers: Math.max(0, ...nodes.map((node) => Number(node["Workers Launched"] || 0))),
+plannedWorkers: Math.max(0, ...nodes.map((node) => Number(node["Workers Planned"] || 0))),
+indexes: nodes.map((node) => node["Index Name"]).filter(Boolean).join(", ") || "未观测",
+estimateError: observations?.statistics_measurement?.estimate_error_ratio === undefined ? "未观测" : `${Number(observations.statistics_measurement.estimate_error_ratio).toFixed(1)}×`,
+};
+}
+
+function planDiffCell(label, before, after) {
+const changed = String(before) !== String(after);
+return '<div class="plan-diff-cell ' + (changed ? "changed" : "") + '"><span>' + esc(label) +
+'</span><div class="plan-diff-values"><code>' + esc(before) + '</code><b>→</b><code>' +
+esc(after) + '</code></div></div>';
+}
+
+function planDiffEvidence(result) {
+if (result.phase !== "after") return "";
+const baselineResult = state.baselineResults[result.scenario];
+if (!baselineResult) return "";
+const before = planSignals(baselineResult.observations || baselineResult);
+const after = planSignals(result.observations || result);
+const fields = [
+["根节点", "root"],
+["扫描路径", "scans"],
+["连接路径", "joins"],
+["哈希批次数", "hashBatches"],
+["排序方法", "sortMethods"],
+["排序空间", "sortSpaceTypes"],
+["聚合策略", "aggregates"],
+["临时块", "temporary"],
+["计划工作进程", "plannedWorkers"],
+["实际启动工作进程", "workers"],
+["使用的索引", "indexes"],
+["估算误差", "estimateError"],
+];
+return '<div class="comparison-panel plan-diff-panel"><div class="comparison-header"><div><span class="eyebrow">执行计划变化</span><h3>观测：之前 → 之后</h3></div><span class="badge info">EXPLAIN ANALYZE</span></div><div class="plan-diff-grid">' +
+fields.map((field) => planDiffCell(field[0], before[field[1]], after[field[1]])).join("") +
+'</div><p class="tiny muted">高亮单元格表示 PostgreSQL 执行计划发生变化；数值来自两次已持久化的工作负载运行。</p></div>';
+}
+
+function renderDiagnosisPanel(result, data) {
+const observations = result.observations || result;
+if (!observations.plan) return "";
+if (!data) {
+return '<div class="diagnosis-panel diagnosis-cta"><div><span class="eyebrow">服务器端推理</span><h3>解释该执行计划</h3><p>针对已持久化的 EXPLAIN JSON 重新运行确定性诊断规则。</p></div><button class="button small primary" data-diagnose-run="' + esc(result.run_id) + '">根据执行计划诊断</button></div>';
+}
+const diagnosis = data.diagnosis || data;
+const causes = (diagnosis.root_causes || []).map((cause) => '<span class="badge info">' + esc(cause) + "</span>").join(" ") || '<span class="muted">尚未确定根因</span>';
+const actions = (diagnosis.actions || []).map((action) => {
+const derivation = action.proposal_evidence ? '<details class="proposal-evidence"><summary>查看建议推导</summary><pre>' + esc(pretty(action.proposal_evidence)) + '</pre></details>' : '';
+return '<div class="diagnosis-action"><code>' + esc(action.action_type || "action") + "</code><span>" + esc(pretty(action.target || action)) + derivation + "</span></div>";
+}).join("") || '<span class="muted">未根据该计划提出类型化操作。</span>';
+const knowledge = (diagnosis.knowledge || []).map((entry) => '<a href="' + esc(entry.provenance) + '" target="_blank" rel="noreferrer">' + esc(entry.title) + "</a>").join("<br>") || '<span class="muted">没有匹配的来源记录。</span>';
+const evidence = (diagnosis.evidence || []).slice(0, 4).map((item) => '<div class="diagnosis-evidence"><span>' + esc(item.source || "evidence") + '</span><code>' + esc(pretty(item.observed || {})) + "</code></div>").join("");
+const llm = diagnosis.llm_analysis;
+const llmBlock = llm ? '<div class="result-box llm-grounded-box"><div class="eyebrow">外部模型 · 仅作证据解释</div><pre>' + esc(llm.text || "") + '</pre><p class="tiny muted">模型：' + esc(llm.model || "—") + ' · 引用：' + esc((llm.evidence_ids || []).join(", ")) + ' · 类型化建议仍以实测验证为准</p></div>' : "";
+return '<div class="comparison-panel diagnosis-panel"><div class="comparison-header"><div><span class="eyebrow">服务器端推理</span><h3>根据观测执行计划诊断</h3></div><button class="button small secondary" data-diagnose-run="' + esc(result.run_id) + '">刷新诊断</button></div><div class="diagnosis-causes">' + causes + '</div><div class="diagnosis-grid"><div><span class="diagnosis-label">类型化建议</span><div class="diagnosis-actions">' + actions + '</div></div><div><span class="diagnosis-label">知识来源</span><div class="diagnosis-links">' + knowledge + "</div></div></div>" + (evidence ? '<details class="diagnosis-evidence-details"><summary>查看规则使用的证据</summary>' + evidence + "</details>" : "") + llmBlock + "</div>";
+}
+
+function showWorkloadResult(result) {
+const card = $("workloadResultCard");
+const box = $("workloadResult");
+const observations = result.observations || result;
+card.classList.remove("hidden");
+const queryMeasurement = observations.query_measurement || {};
+const tempDelta = queryMeasurement.counter_deltas?.temp_blks_written;
+const planRoot = observations.plan_summary?.root_node || result.status || "—";
+const planNodes = observations.plan?.nodes || [];
+const parallelScenario = result.scenario === "parallel_query_underprovisioned";
+const statsScenario = result.scenario === "stale_statistics";
+const workersPlanned = Math.max(0, ...planNodes.map((node) => Number(node["Workers Planned"] || 0)));
+const workersLaunched = Math.max(0, ...planNodes.map((node) => Number(node["Workers Launched"] || 0)));
+const proposal = result.action_proposal ? `<div class="form-row result-actions"><button class="button small primary" data-propose-run="${result.run_id}">创建经过校验的操作建议</button><span class="tiny muted">根据该执行计划生成</span></div>` : "";
+const baselineRun = state.baselineRuns[result.scenario];
+const actionId = state.actionsByScenario[result.scenario];
+const feedback = result.phase === "after" && baselineRun && actionId ? `<div class="form-row result-actions"><button class="button small primary" data-feedback-action="${actionId}" data-feedback-baseline="${baselineRun}" data-feedback-after="${result.run_id}">记录实测前后对比</button><span class="tiny muted">API 会校验这组运行记录</span></div>` : "";
+const stop = state.lockRunId ? `<div class="form-row result-actions"><button class="button small danger" data-lock-stop="${state.lockRunId}">停止锁竞争</button></div>` : "";
+const isRun = result.phase === "baseline" || result.phase === "after";
+const metricCards = isRun ? `<div class="workload-metric-grid">
+${workloadMetric("中位耗时", `${fmt(observations.median_query_time_ms)} 毫秒`, `${observations.timing_summary?.count || result.repetitions || "—"} 个计时样本`, "")}
+${workloadMetric("P95 耗时", `${fmt(observations.p95_query_time_ms)} 毫秒`, "根据样本线性插值", "")}
+${workloadMetric("服务器执行耗时", `${fmt(observations.server_execution_time_ms ?? observations.plan_summary?.execution_time_ms)} 毫秒`, "EXPLAIN ANALYZE", "")}
+${workloadMetric("实际启动工作进程", parallelScenario ? `${fmt(workersLaunched, 0)} / ${fmt(workersPlanned, 0)}` : "不适用", parallelScenario ? "实际 / 计划 · EXPLAIN ANALYZE" : "并行计划信号", parallelScenario ? (workersLaunched > 0 ? "good" : "bad") : "")}
+${statsScenario ? workloadMetric("估算误差", `${fmt(observations.statistics_measurement?.estimate_error_ratio, 1)}×`, "估算行数 vs 实际行数", Number(observations.statistics_measurement?.estimate_error_ratio || 0) <= 2 ? "good" : "bad") : ""}
+${workloadMetric("写入临时块", fmt(tempDelta, 0), "语句计数器精确增量", Number(tempDelta || 0) > 0 ? "bad" : "good")}
+${workloadMetric("观测到的执行计划", planRoot, result.phase === "baseline" ? "基线阶段" : "调优后阶段", "")}
+</div>` : "";
+box.innerHTML = `<div class="card-heading result-heading"><div><span class="eyebrow">PostgreSQL 证据</span><h2>运行 #${esc(result.run_id)} · ${esc(result.phase === "baseline" ? "基线阶段" : result.phase === "after" ? "调优后阶段" : localStatus(result.status || "event"))}</h2><p>${esc(observations.measurement_note || result.message || "已从当前连接的 PostgreSQL 实例观测。")}</p></div><button class="text-button" data-close-result>关闭</button></div>
+${metricCards}${comparisonEvidence(result)}
+${isRun ? `<div class="result-columns"><section><h3>执行计划证据</h3>${planEvidence(observations)}</section><section><h3>测量上下文</h3><div class="context-list"><div><span>参数</span><code>${esc(pretty(result.parameters || observations.parameters || {}))}</code></div><div><span>查询</span><code>${esc(observations.query || "—")}</code></div><div><span>pg_stat_statements</span><code>${queryMeasurement.available ? esc(queryMeasurement.query_id || "可用") : "不可用"}</code></div></div></section></div>` : `<div class="result-event"><span class="badge active">实时会话</span><p>${esc(result.message || "工作负载正在运行；请查看实时异常和锁视图。")}</p></div>`}
+${proposal}${feedback}${stop}
+<details class="raw-evidence"><summary>原始 JSON 证据（已持久化的工作负载运行）</summary><pre class="evidence-pre">${esc(pretty(result))}</pre></details>`;
+const planDiff = planDiffEvidence(result);
+const comparison = box.querySelector(".comparison-panel");
+if (planDiff && comparison) comparison.insertAdjacentHTML("afterend", planDiff);
+const diagnosisPanel = renderDiagnosisPanel(result, result.diagnosis || state.diagnoses[result.run_id]);
+const resultColumns = box.querySelector(".result-columns");
+if (diagnosisPanel && resultColumns) resultColumns.insertAdjacentHTML("beforebegin", diagnosisPanel);
+box.querySelector("[data-close-result]").onclick = () => card.classList.add("hidden");
+const diagnoseButton = box.querySelector("[data-diagnose-run]");
+if (diagnoseButton) diagnoseButton.onclick = async () => {
+diagnoseButton.disabled = true;
+try {
+const data = await api("/api/workload-runs/" + diagnoseButton.dataset.diagnoseRun + "/diagnose", { method: "POST" });
+state.diagnoses[result.run_id] = data;
+showWorkloadResult(Object.assign({}, result, { diagnosis: data.diagnosis }));
+toast("已根据持久化的 PostgreSQL 执行计划刷新诊断");
+} catch (e) {
+toast(e.message, true);
+diagnoseButton.disabled = false;
+}
+};
+const propose = box.querySelector("[data-propose-run]");
+if (propose) propose.onclick = async () => {
+propose.disabled = true;
+try {
+const action = await api(`/api/workload-runs/${propose.dataset.proposeRun}/propose`, { method: "POST" });
+state.actionsByScenario[result.scenario] = action.id;
+toast(`操作建议 #${action.id} 已生成，请在调优后测量前应用`);
+await loadActions();
+showWorkloadResult(result);
+} catch (e) { toast(e.message, true); propose.disabled = false; }
+};
+const feedbackButton = box.querySelector("[data-feedback-action]");
+if (feedbackButton) feedbackButton.onclick = async () => {
+feedbackButton.disabled = true;
+try {
+const data = await api(`/api/actions/${feedbackButton.dataset.feedbackAction}/feedback`, { method: "POST", body: JSON.stringify({ baseline_run_id: Number(feedbackButton.dataset.feedbackBaseline), after_run_id: Number(feedbackButton.dataset.feedbackAfter) }) });
+state.feedbackByScenario[result.scenario] = data.feedback?.outcome || {};
+toast(`实测结果已记录：${localStatus(data.feedback?.outcome?.observed_effect || "complete")}`);
+await loadActions();
+await loadKnowledge();
+showWorkloadResult(result);
+} catch (e) { toast(e.message, true); feedbackButton.disabled = false; }
+};
+const stopButton = box.querySelector("[data-lock-stop]");
+if (stopButton) stopButton.onclick = async () => {
+try {
+await api(`/api/workloads/lock_contention/${stopButton.dataset.lockStop}/stop`, { method: "POST" });
+state.lockRunId = null;
+toast("锁竞争已停止，持锁事务已释放");
+await refreshDashboard();
+await loadIncidents();
+await loadWorkloads();
+} catch (e) { toast(e.message, true); }
+};
+}
+
+function rememberWorkloadActions(actions, runs) {
+const currentBaseline = {};
+(runs.items || []).forEach((run) => {
+if (run.phase === "baseline" && currentBaseline[run.scenario] === undefined) currentBaseline[run.scenario] = run.id;
+});
+(actions.items || []).forEach((action) => {
+const source = action.validation?.proposal_source;
+if (source?.type !== "workload_run" || !source.scenario) return;
+if (state.baselineRuns[source.scenario] === source.run_id || currentBaseline[source.scenario] === source.run_id) {
+if (state.baselineRuns[source.scenario] === undefined) state.baselineRuns[source.scenario] = source.run_id;
+if (state.actionsByScenario[source.scenario] === undefined || Number(action.id) > Number(state.actionsByScenario[source.scenario])) state.actionsByScenario[source.scenario] = action.id;
+}
+});
+}
+
+async function loadWorkloadRuns() {
+const [data, actions] = await Promise.all([api("/api/workload-runs?limit=50"), api("/api/actions?limit=200")]);
+rememberActionRecords(actions.items);
+renderGuidedDemo();
+rememberWorkloadActions(actions, data);
+const latestRuns = {};
+data.items.forEach((row) => {
+if (row.status !== "completed" || !["baseline", "after"].includes(row.phase)) return;
+const key = row.scenario + ":" + row.phase;
+if (!latestRuns[key] || Number(row.id) > Number(latestRuns[key].id)) latestRuns[key] = row;
+});
+Object.keys(latestRuns).forEach((key) => {
+const row = latestRuns[key];
+const scenarioName = row.scenario;
+if (row.phase === "baseline" && state.baselineRuns[scenarioName] === undefined) {
+state.baselineRuns[scenarioName] = row.id;
+state.baselineResults[scenarioName] = rowToRunResult(row);
+}
+if (row.phase === "after" && state.afterRuns[scenarioName] === undefined) {
+const baseline = latestRuns[scenarioName + ":baseline"];
+if (!baseline || Number(row.id) > Number(baseline.id)) {
+state.afterRuns[scenarioName] = row.id;
+state.afterResults[scenarioName] = rowToRunResult(row);
+}
+}
+});
+data.items.forEach((row) => {
+const observations = row.observations || {};
+if (row.status === "completed" && observations.diagnosis) {
+upsertWorkloadReport({
+run: { ...rowToRunResult(row), started_at: row.started_at },
+diagnosis: observations.diagnosis,
+});
+}
+});
+$("workloadRuns").innerHTML = data.items.length ? `<div class="data-table-wrap"><table><thead><tr><th>运行编号</th><th>场景</th><th>阶段</th><th>状态</th><th>开始时间</th><th>中位耗时（毫秒）</th><th>P95 耗时（毫秒）</th><th>计划 / 证据</th><th>操作</th></tr></thead><tbody>${data.items.map((row) => { const obs = row.observations || {}; const summary = obs.plan_summary || {}; return `<tr><td>#${row.id}</td><td><code>${esc(row.scenario)}</code></td><td><span class="phase-label ${row.phase === "after" ? "after" : "baseline"}">${esc(row.phase === "after" ? "调优后" : "基线")}</span></td><td><span class="badge ${esc(row.status)}">${esc(localStatus(row.status))}</span></td><td>${date(row.started_at)}</td><td>${fmt(obs.median_query_time_ms)}</td><td>${fmt(obs.p95_query_time_ms)}</td><td class="wrap"><code>${esc(summary.root_node || (row.scenario === "lock_contention" ? "锁会话" : "—"))}</code>${summary.has_temp_blocks ? `<br><span class="tiny danger-text">观测到临时块</span>` : ""}</td><td>${obs.action_proposal ? `<button class="button small secondary" data-propose-run="${row.id}">生成建议</button>` : "—"}</td></tr>`; }).join("")}</tbody></table></div>` : `<div class="empty">暂无工作负载运行记录。</div>`;
+renderWorkloadReports();
+renderGuidedDemo();
+$("workloadRuns").querySelectorAll("[data-propose-run]").forEach((button) => button.onclick = async () => {
+try {
+const action = await api(`/api/workload-runs/${button.dataset.proposeRun}/propose`, { method: "POST" });
+const row = data.items.find((item) => String(item.id) === String(button.dataset.proposeRun));
+if (row) { state.actionsByScenario[row.scenario] = action.id; state.baselineRuns[row.scenario] = row.id; }
+toast(`操作建议 #${action.id} 已生成，等待审核`);
+await loadActions();
+if (state.lastRun?.run_id === Number(button.dataset.proposeRun)) showWorkloadResult(state.lastRun);
+} catch (e) { toast(e.message, true); }
+});
+}
+
+async function loadActions() {
+try {
+const data = await api("/api/actions?limit=200");
+rememberActionRecords(data.items);
+renderGuidedDemo();
+$("actionTable").innerHTML = data.items.length ? `<div class="data-table-wrap"><table><thead><tr><th>操作</th><th>类型</th><th>目标</th><th>状态</th><th>描述</th><th>状态详情</th><th>实测反馈</th><th>控制</th></tr></thead><tbody>${data.items.map((row) => {
+const feedback = row.validation?.latest_feedback;
+const feedbackText = feedback ? `<span class="badge ${feedback.effective ? "applied" : "warning"}">${esc(localStatus(feedback.observed_effect))}</span><br><span class="tiny">中位改善 ${formatPercent(feedback.median_improvement_pct)} · P95 改善 ${formatPercent(feedback.p95_improvement_pct)}</span><br><span class="tiny muted">运行 #${esc(feedback.baseline_run_id)} → #${esc(feedback.after_run_id)}</span>` : "<span class=\"muted\">暂无实测对比</span>";
+const state = row.status === "applied" || row.status === "completed" ? row.after_state : row.before_state;
+const controlNote = row.status === "completed" && row.action_type === "refresh_statistics" ? `<span class="tiny muted">幂等维护；没有逆操作</span>` : "";
+const derivation = row.validation?.proposal_evidence ? `<details class="proposal-evidence"><summary>推导过程</summary><pre>${esc(pretty(row.validation.proposal_evidence))}</pre></details>` : "";
+return `<tr><td>#${row.id}</td><td><code>${esc(localActionType(row.action_type))}</code></td><td class="wrap"><code>${esc(pretty(row.target))}</code>${derivation}</td><td><span class="badge ${esc(row.status)}">${esc(localStatus(row.status))}</span></td><td class="wrap">${esc(localActionDescription(row))}</td><td class="wrap tiny"><code>${esc(pretty(state))}</code></td><td class="wrap tiny">${feedbackText}</td><td><div class="action-group">${row.status === "proposed" ? `<button class="button small primary" data-apply="${row.id}">应用</button><button class="button small secondary" data-reject="${row.id}">拒绝</button>` : ""}${row.status === "applied" ? `<button class="button small danger" data-rollback="${row.id}">回滚</button>` : ""}${controlNote}</div></td></tr>`;
+}).join("")}</tbody></table></div>` : `<div class="empty">暂无调优操作建议。</div>`;
+document.querySelectorAll("[data-apply]").forEach((button) => button.onclick = async () => {
+if (!confirm("确定将这项经过校验的操作应用到 PostgreSQL 吗？")) return;
+try { await api(`/api/actions/${button.dataset.apply}/apply`, { method: "POST" }); toast("PostgreSQL 操作已应用并完成验证"); await loadActions(); await refreshDashboard(); }
+catch (e) { toast(e.message, true); await loadActions(); }
+});
+document.querySelectorAll("[data-reject]").forEach((button) => button.onclick = async () => {
+if (!confirm("确定拒绝这项建议且不修改 PostgreSQL 吗？")) return;
+try { await api(`/api/actions/${button.dataset.reject}/reject`, { method: "POST" }); toast("操作建议已拒绝并记录"); await loadActions(); }
+catch (e) { toast(e.message, true); }
+});
+document.querySelectorAll("[data-rollback]").forEach((button) => button.onclick = async () => {
+if (!confirm("确定回滚这项操作吗？")) return;
+try { await api(`/api/actions/${button.dataset.rollback}/rollback`, { method: "POST" }); toast("PostgreSQL 回滚已应用并完成验证"); await loadActions(); await refreshDashboard(); }
+catch (e) { toast(e.message, true); }
+});
+} catch (e) { toast(e.message, true); }
+}
+
+async function loadKnowledge() { try { const data = await api("/api/knowledge"); const provenance = (value) => /^https?:\/\//i.test(String(value || "")) ? `<a href="${esc(value)}" target="_blank" rel="noreferrer">官方来源</a>` : esc(value || "—"); $("knowledgeTable").innerHTML = `<div class="data-table-wrap"><table><thead><tr><th>来源</th><th>根因</th><th>标题</th><th>上下文</th><th>来源凭据</th><th>置信度</th><th>样本数</th></tr></thead><tbody>${data.items.map((row) => `<tr><td>${esc(localSourceType(row.source_type))}</td><td><code>${esc(localKind(row.root_cause))}</code></td><td>${esc(row.title)}</td><td class="wrap"><code>${esc(pretty(row.context))}</code></td><td>${provenance(row.provenance)}</td><td>${row.confidence === undefined ? "—" : `${(Number(row.confidence) * 100).toFixed(1)}%`}</td><td>${fmt(row.feedback_count, 0)}（${fmt(row.success_count, 0)} 次成功）</td></tr>`).join("")}</tbody></table></div>`; } catch (e) { toast(e.message, true); } }
+
+function renderObservability(data) {
+const producer = data.kafka?.producer || {}, consumer = data.kafka?.consumer || {}, ebpf = data.ebpf || {};
+$("kafkaStatusPanel").innerHTML = `<div class="detail-list"><div class="detail-row"><span class="detail-key">生产者</span><span class="detail-value"><span class="badge ${producer.available ? "applied" : "warning"}">${esc(producer.transport || "不可用")}</span> · ${esc(producer.topic || "—")}</span></div><div class="detail-row"><span class="detail-key">已发送</span><span class="detail-value">${fmt(producer.sent_count, 0)} · 失败 ${fmt(producer.failed_count, 0)}</span></div><div class="detail-row"><span class="detail-key">消费者</span><span class="detail-value">${consumer.running ? "运行中" : "已停止"} · 已消费 ${fmt(consumer.consumed_count, 0)}${consumer.last_error ? ` · ${esc(consumer.last_error)}` : ""}</span></div></div>`;
+const adaptive = ebpf.adaptive || {};
+const pruned = adaptive.pruned_probes || [];
+const observedRates = adaptive.observed_event_rates || {};
+$("ebpfStatusPanel").innerHTML = `<div class="detail-list"><div class="detail-row"><span class="detail-key">会话</span><span class="detail-value">${ebpf.session_id ? `#${esc(ebpf.session_id)}` : "—"} · ${ebpf.running ? "运行中" : "已停止"}</span></div><div class="detail-row"><span class="detail-key">已挂载探针</span><span class="detail-value"><code>${esc((ebpf.attached_probes || []).join(", ") || "—")}</code></span></div><div class="detail-row"><span class="detail-key">事件 / 丢失</span><span class="detail-value">${fmt(ebpf.event_count, 0)} / ${fmt(ebpf.lost_count, 0)} · 目标 PID ${fmt(ebpf.target_pid_count, 0)}</span></div><div class="detail-row"><span class="detail-key">在线保护</span><span class="detail-value"><span class="badge ${adaptive.enabled ? "applied" : "info"}">${adaptive.enabled ? "启用" : "停用"}</span> · 预算 ${fmt(adaptive.max_event_rate_per_user_probe, 1)} 次/秒 · 已裁剪 ${fmt(pruned.length, 0)}</span></div><div class="detail-row"><span class="detail-key">实测速率</span><span class="detail-value"><code>${esc(pretty(observedRates) || "—")}</code></span></div><div class="detail-row"><span class="detail-key">关联方式</span><span class="detail-value">来自 <code>pg_stat_activity</code> 的 PID + SQL 文本/查询指纹</span></div></div>`;
+const items = data.events?.items || [];
+$("ebpfEventsTable").innerHTML = items.length ? `<div class="data-table-wrap"><table><thead><tr><th>时间</th><th>函数</th><th>PID</th><th>查询身份</th><th>耗时 / 字节</th><th>异常</th><th>传输方式</th></tr></thead><tbody>${items.map((row) => { const payload = row.payload || {}; return `<tr><td>${date(row.observed_at)}</td><td><code>${esc(row.function_name)}</code></td><td>${esc(row.pid || "—")}</td><td class="wrap"><code>${esc(row.query_id || payload.query_id || payload.query_text || "—")}</code></td><td>${fmt(row.duration_ns, 0)} 纳秒 / ${formatBytes(row.bytes || payload.bytes_total)}</td><td>${row.is_anomaly ? '<span class="badge warning">是</span>' : "否"}</td><td><span class="badge info">${esc(row.transport || "—")}</span></td></tr>`; }).join("")}</tbody></table></div>` : `<div class="empty">暂无 eBPF 事件。请先启动探针并运行工作负载。</div>`;
+const lifecycle = data.lifecycle?.items || [];
+$("sqlLifecyclePanel").innerHTML = lifecycle.length ? `<div class="data-table-wrap"><table><thead><tr><th>查询 ID</th><th>函数</th><th>事件数</th><th>耗时</th><th>异常数</th><th>观测区间</th></tr></thead><tbody>${lifecycle.slice(0, 80).map((row) => `<tr><td class="wrap"><code>${esc(row.query_id)}</code><br><span class="tiny muted">${esc(row.query_id_source || "—")}</span></td><td><code>${esc(row.function_name)}</code></td><td>${fmt(row.event_count, 0)}</td><td>${fmt(row.duration_ns, 0)} 纳秒</td><td>${fmt(row.anomaly_count, 0)}</td><td>${date(row.first_observed_at)} → ${date(row.last_observed_at)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">暂无已物化的生命周期记录；请先启动并停止一个 eBPF 会话。</div>`;
+}
+
+async function loadObservability() {
+try {
+const [ebpf, kafka, events, probes] = await Promise.all([api("/api/ebpf/status"), api("/api/kafka/status"), api("/api/ebpf/events?limit=100"), api("/api/ebpf/probes")]);
+const lifecycle = ebpf.session_id ? await api(`/api/ebpf/timelines?session_id=${ebpf.session_id}&limit=200`) : { items: [] };
+renderObservability({ ebpf, kafka, events, probes, lifecycle });
+} catch (e) { toast(e.message, true); }
+}
+
+async function startEbpf() {
+const button = $("ebpfStartButton"); button.disabled = true;
+try { await api("/api/ebpf/start", { method: "POST", body: JSON.stringify({ functions: [], adaptive: $("ebpfOnlineGuard")?.checked ?? true, max_event_rate: 1000 }) }); toast("真实 eBPF 探针已挂载；运行负载期间会刷新目标 PID"); await loadObservability(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function stopEbpf() {
+const button = $("ebpfStopButton"); button.disabled = true;
+try { await api("/api/ebpf/stop", { method: "POST" }); toast("eBPF 会话已停止，并保留在事件审计中"); await loadObservability(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function adaptEbpf() {
+const button = $("ebpfAdaptButton"); button.disabled = true;
+try { const result = await api("/api/ebpf/adapt", { method: "POST", body: JSON.stringify({ min_sessions: 4, max_probes: 8, alpha: 0.001, max_event_rate: 1000 }) }); $("probeSelectionPanel").classList.remove("hidden"); $("probeSelectionPanel").innerHTML = `<pre>${esc(pretty({ method: result.method, sample_count: result.sample_count, selected_probes: result.selected_probes, rejected_probes: result.rejected_probes, selection_budget: result.selection_budget, coefficients: result.coefficients, matched_sessions: result.matched_sessions }))}</pre>`; toast("Lasso 已根据实测会话和在线速率保护选择探针"); await loadObservability(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+function renderAnalysis(data) {
+const models = data.models || {}, source = data.source || {}, vector = data.vector || {};
+$("modelStatusPanel").innerHTML = (models.runs || []).length ? `<div class="detail-list">${models.runs.slice(0, 6).map((row) => `<div class="detail-row"><span class="detail-key">${esc(row.model_type)} #${esc(row.id)}</span><span class="detail-value"><span class="badge ${row.status === "ready" ? "applied" : "warning"}">${esc(localStatus(row.status))}</span> ${esc(row.algorithm)} · 样本数=${fmt(row.train_count, 0)} · ${esc(pretty(row.metrics || {}))}</span></div>`).join("")}</div>` : `<div class="empty">尚未根据已持久化的工作负载运行训练模型。</div>`;
+const latest = source.latest || {};
+const llm = source.llm || {};
+$("sourceStatusPanel").innerHTML = `<div class="detail-list"><div class="detail-row"><span class="detail-key">源码树</span><span class="detail-value"><code>${esc(source.source_root || "—")}</code> · ${source.source_exists ? "可用" : "缺失"}</span></div><div class="detail-row"><span class="detail-key">编译器</span><span class="detail-value">${esc(source.clang || "不可用")} · ${fmt(source.analysis_count, 0)} 条已持久化记录</span></div><div class="detail-row"><span class="detail-key">LLVM 流</span><span class="detail-value">${fmt(source.llvm_control_edge_count, 0)} 条 CFG 边 · ${fmt(source.llvm_data_flow_count, 0)} 条 SSA/数据流记录 · ${fmt(source.llvm_knob_propagation_count, 0)} 条传播记录</span></div><div class="detail-row"><span class="detail-key">代码知识</span><span class="detail-value">${fmt(source.code_knowledge_count, 0)} 条已持久化假设 · ${fmt(source.validated_code_knowledge_count, 0)} 条已验证</span></div><div class="detail-row"><span class="detail-key">外部模型</span><span class="detail-value">${llm.configured ? "已配置" : "未配置"} · ${esc(llm.model || "—")} · 成功 ${fmt(llm.successes, 0)} 次 / 失败 ${fmt(llm.failures, 0)} 次</span></div><div class="detail-row"><span class="detail-key">最新证据</span><span class="detail-value"><code>${esc(latest.knob || latest.function_name || latest.callee || "—")}</code> · ${esc(latest.file_path || "—")}</span></div></div><p class="tiny muted">向量索引：${fmt(vector.embeddings, 0)} 个向量 · ${fmt(vector.dimensions, 0)} 维${vector.model_loaded ? " · 模型已加载" : ""}。</p>`;
+const profiles = data.profiles?.items || [];
+$("differentialPanel").innerHTML = profiles.length ? `<div class="data-table-wrap"><table><thead><tr><th>画像编号</th><th>基线 / 降级会话</th><th>方法</th><th>最大实测差异</th><th>处理</th></tr></thead><tbody>${profiles.map((row) => { const functions = (row.features?.functions || []).slice(0, 3).map((item) => `${item.function_name}: ${fmt(item.delta?.duration_ns, 0)} 纳秒`).join(" · "); return `<tr><td>#${esc(row.id)}</td><td>${esc(row.baseline_session_id)} / ${esc(row.degraded_session_id)}</td><td>${esc(row.method)}</td><td>${esc(functions || "—")}</td><td><button class="button small secondary" data-system-tuning="${esc(row.baseline_session_id)}:${esc(row.degraded_session_id)}">映射到参数</button></td></tr>`; }).join("")}</tbody></table></div>` : `<div class="empty">尚未计算差分画像。请通过 API 选择两个已完成的 eBPF 会话。</div>`;
+}
+
+async function loadAnalysis() {
+try { const [models, source, vector, profiles, llm] = await Promise.all([api("/api/models/status"), api("/api/source-analysis/status"), api("/api/rag/vector/status"), api("/api/profiling/differential?limit=50"), api("/api/llm/status")]); source.llm = llm; renderAnalysis({ models, source, vector, profiles }); document.querySelectorAll("[data-system-tuning]").forEach((button) => button.onclick = async () => { button.disabled = true; const ids = button.dataset.systemTuning.split(":"); try { const result = await api("/api/system-tuning/recommend", { method: "POST", body: JSON.stringify({ baseline_session_id: Number(ids[0]), degraded_session_id: Number(ids[1]) }) }); $("systemTuningPanel").classList.remove("hidden"); $("systemTuningPanel").innerHTML = `<pre>${esc(pretty({ hotspot_functions: result.hotspot_functions, knobs: result.knobs, actions: result.actions, unsupported_knobs: result.unsupported_knobs }))}</pre>`; toast("Measured hotspots mapped through LLVM evidence; review the typed action before applying"); } catch (e) { toast(e.message, true); } finally { button.disabled = false; } }); }
+catch (e) { toast(e.message, true); }
+}
+
+async function trainModel(type, buttonId) {
+const button = $(buttonId); button.disabled = true;
+try { const result = await api("/api/models/train", { method: "POST", body: JSON.stringify({ model_type: type, limit: 2000 }) }); toast(`${localModelType(type)} 已根据 ${fmt(result.run?.train_count, 0)} 条持久化观测训练`); await loadAnalysis(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function predictModel() {
+const query = $("modelQuery").value.trim(); if (!query) return toast("请先输入只读查询", true);
+const button = $("modelPredictButton"); button.disabled = true;
+try { const result = await api("/api/models/predict", { method: "POST", body: JSON.stringify({ model_type: $("modelType").value, query }) }); $("modelPredictionPanel").classList.remove("hidden"); $("modelPredictionPanel").innerHTML = `<pre>${esc(pretty({ prediction: result.prediction, top_tree_shap: (result.attribution || []).slice(0, 8), features: result.features }))}</pre>`; toast("仅基于执行计划的预测和 TreeSHAP 归因已持久化"); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function runSourceAnalysis() {
+const button = $("runSourceAnalysisButton"); button.disabled = true;
+try { const result = await api("/api/source-analysis/run", { method: "POST", body: JSON.stringify({ knobs: [], max_files: 80 }) }); toast(`LLVM 分析已编译 ${fmt(result.compiled_count, 0)} 个翻译单元`); await loadAnalysis(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function retrieveCodeKnowledge() {
+const button = $("retrieveCodeKnowledgeButton"); button.disabled = true;
+try {
+const result = await api("/api/source-analysis/knowledge", { method: "POST", body: JSON.stringify({ knobs: ["work_mem", "max_parallel_workers_per_gather"], limit: 30 }) });
+$("codeKnowledgePanel").classList.remove("hidden");
+$("codeKnowledgePanel").innerHTML = `<div class="detail-list">${(result.hypotheses || []).map((item) => { const llm = item.llm_summary; return `<div class="detail-row"><span class="detail-key"><code>${esc(item.knob)}</code></span><span class="detail-value">${esc(item.statement)}${llm ? `<br><span class="llm-inline"><b>模型摘要：</b>${esc(llm.summary)} <span class="tiny muted">（${esc(llm.evidence_ids.join(", "))}）</span></span>` : ""}<br><span class="tiny muted">${fmt(item.support?.compiler_backed_rows, 0)} 条编译器支撑记录 · 需要实验验证</span></span></div>`; }).join("") || `<div class="empty">没有匹配的已持久化 LLVM/源码证据。</div>`}</div><details><summary>查看检索到的源码上下文和定位信息</summary><pre>${esc(pretty({ records: result.records, contexts: (result.contexts || []).slice(0, 12) }))}</pre></details>`;
+toast(`已检索 ${fmt((result.hypotheses || []).length, 0)} 条有编译器依据的代码假设`);
+await loadAnalysis();
+} catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+function renderAgentResult(data) {
+const run = data.run || {}, ranking = data.ranking || [], candidates = data.candidates || [], llm = data.llm_generation || {};
+$("agentResultPanel").classList.remove("hidden");
+$("agentResultPanel").innerHTML = `<div class="detail-list"><div class="detail-row"><span class="detail-key">运行编号</span><span class="detail-value">#${esc(run.id || "—")} · 已选择 <code>${esc(data.selected_candidate || "无")}</code></span></div><div class="detail-row"><span class="detail-key">证据</span><span class="detail-value">${fmt((data.knowledge || []).length, 0)} 条 RAG 段落 · ${fmt((data.source_evidence || []).length, 0)} 条 LLVM/源码记录</span></div><div class="detail-row"><span class="detail-key">模型候选</span><span class="detail-value">${llm.attempted ? `已调用 ${esc(llm.model || "外部模型")}，接受 ${fmt(llm.accepted_count, 0)} 项` : "未调用外部模型"} · 所有候选仍经过 PostgreSQL 实测</span></div></div><div class="data-table-wrap"><table><thead><tr><th>候选项</th><th>类型</th><th>中位耗时（毫秒）</th><th>结果等价</th><th>排名</th><th>操作</th></tr></thead><tbody>${candidates.map((item) => { const measurement = item.measurement || {}, semantic = item.semantic_equivalence || {}; const rank = ranking.find((row) => row.candidate_key === item.candidate_key); return `<tr><td><code>${esc(item.candidate_key)}</code></td><td>${esc(localActionType(item.action_type))}</td><td>${measurement.median_query_time_ms === undefined ? esc(localStatus(measurement.status || "—")) : fmt(measurement.median_query_time_ms)}</td><td>${semantic.equivalent ? '<span class="badge applied">等价</span>' : '<span class="badge warning">不等价 / 待验证</span>'}</td><td>${rank ? fmt(rank.rank, 0) : "—"}</td><td>${item.action_type === "index_selection" || item.action_type === "index_removal" ? `<button class="button small secondary" data-agent-propose="${esc(item.candidate_key)}">创建审核操作</button>` : `<button class="button small secondary" data-agent-verify="${esc(item.candidate_key)}">再次验证</button>`}</td></tr>`; }).join("")}</tbody></table></div><details><summary>原始排名和来源</summary><pre>${esc(pretty({ ranking, knowledge: data.knowledge, source_evidence: data.source_evidence }))}</pre></details>`;
+document.querySelectorAll("[data-agent-verify]").forEach((button) => button.onclick = async () => { button.disabled = true; try { const result = await api(`/api/optimizer/runs/${run.id}/verify`, { method: "POST", body: JSON.stringify({ candidate_key: button.dataset.agentVerify }) }); toast(`候选项已重新验证：${result.verification?.semantic_equivalence?.equivalent ? "结果等价" : "结果不等价"}`); } catch (e) { toast(e.message, true); } finally { button.disabled = false; } });
+document.querySelectorAll("[data-agent-propose]").forEach((button) => button.onclick = async () => { if (!confirm("确定从这个类型化索引建议创建经过审核的持久化操作吗？")) return; button.disabled = true; try { await api(`/api/optimizer/runs/${run.id}/propose-action`, { method: "POST", body: JSON.stringify({ candidate_key: button.dataset.agentPropose }) }); toast("类型化操作建议已生成，请在调优操作页面审核后应用"); } catch (e) { toast(e.message, true); } finally { button.disabled = false; } });
+}
+
+async function loadAgent() {
+try { const [status, runs, experiences] = await Promise.all([api("/api/optimizer/status"), api("/api/optimizer/runs?limit=20"), api("/api/experiences?limit=20")]); $("agentRunsPanel").innerHTML = (runs.items || []).length ? `<div class="detail-list">${runs.items.map((row) => `<div class="detail-row"><span class="detail-key">#${esc(row.id)} · ${esc(localStatus(row.status))}</span><span class="detail-value"><code>${esc(row.query)}</code> · 已选择 ${esc(row.selected_candidate || "无")}</span></div>`).join("")}</div><p class="tiny muted">${esc(status.agent)} · ${fmt(status.candidate_count, 0)} 个候选项。</p>` : `<div class="empty">暂无智能体运行记录。</div>`; $("experiencePanel").innerHTML = (experiences.items || []).length ? `<div class="detail-list">${experiences.items.map((row) => `<div class="detail-row"><span class="detail-key">聚类 ${esc(row.cluster_id)}</span><span class="detail-value">${esc(row.root_cause)} · ${esc(pretty(row.action))} · 支持度 ${fmt(row.support, 0)} · 置信度 ${(Number(row.confidence || 0) * 100).toFixed(1)}%</span></div>`).join("")}</div>` : `<div class="empty">暂无挖掘出的经验；请先完成至少三条实测反馈记录。</div>`; }
+catch (e) { toast(e.message, true); }
+}
+
+async function runAgent() {
+const query = $("agentQuery").value.trim(); if (!query) return toast("请先输入只读查询", true);
+const button = $("agentOptimizeButton"); button.disabled = true;
+try { renderAgentResult(await api("/api/optimizer/optimize", { method: "POST", body: JSON.stringify({ query, repetitions: Math.max(1, Math.min(7, Number.parseInt($("agentRepetitions").value, 10) || 3)) }) })); toast("智能体候选项已在 PostgreSQL 上实测，并完成结果等价性检查"); await loadAgent(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function mineExperiences() {
+const button = $("mineExperiencesButton"); button.disabled = true;
+try { const result = await api("/api/experiences/mine?max_clusters=8", { method: "POST" }); toast(`已挖掘 ${fmt(result.cluster_count, 0)} 个实测经验聚类`); await loadAgent(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+async function loadSettings() { try { const search = $("settingsSearch").value.trim(); const data = await api(`/api/settings${search ? `?search=${encodeURIComponent(search)}` : ""}`); $("settingsTable").innerHTML = `<div class="data-table-wrap"><table><thead><tr><th>名称</th><th>设置值</th><th>单位</th><th>上下文</th><th>来源</th><th>最小值 / 最大值</th><th>描述</th></tr></thead><tbody>${data.items.map((row) => `<tr><td><code>${esc(row.name)}</code></td><td>${esc(row.setting)}</td><td>${esc(row.unit)}</td><td>${esc(row.context)}</td><td>${esc(row.source)}</td><td>${esc(row.min_val || "—")} / ${esc(row.max_val || "—")}</td><td class="wrap">${esc(row.short_desc)}</td></tr>`).join("")}</tbody></table></div>`; await loadRules(); } catch (e) { toast(e.message, true); } }
+async function loadRules() { try { const data = await api("/api/rules"); $("rulesTable").innerHTML = data.items.length ? `<div class="data-table-wrap"><table><thead><tr><th>规则</th><th>类型</th><th>是否启用</th><th>级别</th><th>JSON 阈值</th><th>更新时间</th><th>操作</th></tr></thead><tbody>${data.items.map((row) => `<tr><td>${esc(localRuleName(row.name, row.kind))}</td><td><code>${esc(localKind(row.kind))}</code></td><td><input type="checkbox" data-rule-enabled="${row.id}" ${row.enabled ? "checked" : ""}></td><td><select data-rule-severity="${row.id}"><option value="info" ${row.severity === "info" ? "selected" : ""}>信息</option><option value="warning" ${row.severity === "warning" ? "selected" : ""}>警告</option><option value="critical" ${row.severity === "critical" ? "selected" : ""}>严重</option></select></td><td><textarea class="rule-config" data-rule-config="${row.id}" spellcheck="false">${esc(JSON.stringify(row.config || {}))}</textarea></td><td>${date(row.updated_at)}</td><td><button class="button small secondary" data-rule-save="${row.id}">保存</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">暂无告警规则配置。</div>`; document.querySelectorAll("[data-rule-save]").forEach((button) => button.onclick = async () => { const id = button.dataset.ruleSave; let config; try { config = JSON.parse(document.querySelector(`[data-rule-config="${id}"]`).value); } catch (e) { toast("规则阈值必须是合法 JSON", true); return; } button.disabled = true; try { await api(`/api/rules/${id}`, { method: "PATCH", body: JSON.stringify({ enabled: document.querySelector(`[data-rule-enabled="${id}"]`).checked, severity: document.querySelector(`[data-rule-severity="${id}"]`).value, config }) }); toast("告警规则已保存到 PostgreSQL"); await loadRules(); await refreshDashboard(); } catch (e) { toast(e.message, true); } finally { button.disabled = false; } }); } catch (e) { toast(e.message, true); } }
+async function loadAudit() { try { const data = await api("/api/audit?limit=200"); $("auditTable").innerHTML = data.items.length ? `<div class="data-table-wrap"><table><thead><tr><th>时间</th><th>事件</th><th>实体</th><th>载荷</th></tr></thead><tbody>${data.items.map((row) => `<tr><td>${date(row.created_at)}</td><td><span class="badge info">${esc(row.event_type)}</span></td><td>${esc(row.entity_type)} #${esc(row.entity_id)}</td><td class="wrap"><code>${esc(pretty(row.payload))}</code></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">暂无审计事件。</div>`; } catch (e) { toast(e.message, true); } }
+
+async function explain() { const query = $("explainQuery").value.trim(); if (!query) return toast("请先输入只读查询", true); $("explainButton").disabled = true; try { const data = await api("/api/queries/explain", { method: "POST", body: JSON.stringify({ query, analyze: $("explainAnalyze").checked }) }); const llm = data.llm_analysis; $("explainResult").classList.remove("hidden"); $("explainResult").innerHTML = `<pre>${esc(pretty(data.summary))}\n\n${esc(pretty(data.nodes))}</pre>${llm ? `<div class="llm-grounded-box"><div class="eyebrow">外部模型 · 计划解释</div><pre>${esc(llm.text || "")}</pre><p class="tiny muted">模型：${esc(llm.model || "—")} · 引用：${esc((llm.evidence_ids || []).join(", "))}</p></div>` : ""}`; } catch (e) { toast(e.message, true); } finally { $("explainButton").disabled = false; } }
+
+function renderRagStatus(data) {
+const database = data.database || {};
+const types = database.source_types || [];
+const selector = $("ragSourceType");
+const selected = selector.value;
+selector.innerHTML = '<option value="">全部已索引来源</option>' + types.map((row) => '<option value="' + esc(row.source_type) + '">' + esc(localSourceType(row.source_type)) + '（' + fmt(row.documents, 0) + '）</option>').join("");
+if ([...selector.options].some((option) => option.value === selected)) selector.value = selected;
+const indexer = data.indexer || {};
+const vector = data.vector || {};
+const evaluation = data.evaluation?.report?.summary;
+const staticManifest = data.manifest?.rag?.static_manifest || {};
+const evaluationText = data.evaluation?.available && evaluation
+? `固定检索评估：${fmt(evaluation.pass_count, 0)}/${fmt(evaluation.question_count, 0)} 通过 · Recall@1 ${(Number(evaluation.source_recall_at_1 || 0) * 100).toFixed(1)}% · Recall@k ${(Number(evaluation.source_recall_at_k || 0) * 100).toFixed(1)}% · MRR ${Number(evaluation.mean_reciprocal_rank || 0).toFixed(2)}。`
+: `固定检索评估不可用：${esc(data.evaluation?.reason || "请运行 scripts/evaluate_rag.py")}`;
+const llm = data.llm || {};
+$("ragStatus").innerHTML = '<div class="rag-status-grid">' +
+'<div class="rag-status-item"><span>文档数</span><strong>' + fmt(database.documents, 0) + '</strong></div>' +
+'<div class="rag-status-item"><span>文本块数</span><strong>' + fmt(database.chunks, 0) + '</strong></div>' +
+'<div class="rag-status-item"><span>最近同步</span><strong>' + esc(date(indexer.last_sync_at || database.latest_update)) + '</strong></div>' +
+'<div class="rag-status-item"><span>后台同步</span><strong>' + (indexer.running ? '运行中' : '已停止') + '</strong></div></div>' +
+'<p class="tiny muted">' + (indexer.last_error ? '最近同步错误：' + esc(indexer.last_error) : '静态来源按哈希校验；运行时工作负载、操作、反馈、异常、知识和遥测记录会定期镜像。') + '</p>' +
+'<p class="tiny muted">' + (staticManifest.available ? '静态语料：' + fmt(staticManifest.record_count, 0) + ' 条记录 · SHA-256 ' + esc(String(staticManifest.sha256 || '').slice(0, 16)) + '…' : '静态语料清单不可用') + ' · 向量：' + fmt(vector.embeddings, 0) + ' × ' + fmt(vector.dimensions, 0) + '（' + esc(vector.model_name || '未配置') + '）</p>' +
+'<p class="tiny muted">外部模型：' + (llm.configured ? '已配置' : '未配置') + ' · ' + esc(llm.model || '—') + ' · 成功 ' + fmt(llm.successes, 0) + ' 次 / 失败 ' + fmt(llm.failures, 0) + (llm.last_latency_ms ? ' · 最近延迟 ' + fmt(llm.last_latency_ms) + ' 毫秒' : '') + '</p>' +
+'<p class="tiny muted">' + evaluationText + '</p>';
+}
+
+function renderRagResults(data) {
+const items = data.results || [];
+$("ragResults").innerHTML = items.length
+? items.map((item) => '<article class="rag-result"><div class="rag-result-head"><span class="badge info">' + esc(item.citation_id) + '</span><strong>' + esc(item.title) + '</strong><span class="tiny muted">' + esc(localSourceType(item.source_type)) + ' · 文本块 ' + fmt(Number(item.chunk_index) + 1, 0) + '</span></div><p>' + esc(item.snippet || item.content || "") + '</p><details><summary>查看检索文本块</summary><pre class="evidence-pre">' + esc(item.content || "") + '</pre></details><div class="tiny muted">来源：<code>' + esc(item.provenance || item.source_key || "—") + '</code>' + (locatorText(item.locator) ? ' · ' + esc(locatorText(item.locator)) : '') + '</div></article>').join("")
+: '<div class="empty">暂无检索到的段落。</div>';
+}
+
+function renderRagAnswer(data) {
+const answer = $("ragAnswer");
+answer.classList.remove("hidden");
+const citations = (data.citations || []).map((item) => '<span class="rag-citation"><b>' + esc(item.citation_id) + '</b> ' + esc(item.title) + ' <code>' + esc(item.provenance) + '</code>' + (locatorText(item.locator) ? ' <span class="tiny muted">' + esc(locatorText(item.locator)) + '</span>' : '') + '</span>').join("");
+const generation = data.generation || {};
+const generationMeta = data.generator === "external" ? `模型：${esc(generation.model || "—")} · 延迟：${fmt(generation.latency_ms)} 毫秒 · 已校验引用` : `确定性路径：${esc(generation.reason || "未启用外部生成")}`;
+answer.innerHTML = '<div class="rag-answer-head"><span class="eyebrow">有依据的回答</span><span class="badge ' + (data.generator === "external" ? "applied" : "info") + '">' + esc(data.generator === "external" ? "外部生成" : "抽取式") + '</span></div><pre class="rag-answer-text">' + esc(data.answer || "") + '</pre><p class="tiny muted">' + generationMeta + '</p><div class="rag-citations">' + (citations || '<span class="muted">没有找到匹配证据，因此没有引用。</span>') + '</div>';
+renderRagResults(data);
+}
+
+async function loadRag() {
+try {
+const [status, evaluation, manifest, vector] = await Promise.all([api("/api/rag/status"), api("/api/rag/evaluation"), api("/api/demo/manifest"), api("/api/rag/vector/status")]);
+renderRagStatus({ ...status, evaluation, manifest, vector });
+$("ragAskButton").onclick = askRag;
+$("ragSyncButton").onclick = syncRag;
+$("ragVectorSyncButton").onclick = syncVectorRag;
+$("ragRefreshButton").onclick = loadRag;
+} catch (e) {
+toast(e.message, true);
+}
+}
+
+async function askRag() {
+const query = $("ragQuery").value.trim();
+if (!query) return toast("请先输入研究或运维问题", true);
+const button = $("ragAskButton");
+button.disabled = true;
+try {
+const sourceType = $("ragSourceType").value;
+const topK = Math.max(1, Math.min(Number.parseInt($("ragTopK").value, 10) || 5, 10));
+const data = await api("/api/rag/ask", {
+method: "POST",
+body: JSON.stringify({ query, top_k: topK, source_type: sourceType || null, mode: $("ragMode").value }),
+});
+renderRagAnswer(data);
+} catch (e) {
+toast(e.message, true);
+} finally {
+button.disabled = false;
+}
+}
+
+async function syncRag() {
+const button = $("ragSyncButton");
+button.disabled = true;
+try {
+await api("/api/rag/sync", { method: "POST" });
+await loadRag();
+toast("RAG 索引已从静态来源和实时 PostgreSQL 证据同步");
+} catch (e) {
+toast(e.message, true);
+} finally {
+button.disabled = false;
+}
+}
+
+async function syncVectorRag() {
+const button = $("ragVectorSyncButton"); button.disabled = true;
+try { const result = await api("/api/rag/vector/sync?limit=10000", { method: "POST" }); toast(`向量索引已同步：新增 ${fmt(result.sync?.created, 0)} 条，更新 ${fmt(result.sync?.updated, 0)} 条`); await loadRag(); }
+catch (e) { toast(e.message, true); } finally { button.disabled = false; }
+}
+
+async function exportEvidence() {
+const button = $("exportEvidenceButton");
+if (button) button.disabled = true;
+try {
+const data = await api("/api/export?limit=1000");
+const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+const url = URL.createObjectURL(blob);
+const anchor = document.createElement("a");
+anchor.href = url;
+anchor.download = "keeninsight-postgresql-evidence-" + new Date().toISOString().replace(/[:.]/g, "-") + ".json";
+document.body.appendChild(anchor);
+anchor.click();
+anchor.remove();
+URL.revokeObjectURL(url);
+toast("证据已导出，包含运行、执行计划、调优操作、反馈和审计记录");
+} catch (e) {
+toast(e.message, true);
+} finally {
+if (button) button.disabled = false;
+}
+}
+
+async function cleanDemoState() {
+if (!window.confirm("要回滚 KeenInsight 演示操作并释放演示锁会话吗？历史证据会保留。")) return;
+const button = $("cleanDemoButton");
+if (button) button.disabled = true;
+try {
+const result = await api("/api/demo/clean", { method: "POST" });
+state.baselineRuns = {};
+state.baselineResults = {};
+state.actionsByScenario = {};
+state.actionRecords = {};
+state.feedbackByScenario = {};
+state.afterRuns = {};
+state.afterResults = {};
+state.diagnoses = {};
+state.guidedCurrent = {};
+if (result.rollback_errors?.length) {
+toast("演示清理完成，但有 " + result.rollback_errors.length + " 个回滚错误；请检查调优操作表", true);
+} else {
+toast("演示状态已清理；历史证据已保留");
+}
+$("workloadResultCard").classList.add("hidden");
+await loadWorkloads();
+await refreshDashboard();
+} catch (e) {
+toast(e.message, true);
+} finally {
+if (button) button.disabled = false;
+}
+}
+
+function bind() {
+document.querySelectorAll("[data-view]").forEach((node) => node.onclick = () => setView(node.dataset.view)); document.querySelectorAll("[data-view-link]").forEach((node) => node.onclick = () => setView(node.dataset.viewLink)); $("refreshButton").onclick = refreshDashboard; $("autoRefresh").onchange = (e) => { state.autoRefresh = e.target.checked; if (state.autoRefresh) schedule(); else clearTimeout(state.timer); }; $("incidentRefresh").onclick = loadIncidents; $("incidentStatusFilter").onchange = loadIncidents; $("closeIncidentDetail").onclick = () => $("incidentDetailCard").classList.add("hidden"); $("queryRefresh").onclick = loadQueries; $("explainButton").onclick = explain; $("bootstrapButton").onclick = async () => { if (!confirm("要创建或刷新命名空间演示数据吗？")) return; try { await api("/api/demo/bootstrap", { method: "POST" }); toast("演示关系表和统计信息已准备就绪"); await loadWorkloads(); } catch (e) { toast(e.message, true); } }; $("workloadRefresh").onclick = loadWorkloads; $("workloadRunnerBackButton").onclick = () => setView("workloads"); $("workloadRunnerBackToWorkload").onclick = () => setView("workloads"); $("workloadRunnerNextButton").onclick = continueFromRunner; $("actionRefresh").onclick = loadActions; $("knowledgeRefresh").onclick = loadKnowledge; $("settingsRefresh").onclick = loadSettings; $("rulesRefresh").onclick = loadRules; $("settingsSearch").onkeydown = (e) => { if (e.key === "Enter") loadSettings(); }; $("auditRefresh").onclick = loadAudit; $("observabilityRefresh").onclick = loadObservability; $("ebpfEventsRefresh").onclick = loadObservability; $("ebpfStartButton").onclick = startEbpf; $("ebpfStopButton").onclick = stopEbpf; $("ebpfAdaptButton").onclick = adaptEbpf; if ($("guidedAutoResolveButton")) $("guidedAutoResolveButton").onclick = autoResolveGuided; if ($("guidedPressureAutoButton")) $("guidedPressureAutoButton").onclick = runPressureAndAutoRepair; $("analysisRefresh").onclick = loadAnalysis; $("trainLatencyButton").onclick = () => trainModel("latency_prediction", "trainLatencyButton"); $("trainRootCauseButton").onclick = () => trainModel("root_cause", "trainRootCauseButton"); $("modelPredictButton").onclick = predictModel; $("runSourceAnalysisButton").onclick = runSourceAnalysis; $("retrieveCodeKnowledgeButton").onclick = retrieveCodeKnowledge; $("differentialRefresh").onclick = loadAnalysis; $("agentRefresh").onclick = loadAgent; $("agentOptimizeButton").onclick = runAgent; $("mineExperiencesButton").onclick = mineExperiences; window.onresize = () => { if (["overview", "workloads"].includes(state.currentView)) drawChart(state.metrics || []); }; }
+function schedule() { clearTimeout(state.timer); if (state.autoRefresh) state.timer = setTimeout(async () => { await refreshDashboard(); if (state.currentView === "incidents") await loadIncidents(); if (state.currentView === "actions") await loadActions(); if (state.currentView === "observability") await loadObservability(); if (state.currentView === "analysis") await loadAnalysis(); if (state.currentView === "agent") await loadAgent(); schedule(); }, 5000); }
+const viewFromHash = () => {
+const view = window.location.hash.replace(/^#/, "");
+return document.getElementById(`view-${view}`) ? view : "overview";
+};
+async function init() { const exportButton = $("exportEvidenceButton"); if (exportButton) exportButton.onclick = exportEvidence; const cleanButton = $("cleanDemoButton"); if (cleanButton) cleanButton.onclick = cleanDemoState; bind(); await refreshDashboard(); setView(viewFromHash()); window.addEventListener("hashchange", () => setView(viewFromHash())); schedule(); }
+document.addEventListener("DOMContentLoaded", init);
+})();

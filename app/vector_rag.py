@@ -1,0 +1,321 @@
+"""Embedding-backed retrieval for the collected KeenInsight corpus."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import re
+import threading
+from pathlib import Path
+from typing import Any
+
+from .db import Database
+from .locks import RAG_CORPUS_ADVISORY_LOCK
+
+
+class VectorRagError(RuntimeError):
+    pass
+
+
+class EmbeddingIndex:
+    """Persist real fastembed vectors and perform exact cosine retrieval."""
+
+    def __init__(
+        self,
+        db: Database,
+        *,
+        model_name: str = "BAAI/bge-small-en-v1.5",
+        cache_dir: str | Path | None = None,
+    ) -> None:
+        self.db = db
+        self.model_name = model_name
+        self.cache_dir = Path(cache_dir) if cache_dir else None
+        self._model: Any = None
+        self._lock = threading.RLock()
+        # ONNX Runtime sessions are not safe to drive concurrently from two
+        # FastAPI worker threads with the old fastembed releases supported by
+        # the demo.  Keep inference and model mutation in one critical
+        # section; otherwise a second sync/search can surface as a native
+        # bad_cast and leave the HTTP worker stuck.
+        self._inference_lock = threading.Lock()
+        self._sync_running = False
+        self._sync_started_at: float | None = None
+        self._sync_processed = 0
+        self._sync_total = 0
+        self._last_sync_error: str | None = None
+        self._last_sync_result: dict[str, Any] | None = None
+
+    def status(self) -> dict[str, Any]:
+        row = self.db.fetch_one(
+            """
+            SELECT count(*)::int AS embeddings,
+                   max(dimensions)::int AS dimensions,
+                   max(updated_at) AS latest_update
+            FROM keeninsight.rag_embeddings WHERE model_name = %s
+            """,
+            (self.model_name,),
+        ) or {}
+        corpus = self.db.fetch_one(
+            """
+            SELECT
+                (SELECT count(*)::int FROM keeninsight.rag_chunks) AS chunks,
+                (SELECT count(*)::int
+                   FROM keeninsight.rag_embeddings
+                  WHERE model_name = %s
+                    AND chunk_id IN (SELECT id FROM keeninsight.rag_chunks)) AS covered_chunks
+            """,
+            (self.model_name,),
+        ) or {}
+        chunks = int(corpus.get("chunks") or 0)
+        covered_chunks = int(corpus.get("covered_chunks") or 0)
+        return {
+            "model_name": self.model_name,
+            "cache_dir": str(self.cache_dir) if self.cache_dir else None,
+            "embeddings": int(row.get("embeddings") or 0),
+            "chunks": chunks,
+            "covered_chunks": covered_chunks,
+            "missing_chunks": max(0, chunks - covered_chunks),
+            "coverage_pct": round(100.0 * covered_chunks / chunks, 4) if chunks else 0.0,
+            "dimensions": int(row.get("dimensions") or 0),
+            "latest_update": row.get("latest_update"),
+            "model_loaded": self._model is not None,
+            "sync": {
+                "running": self._sync_running,
+                "processed": self._sync_processed,
+                "total": self._sync_total,
+                "last_error": self._last_sync_error,
+                "last_result": self._last_sync_result,
+            },
+            "dependency": self._dependency_status(),
+        }
+
+    @staticmethod
+    def _dependency_status() -> dict[str, Any]:
+        try:
+            import fastembed
+            return {"available": True, "version": getattr(fastembed, "__version__", "installed")}
+        except Exception as exc:
+            return {"available": False, "error": str(exc)}
+
+    def _get_model(self) -> Any:
+        with self._lock:
+            if self._model is not None:
+                return self._model
+            try:
+                from fastembed.embedding import DefaultEmbedding
+            except Exception as exc:
+                raise VectorRagError("vector retrieval requires fastembed: %s" % exc) from exc
+            try:
+                if self.cache_dir:
+                    self.cache_dir.mkdir(parents=True, exist_ok=True)
+                self._model = DefaultEmbedding(
+                    model_name=self.model_name,
+                    cache_dir=str(self.cache_dir) if self.cache_dir else None,
+                    threads=4,
+                )
+            except Exception as exc:
+                raise VectorRagError("could not load embedding model %s: %s" % (self.model_name, exc)) from exc
+            return self._model
+
+    def sync(self, *, limit: int = 10000, batch_size: int = 32) -> dict[str, Any]:
+        if not self._inference_lock.acquire(blocking=False):
+            raise VectorRagError("another embedding sync or search is already using the model")
+        self._sync_running = True
+        self._sync_started_at = __import__("time").time()
+        self._sync_processed = 0
+        self._sync_total = 0
+        self._last_sync_error = None
+        try:
+            model = self._get_model()
+            # The RAG indexer replaces chunks in separate transactions.  Hold
+            # the same database advisory lock for the complete snapshot and
+            # batch-insert workflow so a chunk cannot disappear between
+            # embedding inference and the foreign-key insert.
+            with self.db.advisory_lock(RAG_CORPUS_ADVISORY_LOCK):
+                rows = self.db.fetch_all(
+                    """
+                    SELECT c.id AS chunk_id, c.content, d.content_hash,
+                           d.source_key, d.source_type, d.title
+                    FROM keeninsight.rag_chunks c
+                    JOIN keeninsight.rag_documents d ON d.id = c.document_id
+                    ORDER BY c.id LIMIT %s
+                    """,
+                    (max(1, min(int(limit), 50000)),),
+                )
+                self._sync_total = len(rows)
+                chunk_ids = [row["chunk_id"] for row in rows]
+                existing_rows = self.db.fetch_all(
+                    """
+                    SELECT chunk_id, content_hash
+                    FROM keeninsight.rag_embeddings
+                    WHERE model_name = %s AND chunk_id = ANY(%s)
+                    """,
+                    (self.model_name, chunk_ids or [0]),
+                )
+                existing = {int(row["chunk_id"]): row.get("content_hash") for row in existing_rows}
+                any_embedding_rows = self.db.fetch_all(
+                    "SELECT chunk_id FROM keeninsight.rag_embeddings WHERE chunk_id = ANY(%s)",
+                    (chunk_ids or [0],),
+                )
+                any_embedding = {int(row["chunk_id"]) for row in any_embedding_rows}
+                created = updated = unchanged = 0
+                effective_batch_size = max(1, int(batch_size))
+                for offset in range(0, len(rows), effective_batch_size):
+                    batch = rows[offset : offset + effective_batch_size]
+                    pending = []
+                    for row in batch:
+                        if row["chunk_id"] in existing and existing.get(row["chunk_id"]) == row.get("content_hash"):
+                            unchanged += 1
+                        else:
+                            pending.append(row)
+                    if not pending:
+                        self._sync_processed = min(len(rows), offset + len(batch))
+                        continue
+                    try:
+                        vectors = list(model.passage_embed([str(row["content"]) for row in pending]))
+                    except Exception as exc:
+                        raise VectorRagError("embedding batch failed at offset %d: %s" % (offset, exc)) from exc
+                    if len(vectors) != len(pending):
+                        raise VectorRagError("embedding model returned %d vectors for %d chunks" % (len(vectors), len(pending)))
+                    insert_rows = []
+                    for row, vector in zip(pending, vectors):
+                        values = [float(value) for value in vector]
+                        if not values or not all(math.isfinite(value) for value in values):
+                            raise VectorRagError("embedding model returned an invalid vector for chunk %s" % row["chunk_id"])
+                        insert_rows.append(
+                            (row["chunk_id"], self.model_name, len(values), row["content_hash"], values)
+                        )
+                    with self.db.connection() as conn:
+                        with conn.transaction():
+                            with conn.cursor() as cur:
+                                cur.executemany(
+                                    """
+                                    INSERT INTO keeninsight.rag_embeddings
+                                        (chunk_id, model_name, dimensions, content_hash, embedding)
+                                    VALUES (%s, %s, %s, %s, %s)
+                                    ON CONFLICT (chunk_id) DO UPDATE SET
+                                        model_name = EXCLUDED.model_name,
+                                        dimensions = EXCLUDED.dimensions,
+                                        content_hash = EXCLUDED.content_hash,
+                                        embedding = EXCLUDED.embedding,
+                                        updated_at = now()
+                                    """,
+                                    insert_rows,
+                                )
+                    for row in pending:
+                        if row["chunk_id"] in any_embedding:
+                            updated += 1
+                        else:
+                            created += 1
+                    self._sync_processed = min(len(rows), offset + len(batch))
+            result = {
+                "model_name": self.model_name,
+                "processed": len(rows),
+                "created": created,
+                "updated": updated,
+                "unchanged": unchanged,
+                "status": self.status(),
+            }
+            self._last_sync_result = result
+            return result
+        except Exception as exc:
+            self._last_sync_error = str(exc)
+            raise
+        finally:
+            self._sync_running = False
+            self._inference_lock.release()
+
+    def search(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        source_type: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if not self._inference_lock.acquire(blocking=False):
+            raise VectorRagError("another embedding sync or search is already using the model")
+        try:
+            model = self._get_model()
+            with self.db.advisory_lock(RAG_CORPUS_ADVISORY_LOCK):
+                status = self.status()
+                if int(status["embeddings"]) <= 0:
+                    raise VectorRagError("vector index is empty; run /api/rag/vector/sync first")
+                query_vectors = list(model.query_embed(str(query)))
+                if not query_vectors:
+                    raise VectorRagError("embedding model returned no query vector")
+                query_vector = [float(value) for value in query_vectors[0]]
+                # Embedding models assign a high cosine score even to
+                # arbitrary out-of-domain strings.  Use an exact-token
+                # evidence gate before accepting a semantic hit; this keeps
+                # the negative retrieval test honest while still allowing
+                # synonym-level vector matches when the query contains at
+                # least one domain token.
+                terms = list(dict.fromkeys(re.findall(r"[A-Za-z0-9_]{3,}", str(query).lower())))
+                if terms:
+                    clauses = " OR ".join("content ILIKE %s" for _ in terms)
+                    if not self.db.fetch_one(
+                        "SELECT 1 FROM keeninsight.rag_chunks WHERE " + clauses + " LIMIT 1",
+                        tuple("%%%s%%" % term for term in terms),
+                    ):
+                        return []
+                query_norm = math.sqrt(sum(value * value for value in query_vector)) or 1.0
+                source_clause = ""
+                params: list[Any] = [self.model_name]
+                if source_type:
+                    source_clause = " AND d.source_type = %s"
+                    params.append(source_type)
+                rows = self.db.fetch_all(
+                    """
+                    SELECT e.chunk_id, e.embedding, c.document_id, c.chunk_index, c.content,
+                           c.metadata AS chunk_metadata, d.source_key, d.source_type,
+                           d.title, d.uri
+                    FROM keeninsight.rag_embeddings e
+                    JOIN keeninsight.rag_chunks c ON c.id = e.chunk_id
+                    JOIN keeninsight.rag_documents d ON d.id = c.document_id
+                    WHERE e.model_name = %s
+                    """ + source_clause,
+                    tuple(params),
+                )
+                scored = []
+                for row in rows:
+                    vector = [float(value) for value in (row.get("embedding") or [])]
+                    if len(vector) != len(query_vector):
+                        continue
+                    norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+                    similarity = sum(left * right for left, right in zip(query_vector, vector)) / (query_norm * norm)
+                    scored.append((similarity, row))
+                scored.sort(key=lambda item: item[0], reverse=True)
+                result = []
+                seen_documents: set[Any] = set()
+                for similarity, row in scored:
+                    if row["document_id"] in seen_documents:
+                        continue
+                    seen_documents.add(row["document_id"])
+                    result.append(
+                        {
+                            "citation_id": "R%d" % (len(result) + 1),
+                            "chunk_id": row["chunk_id"],
+                            "document_id": row["document_id"],
+                            "chunk_index": row["chunk_index"],
+                            "title": row["title"],
+                            "source_type": row["source_type"],
+                            "provenance": row["uri"],
+                            "source_key": row["source_key"],
+                            "locator": (row.get("chunk_metadata") or {}).get("locator"),
+                            "rank": float(similarity),
+                            "vector_similarity": float(similarity),
+                            "retrieval_mode": "embedding-cosine",
+                            "snippet": str(row.get("content") or "")[:600],
+                            "content": row.get("content") or "",
+                        }
+                    )
+                    if len(result) >= max(1, min(int(top_k), 10)):
+                        break
+                return result
+        finally:
+            self._inference_lock.release()
+
+
+def embedding_content_hash(text: str) -> str:
+    return hashlib.sha256(str(text).encode("utf-8")).hexdigest()

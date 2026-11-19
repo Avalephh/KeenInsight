@@ -1,0 +1,32 @@
+SOURCE_KEY: project:app/audit.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: app/audit.py
+SOURCE_URI: project://app/audit.py
+---
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from .db import Database
+
+def record_audit(
+db: Database,
+event_type: str,
+entity_type: str,
+entity_id: int | None,
+payload: dict[str, Any] | None = None,
+) -> None:
+"""Persist a state-changing event in the monitored PostgreSQL database."""
+db.execute(
+"""
+INSERT INTO keeninsight.audit_events (event_type, entity_type, entity_id, payload)
+VALUES (%s, %s, %s, %s::jsonb)
+""",
+(
+event_type,
+entity_type,
+entity_id,
+json.dumps(payload or {}, default=str),
+),
+)

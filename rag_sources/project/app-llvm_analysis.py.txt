@@ -1,0 +1,1510 @@
+SOURCE_KEY: project:app/llvm_analysis.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: app/llvm_analysis.py
+SOURCE_URI: project://app/llvm_analysis.py
+---
+"""PostgreSQL source and LLVM propagation analysis.
+
+This is intentionally a source-backed analysis rather than a table of
+hand-written knob/function relationships. Given an official PostgreSQL
+source checkout, it locates configuration references, extracts their enclosing
+functions, compiles the real translation units to LLVM IR with clang, and
+records the resulting symbols/call edges and compiler provenance.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import re
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from .db import Database
+from .llm import LLMClient, LLMError, parse_json_object
+
+class LLVMAnalysisError(RuntimeError):
+pass
+
+DEFAULT_KNOBS = (
+"work_mem",
+"hash_mem_multiplier",
+"maintenance_work_mem",
+"max_parallel_workers_per_gather",
+"effective_cache_size",
+)
+
+def _sha256(path: Path) -> str:
+digest = hashlib.sha256()
+with path.open("rb") as stream:
+for block in iter(lambda: stream.read(1024 * 1024), b""):
+digest.update(block)
+return digest.hexdigest()
+
+def _tree_digest(root: Path, paths: list[Path], file_digests: dict[str, str]) -> str:
+"""Digest the exact source snapshot used by the analysis."""
+digest = hashlib.sha256()
+for path in paths:
+relative = str(path.relative_to(root))
+if relative not in file_digests:
+continue
+digest.update(relative.encode("utf-8"))
+digest.update(b"\0")
+digest.update(file_digests[relative].encode("ascii"))
+digest.update(b"\n")
+return digest.hexdigest()
+
+def _compiler_version() -> str:
+try:
+return subprocess.run(["clang", "--version"], capture_output=True, text=True, timeout=10, check=False).stdout.splitlines()[0]
+except Exception as exc:
+return "unavailable: %s" % exc
+
+def _function_spans(text: str) -> list[tuple[int, int, str]]:
+"""Approximate C function spans for a human-readable source locator."""
+lines = text.splitlines()
+starts: list[tuple[int, str]] = []
+# PostgreSQL uses both ``static int f(...)`` and the traditional style
+# where the return type and function name are on separate lines. Match
+# the function declaration up to its opening brace and discard control
+# statements; comments and local calls cannot contain a declaration brace
+# with this restricted character class.
+signatures = [
+re.compile(r"(?m)^\s*(?:static\s+|inline\s+|extern\s+|const\s+|volatile\s+)*(?:[A-Za-z_]\w*[\s\*]+)+(?P<name>[A-Za-z_]\w*)\s*\([^;{}]*?\)\s*\{"),
+re.compile(r"(?m)^\s*(?P<name>[A-Za-z_]\w*)\s*\([^;{}]*?\)\s*\{"),
+]
+seen: set[tuple[int, str]] = set()
+for signature in signatures:
+for match in signature.finditer(text):
+name = match.group("name")
+if name in {"if", "for", "while", "switch", "catch"}:
+continue
+line_number = text.count("\n", 0, match.start()) + 1
+key = (line_number, name)
+if key not in seen:
+seen.add(key)
+starts.append(key)
+starts.sort()
+spans: list[tuple[int, int, str]] = []
+for index, (start, name) in enumerate(starts):
+end = starts[index + 1][0] - 1 if index + 1 < len(starts) else len(lines)
+spans.append((start, end, name))
+return spans
+
+_LLVM_FUNCTION_RE = re.compile(
+r"^define\s+[^@]*@(?P<function>[A-Za-z_][A-Za-z0-9_]*)\([^\n]*\)[^{]*\{(?P<body>.*?)^}\s*$",
+flags=re.MULTILINE | re.DOTALL,
+)
+_LLVM_BLOCK_LABEL_RE = re.compile(r"^(?P<label>[0-9A-Za-z$_.-]+):(?:\s*;.*)?$")
+_LLVM_DEBUG_ID_RE = re.compile(r"!dbg\s+!(?P<id>\d+)")
+_LLVM_DEBUG_LOCATION_RE = re.compile(
+r"!(?P<id>\d+)\s*=\s*!DILocation\(line:\s*(?P<line>\d+),\s*column:\s*(?P<column>\d+)"
+)
+_LLVM_SSA_TOKEN_RE = re.compile(r"%[-A-Za-z$._0-9]+")
+_LLVM_GLOBAL_TOKEN_RE = re.compile(r"@([A-Za-z_][A-Za-z0-9_]*)")
+
+def _llvm_debug_locations(ir_text: str) -> dict[str, dict[str, int]]:
+"""Return compiler-emitted source locations keyed by LLVM metadata id."""
+return {
+match.group("id"): {
+"line": int(match.group("line")),
+"column": int(match.group("column")),
+}
+for match in _LLVM_DEBUG_LOCATION_RE.finditer(ir_text)
+}
+
+def _llvm_value_tokens(instruction: str, definition: str | None) -> list[str]:
+"""Extract SSA values from one LLVM instruction.
+
+LLVM textual IR uses the same ``%`` prefix for named types and SSA values.
+The type namespace is excluded here; the remaining tokens are compiler
+emitted def-use operands rather than source-level guesses.
+"""
+values: list[str] = []
+for match in _LLVM_SSA_TOKEN_RE.finditer(instruction):
+token = match.group(0)
+if token == definition:
+continue
+if token.startswith(("%struct.", "%union.", "%class.", "%enum.", "%opaque.")):
+continue
+# A named LLVM type is commonly followed by '*' in a pointer type.
+# The namespace filter above handles PostgreSQL's normal C types; this
+# guard avoids treating an arbitrary named type as a value as well.
+tail = instruction[match.end():].lstrip()
+if tail.startswith("*") and not token[1:].isdigit():
+continue
+if token not in values:
+values.append(token)
+return values
+
+def _parse_llvm_flow(
+ir_text: str,
+*,
+file_path: str,
+knobs: set[str],
+max_control_edges: int = 5000,
+max_data_edges: int = 12000,
+) -> dict[str, Any]:
+"""Parse compiler-produced IR control flow and SSA data flow.
+
+The parser intentionally operates on the emitted LLVM IR, not on a
+hand-written PostgreSQL relationship table. It records CFG edges for
+branch/switch/invoke terminators, local SSA def-use edges, and bounded
+transitive paths from configuration globals such as ``@work_mem`` to the
+values derived from them. Debug metadata is retained in each row so the
+source locator can be audited against the exact translation unit.
+"""
+debug_locations = _llvm_debug_locations(ir_text)
+control_edges: list[dict[str, Any]] = []
+data_edges: list[dict[str, Any]] = []
+knob_paths: list[dict[str, Any]] = []
+for function_match in _LLVM_FUNCTION_RE.finditer(ir_text):
+function = function_match.group("function")
+body = function_match.group("body")
+body_start_line = ir_text.count("\n", 0, function_match.start("body")) + 1
+lines = body.splitlines()
+
+# Every LLVM function has an implicit entry block when the first block
+# is not explicitly labelled. Explicit labels include numeric labels
+# (the common -O0 clang output) and named labels.
+current_block = "entry"
+definition_meta: dict[str, dict[str, Any]] = {}
+def_use: dict[str, set[str]] = {}
+instruction_meta: dict[str, dict[str, Any]] = {}
+block_lines: dict[str, list[tuple[int, str]]] = {current_block: []}
+terminator_indices: list[tuple[int, str, str]] = []
+for offset, raw_line in enumerate(lines):
+ir_line = body_start_line + offset
+stripped = raw_line.strip()
+label_match = _LLVM_BLOCK_LABEL_RE.match(stripped)
+if label_match:
+current_block = label_match.group("label")
+block_lines.setdefault(current_block, [])
+continue
+if not stripped or stripped.startswith(";"):
+continue
+block_lines.setdefault(current_block, []).append((ir_line, stripped))
+definition_match = re.match(r"^(%[-A-Za-z$._0-9]+)\s*=\s*(.*)$", stripped)
+definition = definition_match.group(1) if definition_match else None
+instruction = definition_match.group(2) if definition_match else stripped
+debug_id_match = _LLVM_DEBUG_ID_RE.search(stripped)
+debug_id = debug_id_match.group("id") if debug_id_match else None
+debug = debug_locations.get(debug_id or "")
+meta = {
+"ir_line": ir_line,
+"source_line": (debug or {}).get("line"),
+"source_column": (debug or {}).get("column"),
+"debug_id": debug_id,
+"block": current_block,
+"instruction": stripped[:2000],
+}
+if definition:
+definition_meta[definition] = meta
+instruction_meta[definition] = meta
+uses = _llvm_value_tokens(instruction, definition)
+if definition:
+def_use.setdefault(definition, set()).update(uses)
+
+# LLVM terminators may span several lines (notably switch case
+# labels). Capture all target labels belonging to the terminator.
+if re.search(r"\b(?:br|switch|indirectbr|invoke|callbr|catchswitch)\b", instruction):
+terminator_text = stripped
+if re.search(r"\bswitch\b", instruction) and "]" not in terminator_text:
+for lookahead in lines[offset + 1:]:
+terminator_text += " " + lookahead.strip()
+if "]" in lookahead:
+break
+terminator_indices.append((ir_line, current_block, terminator_text))
+
+for ir_line, block, terminator in terminator_indices:
+# Keep the IR's label spelling as the graph node. LLVM's entry
+# block is represented explicitly as ``entry`` above.
+targets = list(dict.fromkeys(re.findall(r"\blabel\s+%([0-9A-Za-z$_.-]+)", terminator)))
+for target in targets:
+control_edges.append(
+{
+"knob": None,
+"function_name": function,
+"file_path": file_path,
+"line_number": ir_line,
+"ir_symbol": "block:%s->%s" % (block, target),
+"evidence": {
+"analysis": "llvm_ir_control_flow",
+"flow_kind": "cfg_edge",
+"function": function,
+"block_from": block,
+"block_to": target,
+"terminator": terminator[:2000],
+"ir_line": ir_line,
+},
+}
+)
+if len(control_edges) >= max_control_edges:
+break
+if len(control_edges) >= max_control_edges:
+break
+
+# Direct SSA def-use edges are retained as compiler evidence. The
+# source global -> SSA roots and their transitive descendants are
+# retained separately with a knob, which makes the parameter influence
+# path queryable without confusing it with a generic local edge.
+for definition, uses in def_use.items():
+for use in sorted(uses):
+meta = definition_meta.get(definition) or {}
+data_edges.append(
+{
+"knob": None,
+"function_name": function,
+"file_path": file_path,
+"line_number": int(meta.get("ir_line") or 0),
+"ir_symbol": "ssa:%s->%s" % (use, definition),
+"evidence": {
+"analysis": "llvm_ir_ssa_data_flow",
+"flow_kind": "ssa_def_use",
+"function": function,
+"source_value": use,
+"target_value": definition,
+"ir_line": meta.get("ir_line"),
+"source_line": meta.get("source_line"),
+"source_column": meta.get("source_column"),
+"debug_id": meta.get("debug_id"),
+"instruction": meta.get("instruction"),
+},
+}
+)
+if len(data_edges) >= max_data_edges:
+break
+if len(data_edges) >= max_data_edges:
+break
+
+if not knobs:
+continue
+global_to_ssa: dict[str, set[str]] = {}
+# A global configuration read is an actual IR operand. Add the
+# definition created by its load/operation as a source node.
+for definition, meta in definition_meta.items():
+instruction = str(meta.get("instruction") or "")
+for global_name in sorted(set(_LLVM_GLOBAL_TOKEN_RE.findall(instruction)) & knobs):
+global_to_ssa.setdefault("@" + global_name, set()).add(definition)
+for global_name in sorted(set(global_to_ssa)):
+source = global_name
+queue: list[tuple[str, list[str]]] = [(source, [source])]
+visited: set[str] = {source}
+while queue:
+current, path = queue.pop(0)
+destinations = set(global_to_ssa.get(current, set()))
+destinations.update(
+definition
+for definition, uses in def_use.items()
+if current in uses
+)
+for destination in sorted(destinations):
+if destination in visited:
+continue
+visited.add(destination)
+next_path = path + [destination]
+meta = definition_meta.get(destination) or {}
+knob = global_name[1:]
+knob_paths.append(
+{
+"knob": knob,
+"function_name": function,
+"file_path": file_path,
+"line_number": int(meta.get("ir_line") or 0),
+"ir_symbol": "ssa:%s->%s" % (current, destination),
+"evidence": {
+"analysis": "llvm_ir_knob_data_flow",
+"flow_kind": "global_to_ssa_transitive",
+"function": function,
+"source_global": global_name,
+"source_value": current,
+"target_value": destination,
+"path": next_path,
+"graph_depth": len(next_path) - 1,
+"ir_line": meta.get("ir_line"),
+"source_line": meta.get("source_line"),
+"source_column": meta.get("source_column"),
+"debug_id": meta.get("debug_id"),
+"instruction": meta.get("instruction"),
+},
+}
+)
+queue.append((destination, next_path))
+if len(knob_paths) >= max_data_edges:
+break
+if len(knob_paths) >= max_data_edges:
+break
+if len(knob_paths) >= max_data_edges:
+break
+return {
+"control_edges": control_edges,
+"data_edges": data_edges + knob_paths,
+"control_edge_count": len(control_edges),
+"data_flow_count": len(data_edges) + len(knob_paths),
+"knob_data_flow_count": len(knob_paths),
+}
+
+def _bounded_flow_rows(rows: list[dict[str, Any]], *, limit: int = 30000) -> list[dict[str, Any]]:
+"""Keep generic IR rows bounded while retaining every knob-flow sample."""
+if len(rows) <= limit:
+return rows
+# Parameter influence paths are sparse but are the rows consumed by the
+# tuning agent. Do not let an early alphabetic translation unit's large
+# generic CFG/SSA dump crowd those paths out of the persisted evidence.
+knob_rows = [row for row in rows if row.get("knob")]
+generic_rows = [row for row in rows if not row.get("knob")]
+knob_budget = min(len(knob_rows), max(1, limit // 3))
+return knob_rows[:knob_budget] + generic_rows[: max(0, limit - knob_budget)]
+
+class SourceAnalyzer:
+def __init__(
+self,
+db: Database,
+source_root: str | Path | None = None,
+*,
+llm_client: LLMClient | None = None,
+) -> None:
+self.db = db
+self.source_root = Path(source_root or os.getenv("KI_LLVM_SOURCE_ROOT", "third_party/postgresql-12.22"))
+self.llm_client = llm_client
+# Runtime mapping can be requested repeatedly by the dashboard while a
+# differential profile is being inspected. Keep failed/finished
+# attempts in-process so an absent kernel symbol does not trigger a
+# fresh source scan and clang invocation on every refresh.
+self._runtime_evidence_attempted: set[tuple[str, ...]] = set()
+
+def status(self) -> dict[str, Any]:
+count = self.db.fetch_one(
+"""
+SELECT
+count(*)::int AS count,
+count(*) FILTER (WHERE relation_type = 'llvm_call_edge')::int AS llvm_call_edges,
+count(*) FILTER (WHERE relation_type = 'llvm_knob_propagation')::int AS llvm_knob_propagations,
+count(*) FILTER (WHERE relation_type = 'llvm_control_edge')::int AS llvm_control_edges,
+count(*) FILTER (WHERE relation_type = 'llvm_data_flow')::int AS llvm_data_flows,
+count(*) FILTER (WHERE relation_type = 'knob_source_reference')::int AS knob_references
+FROM keeninsight.source_analyses
+"""
+) or {}
+code_count = self.db.fetch_one(
+"""
+SELECT count(*)::int AS count,
+count(*) FILTER (WHERE validation->>'effective' = 'true')::int
+AS validated_successes,
+max(updated_at) AS latest_update
+FROM keeninsight.code_knowledge
+"""
+) or {}
+latest = self.db.fetch_one(
+"SELECT analyzed_at, source_root, source_digest, evidence FROM keeninsight.source_analyses ORDER BY analyzed_at DESC LIMIT 1"
+)
+return {
+"source_root": str(self.source_root),
+"source_exists": self.source_root.is_dir(),
+"clang": _compiler_version(),
+"analysis_count": int(count.get("count") or 0),
+"knob_reference_count": int(count.get("knob_references") or 0),
+"llvm_call_edge_count": int(count.get("llvm_call_edges") or 0),
+"llvm_knob_propagation_count": int(count.get("llvm_knob_propagations") or 0),
+"llvm_control_edge_count": int(count.get("llvm_control_edges") or 0),
+"llvm_data_flow_count": int(count.get("llvm_data_flows") or 0),
+"code_knowledge_count": int(code_count.get("count") or 0),
+"validated_code_knowledge_count": int(
+code_count.get("validated_successes") or 0
+),
+"code_knowledge_latest_update": code_count.get("latest_update"),
+"llm": self.llm_client.status() if self.llm_client else {"configured": False},
+"latest": latest,
+}
+
+def _persist_llvm_flow_rows(
+self, root: Path, rows: list[dict[str, Any]], file_digests: dict[str, str]
+) -> dict[str, int]:
+"""Persist bounded compiler-derived CFG/SSA rows idempotently."""
+inserted = 0
+updated = 0
+for row in rows:
+relation_type = str(row.get("relation_type") or "llvm_data_flow")
+knob = row.get("knob")
+function_name = row.get("function_name")
+file_path = str(row.get("file_path") or "")
+line_number = row.get("line_number")
+ir_symbol = row.get("ir_symbol")
+existing = self.db.fetch_one(
+"""
+SELECT id FROM keeninsight.source_analyses
+WHERE source_root = %s
+AND relation_type = %s
+AND knob IS NOT DISTINCT FROM %s
+AND function_name IS NOT DISTINCT FROM %s
+AND file_path IS NOT DISTINCT FROM %s
+AND line_number IS NOT DISTINCT FROM %s
+AND ir_symbol IS NOT DISTINCT FROM %s
+LIMIT 1
+""",
+(str(root), relation_type, knob, function_name, file_path, line_number, ir_symbol),
+)
+digest = row.get("source_digest") or file_digests.get(file_path)
+evidence = json.dumps(row.get("evidence") or {}, default=str)
+if existing:
+self.db.execute(
+"""
+UPDATE keeninsight.source_analyses
+SET evidence = %s::jsonb, source_digest = %s, analyzed_at = now()
+WHERE id = %s
+""",
+(evidence, digest, existing["id"]),
+)
+updated += 1
+continue
+self.db.execute(
+"""
+INSERT INTO keeninsight.source_analyses
+(source_root, knob, function_name, file_path, line_number,
+relation_type, ir_symbol, evidence, source_digest)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+""",
+(
+str(root), knob, function_name, file_path, line_number,
+relation_type, ir_symbol, evidence, digest,
+),
+)
+inserted += 1
+return {"inserted": inserted, "updated": updated, "processed": len(rows)}
+
+def knob_evidence_for_functions(
+self, functions: list[str], *, limit: int = 200
+) -> list[dict[str, Any]]:
+"""Resolve observed hotspot functions to source-derived knobs.
+
+Direct references and LLVM propagation records use different columns:
+propagation rows decorate the displayed function name but retain the
+origin/current/neighbor names in evidence. Query all three so a
+runtime probe such as ``tuplesort_begin_heap`` can resolve to the
+governing ``work_mem`` reference in its caller.
+"""
+names = [str(item).strip() for item in functions if str(item).strip()]
+if not names:
+return []
+rows = self._query_function_evidence(names, limit=limit)
+represented = {
+str(row.get("function_name") or "")
+for row in rows
+}
+unresolved = tuple(sorted(set(names) - represented))
+if unresolved and self.source_root.is_dir():
+# The initial analysis compiles translation units containing a GUC
+# reference. A runtime hotspot such as BufFileWrite normally lives
+# in a different translation unit. Extend the *real* LLVM graph
+# on demand so cross-TU propagation is available without a
+# hand-written function/knob table.
+attempt_key = tuple(sorted(set(names)))
+if attempt_key not in self._runtime_evidence_attempted:
+self._runtime_evidence_attempted.add(attempt_key)
+try:
+self._extend_runtime_llvm_graph(list(attempt_key))
+except Exception:
+# Source evidence is an enhancement to the diagnosis path;
+# a missing compiler/header must not make the already
+# persisted eBPF differential profile unavailable.
+pass
+rows = self._query_function_evidence(names, limit=limit)
+return rows
+
+def retrieve_code_knowledge(
+self,
+*,
+knobs: list[str] | None = None,
+functions: list[str] | None = None,
+limit: int = 50,
+persist: bool = True,
+) -> dict[str, Any]:
+"""Retrieve source context and form compiler-grounded hypotheses.
+
+The paper's code retrieval/summary agents operate on the influence
+path of a configuration knob. This implementation keeps that path
+inspectable: source snippets are read from the exact PostgreSQL
+checkout used by clang, while CFG/SSA/call-graph rows come from the
+emitted LLVM IR already persisted in ``source_analyses``. The
+summary is deterministic when no external LLM is configured, but it
+is still generated from the retrieved rows and retains every
+supporting locator. Numeric action values are intentionally not
+invented here; the subsequent PostgreSQL experiment supplies the
+validation and confidence.
+"""
+requested_knobs = sorted(
+{str(item).strip() for item in (knobs or []) if str(item).strip()}
+)
+requested_functions = sorted(
+{str(item).strip() for item in (functions or []) if str(item).strip()}
+)
+row_limit = max(1, min(int(limit), 200))
+if requested_functions:
+rows = self.knob_evidence_for_functions(
+requested_functions, limit=max(row_limit, row_limit * 4)
+)
+elif requested_knobs:
+rows = self.db.fetch_all(
+"""
+WITH ranked AS (
+SELECT sa.*,
+row_number() OVER (
+PARTITION BY relation_type
+ORDER BY analyzed_at DESC, id DESC
+) AS relation_rank
+FROM keeninsight.source_analyses AS sa
+WHERE knob = ANY(%s)
+AND relation_type IN (
+'knob_source_reference', 'llvm_knob_propagation',
+'llvm_data_flow', 'llvm_control_edge'
+)
+)
+SELECT id, source_root, knob, function_name, file_path,
+line_number, relation_type, ir_symbol, evidence,
+source_digest, analyzed_at
+FROM ranked
+WHERE relation_rank <= %s
+ORDER BY CASE WHEN relation_type = 'knob_source_reference' THEN 0
+WHEN relation_type = 'llvm_data_flow' THEN 1
+WHEN relation_type = 'llvm_knob_propagation' THEN 2
+ELSE 3 END,
+analyzed_at DESC, id DESC
+LIMIT %s
+""",
+(
+requested_knobs,
+max(5, row_limit // 4),
+row_limit,
+),
+)
+else:
+rows = self.db.fetch_all(
+"""
+SELECT id, source_root, knob, function_name, file_path,
+line_number, relation_type, ir_symbol, evidence,
+source_digest, analyzed_at
+FROM keeninsight.source_analyses
+WHERE relation_type IN (
+'knob_source_reference', 'llvm_knob_propagation',
+'llvm_data_flow', 'llvm_control_edge'
+)
+ORDER BY analyzed_at DESC, id DESC LIMIT %s
+""",
+(max(row_limit, row_limit * 4),),
+)
+
+contexts: list[dict[str, Any]] = []
+for row in rows[: max(row_limit, row_limit * 4)]:
+item = dict(row)
+item["source_context"] = self._source_context(
+str(row.get("file_path") or ""), row.get("line_number")
+)
+contexts.append(item)
+
+grouped: dict[str, list[dict[str, Any]]] = {}
+for item in contexts:
+knob = str(item.get("knob") or "")
+if not knob:
+evidence = item.get("evidence") or {}
+knob = str(evidence.get("source_global") or "").lstrip("@")
+if not knob and requested_knobs:
+# Generic CFG rows retrieved through a requested function are
+# contextual evidence. Keep them visible under the first
+# requested knob instead of discarding compiler evidence.
+knob = requested_knobs[0]
+if knob:
+grouped.setdefault(knob, []).append(item)
+
+hypotheses: list[dict[str, Any]] = []
+records: list[dict[str, Any]] = []
+for knob, items in sorted(grouped.items()):
+relation_counts: dict[str, int] = {}
+functions_seen: set[str] = set()
+locators: list[dict[str, Any]] = []
+compiler_backed = 0
+for item in items:
+relation = str(item.get("relation_type") or "unknown")
+relation_counts[relation] = relation_counts.get(relation, 0) + 1
+evidence = item.get("evidence") or {}
+function_name = str(
+item.get("function_name")
+or evidence.get("function")
+or evidence.get("target_function")
+or ""
+)
+if function_name:
+functions_seen.add(function_name)
+if relation.startswith("llvm_") or evidence.get("llvm_status") == "compiled":
+compiler_backed += 1
+if item.get("file_path") and item.get("line_number"):
+locators.append(
+{
+"file_path": item.get("file_path"),
+"line_number": item.get("line_number"),
+"relation_type": relation,
+"function_name": function_name or None,
+"ir_symbol": item.get("ir_symbol"),
+}
+)
+hypothesis = self._summarize_code_hypothesis(
+knob,
+items,
+relation_counts=relation_counts,
+functions=sorted(functions_seen),
+locators=locators[:30],
+compiler_backed=compiler_backed,
+)
+llm_summary = self._llm_code_summary(knob, hypothesis, items)
+if llm_summary:
+hypothesis["llm_summary"] = llm_summary
+hypotheses.append(hypothesis)
+retrieval = {
+"method": "source snippet retrieval over clang translation units plus persisted LLVM CFG/SSA paths",
+"source_root": str(self.source_root.resolve()),
+"requested_knobs": requested_knobs,
+"requested_functions": requested_functions,
+"row_count": len(items),
+"relation_counts": relation_counts,
+"items": items[:row_limit],
+}
+fingerprint_payload = {
+"source_root": str(self.source_root.resolve()),
+"knob": knob,
+"ids": sorted(
+int(item["id"])
+for item in items
+if item.get("id") is not None
+)[:200],
+}
+fingerprint = hashlib.sha256(
+json.dumps(
+fingerprint_payload, sort_keys=True, default=str
+).encode("utf-8")
+).hexdigest()
+if persist:
+stored = self.db.fetch_one(
+"""
+INSERT INTO keeninsight.code_knowledge
+(fingerprint, source_root, knob, target_functions,
+retrieval_context, hypothesis, provenance)
+VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb)
+ON CONFLICT (fingerprint) DO UPDATE SET
+source_root = EXCLUDED.source_root,
+knob = EXCLUDED.knob,
+target_functions = EXCLUDED.target_functions,
+retrieval_context = EXCLUDED.retrieval_context,
+hypothesis = EXCLUDED.hypothesis,
+provenance = EXCLUDED.provenance,
+updated_at = now()
+RETURNING id, fingerprint, source_root, knob,
+target_functions, retrieval_context, hypothesis,
+validation, confidence, provenance, created_at,
+updated_at
+""",
+(
+fingerprint,
+str(self.source_root.resolve()),
+knob,
+json.dumps(sorted(functions_seen)),
+json.dumps(retrieval, default=str),
+json.dumps(hypothesis, default=str),
+json.dumps(
+{
+"source_analysis_ids": fingerprint_payload["ids"],
+"analysis": "compiler-backed code retrieval and semantic summary",
+}
+),
+),
+)
+if stored:
+records.append(stored)
+
+return {
+"agent": "compiler-backed code retrieval + grounded semantic summarizer",
+"source_root": str(self.source_root.resolve()),
+"requested_knobs": requested_knobs,
+"requested_functions": requested_functions,
+"contexts": contexts[:row_limit],
+"hypotheses": hypotheses,
+"records": records,
+"persisted": persist,
+}
+
+def validate_code_knowledge(
+self, record_ids: list[int] | tuple[int, ...], validation: dict[str, Any]
+) -> list[dict[str, Any]]:
+"""Fold a real before/after experiment into code-knowledge confidence."""
+updated: list[dict[str, Any]] = []
+for raw_id in record_ids:
+try:
+record_id = int(raw_id)
+except (TypeError, ValueError):
+continue
+row = self.db.fetch_one(
+"""
+SELECT id, validation, confidence
+FROM keeninsight.code_knowledge WHERE id = %s
+""",
+(record_id,),
+)
+if not row:
+continue
+current = dict(row.get("validation") or {})
+attempts = int(current.get("validation_count") or 0) + 1
+successes = int(current.get("success_count") or 0) + (
+1 if bool(validation.get("effective")) else 0
+)
+merged = {
+**current,
+**validation,
+"validation_count": attempts,
+"success_count": successes,
+"confidence_basis": "measured same-SQL PostgreSQL before/after experiment",
+}
+confidence = (successes + 1.0) / (attempts + 2.0)
+stored = self.db.fetch_one(
+"""
+UPDATE keeninsight.code_knowledge
+SET validation = %s::jsonb, confidence = %s, updated_at = now()
+WHERE id = %s
+RETURNING id, fingerprint, source_root, knob,
+target_functions, retrieval_context, hypothesis,
+validation, confidence, provenance, created_at,
+updated_at
+""",
+(json.dumps(merged, default=str), confidence, record_id),
+)
+if stored:
+updated.append(stored)
+return updated
+
+def list_code_knowledge(self, *, limit: int = 100) -> list[dict[str, Any]]:
+return self.db.fetch_all(
+"""
+SELECT id, fingerprint, source_root, knob, target_functions,
+retrieval_context, hypothesis, validation, confidence,
+provenance, created_at, updated_at
+FROM keeninsight.code_knowledge
+ORDER BY updated_at DESC, id DESC LIMIT %s
+""",
+(max(1, min(int(limit), 500)),),
+)
+
+def _source_context(
+self, file_path: str, line_number: Any, *, radius: int = 2
+) -> dict[str, Any] | None:
+try:
+line = int(line_number)
+except (TypeError, ValueError):
+return None
+if line <= 0 or not file_path:
+return None
+path = self.source_root / file_path
+try:
+lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+except OSError:
+return None
+if line > len(lines):
+return None
+start = max(1, line - max(0, int(radius)))
+end = min(len(lines), line + max(0, int(radius)))
+return {
+"file_path": file_path,
+"line_start": start,
+"line_end": end,
+"focus_line": line,
+"text": "\n".join(
+"%d: %s" % (index, lines[index - 1])
+for index in range(start, end + 1)
+),
+}
+
+@staticmethod
+def _summarize_code_hypothesis(
+knob: str,
+items: list[dict[str, Any]],
+*,
+relation_counts: dict[str, int],
+functions: list[str],
+locators: list[dict[str, Any]],
+compiler_backed: int,
+) -> dict[str, Any]:
+if knob == "work_mem":
+statement = (
+"The retrieved PostgreSQL source/LLVM paths connect work_mem "
+"to executor memory sizing and temporary-work operators; when "
+"the measured plan shows spill evidence, increasing the knob is "
+"a testable hypothesis, not a guaranteed improvement."
+)
+direction = "increase_when_spill_is_measured"
+elif knob == "max_parallel_workers_per_gather":
+statement = (
+"The retrieved PostgreSQL source/LLVM paths connect the knob "
+"to planner partial-path and worker selection; increasing it "
+"is testable only when the measured plan and host limits show "
+"under-provisioned parallelism."
+)
+direction = "increase_when_workers_are_underprovisioned"
+else:
+statement = (
+"The retrieved compiler-backed influence path identifies the "
+"knob's source references and affected functions; a value or "
+"direction must be validated by a same-workload experiment."
+)
+direction = "experiment_required"
+return {
+"knob": knob,
+"action_type": "set_database_parameter",
+"direction": direction,
+"statement": statement,
+"support": {
+"relation_counts": relation_counts,
+"compiler_backed_rows": compiler_backed,
+"functions": functions,
+"locators": locators,
+},
+"requires_targeted_experiment": True,
+"source_row_count": len(items),
+}
+
+def _llm_code_summary(
+self,
+knob: str,
+deterministic_hypothesis: dict[str, Any],
+items: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+"""Ask the configured model to phrase compiler evidence for reviewers."""
+
+if not self.llm_client or not self.llm_client.configured:
+return None
+source_rows = []
+for index, item in enumerate(items[:12], 1):
+evidence = item.get("evidence") or {}
+source_rows.append(
+{
+"id": "[S%d]" % index,
+"database_row_id": item.get("id"),
+"file_path": item.get("file_path"),
+"line_number": item.get("line_number"),
+"function_name": item.get("function_name"),
+"relation_type": item.get("relation_type"),
+"ir_symbol": item.get("ir_symbol"),
+"source_context": (item.get("source_context") or {}).get("text"),
+"compiler_evidence": evidence,
+}
+)
+if not source_rows:
+return None
+request = {
+"knob": knob,
+"deterministic_hypothesis": deterministic_hypothesis,
+"source_rows": source_rows,
+}
+messages = [
+{
+"role": "system",
+"content": (
+"你是 PostgreSQL 源码审阅助手。只能根据给出的源码行、编译器 CFG/SSA "
+"记录和确定性假设生成 JSON："
+'{"summary":"...","caveats":["..."],"evidence_ids":["[S1]"]}。'
+"summary 必须是中文，不能虚构函数关系、性能数值或修改建议；"
+"不要生成 SQL；每个关键判断至少引用一个 [S#]。这只是解释文本，"
+"数值和动作仍须由真实 PostgreSQL 实验验证。"
+),
+},
+{
+"role": "user",
+"content": "请总结以下编译器支撑的源码证据：\n"
++ json.dumps(request, ensure_ascii=False, default=str),
+},
+]
+try:
+result = self.llm_client.complete(messages, temperature=0, max_tokens=650)
+except LLMError:
+return None
+parsed = parse_json_object(str(result.get("content") or ""))
+if not parsed or not str(parsed.get("summary") or "").strip():
+return None
+valid_ids = {row["id"] for row in source_rows}
+evidence_ids = [
+str(item)
+for item in (parsed.get("evidence_ids") or [])
+if str(item) in valid_ids
+]
+if not evidence_ids:
+return None
+caveats = parsed.get("caveats") or []
+if not isinstance(caveats, list):
+caveats = [str(caveats)]
+return {
+"generator": "external-llm-grounded",
+"model": result.get("model") or self.llm_client.model,
+"summary": str(parsed["summary"]).strip()[:4000],
+"caveats": [str(item).strip()[:600] for item in caveats[:6] if str(item).strip()],
+"evidence_ids": evidence_ids,
+"usage": result.get("usage") or {},
+"latency_ms": result.get("latency_ms"),
+"display_only": True,
+}
+
+def _query_function_evidence(
+self, names: list[str], *, limit: int
+) -> list[dict[str, Any]]:
+return self.db.fetch_all(
+"""
+SELECT id, source_root, knob, function_name, file_path, line_number,
+relation_type, ir_symbol, evidence, source_digest, analyzed_at
+FROM keeninsight.source_analyses
+WHERE function_name = ANY(%s)
+OR evidence->>'origin_function' = ANY(%s)
+OR evidence->>'current_function' = ANY(%s)
+OR evidence->>'neighbor' = ANY(%s)
+ORDER BY CASE WHEN relation_type = 'knob_source_reference' THEN 0 ELSE 1 END,
+analyzed_at DESC
+LIMIT %s
+""",
+(names, names, names, names, max(1, min(int(limit), 1000))),
+)
+
+def _extend_runtime_llvm_graph(self, targets: list[str]) -> dict[str, Any]:
+"""Compile runtime target/caller TUs and persist cross-TU LLVM paths.
+
+The normal source analysis is deliberately bounded to files containing
+requested GUCs. That is efficient for startup, but it misses the
+boundary between an executor function and a storage function (for
+example ``ExecHashJoinSaveTuple -> BufFileWrite``). This method is a
+demand-driven second pass: it finds the actual definitions and call
+sites in the PostgreSQL 12.22 checkout, compiles those translation
+units with the same clang command, merges their LLVM edges with the
+persisted graph, then stores shortest knob-to-target paths. No
+scenario-specific relationship is inserted here.
+"""
+root = self.source_root.resolve()
+source_files = sorted((root / "src").rglob("*.c")) if (root / "src").is_dir() else sorted(root.rglob("*.c"))
+if not source_files:
+return {"compiled_count": 0, "propagation_count": 0}
+target_set = {str(item).strip() for item in targets if str(item).strip()}
+if not target_set:
+return {"compiled_count": 0, "propagation_count": 0}
+
+texts: dict[str, str] = {}
+digests: dict[str, str] = {}
+definitions: dict[str, list[dict[str, Any]]] = {}
+candidate_scores: dict[str, int] = {}
+for path in source_files:
+try:
+text = path.read_text(encoding="utf-8", errors="replace")
+except OSError:
+continue
+relative = str(path.relative_to(root))
+texts[relative] = text
+digests[relative] = _sha256(path)
+spans = _function_spans(text)
+for start, end, name in spans:
+definitions.setdefault(name, []).append(
+{"file_path": relative, "line_number": start, "end": end}
+)
+# Runtime database functions are in the PostgreSQL backend. Do
+# not let test fixtures/comments pull hundreds of unrelated TUs
+# into an on-demand compile pass.
+score = 0
+for target in target_set:
+if any(item["file_path"] == relative for item in definitions.get(target, [])):
+score += 100
+if relative.startswith("src/backend/") and re.search(r"\b%s\s*\(" % re.escape(target), text):
+score += 50
+if score:
+candidate_scores[relative] = score
+
+# Existing direct references tell us which source TUs are the roots of
+# the propagation graph. Include their files and definitions, plus
+# files that call those root functions, to bridge separately compiled
+# PostgreSQL translation units.
+direct_rows = self.db.fetch_all(
+"""
+SELECT DISTINCT knob, function_name, file_path, line_number, evidence
+FROM keeninsight.source_analyses
+WHERE relation_type = 'knob_source_reference'
+AND function_name ~ '^[A-Za-z_][A-Za-z0-9_]*$'
+AND left(file_path, 12) = 'src/backend/'
+"""
+)
+roots_by_function: dict[str, list[dict[str, Any]]] = {}
+for row in direct_rows:
+function = str(row.get("function_name") or "")
+if not function:
+continue
+roots_by_function.setdefault(function, []).append(row)
+file_path = str(row.get("file_path") or "")
+if file_path in texts:
+candidate_scores[file_path] = max(candidate_scores.get(file_path, 0), 80)
+# Keep the on-demand pass bounded, but prefer target definitions,
+# target call sites, and knob roots. The paths needed by the demo are
+# all in src/backend and are therefore selected before test fixtures.
+ranked_files = sorted(
+candidate_scores,
+key=lambda item: (-candidate_scores[item], item),
+)[:64]
+compile_records: list[dict[str, Any]] = []
+for relative in ranked_files:
+path = root / relative
+if path.is_file():
+compile_records.append(self._compile_to_llvm(root, path))
+compiled = [item for item in compile_records if item.get("status") == "compiled"]
+edges: list[dict[str, str]] = []
+flow_rows: list[dict[str, Any]] = []
+for record in compiled:
+ir_path = Path(str(record.get("ir_path") or ""))
+if not ir_path.is_file():
+continue
+ir_text = ir_path.read_text(encoding="utf-8", errors="replace")
+parsed_flow = _parse_llvm_flow(
+ir_text,
+file_path=str(record["file_path"]),
+knobs=set(DEFAULT_KNOBS),
+max_control_edges=2000,
+max_data_edges=4000,
+)
+flow_rows.extend(
+[{**item, "relation_type": "llvm_control_edge"} for item in parsed_flow["control_edges"]]
+)
+flow_rows.extend(
+[{**item, "relation_type": "llvm_data_flow"} for item in parsed_flow["data_edges"]]
+)
+for match in _LLVM_FUNCTION_RE.finditer(ir_text):
+caller, body = match.group(1), match.group(2)
+for callee in sorted(set(re.findall(r"\bcall\s+[^@]*@([A-Za-z_][A-Za-z0-9_]*)\(", body))):
+edges.append(
+{
+"caller": caller,
+"callee": callee,
+"file_path": str(record["file_path"]),
+}
+)
+
+flow_persisted = self._persist_llvm_flow_rows(
+root, _bounded_flow_rows(flow_rows), digests
+)
+
+# Make the graph durable. The existence check compensates for the
+# legacy nullable-key unique constraint, whose NULL knob column does
+# not deduplicate LLVM edge rows in PostgreSQL.
+for edge in edges:
+exists = self.db.fetch_one(
+"""
+SELECT id FROM keeninsight.source_analyses
+WHERE source_root = %s AND relation_type = 'llvm_call_edge'
+AND function_name = %s AND file_path = %s AND ir_symbol = %s
+LIMIT 1
+""",
+(str(root), edge["caller"], edge["file_path"], edge["callee"]),
+)
+if exists:
+continue
+self.db.execute(
+"""
+INSERT INTO keeninsight.source_analyses
+(source_root, relation_type, function_name, file_path,
+ir_symbol, evidence, source_digest)
+VALUES (%s, 'llvm_call_edge', %s, %s, %s, %s::jsonb, %s)
+""",
+(
+str(root), edge["caller"], edge["file_path"], edge["callee"],
+json.dumps({**edge, "analysis": "runtime_cross_translation_unit"}),
+digests.get(edge["file_path"]),
+),
+)
+
+# Rebuild the adjacency from the persisted LLVM edges so this pass is
+# composable with the startup analysis and with earlier runtime calls.
+edge_rows = self.db.fetch_all(
+"""
+SELECT function_name, file_path, ir_symbol, evidence
+FROM keeninsight.source_analyses
+WHERE relation_type = 'llvm_call_edge'
+"""
+)
+adjacency: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+for row in edge_rows:
+caller = str(row.get("function_name") or "")
+callee = str(row.get("ir_symbol") or (row.get("evidence") or {}).get("callee") or "")
+if not caller or not callee:
+continue
+edge = {
+"caller": caller,
+"callee": callee,
+"file_path": str(row.get("file_path") or ""),
+}
+adjacency.setdefault(caller, []).append((callee, edge))
+adjacency.setdefault(callee, []).append((caller, edge))
+
+propagation_count = 0
+for target in sorted(target_set):
+target_defs = definitions.get(target) or []
+if not target_defs:
+# Kernel functions such as vfs_write have no PostgreSQL source
+# definition; they remain explicitly reported as an external
+# boundary rather than being assigned fabricated source code.
+continue
+target_def = target_defs[0]
+for knob_function, root_rows in roots_by_function.items():
+path_result = self._shortest_source_path(adjacency, knob_function, target, max_depth=10)
+if not path_result:
+continue
+path, path_edges = path_result
+direct = root_rows[0]
+evidence = {
+"analysis": "cross_translation_unit_llvm_call_graph",
+"origin_function": knob_function,
+"target_function": target,
+"path": path,
+"graph_depth": len(path) - 1,
+"edge_files": sorted({edge["file_path"] for edge in path_edges}),
+"knob_reference": {
+"file_path": direct.get("file_path"),
+"line_number": direct.get("line_number"),
+"evidence": direct.get("evidence") or {},
+},
+"compiler": _compiler_version(),
+"runtime_compiled_translation_units": [item.get("file_path") for item in compiled],
+}
+self.db.execute(
+"""
+INSERT INTO keeninsight.source_analyses
+(source_root, knob, function_name, file_path, line_number,
+relation_type, ir_symbol, evidence, source_digest)
+VALUES (%s, %s, %s, %s, %s, 'llvm_knob_propagation', %s, %s::jsonb, %s)
+ON CONFLICT (source_root, knob, function_name, file_path, line_number, relation_type)
+DO UPDATE SET ir_symbol = EXCLUDED.ir_symbol,
+evidence = EXCLUDED.evidence,
+source_digest = EXCLUDED.source_digest,
+analyzed_at = now()
+""",
+(
+str(root), direct.get("knob"), target,
+target_def["file_path"], target_def["line_number"], target,
+json.dumps(evidence), digests.get(target_def["file_path"]),
+),
+)
+propagation_count += 1
+return {
+"compiled_count": len(compiled),
+"call_edge_count": len(edges),
+"propagation_count": propagation_count,
+"control_edge_count": sum(
+1 for row in flow_rows if row.get("relation_type") == "llvm_control_edge"
+),
+"data_flow_count": sum(
+1 for row in flow_rows if row.get("relation_type") == "llvm_data_flow"
+),
+"flow_rows_persisted": flow_persisted,
+"targets": sorted(target_set),
+}
+
+@staticmethod
+def _shortest_source_path(
+adjacency: dict[str, list[tuple[str, dict[str, Any]]]],
+origin: str,
+target: str,
+*,
+max_depth: int,
+) -> tuple[list[str], list[dict[str, Any]]] | None:
+if origin == target:
+return [origin], []
+queue: list[tuple[str, list[str], list[dict[str, Any]]]] = [(origin, [origin], [])]
+visited = {origin}
+while queue:
+current, path, path_edges = queue.pop(0)
+if len(path_edges) >= max_depth:
+continue
+for neighbor, edge in adjacency.get(current, []):
+if neighbor in visited:
+continue
+next_path = path + [neighbor]
+next_edges = path_edges + [edge]
+if neighbor == target:
+return next_path, next_edges
+visited.add(neighbor)
+queue.append((neighbor, next_path, next_edges))
+return None
+
+def run(self, knobs: list[str] | None = None, *, max_files: int = 80) -> dict[str, Any]:
+root = self.source_root.resolve()
+if not root.is_dir():
+raise LLVMAnalysisError("PostgreSQL source root does not exist: %s" % root)
+source_files = sorted((root / "src").rglob("*.c")) if (root / "src").is_dir() else sorted(root.rglob("*.c"))
+if not source_files:
+raise LLVMAnalysisError("no PostgreSQL C source files found below %s" % root)
+requested = [str(item).strip() for item in (knobs or DEFAULT_KNOBS) if str(item).strip()]
+file_digests: dict[str, str] = {}
+matches: list[dict[str, Any]] = []
+relevant_files: list[Path] = []
+for path in source_files:
+try:
+text = path.read_text(encoding="utf-8", errors="replace")
+except OSError:
+continue
+relative_path = str(path.relative_to(root))
+file_digest = _sha256(path)
+file_digests[relative_path] = file_digest
+found = [knob for knob in requested if re.search(r"\b%s\b" % re.escape(knob), text)]
+if not found:
+continue
+relevant_files.append(path)
+spans = _function_spans(text)
+lines = text.splitlines()
+for knob in found:
+for line_number, line in enumerate(lines, 1):
+if not re.search(r"\b%s\b" % re.escape(knob), line):
+continue
+function = next((name for start, end, name in spans if start <= line_number <= end), None)
+matches.append(
+{
+"knob": knob,
+"function_name": function or "file_scope",
+"file_path": relative_path,
+"line_number": line_number,
+"source_digest": file_digest,
+"evidence": {"line": line.strip(), "source_root": str(root)},
+}
+)
+digest = _tree_digest(root, source_files, file_digests)
+if not matches:
+raise LLVMAnalysisError("none of the requested knobs occur in source root %s" % root)
+compile_records = []
+seen_files: set[str] = set()
+for path in relevant_files[: max(1, int(max_files))]:
+relative = str(path.relative_to(root))
+if relative in seen_files:
+continue
+seen_files.add(relative)
+compile_records.append(self._compile_to_llvm(root, path))
+compiled = [item for item in compile_records if item.get("status") == "compiled"]
+compile_by_file = {str(item.get("file_path")): item for item in compile_records}
+ir_symbols: dict[str, list[str]] = {}
+call_edges: list[dict[str, str]] = []
+flow_rows: list[dict[str, Any]] = []
+edges_by_file: dict[str, dict[str, set[str]]] = {}
+for record in compiled:
+ir_path = Path(str(record["ir_path"]))
+ir_text = ir_path.read_text(encoding="utf-8", errors="replace")
+symbols = re.findall(r"^define\s+[^@]*@([A-Za-z_][A-Za-z0-9_]*)\(", ir_text, flags=re.MULTILINE)
+ir_symbols[record["file_path"]] = sorted(set(symbols))
+parsed_flow = _parse_llvm_flow(
+ir_text,
+file_path=str(record["file_path"]),
+knobs=set(requested),
+max_control_edges=2000,
+max_data_edges=4000,
+)
+flow_rows.extend(
+[{**item, "relation_type": "llvm_control_edge"} for item in parsed_flow["control_edges"]]
+)
+flow_rows.extend(
+[{**item, "relation_type": "llvm_data_flow"} for item in parsed_flow["data_edges"]]
+)
+file_edges = edges_by_file.setdefault(record["file_path"], {})
+for match in _LLVM_FUNCTION_RE.finditer(ir_text):
+function, body = match.group(1), match.group(2)
+callees = sorted(set(re.findall(r"\bcall\s+[^@]*@([A-Za-z_][A-Za-z0-9_]*)\(", body)))
+file_edges.setdefault(function, set()).update(callees)
+for callee in callees:
+call_edges.append({"caller": function, "callee": callee, "file_path": record["file_path"]})
+flow_persisted = self._persist_llvm_flow_rows(
+root, _bounded_flow_rows(flow_rows), file_digests
+)
+persisted = 0
+for item in matches:
+file_record = next((record for record in compile_records if record["file_path"] == item["file_path"]), {})
+evidence = dict(item["evidence"])
+evidence.update({"compiler": _compiler_version(), "llvm_status": file_record.get("status"), "llvm_symbols": ir_symbols.get(item["file_path"], []), "compile_command": file_record.get("command")})
+row = self.db.fetch_one(
+"""
+INSERT INTO keeninsight.source_analyses
+(source_root, knob, function_name, file_path, line_number,
+relation_type, ir_symbol, evidence, source_digest)
+VALUES (%s, %s, %s, %s, %s, 'knob_source_reference', %s, %s::jsonb, %s)
+ON CONFLICT (source_root, knob, function_name, file_path, line_number, relation_type)
+DO UPDATE SET ir_symbol = EXCLUDED.ir_symbol, evidence = EXCLUDED.evidence,
+source_digest = EXCLUDED.source_digest, analyzed_at = now()
+RETURNING id
+""",
+(str(root), item["knob"], item["function_name"], item["file_path"], item["line_number"], item["function_name"] if item["function_name"] in ir_symbols.get(item["file_path"], []) else None, json.dumps(evidence), item["source_digest"]),
+)
+if row:
+persisted += 1
+for edge in call_edges:
+# ``knob`` and ``line_number`` are nullable for generic call-edge
+# rows, so the legacy UNIQUE constraint cannot deduplicate them in
+# PostgreSQL. Check the concrete compiler identity explicitly.
+exists = self.db.fetch_one(
+"""
+SELECT id FROM keeninsight.source_analyses
+WHERE source_root = %s AND relation_type = 'llvm_call_edge'
+AND function_name = %s AND file_path = %s
+AND ir_symbol = %s
+LIMIT 1
+""",
+(str(root), edge["caller"], edge["file_path"], edge["callee"]),
+)
+if exists:
+self.db.execute(
+"""
+UPDATE keeninsight.source_analyses
+SET evidence = %s::jsonb, source_digest = %s, analyzed_at = now()
+WHERE id = %s
+""",
+(
+json.dumps(edge),
+file_digests.get(edge["file_path"]),
+exists["id"],
+),
+)
+continue
+self.db.execute(
+"""
+INSERT INTO keeninsight.source_analyses
+(source_root, relation_type, function_name, file_path,
+ir_symbol, evidence, source_digest)
+VALUES (%s, 'llvm_call_edge', %s, %s, %s, %s::jsonb, %s)
+""",
+(
+str(root),
+edge["caller"],
+edge["file_path"],
+edge["callee"],
+json.dumps(edge),
+file_digests.get(edge["file_path"]),
+),
+)
+propagation_rows: list[dict[str, Any]] = []
+seen_propagation: set[tuple[str, str, str, int, str, str]] = set()
+max_depth = 3
+for item in matches:
+origin = str(item.get("function_name") or "")
+file_path = str(item.get("file_path") or "")
+if origin == "file_scope" or origin not in ir_symbols.get(file_path, []):
+continue
+edges = edges_by_file.get(file_path, {})
+reverse: dict[str, set[str]] = {}
+for caller, callees in edges.items():
+for callee in callees:
+reverse.setdefault(callee, set()).add(caller)
+for direction, graph in (("callee", edges), ("caller", reverse)):
+queue: list[tuple[str, int, list[str]]] = [(origin, 0, [origin])]
+visited: set[tuple[str, int]] = {(origin, 0)}
+while queue:
+current, depth, path = queue.pop(0)
+if depth >= max_depth:
+continue
+for neighbor in sorted(graph.get(current, set())):
+if neighbor in path:
+continue
+next_depth = depth + 1
+key = (str(item["knob"]), file_path, current, next_depth, neighbor, direction)
+if key not in seen_propagation:
+seen_propagation.add(key)
+propagation_rows.append(
+{
+"knob": item["knob"],
+# The schema predates graph edges and uses
+# function_name+depth as its natural key.
+# Include the edge direction/neighbor in
+# the display name so parallel edges are
+# retained instead of silently collapsing
+# into one row.
+"function_name": "%s --%s--> %s" % (current, direction, neighbor),
+"file_path": file_path,
+"line_number": next_depth,
+"ir_symbol": neighbor,
+"source_digest": file_digests.get(file_path),
+"evidence": {
+"origin_function": origin,
+"current_function": current,
+"neighbor": neighbor,
+"direction": direction,
+"graph_depth": next_depth,
+"path": path + [neighbor],
+"llvm_status": "compiled",
+"compile_command": compile_by_file.get(file_path, {}).get("command"),
+},
+}
+)
+if (neighbor, next_depth) not in visited:
+visited.add((neighbor, next_depth))
+queue.append((neighbor, next_depth, path + [neighbor]))
+for item in propagation_rows[:10000]:
+self.db.execute(
+"""
+INSERT INTO keeninsight.source_analyses
+(source_root, knob, function_name, file_path, line_number,
+relation_type, ir_symbol, evidence, source_digest)
+VALUES (%s, %s, %s, %s, %s, 'llvm_knob_propagation', %s, %s::jsonb, %s)
+ON CONFLICT (source_root, knob, function_name, file_path, line_number, relation_type)
+DO UPDATE SET ir_symbol = EXCLUDED.ir_symbol,
+evidence = EXCLUDED.evidence,
+source_digest = EXCLUDED.source_digest,
+analyzed_at = now()
+""",
+(
+str(root), item["knob"], item["function_name"], item["file_path"],
+item["line_number"], item["ir_symbol"], json.dumps(item["evidence"]),
+item["source_digest"],
+),
+)
+return {
+"source_root": str(root),
+"source_digest": digest,
+"knobs": requested,
+"matches": matches,
+"compiled_translation_units": compile_records,
+"compiled_count": len(compiled),
+"llvm_symbols": ir_symbols,
+"call_edge_count": len(call_edges),
+"propagation_count": len(propagation_rows),
+"control_edge_count": sum(
+1 for row in flow_rows if row.get("relation_type") == "llvm_control_edge"
+),
+"data_flow_count": sum(
+1 for row in flow_rows if row.get("relation_type") == "llvm_data_flow"
+),
+"flow_rows_persisted": flow_persisted,
+"persisted_reference_count": persisted,
+"compiler": _compiler_version(),
+"analyzed_at": datetime_now_iso(),
+}
+
+def _compile_to_llvm(self, root: Path, source: Path) -> dict[str, Any]:
+output_dir = root.parent / ".keeninsight-llvm"
+output_dir.mkdir(parents=True, exist_ok=True)
+relative = str(source.relative_to(root))
+# Basenames are not globally unique in a PostgreSQL source tree;
+# include the relative path digest so one translation unit cannot
+# overwrite another unit's IR artifact.
+output = output_dir / (
+re.sub(r"[^A-Za-z0-9_.-]", "_", relative)
++ ".%s.ll" % hashlib.sha256(relative.encode("utf-8")).hexdigest()[:12]
+)
+command = [
+"clang", "-S", "-emit-llvm", "-g", "-O0", "-fno-inline",
+"-I", str(root / "src" / "include"),
+"-I", "/usr/include/postgresql/12/server",
+"-I", str(root / "src" / "include" / "port" / "linux"),
+"-D_GNU_SOURCE", "-Wno-deprecated-non-prototype", str(source), "-o", str(output),
+]
+try:
+result = subprocess.run(command, cwd=str(root), capture_output=True, text=True, timeout=60, check=False)
+except Exception as exc:
+return {"file_path": str(source.relative_to(root)), "status": "failed", "command": command, "stderr": str(exc)}
+record = {"file_path": str(source.relative_to(root)), "source_digest": _sha256(source), "status": "compiled" if result.returncode == 0 else "failed", "command": command, "return_code": result.returncode, "stderr": result.stderr[-4000:]}
+if result.returncode == 0:
+record["ir_path"] = str(output)
+record["ir_digest"] = _sha256(output)
+return record
+
+def datetime_now_iso() -> str:
+from datetime import datetime, timezone
+return datetime.now(timezone.utc).isoformat()

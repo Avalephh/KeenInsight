@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - Alert Details</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-light: #e8f3ff;
+            --primary-color-focus: #ccdbff;
+            --success-color: #0fbf60;
+            --success-color-light: #e8ffea;
+            --warning-color: #ff8b07;
+            --warning-color-light: #fff7e8;
+            --danger-color: #ee4d38;
+            --danger-color-light: #fff0f0;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* 主内容区域 */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #f7f8fa;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* 详情页面样式 */
+        .detail-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 顶部区域 - 1和2组成一个整体（全宽） */
+        .top-section {
+            width: 100%;
+        }
+
+        /* 中间区域 - 两栏布局 */
+        .middle-section {
+            display: grid;
+            grid-template-columns: 1.3fr 0.7fr;
+            gap: 20px;
+        }
+
+        /* 底部区域 - 性能对比（全宽） */
+        .bottom-section {
+            width: 100%;
+        }
+
+        /* 详情卡片样式 */
+        .detail-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 顶部区域（1和2）的特殊样式 - 标题和内容在一行 */
+        .detail-section.top-layout {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            align-items: center;
+        }
+
+        .detail-section.top-layout .detail-title {
+            border-bottom: none;
+            border-right: 1px solid #e5e6eb;
+            padding: 16px 20px;
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .detail-section.top-layout .detail-card {
+            border-bottom: none;
+        }
+
+        .detail-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--font-color);
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .detail-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-color);
+        }
+
+        .detail-card {
+            padding: 12px 20px;
+        }
+
+        .detail-card.scrollable {
+            max-height: 220px;
+            overflow-y: auto;
+        }
+
+        .detail-card.scrollable.shap-analysis {
+            max-height: 176px;
+        }
+
+        .detail-card.scrollable.explanation-analysis {
+            max-height: 176px;
+        }
+
+        /* 信息网格 - 4列（触发规则） */
+        .info-grid-4col {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        /* 信息网格 - 5列（运行时数据） */
+        .info-grid-5col {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #86909c;
+        }
+
+        .info-value {
+            font-size: 16px;
+            color: var(--font-color);
+            font-weight: 600;
+        }
+
+        .info-value.highlight {
+            color: var(--danger-color);
+        }
+
+        /* 状态标签 */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-badge.warning {
+            background: var(--warning-color-light);
+            color: var(--warning-color);
+        }
+
+        .status-badge.critical {
+            background: var(--danger-color-light);
+            color: var(--danger-color);
+        }
+
+        /* 差异分析 */
+        .differential-profiling-container {
+            width: 100%;
+        }
+
+        .profiling-row {
+            display: grid;
+            grid-template-columns: 180px 100px 100px 100px 1fr;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid #f0f2f5;
+            align-items: center;
+        }
+
+        .profiling-row.header {
+            background: #f7f8fa;
+            font-weight: 600;
+            color: #4e5969;
+            font-size: 12px;
+        }
+
+        .profiling-function {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            color: var(--font-color);
+        }
+
+        .profiling-value {
+            font-size: 13px;
+            color: #4e5969;
+            text-align: right;
+        }
+
+        .profiling-diff {
+            font-size: 13px;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .profiling-diff.high {
+            color: var(--danger-color);
+        }
+
+        .profiling-diff.medium {
+            color: var(--warning-color);
+        }
+
+        .profiling-diff.low {
+            color: #86909c;
+        }
+
+        .profiling-bar {
+            height: 8px;
+            background: #f0f2f5;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .profiling-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .profiling-bar-fill.high {
+            background: var(--danger-color);
+        }
+
+        .profiling-bar-fill.medium {
+            background: var(--warning-color);
+        }
+
+        .profiling-bar-fill.low {
+            background: var(--primary-color);
+        }
+
+        /* SHAP分析 */
+        .shap-feature {
+            display: grid;
+            grid-template-columns: 180px 80px 1fr 80px;
+            gap: 16px;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f0f2f5;
+        }
+
+        .shap-feature:last-child {
+            border-bottom: none;
+        }
+
+        .shap-name {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            color: var(--font-color);
+        }
+
+        .shap-value {
+            font-size: 13px;
+            color: #4e5969;
+            font-weight: 500;
+        }
+
+        .shap-bar {
+            height: 10px;
+            background: #f0f2f5;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .shap-bar-fill {
+            height: 100%;
+            border-radius: 5px;
+            background: var(--primary-color);
+        }
+
+        .shap-bar-fill.high {
+            background: var(--danger-color);
+        }
+
+        .shap-bar-fill.medium {
+            background: var(--warning-color);
+        }
+
+        .shap-bar-fill.low {
+            background: var(--success-color);
+        }
+
+        .shap-impact {
+            text-align: right;
+        }
+
+        /* 诊断标签 */
+        .diagnosis-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .diagnosis-tag.critical {
+            background: var(--danger-color-light);
+            color: var(--danger-color);
+        }
+
+        .diagnosis-tag.warning {
+            background: var(--warning-color-light);
+            color: var(--warning-color);
+        }
+
+        .diagnosis-tag.normal {
+            background: var(--success-color-light);
+            color: var(--success-color);
+        }
+
+        /* 函数列表 */
+        .function-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .function-item {
+            padding: 10px 14px;
+            background: #f7f8fa;
+            border-radius: 6px;
+        }
+
+        .function-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 6px;
+        }
+
+        .function-name {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .function-info-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .function-meta {
+            font-size: 12px;
+            color: #86909c;
+        }
+
+        .function-sources {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .source-tag {
+            padding: 2px 8px;
+            background: var(--primary-color-light);
+            color: var(--primary-color);
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* Knob列表 */
+        .knob-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .knob-item {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+        }
+
+        .tuning-section.green-background {
+            background: var(--success-color-light);
+        }
+
+        .tuning-section.green-background .knob-item {
+            padding: 10px 14px;
+            background: #fff;
+        }
+
+        .knob-name {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .knob-value {
+            display: flex;
+            gap: 8px;
+            font-size: 13px;
+            align-items: center;
+        }
+
+        .knob-current {
+            color: #86909c;
+        }
+
+        .knob-arrow {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .knob-recommended {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+
+        /* 调优结果紧凑布局 */
+        .tuning-result-compact {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+        }
+
+        .tuning-section {
+            background: #f7f8fa;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .tuning-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 12px;
+            text-align: center;
+        }
+
+        .tuning-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .tuning-metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: #fff;
+            border-radius: 4px;
+        }
+
+        .tuning-metric-name {
+            font-size: 12px;
+            color: #86909c;
+        }
+
+        .tuning-metric-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .tuning-metric-value.highlight {
+            color: var(--danger-color);
+        }
+
+        .tuning-metric-value.success {
+            color: var(--success-color);
+        }
+
+        /* 改进数据样式 */
+        .improvement-section {
+            background: var(--success-color-light);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .improvement-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .improvement-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 4px;
+        }
+
+        .improvement-label {
+            font-size: 12px;
+            color: #4e5969;
+        }
+
+        .improvement-value {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--success-color);
+        }
+
+        /* 知识库按钮 - 只有带按钮的标题才使用左右布局 */
+        .detail-title-with-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .kb-button {
+            padding: 6px 14px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .kb-button:hover {
+            background: var(--primary-color-hover);
+        }
+
+        /* 知识库弹窗 */
+        .kb-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .kb-modal-overlay.show {
+            display: flex;
+        }
+
+        .kb-modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .kb-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .kb-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .kb-modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f7f8fa;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .kb-modal-close:hover {
+            background: #e5e6eb;
+        }
+
+        .kb-modal-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .kb-section {
+            margin-bottom: 24px;
+        }
+
+        .kb-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kb-section-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-color);
+        }
+
+        .kb-item {
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .kb-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .kb-item-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 6px;
+        }
+
+        .kb-item-desc {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        .kb-item-meta {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #86909c;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo" onclick="location.href='template.html'">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none">
+                        <path d="M23.0072 2.82796C23.6226 2.47593 24.3782 2.47593 24.9936 2.82796L41.994 12.554C42.6166 12.9102 43.0008 13.5726 43.0008 14.29V33.7106C43.0008 34.4279 42.6166 35.0903 41.994 35.4466L24.9936 45.1726C24.3782 45.5246 23.6226 45.5246 23.0072 45.1726L6.00683 35.4466C5.38418 35.0903 5 34.4279 5 33.7106V14.29C5 13.5726 5.38418 12.9102 6.00683 12.554L23.0072 2.82796Z" fill="url(#gradient)"/>
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M24.0001 32.5286C28.7103 32.5286 32.5286 28.7103 32.5286 24.0001C32.5286 19.29 28.7103 15.4717 24.0001 15.4717C19.29 15.4717 15.4717 19.29 15.4717 24.0001C15.4717 28.7103 19.29 32.5286 24.0001 32.5286ZM24.0001 35.5286C30.3671 35.5286 35.5286 30.3671 35.5286 24.0001C35.5286 17.6332 30.3671 12.4717 24.0001 12.4717C17.6332 12.4717 12.4717 17.6332 12.4717 24.0001C12.4717 30.3671 17.6332 35.5286 24.0001 35.5286Z" fill="#fff"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="24" y1="5" x2="24" y2="43" gradientUnits="userSpaceOnUse">
+                                <stop stop-color="#3370ff"/>
+                                <stop offset="1" stop-color="#165DFF"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    KeenInsight
+                </div>
+
+            </div>
+            <div class="navbar-right">
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <path d="M24 44c11.046 0 20-8.954 20-20S35.046 4 24 4 4 12.954 4 24s8.954 20 20 20Z"/>
+                        <path d="M16 24h16"/>
+                    </svg>
+                    Console
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="18"/>
+                        <path d="M24 14v10l7 7"/>
+                    </svg>
+                    Help
+                </div>
+                <div class="nav-action">
+                    <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    User
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <div class="menu-item" onclick="location.href='host-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </div>
+                            <div class="menu-item" onclick="location.href='realtime-monitor.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14v10l7 7"/>
+                                </svg>
+                                Real-time Monitor
+                            </div>
+                            
+                            <div class="menu-group-title">System level</div>
+                            <div class="menu-item" onclick="location.href='alert-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </div>
+                            <div class="menu-item" onclick="location.href='alert-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </div>
+                            
+                            <div class="menu-group-title">SQL level</div>
+                            <div class="menu-item" onclick="location.href='sql-log.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </div>
+                            <div class="menu-item" onclick="location.href='dba-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </div>
+                            
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+                            
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <div class="menu-item" onclick="location.href='manual.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </div>
+                            <div class="menu-item" onclick="location.href='code-source.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </div>
+                            <div class="menu-item" onclick="location.href='tuning-knowledge.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner">
+                    <!-- 页面标题 -->
+                    <div class="page-header">
+                        <h1 class="page-title" id="pageTitle">Alert Details</h1>
+                        <button class="back-btn" onclick="location.href='alert-list.html'">
+                            <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M28 12l-12 12 12 12"/>
+                            </svg>
+                            Back to List
+                        </button>
+                    </div>
+
+                    <!-- 详情内容 -->
+                    <div class="detail-layout" id="detailContent">
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const alertData = [
+            { 
+                id: '5f8d4e3b2a1c7d9e8f6a5b4c3d2e1f0a', 
+                time: '2026-03-25 14:32:15', 
+                host: 'db-prod-master-01', 
+                cluster: 'prod-cluster-1',
+                reason: 'High IO', 
+                severity: 'warning', 
+                status: 'resolved',
+                rootCause: [
+                    {
+                        title: 'System-Level Anomaly',
+                        desc: 'Frequent calls to log_buffer_flush_to_disk() detected, indicating excessive log flush operations. By tracing code-level dependencies, the system associates this behavior with the innodb_log_buffer_size parameter.',
+                        evidence: 'log_buffer_flush_to_disk() call ratio: 22.3%'
+                    },
+                    {
+                        title: 'Rule Matching and Recommendations',
+                        desc: 'Based on matched code-derived rules, when the log flush function ratio exceeds the threshold (e.g., 18%), the system recommends increasing the log buffer size with a confidence score of 0.91.',
+                        evidence: 'Function threshold: 18%, Confidence: 0.91'
+                    },
+                    {
+                        title: 'Configuration Validation and Deployment',
+                        desc: 'The recommended configuration is validated before deployment, and performance improvements are visualized in the dashboard.',
+                        evidence: 'Configuration validated and deployed, performance improvement visualized'
+                    }
+                ],
+                diagnosis: {
+                    cpu: {
+                        status: 'medium',
+                        title: 'CPU Load',
+                        content: 'CPU usage is approximately 65.3%, moderate load.',
+                        tag: 'warning'
+                    },
+                    memory: {
+                        status: 'normal',
+                        title: 'Memory Usage',
+                        content: 'Memory usage is approximately 58.2%, normal usage.',
+                        tag: 'normal'
+                    },
+                    disk: {
+                        status: 'critical',
+                        title: 'Disk I/O',
+                        content: 'Disk I/O is too high, average response time is too long, frequent log flush operations exist, need to increase log buffer size.',
+                        tag: 'critical'
+                    },
+                    network: {
+                        status: 'normal',
+                        title: 'Network Traffic',
+                        content: 'Network traffic is stable, no abnormal traffic fluctuations detected.',
+                        tag: 'normal'
+                    }
+                },
+                detailAnalysis: {
+                    triggeredRules: [
+                        {
+                            name: 'Disk IO Wait Timeout',
+                            field: 'P95(io_wait_time)',
+                            threshold: '20ms',
+                            actual: '25.2ms',
+                            period: '1 minute'
+                        },
+                        {
+                            name: 'TPS Drop Alert',
+                            field: 'TPS',
+                            threshold: '≥ 30%',
+                            actual: '35.8%',
+                            period: '1 minute'
+                        }
+                    ],
+                    runtimeData: {
+                        cpu_usage: 92.5,
+                        memory_usage: 96.8,
+                        slow_query_count: 45,
+                        qps: 387.5,
+                        cache_hit_rate: 82.3
+                    },
+                    differentialProfiling: [
+                        { name: 'log_buffer_flush_to_disk', normal: 6.8, abnormal: 29.1, diff: 22.3, diffPercent: 328, status: 'high' },
+                        { name: 'log_write', normal: 8.5, abnormal: 15.2, diff: 6.7, diffPercent: 79, status: 'medium' },
+                        { name: 'fil_flush', normal: 5.2, abnormal: 9.8, diff: 4.6, diffPercent: 88, status: 'medium' },
+                        { name: 'os_file_write', normal: 10.3, abnormal: 15.6, diff: 5.3, diffPercent: 51, status: 'medium' },
+                        { name: 'innobase_flush_logs', normal: 7.8, abnormal: 11.2, diff: 3.4, diffPercent: 44, status: 'low' },
+                        { name: 'trx_flush_log_if_needed', normal: 9.4, abnormal: 10.8, diff: 1.4, diffPercent: 15, status: 'low' },
+                        { name: 'log_buffer_get_flush_order', normal: 8.1, abnormal: 9.2, diff: 1.1, diffPercent: 14, status: 'low' },
+                        { name: 'srv_master_thread', normal: 6.5, abnormal: 5.9, diff: -0.6, diffPercent: -9, status: 'low' }
+                    ],
+                    shapAnalysis: {
+                        features: [
+                            { name: 'log_buffer_flush_to_disk', value: 27.5, impact: 'high', shapValue: 6.2 },
+                            { name: 'log_write', value: 15.2, impact: 'medium', shapValue: 2.1 },
+                            { name: 'fil_flush', value: 9.8, impact: 'medium', shapValue: 1.8 },
+                            { name: 'os_file_write', value: 14.3, impact: 'medium', shapValue: 1.5 },
+                            { name: 'innobase_flush_logs', value: 10.5, impact: 'low', shapValue: 0.8 },
+                            { name: 'trx_flush_log_if_needed', value: 11.5, impact: 'low', shapValue: 0.5 },
+                            { name: 'log_buffer_get_flush_order', value: 8.7, impact: 'low', shapValue: 0.2 }
+                        ]
+                    },
+                    hotFunctions: [
+                        {
+                            name: 'log_buffer_flush_to_disk',
+                            calls: 1587243,
+                            file: 'log0buf.cc',
+                            line: 1876,
+                            sources: ['Log Buffer', 'Disk Flush']
+                        },
+                        {
+                            name: 'log_write',
+                            calls: 982567,
+                            file: 'log0write.cc',
+                            line: 623,
+                            sources: ['Log Write', 'Transaction']
+                        },
+                        {
+                            name: 'fil_flush',
+                            calls: 745321,
+                            file: 'fil0fil.cc',
+                            line: 2456,
+                            sources: ['File System', 'Flush']
+                        }
+                    ],
+                    knobs: [
+                        {
+                            name: 'innodb_log_buffer_size',
+                            current: '16M',
+                            recommended: '64M'
+                        },
+                        {
+                            name: 'innodb_log_file_size',
+                            current: '512M',
+                            recommended: '2G'
+                        },
+                        {
+                            name: 'innodb_flush_log_at_trx_commit',
+                            current: '1',
+                            recommended: '2'
+                        }
+                    ],
+                    functionCodeExamples: [
+                        {
+                            name: 'log_buffer_flush_to_disk',
+                            file: 'log0buf.cc',
+                            line: 1876,
+                            code: `void
+log_buffer_flush_to_disk(
+    log_t* log)
+{
+    log_flush_order_t flush_order;
+    
+    log_buffer_get_flush_order(log, &flush_order);
+    
+    if (flush_order.end_lsn > flush_order.start_lsn) {
+        os_file_write(log->file,
+            log->buf + (flush_order.start_lsn % log->buf_size),
+            flush_order.end_lsn - flush_order.start_lsn,
+            flush_order.start_lsn / log->buf_size * log->buf_size);
+        
+        fil_flush(log->file);
+        
+        fsync(log->file);
+    }
+}`
+                        }
+                    ],
+                    costModelPrediction: {
+                        beforeTuning: {
+                            cpu_usage: 65.3,
+                            io_wait: '15.2ms',
+                            tps: 520.4
+                        },
+                        afterTuning: {
+                            cpu_usage: 52.1,
+                            io_wait: '3.8ms',
+                            tps: 1235.8
+                        },
+                        improvement: {
+                            cpu_reduction: '20.2%',
+                            tps_increase: '137.5%'
+                        }
+                    }
+                }
+            }
+        ];
+
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                id: params.get('id')
+            };
+        }
+
+        function renderDifferentialProfiling(data) {
+            if (!data || data.length === 0) return '';
+
+            let rows = data.map(item => `
+                <div class="profiling-row">
+                    <div class="profiling-function">${item.name}</div>
+                    <div class="profiling-value">${item.normal}</div>
+                    <div class="profiling-value">${item.abnormal}</div>
+                    <div class="profiling-diff ${item.status}">
+                        ${item.diff > 0 ? '+' : ''}${item.diff} (${item.diff > 0 ? '+' : ''}${item.diffPercent}%)
+                    </div>
+                    <div class="profiling-bar">
+                        <div class="profiling-bar-fill ${item.status}" style="width: ${Math.min(Math.abs(item.diffPercent), 100)}%;"></div>
+                    </div>
+                </div>
+            `).join('');
+
+            return `
+                <div class="profiling-row header">
+                    <div>Function Name</div>
+                    <div>Normal</div>
+                    <div>Abnormal</div>
+                    <div>Difference</div>
+                    <div>Diff Degree</div>
+                </div>
+                ${rows}
+            `;
+        }
+
+        function renderDetail(alert) {
+            document.getElementById('pageTitle').innerHTML = `
+                Alert Details - ${alert.id}
+            `;
+
+            const detail = alert.detailAnalysis;
+            const differentialProfilingHtml = renderDifferentialProfiling(detail.differentialProfiling);
+            const shapHtml = detail.shapAnalysis.features.map(feature => `
+                <div class="shap-feature">
+                    <div class="shap-name">${feature.name}</div>
+                    <div class="shap-value">${feature.value}</div>
+                    <div class="shap-bar">
+                        <div class="shap-bar-fill ${feature.impact}" style="width: ${Math.min(feature.shapValue * 25, 100)}%;"></div>
+                    </div>
+                    <div class="shap-impact">
+                        <span class="diagnosis-tag ${feature.impact === 'high' ? 'critical' : feature.impact === 'medium' ? 'warning' : 'normal'}">${feature.impact}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            const hotFunctionsHtml = detail.hotFunctions.map(func => `
+                <div class="function-item">
+                    <div class="function-header">
+                        <div class="function-name">${func.name}</div>
+                    </div>
+                    <div class="function-info-row">
+                        <div class="function-meta">
+                            File: ${func.file}:${func.line}
+                        </div>
+                        <div class="function-sources">
+                            ${func.sources.map(source => `<span class="source-tag">${source}</span>`).join(' ')}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            const knobsHtml = detail.knobs.map(knob => `
+                <div class="knob-item">
+                    <div class="knob-name">${knob.name}</div>
+                    <div class="knob-value">
+                        <span class="knob-current">${knob.current}</span>
+                        <span class="knob-arrow">→</span>
+                        <span class="knob-recommended">${knob.recommended}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            const detailContent = document.getElementById('detailContent');
+            detailContent.innerHTML = `
+                <!-- Top section - 1 and 2 form a whole -->
+                <div class="top-section">
+                    <!-- 1. Trigger Status -->
+                    <div class="detail-section top-layout">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <circle cx="24" cy="24" r="16"/>
+                                <path d="M16 22h16M16 26h12M16 30h16"/>
+                            </svg>
+                            Trigger Status
+                        </div>
+                        <div class="detail-card">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                                ${detail.triggeredRules.map(rule => `
+                                    <div style="background: #f7f8fa; padding: 16px; border-radius: 6px;">
+                                        <div style="font-size: 12px; color: #86909c; margin-bottom: 8px;">${rule.name}</div>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                            <div>
+                                                <div style="font-size: 11px; color: #86909c;">Monitor Field</div>
+                                                <div style="font-size: 14px; font-weight: 600; color: #282f38;">${rule.field}</div>
+                                            </div>
+                                            <div>
+                                                <div style="font-size: 11px; color: #86909c;">Period</div>
+                                                <div style="font-size: 14px; font-weight: 600; color: #282f38;">${rule.period}</div>
+                                            </div>
+                                            <div>
+                                                <div style="font-size: 11px; color: #86909c;">Threshold</div>
+                                                <div style="font-size: 14px; font-weight: 600; color: #282f38;">${rule.threshold}</div>
+                                            </div>
+                                            <div>
+                                                <div style="font-size: 11px; color: #86909c;">Actual Value</div>
+                                                <div style="font-size: 14px; font-weight: 700; color: #ee4d38;">${rule.actual}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Middle section - two-column layout -->
+                <div class="middle-section">
+                    <!-- Left: 3 and 4 form a whole, 3 on top 4 below -->
+                    <div class="detail-section">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M24 8v32M8 24h32"/>
+                                <rect x="14" y="14" width="20" height="20" rx="2" fill="none" stroke="currentColor" stroke-width="3"/>
+                                <path d="M14 24h20M24 14v20"/>
+                            </svg>
+                            Differential Profiling Analysis
+                        </div>
+                        <div class="detail-card scrollable">
+                            <div class="differential-profiling-container">
+                                ${differentialProfilingHtml}
+                            </div>
+                        </div>
+                        <div class="detail-title" style="border-top: 1px solid #e5e6eb;">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M24 8v32M8 24h32"/>
+                                <circle cx="24" cy="24" r="4"/>
+                            </svg>
+                            SHAP Model Analysis Results
+                        </div>
+                        <div class="detail-card scrollable shap-analysis">
+                            ${shapHtml}
+                        </div>
+                    </div>
+
+                    <!-- Right: 5 and 6 form a whole, 5 on top 6 below -->
+                    <div class="detail-section">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <circle cx="24" cy="24" r="16"/>
+                                <path d="M18 20l6 4 6-4M18 28l6 4 6-4"/>
+                            </svg>
+                            Function Analysis
+                        </div>
+                        <div class="detail-card scrollable">
+                            <div class="function-list">
+                                ${hotFunctionsHtml}
+                            </div>
+                        </div>
+                        <div class="detail-title detail-title-with-button" style="border-top: 1px solid #e5e6eb;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Root-Cause Explaination
+                            </div>
+                            <button class="kb-button" onclick="showKnowledgeBaseModal()">Related Knowledge Base</button>
+                        </div>
+                        <div class="detail-card scrollable explanation-analysis">
+                            <div style="padding: 16px; color: #282f38; line-height: 1.8; font-size: 14px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;">By tracing the call frequency of log_buffer_flush_to_disk() function, we observe that this function is frequently triggered, indicating that the redo log buffer capacity is insufficient to hold the log data generated by the current workload. When the redo log buffer overflows, the system is forced to frequently flush the log buffer contents to disk, causing a sharp increase in disk I/O operations, which then becomes the main bottleneck of system throughput. Based on the above root cause analysis, by increasing the innodb_log_buffer_size parameter to expand the redo log buffer capacity, we can effectively reduce the overflow frequency of the log buffer, thereby reducing the frequency of disk flush operations.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom section - Tuning Results (full width, compact layout) -->
+                <div class="bottom-section">
+                    <div class="detail-section top-layout">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M12 24h24M24 12v24"/>
+                                <rect x="6" y="6" width="36" height="36" rx="4"/>
+                            </svg>
+                            Tuning Results
+                        </div>
+                        <div class="detail-card">
+                            <div class="tuning-result-compact">
+                                <!-- Knobs to Tune -->
+                                <div class="tuning-section green-background">
+                                    <div class="tuning-section-title">Tuning Actions</div>
+                                    <div class="knob-list" style="gap: 8px;">
+                                        ${knobsHtml}
+                                    </div>
+                                </div>
+
+                                <!-- Before Tuning -->
+                                <div class="tuning-section">
+                                    <div class="tuning-section-title">Before Tuning</div>
+                                    <div class="tuning-metrics">
+                                        <div class="tuning-metric-row">
+                                            <span class="tuning-metric-name">CPU Usage</span>
+                                            <span class="tuning-metric-value highlight">${detail.costModelPrediction.beforeTuning.cpu_usage}%</span>
+                                        </div>
+                                        <div class="tuning-metric-row">
+                                            <span class="tuning-metric-name">IO Wait Time</span>
+                                            <span class="tuning-metric-value highlight">${detail.costModelPrediction.beforeTuning.io_wait}</span>
+                                        </div>
+                                        <div class="tuning-metric-row">
+                                            <span class="tuning-metric-name">TPS</span>
+                                            <span class="tuning-metric-value highlight">${detail.costModelPrediction.beforeTuning.tps}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- After Tuning -->
+                                <div class="tuning-section">
+                                    <div class="tuning-section-title">After Tuning</div>
+                                    <div class="tuning-metrics">
+                                        <div class="tuning-metric-row">
+                                            <span class="tuning-metric-name">CPU Usage</span>
+                                            <span class="tuning-metric-value success">${detail.costModelPrediction.afterTuning.cpu_usage}%</span>
+                                        </div>
+                                        <div class="tuning-metric-row">
+                                            <span class="tuning-metric-name">IO Wait Time</span>
+                                            <span class="tuning-metric-value success">${detail.costModelPrediction.afterTuning.io_wait}</span>
+                                        </div>
+                                        <div class="tuning-metric-row">
+                                            <span class="tuning-metric-name">TPS</span>
+                                            <span class="tuning-metric-value success">${detail.costModelPrediction.afterTuning.tps}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function init() {
+            const params = getUrlParams();
+            const alert = alertData.find(a => a.id === params.id);
+            
+            if (alert && alert.detailAnalysis) {
+                renderDetail(alert);
+            } else {
+                document.getElementById('detailContent').innerHTML = `
+                    <div style="text-align: center; padding: 80px; color: #86909c;">
+                        <div style="font-size: 18px; margin-bottom: 8px;">Alert details not found</div>
+                        <div style="font-size: 14px;">Please return to the alert list and reselect</div>
+                    </div>
+                `;
+            }
+        }
+
+        init();
+
+        function showKnowledgeBaseModal() {
+            const overlay = document.getElementById('kbModalOverlay');
+            overlay.classList.add('show');
+        }
+
+        function hideKnowledgeBaseModal() {
+            const overlay = document.getElementById('kbModalOverlay');
+            overlay.classList.remove('show');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlay = document.getElementById('kbModalOverlay');
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    hideKnowledgeBaseModal();
+                }
+            });
+        });
+    </script>
+
+    <!-- Knowledge Base Modal -->
+    <div id="kbModalOverlay" class="kb-modal-overlay">
+        <div class="kb-modal">
+            <div class="kb-modal-header">
+                <div class="kb-modal-title">Related Knowledge Base</div>
+                <button class="kb-modal-close" onclick="hideKnowledgeBaseModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="kb-modal-content">
+                <!-- Knowledge Base Sections -->
+                <div class="kb-section">
+                    <div class="kb-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        Maunal
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">Redo Log Buffer Working Principle</div>
+                        <div class="kb-item-desc">innodb_log_buffer_size controls the InnoDB redo log buffer size. The default value is 16MB. Increasing this value can reduce disk I/O, especially suitable for large transaction scenarios. When the buffer is full, it triggers the log_buffer_flush_to_disk() function to flush logs to disk.</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">Log Flush Trigger Conditions</div>
+                        <div class="kb-item-desc">log_buffer_flush_to_disk() is triggered when the log buffer is full, when a transaction commits, or during periodic flushes every second. Frequent calls indicate that insufficient buffer is a typical symptom of performance bottlenecks.</div>
+                    </div>
+                </div>
+
+                <!-- Historical Tuning Records -->
+                <div class="kb-section">
+                    <div class="kb-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12,6 12,12 16,14"/>
+                        </svg>
+                        Tuning-derived Knowledge
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">2026-03-20 Order System IO Optimization</div>
+                        <div class="kb-item-desc">Similar scenario: log_buffer_flush_to_disk() call frequency too high. Tuned innodb_log_buffer_size from 16MB to 64MB.</div>
+                        <div class="kb-item-meta">Effect: IO wait time reduced by 68%, QPS increased by 132%</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">2026-03-05 Analysis Platform Performance Tuning</div>
+                        <div class="kb-item-desc">Similar scenario: large transactions causing frequent flushes. Tuned innodb_log_buffer_size to 128MB, while also adjusting innodb_log_file_size.</div>
+                        <div class="kb-item-meta">Effect: flush count reduced by 75%, transaction average response time reduced by 52%</div>
+                    </div>
+                </div>
+
+                <!-- Code Source -->
+                <div class="kb-section">
+                    <div class="kb-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="4" width="16" height="16" rx="2"/>
+                            <path d="M8 10h8M8 14h6"/>
+                        </svg>
+                        Code Source
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">log_buffer_flush_to_disk()</div>
+                        <div class="kb-item-desc" style="font-family: monospace; font-size: 12px; background: #f5f7fa; padding: 12px; border-radius: 4px; white-space: pre-wrap;">static void log_buffer_flush_to_disk(bool flush) {
+  if (log_sys->buf_free > log_sys->buf_size / 2 || flush) {
+    log_write_up_to(log_sys->lsn, flush);
+  }
+}</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">log_write_up_to()</div>
+                        <div class="kb-item-desc" style="font-family: monospace; font-size: 12px; background: #f5f7fa; padding: 12px; border-radius: 4px; white-space: pre-wrap;">void log_write_up_to(lsn_t lsn, bool flush) {
+  while (log_sys->write_lsn < lsn) {
+    ulint len = log_sys->buf_free - log_sys->buf_next_to_write;
+    if (len > 0) {
+      fil_io(IO_WRITE, log_sys->file, log_sys->write_lsn, 
+             (byte*)log_sys->buf + log_sys->buf_next_to_write, len);
+      log_sys->write_lsn += len;
+      log_sys->buf_next_to_write += len;
+    }
+  }
+  if (flush) {
+    fil_flush(log_sys->file);
+  }
+}</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">innobase_commit()</div>
+                        <div class="kb-item-desc" style="font-family: monospace; font-size: 12px; background: #f5f7fa; padding: 12px; border-radius: 4px; white-space: pre-wrap;">int innobase_commit(THD* thd, bool all) {
+  trx_t* trx = thd_to_trx(thd);
+  trx_commit_for_mysql(trx);
+  if (all) {
+    trx_start_if_not_started(trx);
+  }
+  return 0;
+}</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">trx_commit_complete_for_mysql()</div>
+                        <div class="kb-item-desc" style="font-family: monospace; font-size: 12px; background: #f5f7fa; padding: 12px; border-radius: 4px; white-space: pre-wrap;">void trx_commit_complete_for_mysql(trx_t* trx) {
+  if (trx->flush_log_later) {
+    log_buffer_flush_to_disk(true);
+  }
+  trx->flush_log_later = false;
+}</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">fil_flush()</div>
+                        <div class="kb-item-desc" style="font-family: monospace; font-size: 12px; background: #f5f7fa; padding: 12px; border-radius: 4px; white-space: pre-wrap;">void fil_flush(fil_node_t* node) {
+  if (node->type != FIL_NODE_FILE) {
+    return;
+  }
+  os_file_flush(node->handle);
+}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/legacy-runtime.js"></script>
+    <script src="/static/legacy-pages.js"></script>
+</body>
+</html>

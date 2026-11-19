@@ -1,0 +1,154 @@
+SOURCE_KEY: file:review/pvldb-demo-review.txt
+SOURCE_TYPE: review
+SOURCE_TITLE: PVLDB Demo review for KeenInsight
+SOURCE_URI: Conference Management Toolkit - View review.pdf
+---
+[Page 1]
+2026/9/4 12:02Conference Management Toolkit - View review
+第1/5⻚https://cmt3.research.microsoft.com/PVLDBv19 _2026/Submission/Reviews/2715
+View Reviews
+Paper ID
+2715
+Paper Title
+KeenInsight: From Fine-Grained Signals to Reliable DBMS Self-Tuning via Code-Level
+Insights
+Track Name
+Demo
+Reviewer #1
+Questions
+1. Overall Rating
+Reject
+2. The architecture and functionalities of the tool/software are clearly
+articulated.
+Yes
+3. The demonstration scenario is clearly articulated
+No
+4. Please rate the potential degree of audience interaction of the demo
+scenario
+Low
+6. At most three strong points about the proposal. Please be precise; clearly
+explain the value and nature of the contribution.
+S1 – Relevant problem: Automatically tuning DBMS remains a challenging problem
+and most systems still fall short of providing a performance comparable to human
+DBAs.
+S2 – Interace: The video shows a modern interface that is well structured and
+concise.
+7. At most three weak points about the proposal. Please be precise here. The
+details can be in the relevant ﬁeld below.
+W1 – Complexity: The entire system is highly complex and presents many aspects
+that should rather be discussed in a research paper.
+
+[Page 2]
+2026/9/4 12:02Conference Management Toolkit - View review
+第2/5⻚https://cmt3.research.microsoft.com/PVLDBv19 _2026/Submission/Reviews/2715
+W2 – Interactivity: While the video shows a nice interface, it repeats exactly the use
+cases discussed in the authors' papers. It is no shown that users can, e.g., change
+a system knob and check if the system recognizes the knob.
+8. Elaborate on the above ﬁelds. Please number each point and provide as
+constructive feedback as possible.
+The authors present a very interesting, although highly complex system. The
+demonstration paper itself is very technical and hard to read as many concepts are
+not properly explained. The presented demo looks good but does not show real
+interactivity that users at the demo booth can expect.
+Given the current status of the proposal, the demonstration falls short in two
+demonstration aspects. First, the demonstrating does not show that the proposed
+system actually works as the entire demo appears to be a static HTML website. It is
+quite unreasonable, that a live demo would show exactly the same tuning decisions
+as the main paper. A live demonstration of a system where the user triggers a ﬂush-
+heavy situation (maybe a large data load) where KeenInsight then recognizes the
+problem and adapts, would be desirable for an interactive demo.
+Second, it is not clear how users will interact with the demo. While the demo looks
+very polished, there is no indication how users actually interact with the system, not
+just interacting with a static HTML page.
+The presented system appears to be extremely valuable for database researchers
+and administrators. However, in the current state of the proposal, I don't see this
+proposal to be a good ﬁt for an interactive VLDB demo session. If the system is
+capable as presented, a more sophisticated use case than a ﬂush log issue and a
+misplaced hash join would be very helpful. Both are typical issues that most DBAs
+would check ﬁrst.
+Minor:
+- several parts of the system are named "on the side", while they are on their own
+probably a full PVLDB research paper; it would help the paper to keep the demo
+and the presented use cases simpler (example: "A scoring model trained on
+historical data [6] predicts potential anomaly types (e.g., suboptimal query plans or
+poorly written queries), guiding subsequent tuning decisions.")
+- references: [4] misses authors
+
+[Page 3]
+2026/9/4 12:02Conference Management Toolkit - View review
+第3/5⻚https://cmt3.research.microsoft.com/PVLDBv19 _2026/Submission/Reviews/2715
+Reviewer #2
+Questions
+1. Overall Rating
+Weak Accept
+2. The architecture and functionalities of the tool/software are clearly
+articulated.
+Yes
+3. The demonstration scenario is clearly articulated
+Partially
+4. Please rate the potential degree of audience interaction of the demo
+scenario
+High
+6. At most three strong points about the proposal. Please be precise; clearly
+explain the value and nature of the contribution.
+S1. The paper addresses a relevant and practical problem and presents a solution
+with a rich set of features.
+S2. The monitoring approach is well designed and includes thoughtful mechanisms
+to balance observability and overhead, such as the dynamic probe set and adaptive
+message generation.
+7. At most three weak points about the proposal. Please be precise here. The
+details can be in the relevant ﬁeld below.
+W1. Some technical details remain unclear.
+W2. More information on the demonstration scenarios should be provided.
+W3. Several ﬁgures are diﬃcult to read, and examples from the text should be
+reﬂected more clearly.
+8. Elaborate on the above ﬁelds. Please number each point and provide as
+constructive feedback as possible.
+W1. It is not entirely clear how the diﬀerent knowledge-base components are
+integrated into the anomaly resolution process and how the various mentioned
+agents interact with each other. In particular, the transition from retrieved knowledge
+and code-level insights to concrete tuning actions remains abstract.
+W2. The paper provides little information about the workloads and database setups
+underlying the demonstration scenarios, making it a bit diﬃcult to assess the
+representativeness of the showcased tuning results.
+
+[Page 4]
+2026/9/4 12:02Conference Management Toolkit - View review
+第4/5⻚https://cmt3.research.microsoft.com/PVLDBv19 _2026/Submission/Reviews/2715
+W3. The text in all ﬁgures is too small. Also, the ﬁgures should be integrated more
+into the text. It is not really clear how the many components of the showed GUI
+impressions are to be interpreted.
+Reviewer #3
+Questions
+1. Overall Rating
+Weak Accept
+2. The architecture and functionalities of the tool/software are clearly
+articulated.
+Yes
+3. The demonstration scenario is clearly articulated
+Partially
+4. Please rate the potential degree of audience interaction of the demo
+scenario
+Medium
+6. At most three strong points about the proposal. Please be precise; clearly
+explain the value and nature of the contribution.
+S1. The premise of the demonstration is strong.
+S2. The supplementary video explains the demonstration scenario clearly.
+S3. The system overview is presented clearly and in detail.
+7. At most three weak points about the proposal. Please be precise here. The
+details can be in the relevant ﬁeld below.
+W1. A discussion on the demonstarion UI in the paper would be useful.
+W2. The discussion on the demonstration scenarios are too high level.
+8. Elaborate on the above ﬁelds. Please number each point and provide as
+constructive feedback as possible.
+D1. A discussion in the paper on how the users can interact with the demonstration
+UI would be very useful.
+D2. Do the authors plan on hosting the demo on a server making it more accessible
+
+[Page 5]
+2026/9/4 12:02Conference Management Toolkit - View review
+第5/5⻚https://cmt3.research.microsoft.com/PVLDBv19 _2026/Submission/Reviews/2715
+to the community?
+D3. The demonstration scemarios, as they are presetned in the paper, just shows
+the workﬂow of the framework. It would be useful to highlight a few interesting use-
+cases that the audience can play around with.

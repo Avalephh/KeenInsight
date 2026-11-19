@@ -1,0 +1,41 @@
+SOURCE_KEY: archive:paper:1intro0.tex
+SOURCE_TYPE: paper
+SOURCE_TITLE: 1intro0.tex
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!1intro0.tex
+---
+Modern database systems are increasingly complex, making timely diagnosis and resolution of performance anomalies a challenging task.
+% In practice, database administrators (DBAs) rely on manual troubleshooting, which is costly, hard to scale across a large number of database instances, and fails to respond to incidents in a timely manner.
+However, database administrators (DBAs) still rely on manual troubleshooting, which is costly, hard to scale, and often fails to respond to incidents in a timely manner.
+
+To alleviate this burden, many semi-automated database maintenance tools have been developed. However, these systems still face several significant challenges.
+\textbf{C1. Limited observability.}
+Many systems rely on coarse-grained metrics such as CPU utilization or throughput, making it difficult to accurately diagnose root causes~\cite{Prometheus}.
+In contrast, collecting fine-grained data (e.g., execution stacks~\cite{perf} or per-query statistics~\cite{pg_stat_statements}) incurs substantial overhead, potentially degrading the performance of the monitored system.
+\textbf{C2. Ineffective and non-adaptive diagnosis.}
+Most tools rely on heuristic rules or small-scale learned models. Heuristics often fail to reveal true root causes, while learned approaches~\cite{DBLP:journals/tkde/ZhouCLS22} are semantics-agnostic and require costly retraining or expensive trial-and-error, making them difficult to deploy in online settings.
+
+While some studies have investigated LLM-based database maintenance, they remain standalone and static.
+\textbf{C3. Isolated and semi-automatic optimization.}
+Existing approaches either target isolated tasks such as knob tuning~\cite{DBLP:journals/pvldb/LaoWLWZCCTW24} and query rewrite~\cite{DBLP:journals/pvldb/SunZLYFZ25}, or depend on user queries and provide recommendation-only outputs that require manual validation and deployment~\cite{DBLP:journals/corr/abs-2506-23322}, resulting in semi-automatic workflows.
+Moreover, they heavily rely on pre-trained knowledge or external documentation (e.g., via RAG), which limits their effectiveness in systems with sparse documentation or rapidly evolving workloads not covered by existing knowledge
+
+To address these challenges, we present \sys, an end-to-end LLM-empowered database maintenance system that supports online, closed-loop monitoring, anomaly detection, root cause identification, and automated resolution. \sys offers the following key features:
+\begin{itemize}[leftmargin=*]
+
+\item \textbf{Adaptive fine-grained monitoring based on eBPF (addressing C1).}
+% Instead of frequent metric sampling, \sys attaches eBPF probes to carefully selected key database functions, which triggers metric collection only upon predefined events, enabling lightweight and lossless monitoring.
+% It identifies critical functions for instrumentation and construct SQL-level metrics from raw eBPF data. Furthermore, an adaptive attachment strategy is employed to dynamically control probe activation, thereby reducing runtime overhead.
+\sys enables low-overhead, fine-grained monitoring via eBPF (extended Berkeley Packet Filter), a lightweight in-kernel framework for event-driven tracing.
+To mitigate the overhead of naive, always-on probing, it adaptively attaches probes and employs anomaly-aware message aggregation to reduce overhead while preserving anomaly-critical signals.
+The collected signals are unified into SQL-level metrics, providing execution-aware observability across the query lifecycle.
+
+\item \textbf{Hierarchical rule–model fusion for anomaly diagnosis (addressing C2).}
+Based on streamed runtime metrics, \sys performs anomaly detection in a coarse-to-fine manner across both system and SQL levels. Lightweight checks first identify abnormal signals, which then trigger a diagnosis agent that integrates model-driven reasoning with DBA-defined rules to enable accurate and interpretable root cause identification.
+
+% \item \textbf{A self-evolving dual-path optimization framework (addressing C3).}
+\item\textbf{End-to-end reliable optimization with multi-source knowledge (addressing C3)}
+\sys unifies diverse tuning tasks within a single framework, where tuning agents are triggered to perform optimization actions and coordinated with a validation module to automatically generate, verify, and deploy configurations.
+It integrates multi-source knowledge, including documentation, code-derived insights from DBMS source code, and evolving experience distilled from historical tuning.
+
+% Given the identified root cause, a resolution agent performs system-level tuning via configuration adjustments or SQL-level optimization via query rewriting, hint injection, and index selection. Beyond static knowledge retrieval, it reflects on tuning feedback, clusters similar experiences, and quantifies their confidence, enabling reliable and continuously improving optimization.
+\end{itemize}

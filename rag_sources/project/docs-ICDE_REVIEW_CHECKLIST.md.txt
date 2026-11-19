@@ -1,0 +1,219 @@
+SOURCE_KEY: project:docs/ICDE_REVIEW_CHECKLIST.md
+SOURCE_TYPE: design
+SOURCE_TITLE: docs/ICDE_REVIEW_CHECKLIST.md
+SOURCE_URI: project://docs/ICDE_REVIEW_CHECKLIST.md
+---
+# ICDE reviewer checklist
+
+This checklist is written for a reviewer who wants to challenge the live
+artifact rather than inspect a pre-rendered screenshot. Every answer below
+points to a source file, API response, or raw artifact.
+
+## Contribution and implementation
+
+**What is actually implemented?** The system is a live PostgreSQL port of the
+paper architecture: BCC eBPF event collection, adaptive Lasso probe selection,
+Kafka/outbox delivery, SQL lifecycle reconstruction, rule/model diagnosis,
+XGBoost/TreeSHAP analysis, LLVM source evidence, retrieval-grounded typed
+tuning, query hints/rewrites, measured feedback, and RAG/experience closure.
+See `docs/ICDE_CLAIM_AUDIT.md` for the full matrix.
+
+**Is the dashboard interactive?** Yes. The supplied English.zip visual shell is
+served under `/static/legacy/` and its live adapter clears the illustrative
+fixture output before loading persisted API data. Host metadata, real-time
+charts, alerts, SQL logs, rule switches, source locators, knowledge entries,
+and detail dialogs call the service. The `/console` view exposes workload
+buttons, eBPF start/stop/adapt, plan explanation, diagnosis, action
+proposal/apply/rollback, feedback, RAG sync/search, and export; those controls
+also render returned records. Timing values are never supplied by the browser.
+
+**Is tuning autonomous?** Both execution modes are implemented. The normal
+UI path requires a human to review and apply a persistent typed action. The
+opt-in `POST /api/workload-runs/{id}/auto-resolve` path executes the complete
+server-side generate → rule/RAG/LLVM code-knowledge analysis → typed apply →
+same-SQL after measurement → feedback → rollback loop. It accepts only a
+completed baseline run ID and reuses that run's SQL and parameters; retrieved
+or LLM text is never executed as SQL. `rollback_after_success=true` makes the
+automatic validation run self-cleaning while preserving the audit trail.
+
+## Observability and model questions
+
+**Can the eBPF path be verified?** Run:
+
+```bash
+python scripts/ebpf_strict_smoke.py
+python scripts/ebpf_auto_adapt_smoke.py
+python scripts/ebpf_long_query_smoke.py
+```
+
+The checked-in run captured 208,611 real invocations, zero lost perf records,
+exact SQL-lifecycle event-count reconstruction, and Kafka delivery. The
+online adaptive artifact additionally shows a real over-budget
+`BufFileWrite` probe being detached while the mandatory `vfs_write` signal is
+retained. The long-query artifact uses a real `SELECT pg_sleep(3.0), 1` and
+records immediate-emission reasons.
+`/api/ebpf/events`, `/api/ebpf/timelines`, and the `probe_sessions`/
+`ebpf_events` tables expose the raw rows.
+
+**Is it really low overhead?** Not for every probe set. Directly attaching the
+high-frequency `BufFileWrite` probe produced 4,520.49% median overhead in the
+controlled local comparison. The adaptive Lasso plus measured event-rate
+budget rejected it; the adaptive arm measured 9.63% median and 10.88% p95
+overhead with identical results and plan signal. Both numbers are retained in
+`artifacts/ebpf-overhead-strict.json`. This is a stronger and more honest
+demonstration of adaptive monitoring than silently reporting only the cheap
+probe set.
+
+**Is event batching lossy?** Normal calls are aggregated in the kernel with an
+exact invocation count, total/max duration, and total bytes. Long/large
+events are emitted immediately. The smoke artifact checks that materialized
+lifecycle counts equal the monitor's event count and reports the perf-buffer
+lost count separately.
+
+**Are model metrics based on fabricated labels?** No. The latency target is
+the measured median from completed workload runs; root-cause labels are the
+observed workload scenario; function targets are measured latencies matched by
+probe/workload timestamps. The latest clean pre-execution models are run 21
+(371/93 temporal split, RMSE 2.81 ms, R² 0.99988) and run 22 (six-class root
+cause, accuracy 1.0). Runs overlapping eBPF sessions are excluded from these
+models to prevent observer overhead leakage; they remain available to the
+function model.
+
+**Is SHAP real?** The service loads the persisted XGBoost model and calls
+`shap.TreeExplainer`; each attribution row stores feature value, contribution,
+base value, model run and prediction ID. Differential profiling additionally
+persists function-level TreeSHAP rows for real eBPF event vectors.
+
+**Is the LLVM result real source analysis?** `app/llvm_analysis.py` invokes
+clang on the PostgreSQL 12.22 C files, parses compiler-emitted CFG edges,
+local SSA def-use/global-to-SSA paths, symbols/call edges, and stores compiler
+version, source digest, command, file and line. Runtime hotspots trigger a
+demand-driven bounded cross-translation-unit pass. The separate
+`/api/source-analysis/knowledge` endpoint reads the exact source snippets,
+groups compiler support into an experiment-required hypothesis, and persists
+it. `artifacts/code-knowledge-strict.json` and the automatic-resolution
+artifact show retrieval and measured validation. The analyzed frontier is
+explicit; the implementation does not claim a universal whole-program proof
+for arbitrary builds.
+
+## Causality and tuning questions
+
+**Could the performance gain be hand-crafted?** The workload runner executes
+the same SQL before and after a typed action. Feedback requires identical
+parameters, complete equal results, a verified plan signal, and at least five
+percent improvement in both median and p95. The proposal is derived from the
+observed plan/settings; it does not contain expected timing values. The
+PostgreSQL 12 repeated artifact has 15/15 effective latency comparisons and
+rollback checks. The A/A control applies no action and passes plan/result
+equality.
+
+**What non-index cases demonstrate system capability?** Hash join spill,
+grouped aggregate spill, window sort spill, parallel-worker underprovisioning,
+real lock contention, stale statistics, and the operator-aware system tuning
+path. Index creation is kept as a secondary comparison, and index removal is
+proposal-only until reviewed.
+
+**What does system tuning prove?** A real differential profile maps measured
+hotspots to PostgreSQL `work_mem`/parallel source evidence, proposes typed
+database actions, and records the result. The manual path remains reviewed;
+the automatic path was exercised by `artifacts/auto-resolve-strict.json`:
+action 185 was applied to the observed hash-spill path, accepted by strict
+feedback, code knowledge was validated by the targeted experiment, and the
+default was restored. Source paths and workload context are in the action
+validation record.
+
+**What does query optimization prove?** `optimizer_strict_smoke.py` measures
+allowlisted session-local hints and a conservative `OR` → `IN` rewrite with
+read-only `EXPLAIN ANALYZE`, exact result-bag hashing, plan/cost evidence, and
+pairwise ranking. Index add/remove candidates cannot mutate the database as a
+side effect; a reviewed typed action is required.
+
+## Knowledge and RAG questions
+
+**What sources are indexed?** The supplied paper, review, legacy demo, PDF
+design assets, current implementation/UI/tests/deployment files, official
+PostgreSQL documentation, community DBA Q&A, runtime workload/action/
+feedback/incident/model/lifecycle/source/optimizer records, and measured
+experience entries. Each document has a stable key, digest, source type and
+locator.
+
+**Were the earlier GitHub branches checked?** Yes. The old WorkloadTune API
+contract is live through a real PostgreSQL compatibility adapter; the `dev`
+pgbench pipeline, `dream` SQL-agent prototype, and `db-replay` Go service are
+independent runtimes with explicit boundaries. See
+`docs/UPSTREAM_COMPATIBILITY_AUDIT.md`; a branch name or precomputed JSON is
+not treated as runtime evidence.
+
+**Is vector retrieval real?** Yes. `fastembed` BGE-small produces 384-value
+vectors stored in PostgreSQL; search computes cosine similarity and hybrid
+mode combines lexical and vector ranks. The fixed 20-question vector and
+hybrid reports are `artifacts/rag-vector-evaluation-strict.json` and
+`artifacts/rag-hybrid-evaluation-strict.json`. Exact-token gating protects the
+negative test from out-of-domain high-cosine matches.
+
+**Is an LLM required?** No. The OpenAI-compatible adapter is implemented for
+grounded RAG answers, incident/plan explanations, compiler-backed code
+summaries, and query candidates, but the local artifact runs deterministic
+extractive/rule/typed paths when no endpoint is configured. If an LLM is
+configured, each adapter receives a bounded evidence projection; generated
+summaries require source markers and candidates still pass the server
+allowlist, semantic check and measured ranking.
+
+**Can RAG apply a change?** RAG itself cannot apply a change: retrieval,
+optional generation, source analysis and experience mining are read-only. The
+explicit automatic endpoint is an orchestrator around the same server-side
+typed action handlers; it does not turn retrieved text into SQL. The manual
+mode requires explicit review/apply, while the opt-in automatic mode still
+validates the typed proposal, runs the same SQL, checks result/plan/latency,
+records feedback, and can roll back.
+
+## Deployment and validity questions
+
+**What are the environment limits?** Checked-in numerical results use
+PostgreSQL 12.22, 20,000 customers, 800,000 orders, 20 accounts and a
+50,000-row statistics probe. Compose targets PostgreSQL 16, but it is not
+validated on a host without Docker. eBPF additionally requires BCC, kernel
+tracing privileges and a process namespace exposing the PostgreSQL binary.
+
+**What happens if Kafka/eBPF/vector dependencies are unavailable?** Their
+status and error are returned explicitly. PostgreSQL collector/rule paths
+remain usable; the service never fabricates events or model results. Kafka
+uses an explicit database-fallback status only when no broker is configured.
+
+**Can rollback be trusted?** Settings restore the recorded database value.
+Index rollback checks the recorded OID and exact definition before dropping the
+created index. Statistics refresh is correctly marked one-way maintenance.
+`POST /api/demo/clean` releases demo lock sessions, rolls back workload-sourced
+actions, restores the isolated statistics fixture, and preserves evidence.
+
+**Is this production-secure?** No. The bundled service has no authentication
+or multi-tenant authorization and is for an isolated research artifact. A
+deployment needs authentication, separated monitoring/mutation roles, and
+restricted database privileges.
+
+## Reproduction entry points
+
+```bash
+python scripts/preflight.py --require-clean
+python scripts/ebpf_strict_smoke.py
+python scripts/ebpf_overhead_smoke.py
+python scripts/ebpf_auto_adapt_smoke.py
+python scripts/ebpf_long_query_smoke.py
+python scripts/code_knowledge_smoke.py
+python scripts/optimizer_strict_smoke.py
+python scripts/auto_resolve_smoke.py
+python scripts/aa_control.py --repetitions 7 --warmups 2 \
+--output artifacts/aa-control-results.json
+python scripts/repeat_experiment.py --runs 3 --repetitions 7 --warmups 2 \
+--output artifacts/final-regression-pg12.json
+python scripts/run_stats_case.py --repetitions 7 --warmups 2 \
+--output artifacts/stats-case.json
+python scripts/evaluate_rag.py --output artifacts/rag-evaluation.json
+python scripts/evaluate_rag.py --mode vector \
+--output artifacts/rag-vector-evaluation-strict.json
+python scripts/evaluate_rag.py --mode hybrid \
+--output artifacts/rag-hybrid-evaluation-strict.json
+```
+
+Use `GET /api/demo/manifest` for the current live capability counts and
+`GET /api/export?limit=1000` for the complete evidence handoff.

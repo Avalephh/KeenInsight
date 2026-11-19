@@ -1,0 +1,87 @@
+SOURCE_KEY: archive:pdf-text:system-4.pdf
+SOURCE_TYPE: supplemental-pdf
+SOURCE_TITLE: system-4.pdf
+SOURCE_URI: KeenInsight_VLDB_Demo.zip!system-4.pdf
+---
+[Page 1]
+Anomaly Resolution
+Multi-Source Knowledge Base
+Anomaly Diagnosis
+System Monitoring
+System
+Knob Tuning
+KernelSpace
+Incoming
+Query
+Kprobes
+TargetKnob
+Slow Query
+Prediction
+Historical
+Tuning Records
+SQL Lifecycle
+Reconstruction
+Optimization Suggestions :Apply a query hint todisable hash join andencourage nested loop joinwith index-based access
+Root case
+Windowed
+System
+Performance
+Summarization
+AgentAnalysis
+static analysis
+Diagnosis rules
+System Level
+SQL Level
+UserSpace
+Uprobes
+System Level
+SQL Level
+AdaptiveMessageGeneration
+1
+2 3
+DB Execution
+Functions
+Kernel Resource
+Functions
+DB Events
+Kernel Events
+Adaptive
+Prob Attachment
+Attach
+Attach
+Rule： log_buffer_flush_to_disk()call frequency is abnormally high
+ClusteringAnalysis
+Tuning
+Experience
+Data FLow Control FLowDB Source
+Code
+LLVMAnalysis
+Workload Pattern: High scanRoot Cause: Ineffective index usageAction: Add indexObserved Gain: Latency reduced by 37%
++
+Structured
+RepresentationManuals
+Cost
+Model
+CodeMaunalSys-LevelTuningExperience
+Knowledge Retrieval
+CodeMaunalSQL-LevelTuningExperience
+Knowledge Retrieval
+Cost
+Model
+Hotspot Function:log_buffer_flush_to_disk
+Related Knobs:innodb_log_buffer_sizeinnodb_log_file_size
+DataFlow & ControlFlow Analysis
+Syntax & Semantic
+Validation
+Code Retrieve
+Agent
+ProcessingPipelineCode
+Differential Profiling
+SHAP model
+Hotspot Detection :log_buffer_flush_to_disk
+Root case
+Multiclass Scoring Model
+SELECT /*+ NoHashJoin(o c) */o.order_id, c.customer_name, o.total_amount FROM orders o JOIN customers c ON o.customer_id =c.customer_id WHERE o.order_date BETWEEN XXX AND XXX;
+SQL Optimization
+Threshold
+Check

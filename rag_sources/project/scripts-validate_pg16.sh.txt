@@ -1,0 +1,48 @@
+SOURCE_KEY: project:scripts/validate_pg16.sh
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/validate_pg16.sh
+SOURCE_URI: project://scripts/validate_pg16.sh
+---
+#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v docker >/dev/null 2>&1; then
+echo "Docker Engine with Compose v2 is required for PostgreSQL 16 validation." >&2
+exit 2
+fi
+
+base_url="${KI_PG16_BASE_URL:-http://127.0.0.1:18000}"
+project="${KI_PG16_PROJECT:-keeninsight-pg16-validation}"
+output="${KI_PG16_OUTPUT:-artifacts/pg16-repeat-results.json}"
+export KI_DB_PORT="${KI_DB_PORT:-55432}"
+export KI_APP_PORT="${KI_APP_PORT:-18000}"
+
+cleanup() {
+docker compose -p "$project" down -v --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+
+docker compose -p "$project" up --build -d
+for attempt in $(seq 1 40); do
+if curl -fsS "$base_url/api/health" >/dev/null 2>&1; then
+break
+fi
+if [ "$attempt" = 40 ]; then
+echo "PostgreSQL 16 Compose service did not become healthy." >&2
+exit 1
+fi
+sleep 3
+done
+
+python3 scripts/preflight.py \
+--base-url "$base_url" \
+--database-url "postgresql://keeninsight:keeninsight@127.0.0.1:$KI_DB_PORT/keeninsight" \
+--expected-major 16 \
+--require-clean
+mkdir -p "$(dirname "$output")"
+python3 scripts/repeat_experiment.py \
+--base-url "$base_url" \
+--runs 3 \
+--repetitions 7 \
+--warmups 2 \
+--output "$output"

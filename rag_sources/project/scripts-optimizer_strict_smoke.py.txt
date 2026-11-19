@@ -1,0 +1,144 @@
+SOURCE_KEY: project:scripts/optimizer_strict_smoke.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/optimizer_strict_smoke.py
+SOURCE_URI: project://scripts/optimizer_strict_smoke.py
+---
+#!/usr/bin/env python3
+"""Exercise the evidence-grounded tuning agent against the live database."""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+BASE_URL = os.getenv("KI_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+OUTPUT = Path(os.getenv("KI_OPTIMIZER_ARTIFACT", "artifacts/optimizer-strict-smoke.json"))
+
+QUERIES = [
+{
+"name": "hash_join_hint",
+"query": "SELECT count(*) FROM keeninsight_demo.orders o JOIN keeninsight_demo.customers c ON c.customer_id = o.customer_id",
+},
+{
+"name": "provable_or_to_in_rewrite",
+"query": "SELECT order_id FROM keeninsight_demo.orders WHERE customer_id = 1 OR customer_id = 2 ORDER BY order_id",
+},
+{
+"name": "typed_index_proposal",
+"query": "SELECT order_id, customer_id FROM keeninsight_demo.orders WHERE customer_id = 1 LIMIT 20",
+},
+{
+"name": "aggregate_and_parallel_hints",
+"query": "SELECT customer_id, count(*)::bigint AS n FROM keeninsight_demo.orders GROUP BY customer_id ORDER BY customer_id",
+},
+]
+
+def request(path: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+data = None
+headers = {}
+if payload is not None:
+data = json.dumps(payload).encode("utf-8")
+headers["Content-Type"] = "application/json"
+req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
+try:
+with urllib.request.urlopen(req, timeout=180) as response:
+body = json.load(response)
+except urllib.error.HTTPError as exc:
+detail = exc.read().decode("utf-8", "replace")
+raise RuntimeError("%s %s -> HTTP %s: %s" % (method, path, exc.code, detail)) from exc
+if not isinstance(body, dict):
+raise RuntimeError("%s did not return a JSON object" % path)
+return body
+
+def candidate_summary(item: dict[str, Any]) -> dict[str, Any]:
+measurement = item.get("measurement") or {}
+return {
+"candidate_key": item.get("candidate_key"),
+"action_type": item.get("action_type"),
+"hints": item.get("hints"),
+"proposal": item.get("proposal"),
+"median_query_time_ms": measurement.get("median_query_time_ms"),
+"p95_query_time_ms": measurement.get("p95_query_time_ms"),
+"result_count": measurement.get("result_count"),
+"semantic_equivalent": (item.get("semantic_equivalence") or {}).get("equivalent"),
+"measurement_status": measurement.get("status"),
+}
+
+def main() -> None:
+started = time.time()
+reports = []
+proposal_check = None
+for item in QUERIES:
+result = request(
+"/api/optimizer/optimize",
+method="POST",
+payload={"query": item["query"], "repetitions": 3},
+)
+run = result.get("run") or {}
+candidates = result.get("candidates") or []
+report = {
+"name": item["name"],
+"run_id": run.get("id"),
+"status": run.get("status"),
+"selected_candidate": result.get("selected_candidate"),
+"ranking_methods": sorted(set(str(x.get("ranking_method")) for x in result.get("ranking") or [])),
+"candidate_count": len(candidates),
+"knowledge_count": len(result.get("knowledge") or []),
+"source_evidence_count": len(result.get("source_evidence") or []),
+"candidates": [candidate_summary(candidate) for candidate in candidates],
+}
+reports.append(report)
+if item["name"] == "typed_index_proposal":
+index_candidates = [x for x in candidates if x.get("action_type") == "index_selection"]
+if index_candidates:
+candidate_key = str(index_candidates[0]["candidate_key"])
+action = request(
+"/api/optimizer/runs/%s/propose-action" % run["id"],
+method="POST",
+payload={"candidate_key": candidate_key},
+)
+proposal_check = {
+"candidate_key": candidate_key,
+"action_id": action.get("id"),
+"action_status": action.get("status"),
+"action_type": action.get("action_type"),
+"provenance": action.get("provenance") or action.get("metadata"),
+}
+if action.get("id"):
+rejected = request("/api/actions/%s/reject" % action["id"], method="POST")
+proposal_check["rejected_status"] = rejected.get("status")
+artifact = {
+"format": "keeninsight-optimizer-strict-smoke-v1",
+"base_url": BASE_URL,
+"elapsed_seconds": round(time.time() - started, 3),
+"queries": reports,
+"index_proposal_review": proposal_check,
+"checks": {
+"all_runs_completed": all(x.get("status") == "completed" for x in reports),
+"all_runs_used_knowledge": all(x.get("knowledge_count", 0) > 0 for x in reports),
+"all_runs_used_source_evidence": all(x.get("source_evidence_count", 0) > 0 for x in reports),
+"at_least_one_verified_hint_or_rewrite": any(
+any(c.get("semantic_equivalent") is True for c in x.get("candidates") or []) for x in reports
+),
+"index_proposal_was_reviewed_then_rejected": bool(
+proposal_check and proposal_check.get("action_status") == "proposed" and proposal_check.get("rejected_status") == "rejected"
+),
+},
+}
+OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+OUTPUT.write_text(json.dumps(artifact, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+print(json.dumps(artifact["checks"], indent=2, ensure_ascii=False))
+for report in reports:
+print(report["name"], "run", report["run_id"], "selected", report["selected_candidate"], "candidates", report["candidate_count"], "ranking", report["ranking_methods"])
+print("Wrote optimizer smoke artifact to", OUTPUT)
+if not all(artifact["checks"].values()):
+raise SystemExit(2)
+
+if __name__ == "__main__":
+main()

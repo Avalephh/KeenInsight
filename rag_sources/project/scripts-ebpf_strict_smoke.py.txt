@@ -1,0 +1,114 @@
+SOURCE_KEY: project:scripts/ebpf_strict_smoke.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/ebpf_strict_smoke.py
+SOURCE_URI: project://scripts/ebpf_strict_smoke.py
+---
+#!/usr/bin/env python3
+"""Run a measured eBPF -> Kafka -> SQL-lifecycle smoke test.
+
+The workload is intentionally small enough for a repeatable smoke test, but
+uses a real low-work_mem hash join. No event counts, timings, or Kafka
+delivery values are synthesized; all values in the artifact come from the
+running API and PostgreSQL-backed lifecycle table.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+BASE_URL = os.getenv("KI_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+OUTPUT = Path(os.getenv("KI_EBPF_ARTIFACT", "artifacts/ebpf-smoke-strict.json"))
+
+def request(path: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+data = None
+headers = {}
+if payload is not None:
+data = json.dumps(payload).encode("utf-8")
+headers["Content-Type"] = "application/json"
+req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
+try:
+with urllib.request.urlopen(req, timeout=240) as response:
+body = json.load(response)
+except urllib.error.HTTPError as exc:
+detail = exc.read().decode("utf-8", "replace")
+raise RuntimeError(f"{method} {path} -> HTTP {exc.code}: {detail}") from exc
+if not isinstance(body, dict):
+raise RuntimeError(f"{path} did not return a JSON object")
+return body
+
+def main() -> None:
+started_at = time.time()
+status = request("/api/ebpf/status")
+if status.get("running"):
+request("/api/ebpf/stop", method="POST")
+
+monitor_start = request(
+"/api/ebpf/start",
+method="POST",
+payload={"functions": ["BufFileWrite", "PortalRun"], "target_pids": []},
+)
+workload = request(
+"/api/workloads/hash_join_spill/runs",
+method="POST",
+payload={
+"phase": "baseline",
+"repetitions": 3,
+"warmup_repetitions": 1,
+"parameters": {"baseline_work_mem": "64kB"},
+},
+)
+monitor_stop = request("/api/ebpf/stop", method="POST")
+session_id = int(monitor_stop.get("session_id") or monitor_start.get("session_id"))
+timeline = request(
+"/api/ebpf/timelines?" + urllib.parse.urlencode({"session_id": session_id, "limit": 2000})
+)
+kafka = request("/api/kafka/status")
+lifecycle = timeline.get("items") or []
+lifecycle_events = sum(int(row.get("event_count") or 0) for row in lifecycle)
+lifecycle_anomalies = sum(int(row.get("anomaly_count") or 0) for row in lifecycle)
+event_count = int(monitor_stop.get("event_count") or 0)
+lost_count = int(monitor_stop.get("lost_count") or 0)
+producer = kafka.get("producer") or {}
+artifact = {
+"format": "keeninsight-ebpf-strict-smoke-v1",
+"base_url": BASE_URL,
+"started_at": started_at,
+"finished_at": time.time(),
+"monitor_start": monitor_start,
+"workload": workload,
+"monitor_stop": monitor_stop,
+"timeline": {
+"session_id": session_id,
+"row_count": len(lifecycle),
+"event_count": lifecycle_events,
+"anomaly_count": lifecycle_anomalies,
+"items": lifecycle,
+},
+"kafka": kafka,
+"checks": {
+"session_stopped": monitor_stop.get("running") is False and not monitor_stop.get("last_error"),
+"real_events_observed": event_count > 0,
+"no_perf_buffer_loss": lost_count == 0,
+"lifecycle_reconstructs_all_events": lifecycle_events == event_count,
+"lifecycle_has_query_identity": any(row.get("query_id") for row in lifecycle),
+"kafka_transport_available": producer.get("available") is True,
+"kafka_delivery_not_failed": int(producer.get("failed") or 0) == 0,
+},
+}
+OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+OUTPUT.write_text(json.dumps(artifact, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
+print(json.dumps(artifact["checks"], indent=2, ensure_ascii=False))
+print("session", session_id, "run", workload.get("run_id"), "events", event_count, "lost", lost_count)
+print("Wrote eBPF smoke artifact to", OUTPUT)
+if not all(artifact["checks"].values()):
+raise SystemExit(2)
+
+if __name__ == "__main__":
+main()

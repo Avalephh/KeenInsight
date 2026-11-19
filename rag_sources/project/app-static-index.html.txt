@@ -1,0 +1,188 @@
+SOURCE_KEY: project:app/static/index.html
+SOURCE_TYPE: implementation
+SOURCE_TITLE: app/static/index.html
+SOURCE_URI: project://app/static/index.html
+---
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeenInsight PostgreSQL 智能运维</title>
+<link rel="stylesheet" href="/static/console.css?v=20260908-3">
+</head>
+<body>
+<div class="app-shell">
+<aside class="sidebar">
+<div class="brand">
+<div class="brand-mark">K</div>
+<div><div class="brand-name">KeenInsight</div><div class="brand-subtitle">PostgreSQL 控制面</div></div>
+</div>
+<nav class="nav" aria-label="主导航">
+<div class="nav-group-label">实时总览</div>
+<button class="nav-item active" data-view="overview">总览</button>
+<button class="nav-item" data-view="incidents">异常事件</button>
+<button class="nav-item" data-view="queries">查询证据</button>
+<div class="nav-group-label">调优闭环</div>
+<button class="nav-item" data-view="workloads">工作负载</button>
+<button class="nav-item" data-view="actions">调优操作</button>
+<button class="nav-item" data-view="knowledge">知识库</button>
+<div class="nav-group-label">深入分析</div>
+<button class="nav-item" data-view="rag">RAG 知识</button>
+<button class="nav-item" data-view="observability">eBPF 可观测性</button>
+<button class="nav-item" data-view="analysis">模型与 LLVM</button>
+<button class="nav-item" data-view="agent">调优智能体</button>
+<div class="nav-group-label">系统</div>
+<button class="nav-item" data-view="settings">PostgreSQL 设置</button>
+<button class="nav-item" data-view="audit">审计记录</button>
+</nav>
+<div class="sidebar-foot">
+<span class="status-dot" id="sidebarStatusDot"></span>
+<span id="sidebarStatus">正在连接…</span>
+</div>
+</aside>
+
+<main class="main-content">
+<header class="topbar">
+<div>
+<div class="eyebrow">证据驱动运维</div>
+<h1 id="pageTitle">PostgreSQL 总览</h1>
+</div>
+<div class="topbar-actions">
+<span class="last-updated" id="lastUpdated">尚未采集观测</span>
+<button class="button secondary" id="refreshButton">刷新</button>
+<label class="toggle-label"><input type="checkbox" id="autoRefresh" checked> 自动刷新</label>
+</div>
+</header>
+
+<section class="view active" id="view-overview">
+<div class="overview-hero">
+<div>
+<div class="eyebrow">实时 PostgreSQL 控制面</div>
+<h2>从发现异常到验证恢复</h2>
+<p>这里的指标、会话、锁、查询和异常都直接来自当前连接的 PostgreSQL。遇到异常时，可以从工作负载实验开始，沿着证据链完成诊断、调优和回滚。</p>
+<div class="overview-hero-actions"><button class="button primary" data-view-link="workloads">开始异常演练</button><button class="button secondary" data-view-link="observability">查看实时观测</button></div>
+</div>
+<div class="overview-hero-status"><span class="live-pulse" id="overviewLiveDot"></span><strong id="overviewLiveState">正在读取实例状态</strong><span id="overviewLiveDetail">等待最新观测</span></div>
+</div>
+<div class="notice" id="systemNotice">下方数据均来自 PostgreSQL，不使用模拟指标。</div>
+<div class="metric-grid" id="metricGrid"></div>
+<div class="two-column">
+<article class="card chart-card">
+<div class="card-heading"><div><h2>观测到的计数器速率</h2><p>根据连续的 pg_stat_database 快照计算。</p></div><span class="source-tag">实时快照</span></div>
+<canvas id="metricsCanvas" height="250"></canvas>
+<div class="chart-legend" id="chartLegend"></div>
+</article>
+<article class="card">
+<div class="card-heading"><div><h2>服务器信息</h2><p>来自被监控实例的连接元数据。</p></div></div>
+<div class="detail-list" id="serverDetails"><div class="empty">等待 PostgreSQL…</div></div>
+</article>
+</div>
+<article class="card">
+<div class="card-heading"><div><h2>活跃异常</h2><p>规则可配置；每一行都关联原始证据。</p></div><button class="text-button" data-view-link="incidents">查看全部</button></div>
+<div id="overviewIncidents"></div>
+</article>
+<div class="overview-live-grid">
+<article class="card"><div class="card-heading"><div><h2>实时会话</h2><p>来自 <code>pg_stat_activity</code>，自动排除当前控制台连接。</p></div><button class="text-button" data-view-link="observability">查看观测</button></div><div id="overviewActivity"></div></article>
+<article class="card"><div class="card-heading"><div><h2>锁等待</h2><p>只展示当前实例中未获授权的锁请求及阻塞者。</p></div><button class="text-button" data-view-link="incidents">查看异常</button></div><div id="overviewLocks"></div></article>
+<article class="card"><div class="card-heading"><div><h2>高耗时查询</h2><p>来自 <code>pg_stat_statements</code> 的累计实测统计。</p></div><button class="text-button" data-view-link="queries">查看查询</button></div><div id="overviewQueries"></div></article>
+</div>
+</section>
+
+<section class="view" id="view-incidents">
+<div class="section-intro"><div><div class="eyebrow">检测与诊断</div><h2>异常事件</h2><p>每个异常都由当前 PostgreSQL 观测生成，并保留对应证据。</p></div><div class="inline-controls"><select id="incidentStatusFilter"><option value="">全部状态</option><option value="active">活跃</option><option value="resolved">已解决</option><option value="ignored">已忽略</option></select><button class="button secondary" id="incidentRefresh">刷新</button></div></div>
+<article class="card"><div id="incidentTable"></div></article>
+<article class="card hidden" id="incidentDetailCard"><div class="card-heading"><div><h2 id="incidentDetailTitle">异常详情</h2><p id="incidentDetailSummary"></p></div><button class="text-button" id="closeIncidentDetail">关闭</button></div><div id="incidentDetail"></div></article>
+</section>
+
+<section class="view" id="view-queries">
+<div class="section-intro"><div><div class="eyebrow">数据库证据</div><h2>查询证据</h2><p>统计数据来自 <code>pg_stat_statements</code>；执行计划由已连接的 PostgreSQL 服务器返回。</p></div><button class="button secondary" id="queryRefresh">刷新</button></div>
+<article class="card"><div id="queryTable"></div></article>
+<article class="card">
+<div class="card-heading"><div><h2>查看只读查询执行计划</h2><p>普通 EXPLAIN 不执行查询；只有确认愿意运行 SELECT 时才勾选 ANALYZE。</p></div></div>
+<textarea id="explainQuery" class="query-input" spellcheck="false" placeholder="SELECT ..."></textarea>
+<div class="form-row"><label class="toggle-label"><input type="checkbox" id="explainAnalyze"> EXPLAIN ANALYZE（执行只读查询）</label><button class="button primary" id="explainButton">检查执行计划</button></div>
+<div id="explainResult" class="result-box hidden"></div>
+</article>
+</section>
+
+<section class="view" id="view-workloads">
+<div class="section-intro"><div><div class="eyebrow">可复现实验</div><h2>真实 PostgreSQL 工作负载</h2><p>这些场景会在 PostgreSQL 中产生真实压力，并展示实测执行计划与耗时。结果不会预填：先运行基线，再审核/应用类型化建议，运行调优后版本并记录实测对比。演示包含哈希连接溢出、分组聚合溢出、窗口排序溢出、并行工作进程不足、统计信息过期维护和真实锁竞争，也保留可选的索引案例。</p></div><div class="inline-controls"><label class="toggle-label">计时样本 <input id="workloadRepetitions" type="number" min="1" max="50" value="5" inputmode="numeric"></label><label class="toggle-label">预热次数 <input id="workloadWarmups" type="number" min="0" max="10" value="2" inputmode="numeric"></label><button class="button secondary" id="bootstrapButton">初始化/刷新演示数据</button><button class="button secondary" id="exportEvidenceButton">导出证据</button><button class="button danger" id="cleanDemoButton">清理演示状态</button></div></div>
+<div id="demoState" class="notice"></div>
+<article class="card guided-demo-card">
+<div class="card-heading"><div><div class="eyebrow">ICDE 演示流程</div><h2>证据到操作引导流程</h2><p>可以逐步查看审核流程，也可以由服务器执行同一套基于证据的自动“生成—验证—部署”闭环。</p></div><span class="source-tag">手动 + 自动</span></div>
+<div class="guided-quick-action"><div><strong>实时异常实验室</strong><p>运行真实 PostgreSQL 压力负载，由服务器分析实测执行计划，应用类型化调优操作，用相同 SQL 验证，记录反馈并恢复设置。</p></div><button class="button primary" id="guidedPressureAutoButton">产生压力并自动修复</button></div>
+<div class="form-row guided-selector"><label class="toggle-label">引导场景 <select id="guidedScenario"></select></label><span id="guidedDescription" class="tiny muted"></span><label class="toggle-label"><input id="guidedAutoRollback" type="checkbox" checked> 验证后恢复</label><button class="button small secondary" id="guidedAutoResolveButton" disabled>自动处理当前基线</button></div>
+<div id="guidedTimeline" class="guided-timeline"></div>
+<div id="guidedMessage" class="tiny muted"></div>
+</article>
+<div class="workload-grid" id="workloadGrid"></div>
+<article class="card hidden" id="workloadResultCard"><div id="workloadResult"></div></article>
+<article class="card"><div class="card-heading"><div><h2>最近的工作负载运行</h2><p>服务持久化保存的实际观测结果。</p></div><button class="button secondary" id="workloadRefresh">刷新</button></div><div id="workloadRuns"></div></article>
+</section>
+
+<section class="view" id="view-actions">
+<div class="section-intro"><div><div class="eyebrow">受控变更</div><h2>调优操作</h2><p>所有操作都由服务器进行类型检查和验证，浏览器不会提交可执行 SQL。</p></div><button class="button secondary" id="actionRefresh">刷新</button></div>
+<div class="warning-box"><strong>应用前请审核。</strong> 数据库级别的 <code>work_mem</code> 和 <code>max_parallel_workers_per_gather</code> 会影响新会话；创建索引使用 <code>CREATE INDEX CONCURRENTLY</code>；统计信息刷新使用经过校验的 <code>ANALYZE</code>。持久化设置和创建的索引可以回滚；ANALYZE 没有有意义的逆操作，因此记录为已完成的维护操作。</div>
+<article class="card"><div id="actionTable"></div></article>
+</section>
+
+<section class="view" id="view-knowledge">
+<div class="section-intro"><div><div class="eyebrow">来源追踪</div><h2>知识库</h2><p>每条记录都标明用于解释证据的 PostgreSQL 来源；实测工作负载反馈会按观测置信度和运行来源聚合。</p></div><button class="button secondary" id="knowledgeRefresh">刷新</button></div>
+<article class="card"><div id="knowledgeTable"></div></article>
+</section>
+
+<section class="view" id="view-rag">
+<div class="section-intro"><div><div class="eyebrow">有依据的研究助手</div><h2>RAG 知识</h2><p>搜索已收集的论文、评审意见、设计、实现和实时 PostgreSQL 证据；每个回答都会展示检索段落和来源标识。</p></div><div class="inline-controls"><button class="button secondary" id="ragSyncButton">同步证据</button><button class="button secondary" id="ragVectorSyncButton">同步向量</button><button class="button secondary" id="ragRefreshButton">刷新</button></div></div>
+<article class="card">
+<div class="card-heading"><div><h2>带引用提问</h2><p>未配置外部生成模型时，系统返回抽取式证据摘要，不凭空编造答案。</p></div><span class="source-tag">词法 + 向量 + 来源</span></div>
+<textarea id="ragQuery" class="query-input rag-query-input" spellcheck="false" placeholder="评审意见要求我们如何让演示更具交互性？"></textarea>
+<div class="form-row rag-controls"><label class="toggle-label">检索模式 <select id="ragMode"><option value="hybrid">混合 RRF</option><option value="vector">向量余弦相似度</option><option value="lexical">PostgreSQL 全文检索</option></select></label><label class="toggle-label">来源 <select id="ragSourceType"><option value="">全部已索引来源</option></select></label><label class="toggle-label">结果数量 <input id="ragTopK" type="number" min="1" max="10" value="5"></label><button class="button primary" id="ragAskButton">提问</button></div>
+<div id="ragAnswer" class="rag-answer hidden"></div>
+</article>
+<article class="card"><div class="card-heading"><div><h2>索引状态</h2><p>静态来源按内容哈希幂等导入；运行时证据由低频后台任务刷新。引用会显示 PDF 页码以及文本/代码的规范化行号。</p></div></div><div id="ragStatus"></div></article>
+<article class="card"><div class="card-heading"><div><h2>检索到的段落</h2><p>这里展示实际提供给答案生成器的原始文本块。</p></div></div><div id="ragResults"></div></article>
+</section>
+
+<section class="view" id="view-observability">
+<div class="section-intro"><div><div class="eyebrow">论文中的可观测路径</div><h2>eBPF 与 Kafka 可观测性</h2><p>监控器会为 PostgreSQL 挂载真实的内核/用户态探针，刷新工作负载进程 ID，关联 SQL 生命周期，并通过配置的 Kafka 主题发送异常或周期事件。</p></div><div class="inline-controls"><label class="toggle-label"><input id="ebpfOnlineGuard" type="checkbox" checked> 在线速率保护</label><button class="button secondary" id="observabilityRefresh">刷新</button><button class="button primary" id="ebpfStartButton">启动探针</button><button class="button danger" id="ebpfStopButton">停止探针</button></div></div>
+<div class="two-column">
+<article class="card"><div class="card-heading"><div><h2>传输状态</h2><p>不可用服务会明确显示；任何回退通道都不会被标记为 Kafka。</p></div></div><div id="kafkaStatusPanel"></div></article>
+<article class="card"><div class="card-heading"><div><h2>自适应探针集合</h2><p>根据与真实工作负载耗时匹配的已停止探针会话，训练 StandardScaler + Lasso。</p></div><button class="button small secondary" id="ebpfAdaptButton">根据证据自适应</button></div><div id="ebpfStatusPanel"></div><div id="probeSelectionPanel" class="result-box hidden"></div></article>
+</div>
+<article class="card"><div class="card-heading"><div><h2>最近的函数事件</h2><p>原始事件行保留进程 ID、查询指纹/文本、函数、耗时、字节数、异常标记和传输方式。</p></div><button class="button secondary" id="ebpfEventsRefresh">刷新事件</button></div><div id="ebpfEventsTable"></div></article>
+<article class="card"><div class="card-heading"><div><h2>重建的 SQL 生命周期</h2><p>根据所选 eBPF 会话按查询 ID/时间区间聚合，并保留每个函数片段使用的源事件 ID。</p></div></div><div id="sqlLifecyclePanel"></div></article>
+</section>
+
+<section class="view" id="view-analysis">
+<div class="section-intro"><div><div class="eyebrow">学习与源码证据分析</div><h2>模型、SHAP、差分分析与 LLVM</h2><p>训练只读取已持久化的工作负载观测。预测使用执行前的普通 PostgreSQL 计划；SHAP 和 eBPF 差分画像展示结果背后的证据。</p></div><button class="button secondary" id="analysisRefresh">刷新</button></div>
+<div class="two-column">
+<article class="card"><div class="card-heading"><div><h2>模型注册表</h2><p>XGBoost 模型与时间留出评估指标。</p></div><div class="inline-controls"><button class="button small secondary" id="trainLatencyButton">训练耗时模型</button><button class="button small secondary" id="trainRootCauseButton">训练根因模型</button></div></div><div id="modelStatusPanel"></div></article>
+<article class="card"><div class="card-heading"><div><h2>LLVM 源码传播</h2><p>由 Clang 生成 CFG/SSA 中间表示、源码定位信息，以及来自 PostgreSQL 源码树的有依据代码假设。</p></div><div class="inline-controls"><button class="button small secondary" id="runSourceAnalysisButton">运行分析</button><button class="button small secondary" id="retrieveCodeKnowledgeButton">检索代码知识</button></div></div><div id="sourceStatusPanel"></div><div id="codeKnowledgePanel" class="result-box hidden"></div></article>
+</div>
+<article class="card"><div class="card-heading"><div><h2>仅基于计划的预测与 TreeSHAP</h2><p>请输入只读查询。模型不允许使用执行后的溢出计数器。</p></div></div><textarea id="modelQuery" class="query-input" spellcheck="false" placeholder="SELECT count(*) FROM keeninsight_demo.orders"></textarea><div class="form-row"><label class="toggle-label">模型 <select id="modelType"><option value="latency_prediction">耗时预测</option><option value="root_cause">根因分析</option></select></label><button class="button primary" id="modelPredictButton">预测并解释</button></div><div id="modelPredictionPanel" class="result-box hidden"></div></article>
+<article class="card"><div class="card-heading"><div><h2>差分画像</h2><p>根据函数事件向量和函数级 TreeSHAP 对比两个已完成的 eBPF 会话；系统调优按钮会通过 LLVM 源码证据，将实测热点映射为待审核的设置操作。</p></div><button class="button secondary" id="differentialRefresh">刷新画像</button></div><div id="differentialPanel"></div><div id="systemTuningPanel" class="result-box hidden"></div></article>
+</section>
+
+<section class="view" id="view-agent">
+<div class="section-intro"><div><div class="eyebrow">检索增强调优闭环</div><h2>查询调优智能体</h2><p>智能体检索证据，生成类型化的会话级提示或可证明范围很窄的改写，在 PostgreSQL 上实测每个候选，检查结果等价性，并按实测耗时/计划代价或学习到的成对模型排序。持久化索引建议必须经过明确审核。</p></div><button class="button secondary" id="agentRefresh">刷新历史</button></div>
+<article class="card"><div class="card-heading"><div><h2>优化只读查询</h2><p>候选执行有边界且为只读；生成的 SQL 不会自动应用。</p></div></div><textarea id="agentQuery" class="query-input" spellcheck="false" placeholder="SELECT count(*) FROM keeninsight_demo.orders o JOIN keeninsight_demo.customers c ON c.customer_id = o.customer_id"></textarea><div class="form-row"><label class="toggle-label">测量次数 <input id="agentRepetitions" type="number" min="1" max="7" value="3"></label><button class="button primary" id="agentOptimizeButton">运行调优智能体</button></div><div id="agentResultPanel" class="result-box hidden"></div></article>
+<div class="two-column"><article class="card"><div class="card-heading"><div><h2>最近的智能体运行</h2></div></div><div id="agentRunsPanel"></div></article><article class="card"><div class="card-heading"><div><h2>挖掘出的经验</h2><p>从实测调优反馈中进行 TF-IDF/KMeans 聚类。</p></div><button class="button small secondary" id="mineExperiencesButton">挖掘经验</button></div><div id="experiencePanel"></div></article></div>
+</section>
+
+<section class="view" id="view-settings">
+<div class="section-intro"><div><div class="eyebrow">服务器状态</div><h2>PostgreSQL 设置</h2><p>当前值和设置上下文来自 <code>pg_settings</code>。</p></div><div class="inline-controls"><input id="settingsSearch" placeholder="搜索设置名或描述"><button class="button secondary" id="settingsRefresh">刷新</button></div></div>
+<article class="card"><div id="settingsTable"></div></article>
+<article class="card"><div class="card-heading"><div><h2>告警规则</h2><p>阈值存储在 PostgreSQL 中，并在下一次完整观测周期应用。</p></div><button class="button secondary" id="rulesRefresh">刷新</button></div><div id="rulesTable"></div></article>
+</section>
+
+<section class="view" id="view-audit">
+<div class="section-intro"><div><div class="eyebrow">可追溯性</div><h2>审计记录</h2><p>操作建议、应用、失败和回滚都会记录在 PostgreSQL 中。</p></div><button class="button secondary" id="auditRefresh">刷新</button></div>
+<article class="card"><div id="auditTable"></div></article>
+</section>
+</main>
+</div>
+<div class="toast" id="toast" role="status"></div>
+<script src="/static/console.js?v=20260908-3"></script>
+</body>
+</html>

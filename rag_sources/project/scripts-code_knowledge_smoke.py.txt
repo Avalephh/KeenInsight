@@ -1,0 +1,96 @@
+SOURCE_KEY: project:scripts/code_knowledge_smoke.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: scripts/code_knowledge_smoke.py
+SOURCE_URI: project://scripts/code_knowledge_smoke.py
+---
+#!/usr/bin/env python3
+"""Verify compiler-backed code retrieval and grounded hypothesis generation."""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+BASE_URL = os.getenv("KI_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+OUTPUT = Path(
+os.getenv("KI_CODE_KNOWLEDGE_ARTIFACT", "artifacts/code-knowledge-strict.json")
+)
+
+def request(path: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+data = json.dumps(payload).encode("utf-8") if payload is not None else None
+headers = {"Content-Type": "application/json"} if payload is not None else {}
+req = urllib.request.Request(BASE_URL + path, data=data, headers=headers, method=method)
+try:
+with urllib.request.urlopen(req, timeout=180) as response:
+body = json.load(response)
+except urllib.error.HTTPError as exc:
+raise RuntimeError(
+f"{method} {path} -> HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')}"
+) from exc
+if not isinstance(body, dict):
+raise RuntimeError(f"{path} did not return a JSON object")
+return body
+
+def main() -> None:
+started = time.time()
+result = request(
+"/api/source-analysis/knowledge",
+method="POST",
+payload={
+"knobs": ["work_mem", "max_parallel_workers_per_gather"],
+"limit": 50,
+},
+)
+hypotheses = result.get("hypotheses") or []
+contexts = result.get("contexts") or []
+relation_types = {
+str(item.get("relation_type"))
+for item in contexts
+if item.get("relation_type")
+}
+records = result.get("records") or []
+checks = {
+"source_tree_is_reported": bool(result.get("source_root")),
+"real_source_context_retrieved": any(
+isinstance(item.get("source_context"), dict)
+and item["source_context"].get("text")
+for item in contexts
+),
+"compiler_flow_evidence_retrieved": bool(
+{"llvm_data_flow", "llvm_knob_propagation"} & relation_types
+),
+"hypothesis_is_grounded_and_requires_experiment": all(
+item.get("support", {}).get("compiler_backed_rows", 0) > 0
+and item.get("requires_targeted_experiment") is True
+for item in hypotheses
+)
+and bool(hypotheses),
+"knowledge_records_persisted": len(records) == len(hypotheses) and bool(records),
+}
+artifact = {
+"format": "keeninsight-code-knowledge-strict-v1",
+"base_url": BASE_URL,
+"started_at": started,
+"finished_at": time.time(),
+"result": result,
+"relation_types": sorted(relation_types),
+"checks": checks,
+}
+OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+OUTPUT.write_text(
+json.dumps(artifact, indent=2, ensure_ascii=False, default=str) + "\n",
+encoding="utf-8",
+)
+print(json.dumps(checks, indent=2, ensure_ascii=False))
+print("hypotheses", len(hypotheses), "contexts", len(contexts), "records", len(records))
+print("Wrote code-knowledge artifact to", OUTPUT)
+if not all(checks.values()):
+raise SystemExit(2)
+
+if __name__ == "__main__":
+main()

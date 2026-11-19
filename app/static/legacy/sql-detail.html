@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeenInsight - SQL Detail</title>
+    <style>
+        :root {
+            --primary-color: #3370ff;
+            --primary-color-hover: #6694ff;
+            --primary-color-light: #e8f3ff;
+            --primary-color-focus: #ccdbff;
+            --success-color: #0fbf60;
+            --success-color-light: #e8ffea;
+            --warning-color: #ff8b07;
+            --warning-color-light: #fff7e8;
+            --danger-color: #ee4d38;
+            --danger-color-light: #fff0f0;
+            --font-color: #282f38;
+            --ve-navbar-height: 48px;
+            --sidebar-width: 200px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            height: 100%;
+            font-family: Roboto, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+            line-height: 1.6;
+            background: #f7f8fa;
+        }
+
+        #container {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部导航栏 */
+        #navbar {
+            height: var(--ve-navbar-height);
+            background: #fff;
+            border-bottom: 1px solid #e5e6eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 20px;
+            z-index: 1000;
+        }
+
+        .navbar-left {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            font-size: 16px;
+            color: var(--font-color);
+            cursor: pointer;
+        }
+
+        .logo svg {
+            margin-right: 8px;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .nav-link {
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link.active {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-action {
+            display: flex;
+            align-items: center;
+            color: #4e5969;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .nav-action svg {
+            margin-right: 6px;
+        }
+
+        /* 主内容区域 */
+        .main-wrapper {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 左侧导航栏 */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: #f7f8fa;
+            border-right: 1px solid #e5e6eb;
+            overflow-y: auto;
+            flex-shrink: 0;
+        }
+
+        .sidebar-inner {
+            padding: 16px 0;
+        }
+
+        .sidebar-header {
+            padding: 0 16px 16px;
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--font-color);
+        }
+
+        .sidebar-header svg {
+            margin-right: 8px;
+        }
+
+        .sidebar-menu {
+            padding: 0 8px;
+        }
+
+        .menu-group {
+            margin-bottom: 8px;
+        }
+
+        .menu-group-title {
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #86909c;
+            font-weight: 500;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+            margin: 2px 0;
+        }
+
+        .menu-item:hover {
+            background: #e5e6eb;
+        }
+
+        .menu-item.active {
+            background: var(--primary-color);
+            color: #fff;
+        }
+
+        .menu-item svg {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+        }
+
+        /* 内容区域 */
+        .content-area {
+            flex: 1;
+            background: #f7f8fa;
+            overflow: auto;
+        }
+
+        .content-inner {
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .page-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .page-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: #fff;
+            border: 1px solid #e5e6eb;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #4e5969;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #f7f8fa;
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* 详情页面样式 */
+        .detail-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 顶部区域 - 1和2组成一个整体（全宽） */
+        .top-section {
+            width: 100%;
+        }
+
+        /* 中间区域 - 两栏布局 */
+        .middle-section {
+            display: grid;
+            grid-template-columns: 3fr 7fr;
+            gap: 20px;
+        }
+        .middle-section > .detail-section {
+            box-sizing: border-box;
+        }
+
+        /* 底部区域 - 性能对比（全宽） */
+        .bottom-section {
+            width: 100%;
+        }
+
+        /* 详情卡片样式 */
+        .detail-section {
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+
+        /* 顶部区域（1和2）的特殊样式 - 标题和内容在一行 */
+        .detail-section.top-layout {
+            display: grid;
+            grid-template-columns: 180px 1fr;
+            align-items: center;
+        }
+
+        .detail-section.top-layout .detail-title {
+            border-bottom: none;
+            border-right: 1px solid #e5e6eb;
+            padding: 16px 20px;
+            min-height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .detail-section.top-layout .detail-card {
+            border-bottom: none;
+        }
+
+        .detail-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--font-color);
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .detail-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-color);
+        }
+
+        .detail-card {
+            padding: 12px 20px;
+        }
+
+        .detail-card.scrollable {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        /* 信息网格 - 3列（SQL基本信息） */
+        .info-grid-3col {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        /* 信息网格 - 4列（其他） */
+        .info-grid-4col {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+            text-align: center;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: #86909c;
+        }
+
+        .info-value {
+            font-size: 16px;
+            color: var(--font-color);
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .info-value.highlight {
+            color: var(--danger-color);
+        }
+
+        /* SQL语句样式 */
+        .sql-statement {
+            background: #f7f8fa;
+            color: var(--font-color);
+            padding: 10px 14px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: nowrap;
+            max-width: 100%;
+        }
+
+        /* 匹配规则样式 */
+        .rule-match-item {
+            padding: 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .rule-match-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .rule-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .rule-principle {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        /* 分类模型预测结果样式 */
+        .root-causes-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .root-cause-item {
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+        }
+
+        .root-cause-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 6px;
+        }
+
+        .root-cause-confidence {
+            font-size: 13px;
+            color: #86909c;
+        }
+
+        .confidence-value {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        /* 详细解释样式 */
+        .detail-explanation {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.8;
+        }
+
+        /* 火焰图样式 */
+        .flame-graph {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            min-width: 800px;
+        }
+
+        .flame-level {
+            display: flex;
+            align-items: stretch;
+            margin-bottom: 4px;
+            width: 100%;
+        }
+
+        .flame-bar {
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            flex-shrink: 0;
+        }
+
+        .flame-bar:hover {
+            transform: scaleY(1.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        .flame-bar-text {
+            color: #1d2129;
+            font-weight: 500;
+            white-space: nowrap;
+            padding: 0 8px;
+            text-overflow: ellipsis;
+            overflow: hidden;
+            text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+        }
+
+        .flame-bar-tooltip {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1d2129;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+
+        .flame-bar-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #1d2129;
+        }
+
+        .flame-bar:hover .flame-bar-tooltip {
+            opacity: 1;
+        }
+
+        .flame-timeline {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            padding: 0 4px;
+            font-size: 11px;
+            color: #86909c;
+        }
+
+        /* 调优建议样式 */
+        .tuning-suggestion-item {
+            padding: 16px;
+            background: #f7f8fa;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .tuning-suggestion-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .suggestion-type {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+        }
+
+        .suggestion-action {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            margin-bottom: 8px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .suggestion-explanation {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        /* SQL生命周期样式 */
+        .lifecycle-stages {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .lifecycle-stage {
+            padding: 20px 12px;
+            background: #f7f8fa;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .lifecycle-name {
+            font-size: 12px;
+            color: #86909c;
+            margin-bottom: 6px;
+        }
+
+        .lifecycle-metrics {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .lifecycle-metric {
+            font-size: 11px;
+            color: #4e5969;
+        }
+
+        .lifecycle-metric strong {
+            color: var(--font-color);
+        }
+
+        /* 火焰图占位样式 */
+        .flame-graph-placeholder {
+            background: #f7f8fa;
+            padding: 24px;
+            border-radius: 6px;
+            text-align: center;
+            color: #86909c;
+        }
+
+        /* 知识库按钮 - 只有带按钮的标题才使用左右布局 */
+        .detail-title-with-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .kb-button {
+            padding: 6px 14px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .kb-button:hover {
+            background: var(--primary-color-hover);
+        }
+
+        /* 知识库弹窗 */
+        .kb-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .kb-modal-overlay.show {
+            display: flex;
+        }
+
+        .kb-modal {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .kb-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e6eb;
+        }
+
+        .kb-modal-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--font-color);
+        }
+
+        .kb-modal-close {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: #f7f8fa;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .kb-modal-close:hover {
+            background: #e5e6eb;
+        }
+
+        .kb-modal-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .kb-section {
+            margin-bottom: 24px;
+        }
+
+        .kb-section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .kb-section-title svg {
+            width: 18px;
+            height: 18px;
+            color: var(--primary-color);
+        }
+
+        .kb-item {
+            padding: 12px 16px;
+            background: #f7f8fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .kb-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .kb-item-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--font-color);
+            margin-bottom: 6px;
+        }
+
+        .kb-item-desc {
+            font-size: 13px;
+            color: #4e5969;
+            line-height: 1.6;
+        }
+
+        .kb-item-meta {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #86909c;
+        }
+
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- 顶部导航栏 -->
+        <header id="navbar">
+            <div class="navbar-left">
+                <div class="logo" onclick="location.href='host-list.html'">
+                    <svg width="24" height="24" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="16"/>
+                        <path d="M16 22h16M16 26h12M16 30h16"/>
+                    </svg>
+                    KeenInsight
+                </div>
+                <nav class="nav-links">
+                    <span class="nav-link">Performance Monitoring</span>
+                    <span class="nav-link">Security Audit</span>
+                    <span class="nav-link">Capacity Planning</span>
+                </nav>
+            </div>
+            <div class="navbar-right">
+                <span class="nav-action">
+                    <svg width="18" height="18" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="24" r="16"/>
+                        <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                    </svg>
+                    System Settings
+                </span>
+                <span class="nav-action">
+                    <svg width="18" height="18" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                        <circle cx="24" cy="18" r="8"/>
+                        <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                    </svg>
+                    admin
+                </span>
+            </div>
+        </header>
+
+        <!-- 主内容区域 -->
+        <div class="main-wrapper">
+            <!-- 左侧导航栏 -->
+            <aside class="sidebar">
+                <div class="sidebar-inner">
+                    <nav class="sidebar-menu">
+                        <div class="menu-group">
+                            <div class="menu-group-title">Overview</div>
+                            <div class="menu-item" onclick="location.href='host-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="10" width="32" height="28" rx="2"/>
+                                    <path d="M14 18h20M14 26h12"/>
+                                </svg>
+                                Clusters
+                            </div>
+                            <div class="menu-item" onclick="location.href='realtime-monitor.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14v10l7 7"/>
+                                </svg>
+                                Real-time Monitor
+                            </div>
+                            
+                            <div class="menu-group-title">System level</div>
+                            <div class="menu-item" onclick="location.href='alert-list.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="12" y="8" width="24" height="32" rx="2"/>
+                                    <path d="M18 16h12M18 24h12M18 32h12"/>
+                                </svg>
+                                Alert List
+                            </div>
+                            <div class="menu-item" onclick="location.href='alert-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M16 22h16M16 26h12M16 30h16"/>
+                                </svg>
+                                Alert Rules
+                            </div>
+                            
+                            <div class="menu-group-title">SQL level</div>
+                            <div class="menu-item" onclick="location.href='sql-log.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="8" width="32" height="32" rx="2"/>
+                                    <path d="M14 18h20M14 26h20M14 34h20"/>
+                                </svg>
+                                SQL Logs
+                            </div>
+                            <div class="menu-item" onclick="location.href='dba-rules.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="10" width="28" height="28" rx="2"/>
+                                    <path d="M16 20h16M16 28h16"/>
+                                </svg>
+                                Diagnosis Rules
+                            </div>
+                            
+                            <div class="menu-group-title">System Settings</div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                </svg>
+                                System Config
+                            </div>
+                            <div class="menu-item">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="18" r="8"/>
+                                    <path d="M8 42c0-8 7-14 16-14s16 6 16 14"/>
+                                </svg>
+                                User Management
+                            </div>
+                            
+                            <div class="menu-group-title">Knowledge Base</div>
+                            <div class="menu-item" onclick="location.href='manual.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="10" y="8" width="28" height="32" rx="2"/>
+                                    <path d="M16 16h16M16 22h16M16 28h12M16 34h8"/>
+                                </svg>
+                                Manual
+                            </div>
+                            <div class="menu-item" onclick="location.href='code-source.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <rect x="8" y="6" width="32" height="36" rx="2"/>
+                                    <path d="M14 14h20M14 20h20M14 26h20M14 32h16"/>
+                                </svg>
+                                Code Source
+                            </div>
+                            <div class="menu-item" onclick="location.href='tuning-knowledge.html'">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M24 14a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z"/>
+                                    <path d="M16 24h16M24 16v16"/>
+                                </svg>
+                                Tuning-derived Knowledge
+                            </div>
+                        </div>
+                    </nav>
+                </div>
+            </aside>
+
+            <!-- 内容区域 -->
+            <main class="content-area">
+                <div class="content-inner">
+                    <!-- 页面标题 -->
+                    <div class="page-header">
+                        <h1 class="page-title" id="pageTitle">SQL Detail</h1>
+                        <button class="back-btn" onclick="location.href='sql-log.html'">
+                            <svg width="16" height="16" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M28 12l-12 12 12 12"/>
+                            </svg>
+                            Back to List
+                        </button>
+                    </div>
+
+                    <!-- 详情内容 -->
+                    <div class="detail-layout" id="detailContent">
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const sqlLogData = [
+            {
+                id: 'a1b2c3d4e5f67890abcdef1234567890',
+                time: '2026-03-25 14:32:15.123',
+                sql: 'SELECT o.order_id, c.customer_name, o.total_amount \n FROM orders o \n JOIN customers c ON o.customer_id = c.customer_id \n WHERE o.order_date BETWEEN \'2023-01-01\' AND \'2023-12-31\';',
+                type: 'SELECT',
+                result: 'Executed successfully, returned query results',
+                lifecycle: {
+                    parsing: { time: 1, cpu: 3, memory: 8, io: 0 },
+                    optimization: { time: 5, cpu: 8, memory: 6, io: 0 },
+                    execution: { time: 18601, cpu: 99.9, memory: 78, io: 18 },
+                    network: { time: 15, cpu: 2, memory: 4, io: 10 }
+                },
+                flameGraph: {
+                    name: 'mysql_execute',
+                    value: 18622,
+                    children: [
+                        {
+                            name: 'mysql_parse',
+                            value: 2,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'mysql_execute_command',
+                            value: 25,
+                            color: '#8da0cb',
+                            children: [
+                                {
+                                    name: 'JOIN::optimize',
+                                    value: 15,
+                                    color: '#b3de69'
+                                },
+                                {
+                                    name: 'JOIN::make_join_plan',
+                                    value: 10,
+                                    color: '#fdb462'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'JOIN::exec',
+                            value: 18579,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'HashJoinIterator::Init',
+                                    value: 18579,
+                                    color: '#bebada',
+                                    children: [
+                                        {
+                                            name: 'HashJoinIterator::BuildHashTable',
+                                            value: 8200,
+                                            color: '#80b1d3',
+                                            children: [
+                                                {
+                                                    name: 'hash_join_buffer::StoreRowFromProbeIterator',
+                                                    value: 4200,
+                                                    color: '#8dd3c7',
+                                                    children: [
+                                                        {
+                                                            name: 'InnoDB::row_search_mvcc',
+                                                            value: 4200,
+                                                            color: '#ffffb3'
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            name: 'HashJoinIterator::WriteBuildTableToChunkFiles',
+                                            value: 10379,
+                                            color: '#fb8072',
+                                            children: [
+                                                {
+                                                    name: 'hash_join_buffer::WriteChunksToDisk',
+                                                    value: 6200,
+                                                    color: '#b3de69',
+                                                    children: [
+                                                        {
+                                                            name: 'my_b_write',
+                                                            value: 6200,
+                                                            color: '#fccde5'
+                                                        }
+                                                    ]
+                                                },
+                                                {
+                                                    name: 'HashJoinIterator::ReadRowFromChunkFiles',
+                                                    value: 4179,
+                                                    color: '#fdb462',
+                                                    children: [
+                                                        {
+                                                            name: 'hash_join_buffer::ReadRowFromChunk',
+                                                            value: 4179,
+                                                            color: '#80b1d3'
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            name: 'mysql_send_net',
+                            value: 16,
+                            color: '#80b1d3'
+                        }
+                    ]
+                },
+                diagnosis_results: {
+                    query_id: '1',
+                    root_causes: ['suboptimal query plans', 'query rewrite'],
+                    confidence: {
+                        'suboptimal query plans': 0.89,
+                        'query rewrite': 0.60,
+                        'suboptimal plan optimizer': 0.32,
+                        'missing indexes': 0.25
+                    },
+                    explanation: 'Frequent calls to HashJoinIterator::WriteBuildTableToChunkFiles() indicate that the Hash Join is experiencing a spill during execution, meaning the in-memory hash table cannot accommodate all rows from the build side. Normally, during the Build phase of a Hash Join, data from the smaller table is stored in an in-memory hash table, and matching is performed via memory lookups during the Probe phase. However, when the build-side table exceeds the available memory, MySQL writes some hash table partitions to disk chunk files to free up memory, a process handled by HashJoinIterator::WriteBuildTableToChunkFiles(). Frequent spills can severely degrade performance because disk I/O is significantly slower than memory operations, potentially increasing query execution time by an order of magnitude.',
+                    rule_matches_detail: [
+                        {
+                            'Rule Name': 'Rule-based differential profiling',
+                            'Principle': 'If frequent calls to HashJoinIterator::WriteBuildTableToChunkFiles() are observed, indicating hash join spill due to insufficient memory, then disable hash join for the operator.'
+                        }
+                    ]
+                },
+                tuning_results: {
+                    query_id: '1',
+                    fix_action: 'CREATE INDEX idx_orders_user_id ON orders(user_id);\nCREATE INDEX idx_orders_status ON orders(status);\nSELECT /*+ INDEX(orders idx_orders_user_id) */ * FROM orders WHERE user_id = 1001 OR status = \'PAID\';',
+                    rewrite_sql: 'SELECT /*+ NO_HASH_JOIN(o, c) */\n    o.order_id,\n    c.customer_name,\n    o.total_amount\nFROM orders o\nJOIN customers c ON o.customer_id = c.customer_id\nWHERE o.order_date BETWEEN \'2023-01-01\' AND \'2023-12-31\';',
+                    action_explanation: '1. Original query contains OR condition but did not use query hints, optimizer chose full table scan.\n2. By adding INDEX query hint, guide optimizer to use idx_orders_user_id index for access, avoiding full table scan.\n3. Alternatively, consider using INDEX_MERGE hint to let optimizer use both indexes on user_id and status for merged access.',
+                    root_causes: ['suboptimal query plans', 'query rewrite'],
+                    state_confidence: {
+                        'suboptimal query plans': 0.89,
+                        'query rewrite': 0.45,
+                        'suboptimal plan optimizer': 0.32,
+                        'missing indexes': 0.25
+                    },
+                    tuning_suggestions: [
+                        {
+                            'type': 'query_hint',
+                            'action': 'SELECT /*+ INDEX(orders idx_orders_user_id) */ * FROM orders WHERE user_id = 1001 OR status = \'PAID\';',
+                            'explanation': 'Frequent calls to ExecHashJoinSaveTuple() indicate that hash join is experiencing spill during execution (insufficient memory, writing to disk).'
+                        },
+                        {
+                            'type': 'index_creation',
+                            'action': 'CREATE INDEX idx_orders_user_id ON orders(user_id);\nCREATE INDEX idx_orders_status ON orders(status);',
+                            'explanation': 'Frequent calls to ExecHashJoinSaveTuple() indicate that hash join is experiencing spill during execution (insufficient memory, writing to disk).'
+                        }
+                    ],
+                    beforeTuning: {
+                        cpu_usage: 92.5,
+                        memory_usage: 96.8,
+                        avg_query_time: '18.6s',
+                        qps: 387.5
+                    },
+                    afterTuning: {
+                        cpu_usage: 45.2,
+                        memory_usage: 58.6,
+                        avg_query_time: '0.8s',
+                        qps: 512.8
+                    },
+                    improvement: {
+                        cpu_reduction: '51.1%',
+                        memory_reduction: '39.5%',
+                        qps_increase: '32.4%'
+                    }
+                }
+            },
+            {
+                id: 'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7',
+                time: '2026-03-25 14:31:58.456',
+                sql: 'SELECT s_acctbal, s_name, n_name, p_partkey, p_mfgr, s_address, s_phone, s_comment\nFROM part\nJOIN partsupp ps1 ON part.p_partkey = ps1.ps_partkey\nJOIN supplier s1 ON s1.s_suppkey = ps1.ps_suppkey\nJOIN nation n1 ON s1.s_nationkey = n1.n_nationkey\nJOIN region r1 ON n1.n_regionkey = r1.r_regionkey\nWHERE part.p_size = 4\n  AND part.p_type LIKE \'%COPPER\'\n  AND r1.r_name = \'ASIA\'\n  AND ps1.ps_supplycost = (\n    SELECT MIN(ps2.ps_supplycost)\n    FROM partsupp ps2\n    JOIN supplier s2 ON s2.s_suppkey = ps2.ps_suppkey\n    JOIN nation n2 ON s2.s_nationkey = n2.n_nationkey\n    JOIN region r2 ON n2.n_regionkey = r2.r_regionkey\n    WHERE ps2.ps_partkey = part.p_partkey AND r2.r_name = \'ASIA\'\n  )\nORDER BY s_acctbal DESC, n_name, s_name, p_partkey\nLIMIT 100;',
+                type: 'SELECT',
+                result: 'Executed successfully, returned 100 records',
+                lifecycle: {
+                    parsing: { time: 3, cpu: 6, memory: 15, io: 0 },
+                    optimization: { time: 15, cpu: 18, memory: 12, io: 3 },
+                    execution: { time: 11354, cpu: 99.9, memory: 90, io: 48 },
+                    network: { time: 15, cpu: 4, memory: 8, io: 15 }
+                },
+                flameGraph: {
+                    name: 'postgres_execute',
+                    value: 11387,
+                    children: [
+                        {
+                            name: 'pg_parse_sql',
+                            value: 3,
+                            color: '#66c2a5'
+                        },
+                        {
+                            name: 'pg_plan_query',
+                            value: 15,
+                            color: '#8da0cb',
+                            children: [
+                                {
+                                    name: 'subquery_planner',
+                                    value: 8,
+                                    color: '#b3de69'
+                                },
+                                {
+                                    name: 'join_planner',
+                                    value: 7,
+                                    color: '#fdb462'
+                                }
+                            ]
+                        },
+                        {
+                            name: 'pg_exec_query',
+                            value: 11354,
+                            color: '#fc8d62',
+                            children: [
+                                {
+                                    name: 'ExecHashJoin',
+                                    value: 11354,
+                                    color: '#8dd3c7',
+                                    children: [
+                                        {
+                                            name: 'ExecHash',
+                                            value: 2800,
+                                            color: '#bebada',
+                                            children: [
+                                                {
+                                                    name: 'ExecSeqScan',
+                                                    value: 2800,
+                                                    color: '#a6d854'
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            name: 'ExecHashJoinImpl',
+                                            value: 8554,
+                                            color: '#fb8072',
+                                            children: [
+                                                {
+                                                    name: 'ExecHashJoinSaveTuple',
+                                                    value: 4800,
+                                                    color: '#80b1d3'
+                                                },
+                                                {
+                                                    name: 'ExecHashJoinGetMatch',
+                                                    value: 3754,
+                                                    color: '#b3de69'
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            name: 'pg_send_result',
+                            value: 15,
+                            color: '#80b1d3'
+                        }
+                    ]
+                },
+                diagnosis_results: {
+                    query_id: '2',
+                    root_causes: ['suboptimal query plans', 'query rewrite'],
+                    confidence: {
+                        'suboptimal query plans': 0.89,
+                        'query rewrite': 0.45,
+                        'missing indexes': 0.35,
+                        'suboptimal plan optimizer': 0.20
+                    },
+                    explanation: '1. Referenced Rule: 1) Index Rule - Evidence: Execution plan shows full table scan on part table, and query contains p_size and p_type filters; Inference: Missing appropriate indexes leading to full table scan; Support: missing indexes.\n2. Referenced Rule: None - Evidence: Query contains multiple JOINs and subqueries, optimizer chose suboptimal execution plan; Inference: Can improve execution plan through query rewrite or optimizer hints; Support: suboptimal plan optimizer.',
+                    rule_matches_detail: [
+                        {
+                            'Rule Name': 'Index Rule',
+                            'Principle': 'IF a query filters on columns with low cardinality and the EXPLAIN plan shows type=ALL, THEN recommend creating appropriate indexes on the filtered columns.'
+                        }
+                    ]
+                },
+                tuning_results: {
+                    query_id: '2',
+                    fix_action: 'CREATE INDEX idx_part_size_type ON part(p_size, p_type);\nCREATE INDEX idx_partsupp_partkey ON partsupp(ps_partkey);',
+                    rewrite_sql: 'SELECT /*+ INDEX(part idx_part_size_type) */\n    s_acctbal,\n    s_name,\n    n_name,\n    p_partkey,\n    p_mfgr,\n    s_address,\n    s_phone,\n    s_comment\nFROM part\nJOIN partsupp ps1 ON part.p_partkey = ps1.ps_partkey\nJOIN supplier s1 ON s1.s_suppkey = ps1.ps_suppkey\nJOIN nation n1 ON s1.s_nationkey = n1.n_nationkey\nJOIN region r1 ON n1.n_regionkey = r1.r_regionkey\nWHERE part.p_size = 4\n  AND part.p_type LIKE \'%COPPER\'\n  AND r1.r_name = \'ASIA\'\n  AND ps1.ps_supplycost = (\n    SELECT MIN(ps2.ps_supplycost)\n    FROM partsupp ps2\n    JOIN supplier s2 ON s2.s_suppkey = ps2.ps_suppkey\n    JOIN nation n2 ON s2.s_nationkey = n2.n_nationkey\n    JOIN region r2 ON n2.n_regionkey = r2.r_regionkey\n    WHERE ps2.ps_partkey = part.p_partkey AND r2.r_name = \'ASIA\'\n  )\nORDER BY s_acctbal DESC, n_name, s_name, p_partkey\nLIMIT 100;',
+                    action_explanation: '1. Create composite index on p_size and p_type columns of part table to optimize filter conditions.\n2. Create index on ps_partkey column of partsupp table to optimize JOIN operations.\n3. Guide optimizer to use newly created indexes through query hints.',
+                    root_causes: ['suboptimal query plans', 'query rewrite'],
+                    state_confidence: {
+                        'suboptimal query plans': 0.89,
+                        'query rewrite': 0.45,
+                        'missing indexes': 0.35,
+                        'suboptimal plan optimizer': 0.20
+                    },
+                    tuning_suggestions: [
+                        {
+                            'type': 'index_creation',
+                            'action': 'CREATE INDEX idx_part_size_type ON part(p_size, p_type);',
+                            'explanation': 'Frequent calls to HashJoinIterator::WriteBuildTableToChunkFiles() indicate that hash join is experiencing spill during execution (insufficient memory, writing to disk).'
+                        },
+                        {
+                            'type': 'index_creation',
+                            'action': 'CREATE INDEX idx_partsupp_partkey ON partsupp(ps_partkey);',
+                            'explanation': 'Frequent calls to HashJoinIterator::WriteBuildTableToChunkFiles() indicate that hash join is experiencing spill during execution (insufficient memory, writing to disk).'
+                        }
+                    ],
+                    beforeTuning: {
+                        cpu_usage: 95.2,
+                        memory_usage: 98.5,
+                        avg_query_time: '11.4s',
+                        qps: 256.3
+                    },
+                    afterTuning: {
+                        cpu_usage: 52.8,
+                        memory_usage: 62.3,
+                        avg_query_time: '0.6s',
+                        qps: 421.7
+                    },
+                    improvement: {
+                        cpu_reduction: '44.5%',
+                        memory_reduction: '36.8%',
+                        qps_increase: '64.5%'
+                    }
+                }
+            }
+        ];
+
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                id: params.get('id')
+            };
+        }
+
+        function getRandomColor(level) {
+            const colors = [
+                '#66c2a5', '#8da0cb', '#fc8d62', '#a6d854',
+                '#8dd3c7', '#ffffb3', '#bebada', '#fb8072',
+                '#b3de69', '#fdb462', '#80b1d3', '#fccde5'
+            ];
+            return colors[level % colors.length];
+        }
+
+        function renderFlameGraph(flameData) {
+            if (!flameData) return '';
+            
+            const totalTime = flameData.value;
+            const levels = [];
+            
+            function buildLevel(node, level, startPercent) {
+                if (!levels[level]) {
+                    levels[level] = [];
+                }
+                
+                const widthPercent = (node.value / totalTime) * 100;
+                const color = node.color || getRandomColor(level);
+                
+                levels[level].push({
+                    name: node.name,
+                    value: node.value,
+                    widthPercent: widthPercent,
+                    color: color,
+                    startPercent: startPercent
+                });
+                
+                if (node.children && node.children.length > 0) {
+                    let childStart = startPercent;
+                    let childrenTotal = 0;
+                    node.children.forEach(child => {
+                        childrenTotal += child.value;
+                    });
+                    
+                    if (childrenTotal > node.value) {
+                        console.warn('Children total exceeds parent value, normalizing');
+                    }
+                    
+                    node.children.forEach(child => {
+                        buildLevel(child, level + 1, childStart);
+                        childStart += (child.value / totalTime) * 100;
+                    });
+                }
+            }
+            
+            buildLevel(flameData, 0, 0);
+            
+            let flameHTML = '<div class="flame-graph">';
+            
+            for (let i = levels.length - 1; i >= 0; i--) {
+                const level = levels[i];
+                if (!level) continue;
+                
+                flameHTML += '<div class="flame-level">';
+                
+                let currentPosition = 0;
+                
+                level.forEach((item, index) => {
+                    const gap = item.startPercent - currentPosition;
+                    const width = Math.max(item.widthPercent, 0.3);
+                    
+                    if (gap > 0.01) {
+                        flameHTML += `<div style="width: ${gap}%; flex-shrink: 0;"></div>`;
+                    }
+                    
+                    flameHTML += `
+                        <div class="flame-bar" style="width: ${width}%; background-color: ${item.color};">
+                            <span class="flame-bar-text">${item.name}</span>
+                            <div class="flame-bar-tooltip">${item.name}: ${item.widthPercent.toFixed(1)}%</div>
+                        </div>
+                    `;
+                    
+                    currentPosition = item.startPercent + item.widthPercent;
+                });
+                
+                const remaining = 100 - currentPosition;
+                if (remaining > 0.01) {
+                    flameHTML += `<div style="width: ${remaining}%; flex-shrink: 0;"></div>`;
+                }
+                
+                flameHTML += '</div>';
+            }
+            
+            flameHTML += '</div>';
+            
+            const timelineHTML = `
+                <div class="flame-timeline">
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                    <span>75%</span>
+                    <span>100%</span>
+                </div>
+            `;
+            
+            return flameHTML + timelineHTML;
+        }
+
+        function formatTextWithNewlines(text) {
+            if (!text) return '';
+            const lines = text.split(/\d+\.\s*/).filter(line => line.trim() !== '');
+            return lines.map((line, index) => {
+                const trimmedLine = line.trim();
+                if (trimmedLine) {
+                    return `<div style="margin-bottom: 10px; padding-left: 24px; position: relative;">
+                        <span style="position: absolute; left: 0; font-weight: 600; color: var(--primary-color);">${index + 1}.</span>
+                        ${trimmedLine}
+                    </div>`;
+                }
+                return '';
+            }).join('');
+        }
+
+        function renderDetail(sql) {
+            document.getElementById('pageTitle').innerHTML = `SQL Detail - ${sql.id.substring(0, 16)}...`;
+
+            const diagnosis = sql.diagnosis_results;
+            const tuning = sql.tuning_results;
+
+            currentFlameData = sql.flameGraph;
+            const flameGraphHtml = renderFlameGraph(sql.flameGraph);
+
+            const ruleMatchesHtml = diagnosis.rule_matches_detail.map(rule => `
+                <div class="rule-match-item">
+                    <div class="rule-principle">${rule['Principle']}</div>
+                </div>
+            `).join('');
+
+            const rootCausesHtml = Object.entries(diagnosis.confidence).map(([name, conf]) => {
+                if (diagnosis.root_causes.includes(name)) {
+                    return `
+                        <div class="root-cause-item">
+                            <div class="root-cause-name">${name}</div>
+                            <div class="root-cause-confidence">
+                                Confidence: <span class="confidence-value">${(conf * 100).toFixed(0)}%</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                return '';
+            }).join('');
+
+            const tuningSuggestionsHtml = `
+                <div style="padding: 12px 12px; background: #f7f8fa; border-radius: 6px;">
+                    <div style="font-size: 13px; color: #4e5969; line-height: 1.8;">
+                        Frequent calls to HashJoinIterator::WriteBuildTableToChunkFiles() indicate that the Hash Join is experiencing a spill during execution, meaning the in-memory hash table cannot accommodate all rows from the build side. Normally, during the Build phase of a Hash Join, data from the smaller table is stored in an in-memory hash table, and matching is performed via memory lookups during the Probe phase. However, when the build-side table exceeds the available memory, MySQL writes some hash table partitions to disk chunk files to free up memory, a process handled by HashJoinIterator::WriteBuildTableToChunkFiles(). Frequent spills can severely degrade performance because disk I/O is significantly slower than memory operations, potentially increasing query execution time by an order of magnitude.
+                    </div>
+                </div>
+            `;
+
+            const lifecycleHtml = `
+                <div class="lifecycle-stages">
+                    <div class="lifecycle-stage">
+                        <div class="lifecycle-name">Parsing</div>
+                        <div class="lifecycle-metrics">
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.parsing.time}ms</strong> Time</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.parsing.cpu}%</strong> CPU</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.parsing.memory}%</strong> Memory</div>
+                        </div>
+                    </div>
+                    <div class="lifecycle-stage">
+                        <div class="lifecycle-name">Optimization</div>
+                        <div class="lifecycle-metrics">
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.optimization.time}ms</strong> Time</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.optimization.cpu}%</strong> CPU</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.optimization.memory}%</strong> Memory</div>
+                        </div>
+                    </div>
+                    <div class="lifecycle-stage">
+                        <div class="lifecycle-name">Execution</div>
+                        <div class="lifecycle-metrics">
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.execution.time}ms</strong> Time</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.execution.cpu}%</strong> CPU</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.execution.memory}%</strong> Memory</div>
+                        </div>
+                    </div>
+                    <div class="lifecycle-stage">
+                        <div class="lifecycle-name">Network</div>
+                        <div class="lifecycle-metrics">
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.network.time}ms</strong> Time</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.network.cpu}%</strong> CPU</div>
+                            <div class="lifecycle-metric"><strong>${sql.lifecycle.network.memory}%</strong> Memory</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const detailContent = document.getElementById('detailContent');
+            detailContent.innerHTML = `
+                <!-- 顶部区域 - 1和2组成一个整体 -->
+                <div class="top-section">
+                    <!-- 1. SQL基本信息 -->
+                    <div class="detail-section top-layout">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <circle cx="24" cy="24" r="16"/>
+                                <path d="M16 22h16M16 26h12M16 30h16"/>
+                            </svg>
+                            SQL Basic Information
+                        </div>
+                        <div class="detail-card" style="padding: 12px 20px;">
+                            <div style="display: flex; gap: 20px; align-items: center;">
+                                <div style="width: 50%; min-width: 0;">
+                                    <div style="font-size: 11px; color: #86909c; margin-bottom: 4px;">SQL Statement</div>
+                                    <div class="sql-statement">${sql.sql}</div>
+                                </div>
+                                <div style="display: flex; gap: 24px; flex-shrink: 0;">
+                                    <div class="info-item" style="align-items: flex-start; text-align: left;">
+                                        <div class="info-label">Execution Time</div>
+                                        <div class="info-value" style="font-size: 14px;">${sql.time}</div>
+                                    </div>
+                                    <div class="info-item" style="align-items: flex-start; text-align: left;">
+                                        <div class="info-label">SQL Type</div>
+                                        <div class="info-value" style="font-size: 14px;">${sql.type}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 中间区域 - 两栏布局 -->
+                <div class="middle-section">
+                    <!-- 左边：异常根因、规则匹配、预测结果 -->
+                    <div class="detail-section">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <circle cx="24" cy="24" r="16"/>
+                                <path d="M16 22h16M16 26h12M16 30h16"/>
+                            </svg>
+                            Root Causes
+                        </div>
+                        <div class="detail-card" style="padding: 16px;">
+                            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: #fff7e6; border-radius: 6px; border: 1px solid #ffcc80;">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" style="width: 32px; height: 32px; color: #ff9800; flex-shrink: 0;">
+                                    <circle cx="24" cy="24" r="16"/>
+                                    <path d="M20 16l4 20M28 16l-4 20"/>
+                                    <circle cx="24" cy="36" r="2" fill="currentColor"/>
+                                </svg>
+                                <div>
+                                    <div style="font-size: 14px; font-weight: 600; color: #e65100;">Suboptimal query plans</div>
+                                    <div style="font-size: 13px; color: #6d4c41;">The database optimizer has chosen an inefficient execution plan.</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="detail-title" style="border-top: 1px solid #e5e6eb;">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <rect x="8" y="12" width="32" height="24" rx="2"/>
+                                <path d="M12 20h8M24 20h12M12 28h12M28 28h8"/>
+                            </svg>
+                            Matched Diagnosis Rules
+                        </div>
+                        <div class="detail-card scrollable">
+                            ${ruleMatchesHtml}
+                        </div>
+                        <div class="detail-title" style="border-top: 1px solid #e5e6eb;">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M24 8v32M8 24h32"/>
+                                <circle cx="24" cy="24" r="4"/>
+                            </svg>
+                            Multiclass scoring model
+                        </div>
+                        <div class="detail-card scrollable">
+                            <div class="root-causes-list">
+                                ${rootCausesHtml}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 右边：SQL生命周期和调优建议 -->
+                    <div class="detail-section">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M8 32l12-12 8 8 12-14"/>
+                                <path d="M8 24h4M8 16h4M8 8h4"/>
+                            </svg>
+                            SQL Lifecycle
+                        </div>
+                        <div class="detail-card" style="position: relative; padding: 16px;">
+                            <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                                <button onclick="zoomFlameGraph()" style="padding: 4px 8px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    Zoom In
+                                </button>
+                            </div>
+                            <div id="flameGraphContainer" onclick="zoomFlameGraph()" style="cursor: pointer; overflow-x: auto;">
+                                ${flameGraphHtml}
+                            </div>
+                        </div>
+                        <div class="detail-title detail-title-with-button" style="border-top: 1px solid #e5e6eb;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                    <path d="M12 24h24M24 12v24"/>
+                                    <rect x="6" y="6" width="36" height="36" rx="4"/>
+                                </svg>
+                                Root Cause Explaination
+                            </div>
+                            <button class="kb-button" onclick="showKnowledgeBaseModal()">Related Knowledge Base</button>
+                        </div>
+                        <div class="detail-card scrollable">
+                            ${tuningSuggestionsHtml}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 底部区域 - 调优结果（全宽） -->
+                <div class="bottom-section">
+                    <div class="detail-section top-layout">
+                        <div class="detail-title">
+                            <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3">
+                                <path d="M12 24h24M24 12v24"/>
+                                <rect x="6" y="6" width="36" height="36" rx="4"/>
+                            </svg>
+                            Tuning Results
+                        </div>
+                        <div class="detail-card" style="padding: 12px 20px;">
+                            <div style="display: flex; gap: 24px; align-items: stretch;">
+                                <div style="flex: 0 0 55%; min-width: 0;">
+                                    <div style="font-size: 11px; color: #86909c; margin-bottom: 4px;">Optimized SQL</div>
+                                    <div class="sql-statement" style="overflow-x: auto; white-space: pre-wrap !important;">${tuning.rewrite_sql.replace(/(\/\*\+[\s\S]*?\*\/)/g, '<span style="color: #ee4d38; font-weight: 600;">$1</span>')}</div>
+                                </div>
+                                <div style="flex: 1; display: flex; gap: 16px; align-items: center; justify-content: center;">
+                                    <div style="text-align: center;">
+                                        <div style="font-size: 16px; color: #86909c; margin-bottom: 6px; font-weight: 500;">Before Tuning</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: var(--danger-color);">${tuning.beforeTuning.avg_query_time}</div>
+                                    </div>
+                                    <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="3" style="width: 24px; height: 24px; color: var(--success-color); flex-shrink: 0;">
+                                        <path d="M10 24h28M30 14l10 10-10 10"/>
+                                    </svg>
+                                    <div style="text-align: center;">
+                                        <div style="font-size: 16px; color: #86909c; margin-bottom: 6px; font-weight: 500;">After Tuning</div>
+                                        <div style="font-size: 24px; font-weight: 700; color: var(--success-color);">${tuning.afterTuning.avg_query_time}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function init() {
+            const params = getUrlParams();
+            const sql = sqlLogData.find(s => s.id === params.id);
+            if (sql) {
+                renderDetail(sql);
+            } else {
+                document.getElementById('detailContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #86909c;">
+                        SQL detail information not found
+                    </div>
+                `;
+            }
+        }
+
+        let currentFlameData = null;
+
+        function zoomFlameGraph() {
+            const modal = document.getElementById('flameGraphModal');
+            const modalContent = document.getElementById('flameGraphModalContent');
+            if (currentFlameData) {
+                modalContent.innerHTML = renderFlameGraph(currentFlameData);
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeFlameGraphModal() {
+            const modal = document.getElementById('flameGraphModal');
+            modal.style.display = 'none';
+        }
+
+        function showKnowledgeBaseModal() {
+            const overlay = document.getElementById('kbModalOverlay');
+            overlay.classList.add('show');
+        }
+
+        function hideKnowledgeBaseModal() {
+            const overlay = document.getElementById('kbModalOverlay');
+            overlay.classList.remove('show');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlay = document.getElementById('kbModalOverlay');
+            overlay.addEventListener('click', function(e) {
+                if (e.target === overlay) {
+                    hideKnowledgeBaseModal();
+                }
+            });
+        });
+
+        init();
+    </script>
+
+    <!-- 火焰图放大查看模态框 -->
+    <div id="flameGraphModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10000; justify-content: center; align-items: center;">
+        <div style="position: relative; background: white; padding: 24px; border-radius: 12px; max-width: 95%; max-height: 95%; overflow: auto;">
+            <button onclick="closeFlameGraphModal()" style="position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 28px; cursor: pointer; color: #86909c; line-height: 1;">×</button>
+            <div style="margin-bottom: 16px; font-size: 18px; font-weight: 600;">SQL Lifecycle Flame Graph</div>
+            <div id="flameGraphModalContent" style="overflow-x: auto;">
+            </div>
+        </div>
+    </div>
+
+    <!-- 知识库弹窗 -->
+    <div id="kbModalOverlay" class="kb-modal-overlay">
+        <div class="kb-modal">
+            <div class="kb-modal-header">
+                <div class="kb-modal-title">Related Knowledge Base</div>
+                <button class="kb-modal-close" onclick="hideKnowledgeBaseModal()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="kb-modal-content">
+                <!-- 知识库段落 -->
+                <div class="kb-section">
+                    <div class="kb-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                        </svg>
+                        Manual
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">Hash Join Spill Principle</div>
+                        <div class="kb-item-desc">Hash Join has two phases: Build phase and Probe phase. In the Build phase, data from the smaller table is loaded into an in-memory Hash Table. When the data exceeds available memory, the database must write some Hash Buckets to disk, a process called Spill, implemented through the ExecHashJoinSaveTuple() function. Frequent spill causes severe performance degradation.</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">Spill Performance Impact</div>
+                        <div class="kb-item-desc">Disk I/O is several orders of magnitude slower than memory. When spill occurs, query execution time may increase by 10-100 times. Main reasons include: 1) Serialization and deserialization overhead; 2) Disk read/write latency; 3) Multiple scans of disk data.</div>
+                    </div>
+                </div>
+
+                <!-- 历史调优记录 -->
+                <div class="kb-section">
+                    <div class="kb-section-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12,6 12,12 16,14"/>
+                        </svg>
+                        Tuning-derived Knowledge
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">2026-02-18 Order Query OR Condition Optimization</div>
+                        <div class="kb-item-desc">Similar scenario: Query with OR predicates, optimizer failed to select appropriate index, leading to full table scan. Problem solved by adding INDEX_MERGE hint to use multiple indexes efficiently.</div>
+                        <div class="kb-item-meta">Result: Query time reduced from 12.3s to 0.5s, 95.9% improvement</div>
+                    </div>
+                    <div class="kb-item">
+                        <div class="kb-item-title">2026-03-10 Customer Report Query Optimization</div>
+                        <div class="kb-item-desc">Similar scenario: Inefficient query plan with suboptimal join strategy. Optimization approach: 1) Add query hints to guide optimizer; 2) Create composite indexes; 3) Simplify query structure.</div>
+                        <div class="kb-item-meta">Result: Query average response time reduced by 82%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="/static/legacy-runtime.js"></script>
+    <script src="/static/legacy-pages.js"></script>
+</body>
+</html>

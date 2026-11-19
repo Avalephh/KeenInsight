@@ -1,0 +1,13 @@
+SOURCE_KEY: artifact:artifacts/final-regression-pg12.json
+SOURCE_TYPE: evaluation-data
+SOURCE_TITLE: artifacts/final-regression-pg12.json
+SOURCE_URI: project://artifacts/final-regression-pg12.json
+---
+Artifact: artifacts/final-regression-pg12.json
+Protocol: {"complete_protocol_repetitions":3,"timed_repetitions_per_phase":7,"warmup_repetitions_per_phase":2,"customer_id":null,"baseline_work_mem":null,"baseline_parallel_workers":null}
+Failures: []
+Scenario missing_index: effective=3; rollback_completed=3; median_improvement={"count":3,"mean":99.05209582338021,"min":98.84103821539536,"max":99.17089478614677}; p95_improvement={"count":3,"mean":98.35860590660268,"min":98.13330579191111,"max":98.53342670034371}
+Scenario hash_join_spill: effective=3; rollback_completed=3; median_improvement={"count":3,"mean":30.168968080202877,"min":28.010930909741578,"max":31.438112427926075}; p95_improvement={"count":3,"mean":30.007436165039724,"min":28.36611529437163,"max":31.266995775539964}
+Scenario aggregate_spill: effective=3; rollback_completed=3; median_improvement={"count":3,"mean":61.80938276420454,"min":60.74162241369132,"max":62.34800422699719}; p95_improvement={"count":3,"mean":62.11615830923599,"min":61.08314394639536,"max":63.234234005196775}
+Scenario sort_spill: effective=3; rollback_completed=3; median_improvement={"count":3,"mean":45.6271111083447,"min":45.52200986918592,"max":45.69466060217003}; p95_improvement={"count":3,"mean":46.62554136591125,"min":44.85408062371352,"max":49.63648223209935}
+Scenario parallel_query_underprovisioned: effective=3; rollback_completed=3; median_improvement={"count":3,"mean":38.22359487801791,"min":36.436913633129905,"max":40.168208310455285}; p95_improvement={"count":3,"mean":37.19872380526319,"min":35.71029647650404,"max":39.686237043770554}

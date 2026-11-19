@@ -1,0 +1,484 @@
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+from datetime import datetime, timezone
+from typing import Any
+
+from .db import Database
+from .detect import detect, enabled_rules, persist_candidates
+from .host import HostProbe
+from .pg import (
+    activity,
+    background_writer,
+    current_settings_map,
+    database_metrics,
+    jsonable,
+    jsonable_rows,
+    locks,
+    server_meta,
+    top_queries,
+    query_stats_count,
+    wal_stats,
+)
+
+LOG = logging.getLogger(__name__)
+
+
+class Collector:
+    """Poll PostgreSQL views and persist raw observations.
+
+    The collector does not synthesize a health score.  It stores the source
+    counters and derived rates together so an evaluation can audit exactly how
+    a dashboard value was obtained.
+    """
+
+    def __init__(
+        self,
+        db: Database,
+        interval_seconds: float,
+        *,
+        retention_hours: float = 24.0,
+        cleanup_interval_seconds: float = 60.0,
+    ) -> None:
+        if retention_hours < 1:
+            raise ValueError("retention_hours must be at least 1 hour")
+        self.db = db
+        self.interval_seconds = interval_seconds
+        self.retention_hours = float(retention_hours)
+        self.cleanup_interval_seconds = max(1.0, float(cleanup_interval_seconds))
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._lock = threading.Lock()
+        self._previous: dict[str, Any] | None = None
+        self._first_sample_ready = threading.Event()
+        self.last_success_at: datetime | None = None
+        self.last_error: str | None = None
+        self.last_error_at: datetime | None = None
+        self.cycles = 0
+        self.error_count = 0
+        self._last_retention_cleanup_monotonic = 0.0
+        self.last_retention_cleanup_at: datetime | None = None
+        self.last_retention_deleted = 0
+        self.retention_deleted_total = 0
+        self.retention_last_error: str | None = None
+        self.host_probe = HostProbe()
+
+    def start(self) -> None:
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="keeninsight-collector",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=max(2.0, self.interval_seconds + 1.0))
+        self._thread = None
+
+    def wait_for_first_sample(self, timeout: float = 10.0) -> bool:
+        """Wait until one real PostgreSQL observation has been persisted."""
+        return self._first_sample_ready.wait(timeout=max(0.0, float(timeout)))
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "running": bool(self._thread and self._thread.is_alive()),
+                "cycles": self.cycles,
+                "first_sample_ready": self._first_sample_ready.is_set(),
+                "interval_seconds": self.interval_seconds,
+                "last_success_at": self.last_success_at.isoformat()
+                if self.last_success_at
+                else None,
+                "last_error": self.last_error,
+                "last_error_at": self.last_error_at.isoformat()
+                if self.last_error_at
+                else None,
+                "error_count": self.error_count,
+                "snapshot_retention_hours": self.retention_hours,
+                "snapshot_cleanup_interval_seconds": self.cleanup_interval_seconds,
+                "last_snapshot_cleanup_at": self.last_retention_cleanup_at.isoformat()
+                if self.last_retention_cleanup_at
+                else None,
+                "last_snapshot_deleted": self.last_retention_deleted,
+                "snapshots_deleted_total": self.retention_deleted_total,
+                "snapshot_cleanup_error": self.retention_last_error,
+            }
+
+    def prune_snapshots(self, *, force: bool = False) -> int:
+        """Delete snapshots older than the configured rolling retention window."""
+        now_monotonic = time.monotonic()
+        if (
+            not force
+            and self._last_retention_cleanup_monotonic
+            and now_monotonic - self._last_retention_cleanup_monotonic
+            < self.cleanup_interval_seconds
+        ):
+            return 0
+        try:
+            deleted = self.db.execute(
+                """
+                DELETE FROM keeninsight.snapshots
+                WHERE collected_at < CURRENT_TIMESTAMP - (%s * INTERVAL '1 hour')
+                """,
+                (self.retention_hours,),
+            )
+        except Exception as exc:
+            with self._lock:
+                self.retention_last_error = str(exc)
+            LOG.warning("snapshot retention cleanup failed: %s", exc)
+            return 0
+        cleanup_at = datetime.now(timezone.utc)
+        with self._lock:
+            self._last_retention_cleanup_monotonic = now_monotonic
+            self.last_retention_cleanup_at = cleanup_at
+            self.last_retention_deleted = int(deleted or 0)
+            self.retention_deleted_total += int(deleted or 0)
+            self.retention_last_error = None
+        return int(deleted or 0)
+
+    def collect_once(self) -> dict[str, Any]:
+        meta = server_meta(self.db)
+        database = database_metrics(self.db)
+        current_activity = activity(self.db)
+        lock_rows = locks(self.db)
+        query_rows, query_error = top_queries(self.db)
+        query_count = query_stats_count(self.db) if query_error is None else None
+        query_stats_complete = (
+            query_count is not None and len(query_rows) >= query_count
+        )
+        settings = current_settings_map(self.db)
+        bgwriter = background_writer(self.db)
+        wal = wal_stats(self.db)
+        host = self.host_probe.sample()
+
+        observed_at = database.get("collected_at") or datetime.now(timezone.utc)
+        if isinstance(observed_at, str):
+            observed_at = datetime.fromisoformat(observed_at)
+        previous = self._previous
+        rates = _derive_rates(database, previous, observed_at)
+        query_deltas = _derive_query_deltas(
+            query_rows,
+            (previous or {}).get("top_queries") if previous else None,
+        )
+
+        payload: dict[str, Any] = {
+            "observed_at": jsonable(observed_at),
+            "server": jsonable(meta),
+            "database": jsonable(database),
+            "rates": jsonable(rates),
+            "latency": jsonable(
+                _summarize_query_latency(
+                    query_deltas,
+                    coverage_complete=query_stats_complete,
+                )
+            ),
+            "settings": jsonable(settings),
+            "activity": jsonable_rows(current_activity),
+            "locks": jsonable_rows(lock_rows),
+            "top_queries": jsonable_rows(query_rows),
+            "query_deltas": jsonable_rows(query_deltas),
+            "background_writer": jsonable(bgwriter),
+            "wal": jsonable(wal),
+            "host": jsonable(host),
+            "features": {
+                "pg_stat_statements": query_error is None,
+                "pg_stat_statements_error": query_error,
+                "pg_stat_statements_count": query_count,
+                "query_stats_complete": query_stats_complete,
+            },
+        }
+
+        self.db.execute(
+            """
+            INSERT INTO keeninsight.snapshots
+                (collected_at, server_version, database_name, payload)
+            VALUES (%s, %s, %s, %s::jsonb)
+            """,
+            (
+                observed_at,
+                meta.get("server_version"),
+                database.get("database_name") or meta.get("database_name") or "",
+                json.dumps(payload, separators=(",", ":")),
+            ),
+        )
+        self.prune_snapshots()
+        # The overview only needs the persisted observation.  Mark readiness
+        # before detection/incident persistence so a slow or unavailable
+        # secondary rule cannot make a healthy telemetry page look empty.
+        self._first_sample_ready.set()
+
+        rules = enabled_rules(self.db)
+        candidates = detect(payload, rules)
+        observed_kinds = {
+            "connection_saturation",
+            "lock_wait",
+            "cache_hit_ratio",
+        }
+        # The query view is top-N.  Only resolve a query incident when this
+        # cycle covered every filtered pg_stat_statements row; absence from a
+        # truncated top-N result is not proof that the condition disappeared.
+        if query_error is None and query_stats_complete:
+            observed_kinds.update({"slow_query", "temp_spill"})
+        saved = persist_candidates(
+            self.db,
+            candidates,
+            observed_kinds=observed_kinds & {rule["kind"] for rule in rules},
+        )
+        with self._lock:
+            self.cycles += 1
+            self.last_success_at = datetime.now(timezone.utc)
+            self.last_error = None
+        self._previous = {
+            "observed_at": observed_at,
+            "database": database,
+            "top_queries": query_rows,
+        }
+        return {"payload": payload, "incidents": saved}
+
+    def _run(self) -> None:
+        # Collect immediately so the UI has evidence as soon as the service is
+        # ready, then use an interruptible wait for the configured interval.
+        first_cycle = True
+        while not self._stop.is_set():
+            try:
+                # Remove stale history before the first live sample, so an old
+                # database cannot make the dashboard appear populated with
+                # observations outside the advertised rolling window.
+                self.prune_snapshots(force=first_cycle)
+                self.collect_once()
+                first_cycle = False
+            except Exception as exc:  # a database outage must not kill the API
+                LOG.exception("collector cycle failed")
+                with self._lock:
+                    self.last_error = str(exc)
+                    self.last_error_at = datetime.now(timezone.utc)
+                    self.error_count += 1
+                self._record_error(exc)
+                self.prune_snapshots()
+            self._stop.wait(self.interval_seconds)
+
+    def _record_error(self, error: Exception) -> None:
+        """Persist a best-effort error observation when PostgreSQL is reachable."""
+        try:
+            observed_at = datetime.now(timezone.utc)
+            self.db.execute(
+                """
+                INSERT INTO keeninsight.snapshots
+                    (collected_at, database_name, payload, collection_error)
+                VALUES (%s, current_database(), %s::jsonb, %s)
+                """,
+                (
+                    observed_at,
+                    json.dumps(
+                        {
+                            "observed_at": observed_at.isoformat(),
+                            "collection_error": str(error),
+                        },
+                        separators=(",", ":"),
+                    ),
+                    str(error),
+                ),
+                )
+            self.prune_snapshots()
+        except Exception:
+            # A connection outage can make this insert fail as well; the
+            # in-memory health status remains available to the API process.
+            LOG.debug("could not persist collector error", exc_info=True)
+
+
+def _derive_rates(
+    current: dict[str, Any], previous: dict[str, Any] | None, observed_at: Any
+) -> dict[str, Any]:
+    current_counters = {
+        key: current.get(key)
+        for key in (
+            "xact_commit",
+            "xact_rollback",
+            "tup_returned",
+            "tup_fetched",
+            "tup_inserted",
+            "tup_updated",
+            "tup_deleted",
+            "blks_read",
+            "blks_hit",
+            "temp_bytes",
+            "temp_files",
+        )
+    }
+    if not previous:
+        return {"interval_seconds": None, "counters_per_second": {}}
+
+    previous_time = previous.get("observed_at")
+    try:
+        seconds = max(0.001, (observed_at - previous_time).total_seconds())
+    except (AttributeError, TypeError):
+        seconds = None
+    if not seconds:
+        return {"interval_seconds": None, "counters_per_second": {}}
+
+    old = previous.get("database") or {}
+    per_second: dict[str, float] = {}
+    for key, value in current_counters.items():
+        try:
+            delta = float(value or 0) - float(old.get(key) or 0)
+        except (TypeError, ValueError):
+            continue
+        # PostgreSQL stats can reset while the service stays up.  A negative
+        # delta is a reset signal, not negative work.
+        per_second[key] = max(0.0, delta / seconds)
+
+    return {"interval_seconds": seconds, "counters_per_second": per_second}
+
+
+def _derive_query_deltas(
+    current: list[dict[str, Any]], previous: list[dict[str, Any]] | None
+) -> list[dict[str, Any]]:
+    """Turn cumulative pg_stat_statements counters into interval evidence.
+
+    pg_stat_statements exposes counters accumulated since its last reset.  An
+    incident detector must not keep reporting an old slow statement forever,
+    so it reasons over calls and temporary blocks added since the prior
+    collector cycle.  A negative counter is treated as a reset and the
+    post-reset value becomes the new interval observation.
+    """
+    if not previous:
+        return []
+    old_by_key = {_query_key(row): row for row in previous}
+    result: list[dict[str, Any]] = []
+    counter_fields = (
+        "calls",
+        "total_exec_time_ms",
+        "rows",
+        "shared_blks_hit",
+        "shared_blks_read",
+        "temp_blks_read",
+        "temp_blks_written",
+    )
+    for row in current:
+        old = old_by_key.get(_query_key(row))
+        if old is None:
+            # The top-N query view may contain a statement whose counters
+            # predate this service (it only became top-N now).  Do not treat
+            # that historical total as fresh activity; it can be considered
+            # on the next complete cycle.
+            continue
+        deltas: dict[str, Any] = {}
+        reset = False
+        for field in counter_fields:
+            value = _number(row.get(field))
+            before = _number(old.get(field))
+            if old and value < before:
+                reset = True
+                delta = value
+            else:
+                delta = value - before
+            deltas[field] = delta
+        calls = deltas["calls"]
+        if calls <= 0:
+            continue
+        observation = {
+            "query_id": row.get("query_id"),
+            "query": row.get("query"),
+            "calls": calls,
+            "total_exec_time_ms": deltas["total_exec_time_ms"],
+            "mean_exec_time_ms": deltas["total_exec_time_ms"] / calls,
+            "rows": deltas["rows"],
+            "shared_blks_hit": deltas["shared_blks_hit"],
+            "shared_blks_read": deltas["shared_blks_read"],
+            "temp_blks_read": deltas["temp_blks_read"],
+            "temp_blks_written": deltas["temp_blks_written"],
+            "counter_reset": reset,
+        }
+        result.append(observation)
+    return result
+
+
+def _summarize_query_latency(
+    query_deltas: list[dict[str, Any]], *, coverage_complete: bool
+) -> dict[str, Any]:
+    """Summarize real interval query observations for the overview.
+
+    PostgreSQL's pg_stat_statements view exposes aggregate mean/min/max values,
+    not a request-latency histogram.  The overview therefore reports the
+    weighted mean and P95 of the per-fingerprint interval means, and labels
+    that basis explicitly.  Transaction/control statements are excluded so a
+    quiet database does not look artificially fast because of BEGIN/COMMIT.
+    """
+    observations: list[tuple[float, float]] = []
+    total_calls = 0.0
+    total_time = 0.0
+    for row in query_deltas:
+        query = str(row.get("query") or "").strip().upper().rstrip(";")
+        command = query.split(None, 1)[0] if query else ""
+        if command in {
+            "BEGIN",
+            "COMMIT",
+            "ROLLBACK",
+            "END",
+            "START",
+            "SET",
+            "SHOW",
+            "DISCARD",
+            "DEALLOCATE",
+            "PREPARE",
+        }:
+            continue
+        calls = _number(row.get("calls"))
+        execution_time = max(0.0, _number(row.get("total_exec_time_ms")))
+        if calls <= 0:
+            continue
+        mean = execution_time / calls
+        observations.append((mean, calls))
+        total_calls += calls
+        total_time += execution_time
+
+    basis = "pg_stat_statements 区间增量中已观测语句均值"
+    if not observations:
+        return {
+            "available": False,
+            "mean_ms": None,
+            "p95_ms": None,
+            "sample_count": 0,
+            "calls": 0,
+            "coverage_complete": coverage_complete,
+            "basis": basis,
+        }
+
+    ordered = sorted(observations, key=lambda item: item[0])
+    target = max(1.0, total_calls * 0.95)
+    cumulative = 0.0
+    p95 = ordered[-1][0]
+    for mean, calls in ordered:
+        cumulative += calls
+        if cumulative >= target:
+            p95 = mean
+            break
+    return {
+        "available": True,
+        "mean_ms": total_time / total_calls if total_calls else None,
+        "p95_ms": p95,
+        "sample_count": len(observations),
+        "calls": total_calls,
+        "coverage_complete": coverage_complete,
+        "basis": basis,
+    }
+
+
+def _query_key(row: dict[str, Any]) -> str:
+    query_id = row.get("query_id")
+    return str(query_id) if query_id is not None else str(row.get("query") or "")
+
+
+def _number(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0

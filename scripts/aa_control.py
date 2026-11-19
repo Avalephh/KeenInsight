@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Run an A/A control: identical workload and settings, no tuning action."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any
+
+
+SCENARIOS = {
+    "missing_index": {},
+    "hash_join_spill": {"baseline_work_mem": "64kB"},
+    "aggregate_spill": {"baseline_work_mem": "64kB"},
+    "sort_spill": {"baseline_work_mem": "64kB"},
+    "parallel_query_underprovisioned": {"baseline_parallel_workers": 0},
+}
+
+
+def request(base: str, path: str, body: dict[str, Any]) -> dict[str, Any]:
+    data = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(
+        base.rstrip("/") + path,
+        data=data,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(
+            f"{path} -> HTTP {exc.code}: {exc.read().decode('utf-8', 'replace')}"
+        ) from exc
+    if not isinstance(result, dict):
+        raise RuntimeError(f"{path} did not return an object")
+    return result
+
+
+def observed(result: dict[str, Any]) -> dict[str, Any]:
+    return result.get("observations") or result
+
+
+def plan_signature(observations: dict[str, Any]) -> dict[str, Any]:
+    summary = observations.get("plan_summary") or {}
+    nodes = observations.get("plan", {}).get("nodes") or []
+    return {
+        "root_node": summary.get("root_node"),
+        "scan_nodes": summary.get("scan_nodes") or [],
+        "join_nodes": summary.get("join_nodes") or [],
+        "sort_methods": summary.get("sort_methods") or [],
+        "sort_space_types": summary.get("sort_space_types") or [],
+        "aggregate_strategies": summary.get("aggregate_strategies") or [],
+        "has_temp_blocks": bool(summary.get("has_temp_blocks")),
+        "hash_batches": sorted(
+            str(node.get("Hash Batches", node.get("Batches")))
+            for node in nodes
+            if node.get("Node Type") == "Hash"
+            and node.get("Hash Batches", node.get("Batches")) is not None
+        ),
+        "workers_planned": max(
+            [int(node.get("Workers Planned") or 0) for node in nodes] or [0]
+        ),
+        "workers_launched": max(
+            [int(node.get("Workers Launched") or 0) for node in nodes] or [0]
+        ),
+    }
+
+
+def relative_difference(first: Any, second: Any) -> float | None:
+    try:
+        first_number = float(first)
+        second_number = float(second)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(first_number) or first_number == 0:
+        return None
+    return ((second_number - first_number) / first_number) * 100.0
+
+
+def run_case(
+    base: str, scenario: str, repetitions: int, warmups: int
+) -> dict[str, Any]:
+    body = {
+        "phase": "baseline",
+        "repetitions": repetitions,
+        "warmup_repetitions": warmups,
+        "parameters": SCENARIOS[scenario],
+    }
+    first = request(base, f"/api/workloads/{scenario}/runs", body)
+    second = request(base, f"/api/workloads/{scenario}/runs", body)
+    first_obs, second_obs = observed(first), observed(second)
+    return {
+        "scenario": scenario,
+        "parameters": SCENARIOS[scenario],
+        "run_a": first,
+        "run_b": second,
+        "comparison": {
+            "same_plan_signature": plan_signature(first_obs) == plan_signature(second_obs),
+            "plan_a": plan_signature(first_obs),
+            "plan_b": plan_signature(second_obs),
+            "same_result": first_obs.get("result") == second_obs.get("result"),
+            "median_difference_pct": relative_difference(
+                first_obs.get("median_query_time_ms"),
+                second_obs.get("median_query_time_ms"),
+            ),
+            "p95_difference_pct": relative_difference(
+                first_obs.get("p95_query_time_ms"),
+                second_obs.get("p95_query_time_ms"),
+            ),
+            "action_proposal_observed_but_not_applied": bool(
+                first.get("action_proposal") or second.get("action_proposal")
+            ),
+        },
+    }
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--output", default="aa-control-results.json")
+    parser.add_argument("--repetitions", type=int, default=7)
+    parser.add_argument("--warmups", type=int, default=2)
+    parser.add_argument(
+        "--scenario", action="append", choices=sorted(SCENARIOS), dest="scenarios"
+    )
+    args = parser.parse_args()
+    if not 1 <= args.repetitions <= 50:
+        parser.error("--repetitions must be between 1 and 50")
+    if not 0 <= args.warmups <= 10:
+        parser.error("--warmups must be between 0 and 10")
+    scenarios = args.scenarios or list(SCENARIOS)
+    records = [
+        run_case(args.base_url, scenario, args.repetitions, args.warmups)
+        for scenario in scenarios
+    ]
+    failures = [
+        row["scenario"]
+        for row in records
+        if not row["comparison"]["same_plan_signature"]
+        or not row["comparison"]["same_result"]
+    ]
+    output = {
+        "format": "keeninsight-aa-control-v1",
+        "protocol": {
+            "timed_repetitions_per_arm": args.repetitions,
+            "warmup_repetitions_per_arm": args.warmups,
+            "scenarios": scenarios,
+            "no_tuning_action_applied": True,
+        },
+        "status": "passed" if not failures else "failed",
+        "failures": failures,
+        "cases": records,
+    }
+    target = Path(args.output)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        json.dumps(output, indent=2, ensure_ascii=False, default=str) + "\n"
+    )
+    print(
+        json.dumps(
+            {"status": output["status"], "failures": failures, "output": str(target)}
+        )
+    )
+    if failures:
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()

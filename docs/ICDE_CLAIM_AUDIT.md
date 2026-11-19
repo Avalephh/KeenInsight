@@ -1,0 +1,162 @@
+# ICDE claim audit: strict implementation
+
+Audit date: 2026-09-07.  This document compares the active paper source in
+`rag_sources/paper/` with the executable artifact.  The paper source was not
+edited to hide an implementation gap.  The artifact implements the described
+architecture on a PostgreSQL 12/16-compatible port; the exact MySQL symbols
+used by the original screenshots are called out separately.
+
+## Bottom line
+
+The current repository is no longer a static dashboard or a plan-only demo.
+Its live path is:
+
+```text
+PostgreSQL workload
+  -> BCC eBPF uprobes/kprobes
+  -> anomaly-aware kernel batching
+  -> Kafka + transactional PostgreSQL outbox
+  -> SQL lifecycle reconstruction
+  -> rules + XGBoost/TreeSHAP + differential profiling
+  -> LLVM CFG/SSA/source evidence + code retrieval/semantic summary
+  -> RAG/experience retrieval -> typed proposal, measured validation
+  -> explicit apply or opt-in automatic deployment/feedback/rollback
+  -> feedback, confidence update, rollback/cleanup
+```
+
+Every performance number in the checked-in artifacts is returned by the live
+PostgreSQL service.  No timing, event count, model label, Kafka delivery, or
+improvement percentage is inserted by the UI.
+
+The upstream branch comparison is maintained separately in
+[`docs/UPSTREAM_COMPATIBILITY_AUDIT.md`](UPSTREAM_COMPATIBILITY_AUDIT.md).
+In particular, the old WorkloadTune page contract is implemented as a live
+adapter, while the `dev` pgbench script, the `dream` agent environment, and
+the `db-replay` Go service are recorded as independent boundaries rather than
+being mistaken for PostgreSQL measurements produced by this process.
+
+## Paper-to-code matrix
+
+| Paper capability | Implementation and entry points | Verification and precise boundary |
+| --- | --- | --- |
+| Fine-grained event-driven monitoring | `app/ebpf_monitor.py`; BCC `uprobe`/`uretprobe` on PostgreSQL functions and `kprobe` on `vfs_write` | `artifacts/ebpf-smoke-strict.json` reports 208,611 real invocations and zero perf-buffer loss in session 40. Requires BCC privileges and a visible PostgreSQL process. |
+| Adaptive probe attachment | `app/probes.py`; `StandardScaler + Lasso`; `/api/ebpf/adapt` dynamically stops/starts the selected set | `artifacts/ebpf-overhead-strict.json` records measured rates and the rejected `BufFileWrite` probe. Optional user-space probes obey a 1,000 invocation/s empirical budget; mandatory `vfs_write` remains a kernel signal. |
+| Anomaly-aware message generation | Kernel-side normal-call aggregation, immediate emission for long/large events, periodic/user-space flush, exact batch count/duration/bytes fields | The smoke artifact checks exact lifecycle count reconstruction and zero loss. Batching reduces transport volume but does not pretend that a batch is one invocation. |
+| SQL lifecycle reconstruction | `sql_lifecycle_events`; `reconstruct_sql_lifecycle()` groups event stream records by local PostgreSQL SQL fingerprint/query ID and time interval | Session 40 materializes four lifecycle rows whose event-count sum equals the raw 208,611 invocation count. PostgreSQL 12 uses an explicit local fingerprint when `compute_query_id` is unavailable. |
+| System-level anomaly screening | Collector snapshots, threshold/incident rules, plan/counter signals, `/api/incidents` | Runtime snapshots and incidents are persisted. The database/host thresholds are visible in evidence; this is not claimed as a universal production detector. |
+| Pre-execution slow-query prediction | `app/modeling.py`; plan/config-only feature extraction; temporal XGBoost regressor; `/api/models/screen` | Model run 21: 371 train / 93 temporal holdout, RMSE 2.81 ms, MAE 1.10 ms, R² 0.99988 on the controlled clean fixture. Twenty-seven workload runs overlapping eBPF sessions are excluded from this model to avoid measuring observer overhead as query latency. |
+| SQL root-cause model | Temporal XGBoost multiclass classifier and TreeSHAP attribution; `/api/models/predict` | Model run 22 has six observed scenario classes, 371 train / 93 holdout, accuracy 1.0. This is a fixture result, not a claim of production-wide accuracy. |
+| Rule–model fusion | `/api/workload-runs/{id}/diagnose` combines persisted PostgreSQL plan rules with the root model and records agreement/decision | A real hash-spill run returns both rule and model `hash_join_spill` evidence; model and rule outputs remain separately inspectable. |
+| Differential profiling | eBPF event-vector deltas in `ModelManager.differential_profile()` | Profile 1 compares sessions 16 and 21; `BufFileWrite`, `vfs_write`, `PortalRun`, and `standard_ExecutorRun` deltas are taken from persisted events. |
+| Function-level SHAP | `_function_shap()` fits XGBoost on stopped probe sessions matched by timestamp to measured workload runs; TreeSHAP rows are persisted | Latest successful function model run 20 is ready and ranks actual `BufFileWrite`/`vfs_write` contributions. Failed historical training rows are retained as audit history; current code no longer uses the incompatible verbosity parameter. |
+| Code-level knob propagation | `app/llvm_analysis.py`; real PostgreSQL C source, clang-generated LLVM CFG/SSA def-use/global-to-SSA rows, call edges, source locators, and demand-driven cross-translation-unit graph | Source root is `third_party/postgresql-12.22`; the live database exposes 370 direct knob references, 25,184 persisted LLVM call-edge rows, 7,341 CFG rows, 28,061 SSA/data-flow rows, and 2,314 propagation rows. These are compiler-derived rows from the matching checkout; bounded cross-TU paths are labeled as graph evidence, not universal numeric proof. |
+| Compiler-backed code retrieval and summary | `SourceAnalyzer.retrieve_code_knowledge()` reads exact source snippets, groups CFG/SSA/propagation support by knob, and emits an experiment-required hypothesis; `code_knowledge` persists provenance and measured validation | `artifacts/code-knowledge-strict.json` retrieves 36 source/compiler contexts and two hypotheses. `artifacts/auto-resolve-strict.json` validates the selected code record with the same-SQL before/after experiment rather than accepting a textual claim. |
+| System tuning agent | `/api/system-tuning/recommend`; differential hotspots are joined to contextual plan/temp/parallel signals, RAG, and code knowledge, then converted to typed actions | The live system supports reviewed manual deployment and an opt-in `/api/workload-runs/{id}/auto-resolve` closed loop. `artifacts/auto-resolve-strict.json` records action 185: real `work_mem` 64 kB pressure, 8 MB deployment, 27.28% median / 27.81% p95 improvement, plan recovery, feedback, and rollback. |
+| Query hints | `app/optimizer.py`; allowlisted session-local `SET LOCAL` candidates for join/scan, memory, and parallel settings | Optimizer strict smoke measured candidates on the live database and checks exact result equivalence. No persistent database setting is changed by a hint candidate. |
+| Query rewriting | Conservative equality-disjunction → `IN` rewrite, read-only execution, order-sensitive/unordered result-bag hashing | The strict optimizer artifact includes a measured rewrite candidate. The rewriter rejects unsupported boolean nesting rather than rewriting arbitrary SQL. |
+| Index addition/removal | Existing validated `CREATE INDEX CONCURRENTLY` action; proposal-only zero-scan/non-constraint index removal path | Index changes require an explicit reviewed typed action. The optimizer never silently creates or drops an index. OID/definition validation protects rollback. |
+| Pairwise cost/ranking model | Measured candidate ranking plus `StandardScaler + pairwise LogisticRegression` when enough historical comparisons exist | Optimizer runs persist candidate measurements, semantic hashes, plan costs, and ranking method. The smoke artifact confirms completed runs and reviewed/rejected index proposal. |
+| Multi-source knowledge base | `rag_sources/` collection, PostgreSQL knowledge entries, runtime records, source analysis and tuning experiences | Static corpus contains paper/review/demo/project/external official/community material; runtime RAG mirrors workloads, actions, feedback, incidents, models, lifecycle, source, and optimizer records by stable keys. |
+| Tuning-derived experience | `app/experience.py`; TF-IDF + KMeans clusters, association rules with support/confidence/lift, measured-success confidence | Live database contains six experience clusters, 161+ measured feedback records, and association rules sourced from `tuning_feedback`, actions, and workload runs. |
+| Embedding retrieval | `app/vector_rag.py`; fastembed `BAAI/bge-small-en-v1.5`, 384-dimensional vectors in PostgreSQL, exact cosine and hybrid RRF | Vector and hybrid strict reports are checked in; the current index is synchronized through `/api/rag/vector/sync`. OOD exact-token gating prevents a high cosine score from fabricating a hit for an unrelated query. |
+| Optional LLM reasoning | Shared OpenAI-compatible client in `app/llm.py`, grounded RAG in `app/rag.py`, evidence explanations in `app/diagnose.py`, compiler-backed summaries in `app/llvm_analysis.py`, and typed optimizer candidates in `app/optimizer.py` | The client sends bounded evidence projections, requires citations for generated summaries/answers, and validates returned candidates. The deterministic extractive/rule/typed paths remain authoritative when no endpoint is configured or a call fails; this is an operational dependency, not a hidden claim of local model inference. |
+| Interactive demonstration | `app/static/index.html`/`app/static/app.js`; live workload, observation, diagnosis, tuning, RAG, lifecycle and export panels | Browser requests call the API and render returned rows. The runbook includes a monitoring → pressure → diagnosis → action → feedback → rollback walkthrough. |
+
+## Real evidence currently checked in
+
+### eBPF transport and overhead
+
+`artifacts/ebpf-smoke-strict.json` is a live PostgreSQL hash-spill smoke test:
+session 40 records 208,611 invocations, zero lost perf records, four
+query/function lifecycle rows, and Kafka producer delivery with zero failures.
+The kernel batch carries exact invocation counts, so the transport's lower
+message count is not reported as a lower workload count.
+
+`artifacts/ebpf-overhead-strict.json` is the required overhead control.  In
+the same fixture, directly attaching high-frequency `BufFileWrite` produced a
+real median overhead of 4,520.49% and p95 overhead of 4,452.83% versus a clean
+arm.  The Lasso plus measured event-rate budget rejected that probe and the
+adaptive arm measured 9.63% median and 10.88% p95 overhead, with identical
+result and spill-plan signals and zero event loss.  This is why the artifact
+does not claim that every possible probe set is low overhead: adaptive probe
+selection is part of the implementation and the bad probe result remains
+visible.
+
+### Database tuning causality
+
+The PostgreSQL 12.22 repeated protocol in
+`artifacts/final-regression-pg12.json` executes the same SQL before/after each
+typed intervention, requires identical results, checks a plan signal, and
+requires at least a five-percent median and p95 improvement for latency
+actions.  All five tunable scenarios pass in three repetitions and roll back.
+The independent A/A control in `artifacts/aa-control-results.json` applies no
+action and passes plan/result equality.  `artifacts/stats-case.json` treats
+`ANALYZE` separately: it verifies estimate/actual agreement and result
+preservation, because statistics refresh has no meaningful inverse.
+
+The current implementation also records an observer-overhead policy for ML:
+workload rows overlapping eBPF sessions are excluded from the pre-execution
+model training set, while they remain available to the function-level eBPF
+model.  This prevents a deliberately instrumented 4-second run from being
+silently treated as a database-only latency label.
+
+### Compiler-backed code retrieval and closed-loop validation
+
+The source layer is now independently inspectable from the tuning action.  A
+request to `/api/source-analysis/knowledge` retrieves source snippets from the
+same PostgreSQL checkout compiled by clang, returns CFG/SSA/data-flow and
+cross-translation-unit support rows, and produces a deterministic semantic
+hypothesis that explicitly requires a targeted experiment.  Runtime records
+are stored in `keeninsight.code_knowledge` with source-analysis IDs,
+locators, digests, and validation state.  The automatic workload endpoint
+then performs the targeted same-SQL before/after experiment and folds its
+result into that record's confidence.
+
+`artifacts/auto-resolve-strict.json` is the end-to-end check: baseline run 561
+used session `work_mem=64kB`; the server generated and deployed typed action
+185 (`work_mem=8MB`), ran after run 562 using the recorded SQL and parameters,
+observed 32 → 1 hash batches and no temporary blocks, measured 27.28% median
+and 27.81% p95 improvement with equal results, validated the code-knowledge
+record, and rolled the setting back.  The endpoint is opt-in; its mutation
+path is server-side typed code, not executable RAG or LLM text.
+
+`artifacts/ebpf-auto-adapt-strict.json` adds the online path: session 41
+measured `BufFileWrite` above the 1,000 invocations/s budget, detached that
+user-space probe during the real spill workload, retained the `vfs_write`
+kernel signal, and observed no perf-buffer loss.  `artifacts/ebpf-long-query-strict.json`
+separately verifies immediate emission for a real `pg_sleep(3.0)`
+query and records `long_function_or_duration` and `long_query` anomaly reasons.
+
+## Exact limitations that remain visible
+
+1. The live port is PostgreSQL.  The original paper/demo material contains
+   MySQL-specific example names such as `log_buffer_flush_to_disk` and
+   `HashJoin(off)`.  The executable demonstrates the corresponding real
+   PostgreSQL mechanisms—hash/aggregate/sort spill, worker underprovisioning,
+   locks, statistics, hints, rewrites, and validated index proposals—but does
+   not claim that those MySQL functions ran on PostgreSQL.
+2. eBPF requires a compatible kernel, BCC, tracing privileges, and a process
+   namespace where the PostgreSQL executable is visible.  When these are not
+   present, the API reports the attach/compiler error and the PostgreSQL
+   collector remains usable; it never fabricates eBPF events.
+3. The external LLM is optional.  With no endpoint, grounded extractive RAG
+   and evidence-rule candidate generation are used; all mutation and
+   verification gates remain active.
+4. The PostgreSQL 12 data set is controlled and small (20,000 customers,
+   800,000 orders, 20 accounts, and a 50,000-row statistics probe).  Model
+   metrics and improvement percentages must be reported with the machine,
+   server version, data cardinality, and raw samples.
+5. LLVM evidence is source-backed and compiler-backed: the matching checkout
+   is compiled into LLVM IR and the artifact persists CFG edges, local SSA
+   def-use/global-to-SSA paths, direct knob locators, and bounded demand-driven
+   cross-translation-unit call-graph paths.  It is not a universal whole
+   program proof for every DBMS build: source, headers, compiler flags, and
+   the bounded graph frontier must match the analyzed deployment, and every
+   numeric tuning effect is still required to pass a PostgreSQL experiment.
+6. The Compose target is PostgreSQL 16, while the checked-in numerical run is
+   PostgreSQL 12.22.  `docs/PG16_VALIDATION.md` remains `not_run` when Docker
+   is unavailable; no PostgreSQL 12 result is relabeled as PostgreSQL 16.
+
+These are deployment and evaluation boundaries, not reasons to remove the
+implemented architecture from the paper.  The raw artifacts and API manifest
+are the reviewable source of truth.

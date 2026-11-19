@@ -1,0 +1,319 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from .db import Database
+
+
+# These are small, source-attributed PostgreSQL facts rather than fabricated
+# incident outputs.  They are deliberately generic; the observed context and
+# the actual plan remain the source of each recommendation.
+DEFAULT_KNOWLEDGE = [
+    {
+        "source_type": "postgresql-documentation",
+        "title": "Hash operations can spill to temporary files",
+        "root_cause": "hash_join_spill",
+        "context": {"plan_signals": ["Node Type=Hash", "Batches>1", "Temp Written Blocks>0"]},
+        "action_type": "set_database_parameter",
+        "action_template": {"parameter": "work_mem", "scope": "database"},
+        "provenance": "https://www.postgresql.org/docs/16/runtime-config-resource.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "EXPLAIN buffers expose temporary blocks used by hashes and sorts",
+        "root_cause": "temporary_file_spill",
+        "context": {"plan_signals": ["Temp Read Blocks", "Temp Written Blocks"]},
+        "action_type": None,
+        "action_template": {},
+        "provenance": "https://www.postgresql.org/docs/16/sql-explain.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "Grouped aggregates can spill sort state under low work_mem",
+        "root_cause": "aggregate_spill",
+        "context": {
+            "plan_signals": [
+                "Aggregate",
+                "Sort Method=external merge",
+                "Temp Written Blocks>0",
+            ]
+        },
+        "action_type": "set_database_parameter",
+        "action_template": {"parameter": "work_mem", "scope": "database"},
+        "provenance": "https://www.postgresql.org/docs/16/runtime-config-resource.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "Window sorts can spill to disk when work_mem is insufficient",
+        "root_cause": "sort_spill",
+        "context": {
+            "plan_signals": [
+                "Node Type=Sort",
+                "Sort Method=external merge",
+                "Sort Space Type=Disk",
+                "Temp Written Blocks>0",
+            ]
+        },
+        "action_type": "set_database_parameter",
+        "action_template": {"parameter": "work_mem", "scope": "database"},
+        "provenance": "https://www.postgresql.org/docs/16/runtime-config-resource.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "Parallel query workers are bounded by PostgreSQL worker settings",
+        "root_cause": "parallel_query_underprovisioned",
+        "context": {
+            "plan_signals": ["Gather/Gather Merge", "Workers Planned", "Workers Launched"],
+            "settings": [
+                "max_parallel_workers_per_gather",
+                "max_parallel_workers",
+                "max_worker_processes",
+            ],
+        },
+        "action_type": "set_database_parameter",
+        "action_template": {
+            "parameter": "max_parallel_workers_per_gather",
+            "scope": "database",
+        },
+        "provenance": "https://www.postgresql.org/docs/16/how-parallel-query-works.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "EXPLAIN plans identify sequential and index scans",
+        "root_cause": "filtered_sequential_scan",
+        "context": {"plan_signals": ["Node Type=Seq Scan", "Filter"]},
+        "action_type": "create_index",
+        "action_template": {"requires": ["validated relation", "validated columns"]},
+        "provenance": "https://www.postgresql.org/docs/16/using-explain.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "ANALYZE refreshes planner statistics after data changes",
+        "root_cause": "stale_statistics",
+        "context": {
+            "signals": ["estimated rows diverge from actual rows", "distribution shift"],
+            "verification": ["EXPLAIN ANALYZE", "pg_stat_user_tables.last_analyze"],
+        },
+        "action_type": "refresh_statistics",
+        "action_template": {"operation": "ANALYZE", "scope": "validated user table"},
+        "provenance": "https://www.postgresql.org/docs/16/sql-analyze.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "Database connection saturation is bounded by max_connections",
+        "root_cause": "connection_saturation",
+        "context": {"signals": ["numbackends/max_connections"]},
+        "action_type": None,
+        "action_template": {},
+        "provenance": "https://www.postgresql.org/docs/16/runtime-config-connection.html",
+        "verified": True,
+    },
+    {
+        "source_type": "postgresql-documentation",
+        "title": "Blocking sessions are visible through pg_locks and pg_blocking_pids",
+        "root_cause": "lock_wait",
+        "context": {"signals": ["pg_locks.granted=false"]},
+        "action_type": None,
+        "action_template": {},
+        "provenance": "https://www.postgresql.org/docs/16/view-pg-locks.html",
+        "verified": True,
+    },
+]
+
+
+def ensure_knowledge(db: Database) -> None:
+    with db.connection() as conn:
+        with conn.cursor() as cur:
+            for entry in DEFAULT_KNOWLEDGE:
+                cur.execute(
+                    """
+                    INSERT INTO keeninsight.knowledge_entries
+                        (source_type, title, root_cause, context, action_type,
+                         action_template, provenance, verified)
+                    VALUES (%s, %s, %s, %s::jsonb, %s, %s::jsonb, %s, %s)
+                    ON CONFLICT (source_type, title) DO NOTHING
+                    """,
+                    (
+                        entry["source_type"],
+                        entry["title"],
+                        entry["root_cause"],
+                        json.dumps(entry["context"]),
+                        entry["action_type"],
+                        json.dumps(entry["action_template"]),
+                        entry["provenance"],
+                        entry["verified"],
+                    ),
+                )
+            cur.execute(
+                """
+                UPDATE keeninsight.knowledge_entries
+                SET confidence = 1.0, updated_at = now()
+                WHERE source_type = 'postgresql-documentation'
+                  AND feedback_count = 0
+                """
+            )
+            cur.execute(
+                """
+                UPDATE keeninsight.knowledge_entries
+                SET confidence = (success_count + 1.0) / (feedback_count + 2.0)
+                WHERE source_type = 'tuning-feedback'
+                """
+            )
+
+
+def record_feedback_knowledge(
+    db: Database,
+    *,
+    root_cause: str,
+    scenario: str,
+    action: dict[str, Any],
+    outcome: dict[str, Any],
+    baseline_run_id: int,
+    after_run_id: int,
+) -> dict[str, Any]:
+    """Fold a measured workload outcome into empirical, source-attributed KB.
+
+    The entry is an aggregate, while its context retains the latest measured
+    comparison and the run IDs needed to audit it.  Confidence is a smoothed
+    proportion of successful observations; it is never a model prediction and
+    is not initialized from a fabricated benchmark result.
+    """
+    title = f"Measured {action['action_type']} outcome for {scenario}"
+    provenance = f"workload_runs:{baseline_run_id}->{after_run_id}"
+    success = 1 if outcome.get("effective") else 0
+    sample = {
+        "baseline_run_id": baseline_run_id,
+        "after_run_id": after_run_id,
+        "effective": bool(outcome.get("effective")),
+        "observed_effect": outcome.get("observed_effect"),
+        "median_improvement_pct": outcome.get("median_improvement_pct"),
+        "p95_improvement_pct": outcome.get("p95_improvement_pct"),
+        "plan_change": outcome.get("plan_change"),
+    }
+    with db.connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, context, feedback_count, success_count, failure_count
+                FROM keeninsight.knowledge_entries
+                WHERE source_type = 'tuning-feedback' AND title = %s
+                FOR UPDATE
+                """,
+                (title,),
+            )
+            existing = cur.fetchone()
+            if existing:
+                feedback_count = int(existing.get("feedback_count") or 0) + 1
+                success_count = int(existing.get("success_count") or 0) + success
+                failure_count = int(existing.get("failure_count") or 0) + (1 - success)
+                context = dict(existing.get("context") or {})
+                samples = list(context.get("samples") or [])
+                samples.append(sample)
+                # Keep the KB row bounded while the normalized feedback table
+                # remains the complete source of empirical history.
+                context["samples"] = samples[-20:]
+                context["last_observation"] = outcome
+                cur.execute(
+                    """
+                    UPDATE keeninsight.knowledge_entries
+                    SET context = %s::jsonb,
+                        feedback_count = %s,
+                        success_count = %s,
+                        failure_count = %s,
+                        confidence = (%s + 1.0) / (%s + 2.0),
+                        last_feedback_at = now(),
+                        updated_at = now(),
+                        verified = TRUE
+                    WHERE id = %s
+                    RETURNING id, source_type, title, root_cause, context,
+                              action_type, action_template, provenance,
+                              verified, confidence, feedback_count, success_count,
+                              failure_count, last_feedback_at, updated_at, created_at
+                    """,
+                    (
+                        json.dumps(context, default=str),
+                        feedback_count,
+                        success_count,
+                        failure_count,
+                        success_count,
+                        feedback_count,
+                        existing["id"],
+                    ),
+                )
+            else:
+                context = {
+                    "scenario": scenario,
+                    "action_target": action.get("target") or {},
+                    "samples": [sample],
+                    "last_observation": outcome,
+                }
+                cur.execute(
+                    """
+                    INSERT INTO keeninsight.knowledge_entries
+                        (source_type, title, root_cause, context, action_type,
+                         action_template, provenance, verified, confidence,
+                         feedback_count, success_count, failure_count,
+                         last_feedback_at, updated_at)
+                    VALUES ('tuning-feedback', %s, %s, %s::jsonb, %s,
+                            %s::jsonb, %s, TRUE, (%s + 1.0) / 3.0,
+                            1, %s, %s, now(), now())
+                    RETURNING id, source_type, title, root_cause, context,
+                              action_type, action_template, provenance,
+                              verified, confidence, feedback_count, success_count,
+                              failure_count, last_feedback_at, updated_at, created_at
+                    """,
+                    (
+                        title,
+                        root_cause,
+                        json.dumps(context, default=str),
+                        action.get("action_type"),
+                        json.dumps(action.get("target") or {}, default=str),
+                        provenance,
+                        success,
+                        success,
+                        1 - success,
+                    ),
+                )
+            row = cur.fetchone()
+    if not row:
+        raise RuntimeError("could not persist empirical knowledge")
+    return row
+
+
+def list_knowledge(
+    db: Database, *, root_cause: str | None = None, limit: int = 100
+) -> list[dict[str, Any]]:
+    if root_cause:
+        return db.fetch_all(
+            """
+            SELECT id, source_type, title, root_cause, context, action_type,
+                   action_template, provenance, verified, confidence,
+                   feedback_count, success_count, failure_count,
+                   last_feedback_at, updated_at, created_at
+            FROM keeninsight.knowledge_entries
+            WHERE root_cause = %s
+            ORDER BY verified DESC, created_at DESC
+            LIMIT %s
+            """,
+            (root_cause, max(1, min(limit, 500))),
+        )
+    return db.fetch_all(
+        """
+        SELECT id, source_type, title, root_cause, context, action_type,
+               action_template, provenance, verified, confidence,
+               feedback_count, success_count, failure_count,
+               last_feedback_at, updated_at, created_at
+        FROM keeninsight.knowledge_entries
+        ORDER BY verified DESC, created_at DESC
+        LIMIT %s
+        """,
+        (max(1, min(limit, 500)),),
+    )

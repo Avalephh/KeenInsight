@@ -1,0 +1,130 @@
+#!/usr/bin/env python3
+"""Run the non-index stale-statistics maintenance demonstration.
+
+The case deliberately ends with a completed ANALYZE action rather than a
+rollback: planner statistics have no meaningful inverse.  The final clean
+call restores the isolated probe distribution and preserves all evidence.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+
+def request(
+    base_url: str,
+    path: str,
+    method: str = "GET",
+    body: Optional[Dict[str, Any]] = None,
+    timeout: int = 180,
+) -> Any:
+    data = json.dumps(body).encode("utf-8") if body is not None else None
+    req = urllib.request.Request(
+        base_url.rstrip("/") + path,
+        data=data,
+        method=method,
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(f"{method} {path} -> HTTP {exc.code}: {detail}") from exc
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base-url", default="http://127.0.0.1:8000")
+    parser.add_argument("--repetitions", type=int, default=7)
+    parser.add_argument("--warmups", type=int, default=2)
+    parser.add_argument("--output", type=Path, default=Path("artifacts/stats-case.json"))
+    args = parser.parse_args()
+    if not 1 <= args.repetitions <= 50:
+        parser.error("--repetitions must be between 1 and 50")
+    if not 0 <= args.warmups <= 10:
+        parser.error("--warmups must be between 0 and 10")
+
+    output: Dict[str, Any] = {
+        "format": "keeninsight-stats-case-v1",
+        "started_at": time.time(),
+        "protocol": {
+            "scenario": "stale_statistics",
+            "timed_repetitions": args.repetitions,
+            "warmup_repetitions": args.warmups,
+            "rollback": "not_applicable_for_analyze",
+        },
+    }
+    failure: Optional[BaseException] = None
+    clean_error: Optional[str] = None
+    try:
+        output["health"] = request(args.base_url, "/api/health")
+        output["manifest"] = request(args.base_url, "/api/demo/manifest")
+        output["bootstrap"] = request(args.base_url, "/api/demo/bootstrap", "POST")
+        parameters = {
+            "phase": "baseline",
+            "repetitions": args.repetitions,
+            "warmup_repetitions": args.warmups,
+            "parameters": {},
+        }
+        baseline = request(
+            args.base_url, "/api/workloads/stale_statistics/runs", "POST", parameters
+        )
+        output["baseline"] = baseline
+        action = request(
+            args.base_url,
+            f"/api/workload-runs/{baseline['run_id']}/propose",
+            "POST",
+        )
+        output["action"] = action
+        output["applied"] = request(
+            args.base_url, f"/api/actions/{action['id']}/apply", "POST"
+        )
+        after = dict(parameters)
+        after["phase"] = "after"
+        output["after"] = request(
+            args.base_url, "/api/workloads/stale_statistics/runs", "POST", after
+        )
+        output["feedback"] = request(
+            args.base_url,
+            f"/api/actions/{action['id']}/feedback",
+            "POST",
+            {
+                "baseline_run_id": baseline["run_id"],
+                "after_run_id": output["after"]["run_id"],
+            },
+        )
+    except BaseException as exc:
+        # Preserve the failing step in the artifact while still attempting a
+        # scoped cleanup.  A cleanup failure must not hide the original error.
+        failure = exc
+        output["error"] = str(exc)
+    finally:
+        try:
+            output["clean"] = request(args.base_url, "/api/demo/clean", "POST")
+        except Exception as exc:
+            clean_error = str(exc)
+            output["clean_error"] = clean_error
+        output["finished_at"] = time.time()
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(
+            json.dumps(output, indent=2, ensure_ascii=False, default=str) + "\n",
+            encoding="utf-8",
+        )
+    if failure is not None:
+        raise failure
+    if clean_error is not None:
+        raise RuntimeError(f"demo cleanup failed: {clean_error}")
+    outcome = (output.get("feedback") or {}).get("feedback", {}).get("outcome", {})
+    print(json.dumps({"observed_effect": outcome.get("observed_effect"), "effective": outcome.get("effective")}, indent=2))
+    print(f"Wrote stale-statistics evidence to {args.output}")
+
+
+if __name__ == "__main__":
+    main()

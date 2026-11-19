@@ -1,0 +1,57 @@
+SOURCE_KEY: project:tests/test_collector.py
+SOURCE_TYPE: implementation
+SOURCE_TITLE: tests/test_collector.py
+SOURCE_URI: project://tests/test_collector.py
+---
+import pytest
+
+from app.collector import Collector, _summarize_query_latency
+
+class FakeDatabase:
+def __init__(self, rowcount=0):
+self.rowcount = rowcount
+self.calls = []
+
+def execute(self, statement, params=()):
+self.calls.append((statement, params))
+return self.rowcount
+
+def test_snapshot_retention_cleanup_is_configured_and_auditable():
+db = FakeDatabase(rowcount=17)
+collector = Collector(
+db,
+interval_seconds=5,
+retention_hours=24,
+cleanup_interval_seconds=60,
+)
+
+assert collector.prune_snapshots(force=True) == 17
+assert len(db.calls) == 1
+statement, params = db.calls[0]
+assert "DELETE FROM keeninsight.snapshots" in statement
+assert "CURRENT_TIMESTAMP" in statement
+assert "INTERVAL '1 hour'" in statement
+assert params == (24.0,)
+assert collector.status()["last_snapshot_deleted"] == 17
+assert collector.status()["snapshots_deleted_total"] == 17
+
+def test_snapshot_retention_rejects_a_window_shorter_than_one_hour():
+with pytest.raises(ValueError, match="at least 1 hour"):
+Collector(FakeDatabase(), interval_seconds=5, retention_hours=0.5)
+
+def test_query_latency_summary_excludes_control_statements_and_exposes_basis():
+result = _summarize_query_latency(
+[
+{"query": "BEGIN", "calls": 100, "total_exec_time_ms": 1},
+{"query": "SELECT * FROM orders", "calls": 10, "total_exec_time_ms": 100},
+{"query": "SELECT * FROM customers", "calls": 1, "total_exec_time_ms": 500},
+],
+coverage_complete=False,
+)
+
+assert result["available"] is True
+assert result["sample_count"] == 2
+assert result["calls"] == 11
+assert result["p95_ms"] == 500
+assert result["coverage_complete"] is False
+assert "语句均值" in result["basis"]

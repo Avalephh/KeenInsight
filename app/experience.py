@@ -1,0 +1,186 @@
+"""Mine reusable tuning experiences from measured feedback."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+from collections import Counter
+from datetime import datetime, timezone
+from typing import Any
+
+from .db import Database
+
+
+class ExperienceMiningError(RuntimeError):
+    pass
+
+
+class ExperienceMiner:
+    def __init__(self, db: Database) -> None:
+        self.db = db
+
+    def status(self) -> dict[str, Any]:
+        rows = self.db.fetch_one("SELECT count(*)::int AS count, max(updated_at) AS latest_update FROM keeninsight.tuning_experiences") or {}
+        feedback = self.db.fetch_one("SELECT count(*)::int AS count FROM keeninsight.tuning_feedback") or {}
+        return {"experience_count": int(rows.get("count") or 0), "latest_update": rows.get("latest_update"), "feedback_count": int(feedback.get("count") or 0), "algorithm": "TF-IDF + KMeans + association rules + measured success confidence"}
+
+    @staticmethod
+    def _association_rules(rows: list[dict[str, Any]], *, minimum_pair_count: int = 2) -> list[dict[str, Any]]:
+        """Mine one-item antecedent -> action rules from measured feedback.
+
+        The items are facts observed in the feedback record (scenario, root
+        cause, plan root and effectiveness), while the consequent is the
+        action that was actually measured.  Support, confidence and lift are
+        retained so retrieval can distinguish a repeated successful pattern
+        from a one-off action.
+        """
+        antecedent_counts: Counter[str] = Counter()
+        pair_counts: Counter[tuple[str, str]] = Counter()
+        action_counts: Counter[str] = Counter()
+        total = max(1, len(rows))
+        for row in rows:
+            outcome = row.get("outcome") or {}
+            baseline = row.get("baseline_observations") or {}
+            action = "action:%s" % str(row.get("action_type") or "unknown")
+            items = {
+                "scenario:%s" % str(row.get("baseline_scenario") or "unknown"),
+                "root_cause:%s" % str(outcome.get("root_cause") or row.get("baseline_scenario") or "unknown"),
+                "plan_root:%s" % str((baseline.get("plan_summary") or {}).get("root_node") or "unknown"),
+                "effective:%s" % ("true" if bool(outcome.get("effective")) else "false"),
+            }
+            action_counts[action] += 1
+            for item in items:
+                antecedent_counts[item] += 1
+                pair_counts[(item, action)] += 1
+        rules = []
+        for (antecedent, action), pair_count in pair_counts.items():
+            if pair_count < max(1, int(minimum_pair_count)):
+                continue
+            antecedent_count = antecedent_counts[antecedent]
+            action_count = action_counts[action]
+            confidence = pair_count / max(1.0, antecedent_count)
+            action_support = action_count / total
+            rules.append(
+                {
+                    "antecedent": antecedent,
+                    "consequent": action,
+                    "pair_count": int(pair_count),
+                    "support": float(pair_count / total),
+                    "confidence": float(confidence),
+                    "lift": float(confidence / max(1e-12, action_support)),
+                }
+            )
+        rules.sort(key=lambda item: (item["confidence"], item["support"], item["lift"]), reverse=True)
+        return rules[:50]
+
+    def mine(self, *, max_clusters: int = 8) -> dict[str, Any]:
+        try:
+            import numpy as np
+            from sklearn.cluster import KMeans
+            from sklearn.feature_extraction.text import TfidfVectorizer
+        except Exception as exc:
+            raise ExperienceMiningError("experience mining requires numpy and scikit-learn: %s" % exc) from exc
+        rows = self.db.fetch_all(
+            """
+            SELECT f.id, f.action_id, f.baseline_run_id, f.after_run_id,
+                   f.outcome, a.action_type, a.target,
+                   b.scenario AS baseline_scenario,
+                   b.observations AS baseline_observations,
+                   af.observations AS after_observations
+            FROM keeninsight.tuning_feedback f
+            JOIN keeninsight.tuning_actions a ON a.id = f.action_id
+            JOIN keeninsight.workload_runs b ON b.id = f.baseline_run_id
+            JOIN keeninsight.workload_runs af ON af.id = f.after_run_id
+            ORDER BY f.id
+            """
+        )
+        if len(rows) < 3:
+            raise ExperienceMiningError("at least three measured feedback records are required; found %d" % len(rows))
+        texts = []
+        for row in rows:
+            outcome = row.get("outcome") or {}
+            baseline = row.get("baseline_observations") or {}
+            texts.append(" ".join(str(item) for item in (row.get("baseline_scenario"), row.get("action_type"), outcome.get("root_cause"), outcome.get("observed_effect"), (baseline.get("plan_summary") or {}).get("root_node"))))
+        vectorizer = TfidfVectorizer(token_pattern=r"(?u)\b[\w.-]+\b", lowercase=True)
+        matrix = vectorizer.fit_transform(texts)
+        cluster_count = min(max(1, int(max_clusters)), max(1, int(math.sqrt(len(rows)))))
+        cluster_count = min(cluster_count, len(rows))
+        if cluster_count > 1:
+            model = KMeans(n_clusters=cluster_count, n_init=10, random_state=17)
+            labels = model.fit_predict(matrix)
+        else:
+            labels = np.zeros(len(rows), dtype=int)
+        association_rules = self._association_rules(rows)
+        experiences = []
+        for cluster_id in sorted(set(int(label) for label in labels)):
+            cluster_rows = [row for row, label in zip(rows, labels) if int(label) == cluster_id]
+            scenarios = Counter(str(row.get("baseline_scenario") or "unknown") for row in cluster_rows)
+            actions = Counter(str(row.get("action_type") or "unknown") for row in cluster_rows)
+            roots = Counter(str((row.get("outcome") or {}).get("root_cause") or scenarios.most_common(1)[0][0]) for row in cluster_rows)
+            success = sum(1 for row in cluster_rows if bool((row.get("outcome") or {}).get("effective")))
+            improvements = [_number((row.get("outcome") or {}).get("median_improvement_pct")) for row in cluster_rows]
+            root = roots.most_common(1)[0][0]
+            action = actions.most_common(1)[0][0]
+            fingerprint = hashlib.sha256((root + "|" + action + "|" + ",".join(sorted(scenarios))).encode("utf-8")).hexdigest()
+            context = {
+                "scenarios": dict(scenarios),
+                "action_types": dict(actions),
+                "median_improvement_pct": _median([value for value in improvements if value is not None]),
+                "feedback_ids": [int(row["id"]) for row in cluster_rows],
+                "association_rules": self._association_rules(cluster_rows),
+                "algorithm": "TF-IDF + KMeans + association rules over measured feedback context",
+            }
+            provenance = {"feedback_ids": context["feedback_ids"], "source_tables": ["tuning_feedback", "tuning_actions", "workload_runs"], "mining": "association support/confidence/lift"}
+            row = self.db.fetch_one(
+                """
+                INSERT INTO keeninsight.tuning_experiences
+                    (fingerprint, cluster_id, context, root_cause, action,
+                     support, success_count, confidence, provenance)
+                VALUES (%s, %s, %s::jsonb, %s, %s::jsonb, %s, %s, %s, %s::jsonb)
+                ON CONFLICT (fingerprint) DO UPDATE SET
+                    cluster_id = EXCLUDED.cluster_id, context = EXCLUDED.context,
+                    root_cause = EXCLUDED.root_cause, action = EXCLUDED.action,
+                    support = EXCLUDED.support, success_count = EXCLUDED.success_count,
+                    confidence = EXCLUDED.confidence, provenance = EXCLUDED.provenance,
+                    updated_at = now()
+                RETURNING id, fingerprint, cluster_id, context, root_cause, action,
+                          support, success_count, confidence, provenance, created_at, updated_at
+                """,
+                (fingerprint, cluster_id, _json(context), root, _json({"action_type": action}), len(cluster_rows), success, success / max(1.0, len(cluster_rows)), _json(provenance)),
+            )
+            experiences.append(row)
+        return {"algorithm": "TF-IDF + KMeans + association rules + measured success confidence", "feedback_count": len(rows), "cluster_count": len(experiences), "association_rules": association_rules, "experiences": experiences, "status": self.status()}
+
+    def list(self, limit: int = 100) -> list[dict[str, Any]]:
+        return self.db.fetch_all(
+            """
+            SELECT id, fingerprint, cluster_id, context, root_cause, action,
+                   support, success_count, confidence, provenance, created_at, updated_at
+            FROM keeninsight.tuning_experiences
+            ORDER BY confidence DESC, support DESC, updated_at DESC LIMIT %s
+            """,
+            (max(1, min(int(limit), 500)),),
+        )
+
+
+def _number(value: Any) -> float | None:
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return value if math.isfinite(value) else None
+
+
+def _median(values: list[float]) -> float | None:
+    if not values:
+        return None
+    values = sorted(values)
+    middle = len(values) // 2
+    if len(values) % 2:
+        return values[middle]
+    return (values[middle - 1] + values[middle]) / 2.0
+
+
+def _json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, default=str, separators=(",", ":"))

@@ -1,0 +1,84 @@
+SOURCE_KEY: archive:legacy-demo:English/sql-detail.html
+SOURCE_TYPE: legacy-demo
+SOURCE_TITLE: sql-detail.html
+SOURCE_URI: English.zip!English/sql-detail.html
+---
+KeenInsight - SQL Detail
+
+KeenInsight
+
+Performance Monitoring
+
+Security Audit
+
+Capacity Planning
+
+System Settings
+
+admin
+
+Overview
+
+Clusters
+
+Real-time Monitor
+
+System level
+
+Alert List
+
+Alert Rules
+
+SQL level
+
+SQL Logs
+
+Diagnosis Rules
+
+System Settings
+
+System Config
+
+User Management
+
+Knowledge Base
+
+Manual
+
+Code Source
+
+Tuning-derived Knowledge
+
+SQL Detail
+
+Back to List
+
+×
+
+SQL Lifecycle Flame Graph
+
+Related Knowledge Base
+
+Manual
+
+Hash Join Spill Principle
+
+Hash Join has two phases: Build phase and Probe phase. In the Build phase, data from the smaller table is loaded into an in-memory Hash Table. When the data exceeds available memory, the database must write some Hash Buckets to disk, a process called Spill, implemented through the ExecHashJoinSaveTuple() function. Frequent spill causes severe performance degradation.
+
+Spill Performance Impact
+
+Disk I/O is several orders of magnitude slower than memory. When spill occurs, query execution time may increase by 10-100 times. Main reasons include: 1) Serialization and deserialization overhead; 2) Disk read/write latency; 3) Multiple scans of disk data.
+
+Tuning-derived Knowledge
+
+2026-02-18 Order Query OR Condition Optimization
+
+Similar scenario: Query with OR predicates, optimizer failed to select appropriate index, leading to full table scan. Problem solved by adding INDEX_MERGE hint to use multiple indexes efficiently.
+
+Result: Query time reduced from 12.3s to 0.5s, 95.9% improvement
+
+2026-03-10 Customer Report Query Optimization
+
+Similar scenario: Inefficient query plan with suboptimal join strategy. Optimization approach: 1) Add query hints to guide optimizer; 2) Create composite indexes; 3) Simplify query structure.
+
+Result: Query average response time reduced by 82%

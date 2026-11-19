@@ -1,0 +1,1866 @@
+{
+  "format": "keeninsight-rag-evaluation-report-v1",
+  "evaluated_at": "2026-09-07T05:18:26Z",
+  "base_url": "http://127.0.0.1:8000",
+  "question_file": "evaluation/rag_questions.json",
+  "top_k": 5,
+  "mode": "hybrid",
+  "duration_seconds": 0.955,
+  "environment": {
+    "server": {
+      "database_name": "keeninsight",
+      "current_user": "keeninsight",
+      "server_address": "::1/128",
+      "server_port": 5432,
+      "server_version": "12.22 (Ubuntu 12.22-0ubuntu0.20.04.4)",
+      "server_version_num": "120022",
+      "track_io_timing": "on",
+      "compute_query_id": null,
+      "postmaster_start_time": "2026-09-04T16:06:09.907929+08:00"
+    },
+    "static_manifest": {
+      "available": true,
+      "path": "rag_sources/manifest.json",
+      "format": "keeninsight-rag-sources-v1",
+      "record_count": 87,
+      "source_type_counts": {
+        "design": 12,
+        "paper": 5,
+        "supplemental-pdf": 9,
+        "supplemental": 2,
+        "legacy-demo": 12,
+        "review": 1,
+        "deployment": 8,
+        "implementation": 32,
+        "evaluation-data": 6
+      },
+      "sha256": "4e2ca6ea87dcaf5bdfa5ba6ee20c126ee5fb9915e388e8e65ed7723727ec3e95"
+    },
+    "rag_database": {
+      "documents": 694,
+      "chunks": 3020,
+      "latest_update": "2026-09-07T13:17:38.823375+08:00",
+      "source_types": [
+        {
+          "source_type": "deployment",
+          "documents": 8
+        },
+        {
+          "source_type": "design",
+          "documents": 12
+        },
+        {
+          "source_type": "evaluation-data",
+          "documents": 6
+        },
+        {
+          "source_type": "external-community",
+          "documents": 8
+        },
+        {
+          "source_type": "external-official",
+          "documents": 5
+        },
+        {
+          "source_type": "implementation",
+          "documents": 32
+        },
+        {
+          "source_type": "knowledge-entry",
+          "documents": 15
+        },
+        {
+          "source_type": "legacy-demo",
+          "documents": 12
+        },
+        {
+          "source_type": "paper",
+          "documents": 5
+        },
+        {
+          "source_type": "review",
+          "documents": 1
+        },
+        {
+          "source_type": "runtime-action",
+          "documents": 100
+        },
+        {
+          "source_type": "runtime-feedback",
+          "documents": 100
+        },
+        {
+          "source_type": "runtime-incident",
+          "documents": 75
+        },
+        {
+          "source_type": "runtime-model",
+          "documents": 2
+        },
+        {
+          "source_type": "runtime-observability",
+          "documents": 100
+        },
+        {
+          "source_type": "runtime-optimizer",
+          "documents": 1
+        },
+        {
+          "source_type": "runtime-snapshot",
+          "documents": 1
+        },
+        {
+          "source_type": "runtime-source-analysis",
+          "documents": 100
+        },
+        {
+          "source_type": "runtime-workload",
+          "documents": 100
+        },
+        {
+          "source_type": "supplemental",
+          "documents": 2
+        },
+        {
+          "source_type": "supplemental-pdf",
+          "documents": 9
+        }
+      ]
+    }
+  },
+  "summary": {
+    "question_count": 20,
+    "evaluated_count": 20,
+    "error_count": 0,
+    "pass_count": 20,
+    "pass_rate": 1.0,
+    "positive_question_count": 19,
+    "source_recall_at_1": 0.7368421052631579,
+    "source_recall_at_k": 1.0,
+    "mean_reciprocal_rank": 0.8105263157894737,
+    "mean_precision_at_k": 0.3526315789473686,
+    "mean_term_coverage": 0.8947368421052632,
+    "negative_no_hit_accuracy": 1.0
+  },
+  "errors": [],
+  "cases": [
+    {
+      "id": "review-interactivity",
+      "query": "What did the review say about demo interactivity and changing a system knob?",
+      "source_type": "review",
+      "expected_source_keys": [
+        "file:review/pvldb-demo-review.txt"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 2,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        1,
+        2
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 1.0,
+      "required_terms": [
+        "interactivity",
+        "system knob"
+      ],
+      "covered_terms": [
+        "interactivity",
+        "system knob"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "file:review/pvldb-demo-review.txt",
+          "source_type": "review",
+          "title": "PVLDB Demo review for KeenInsight",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2197,
+            "line_end": 50,
+            "page_end": 2,
+            "char_start": 0,
+            "line_start": 1,
+            "page_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "file:review/pvldb-demo-review.txt",
+          "source_type": "review",
+          "title": "PVLDB Demo review for KeenInsight",
+          "chunk_index": 2,
+          "locator": {
+            "char_end": 6032,
+            "line_end": 125,
+            "page_end": 4,
+            "char_start": 3833,
+            "line_start": 79,
+            "page_start": 3,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "review-live-pressure",
+      "query": "What kind of live workload pressure did the reviewer want the audience to trigger?",
+      "source_type": "review",
+      "expected_source_keys": [
+        "file:review/pvldb-demo-review.txt"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 2,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        1,
+        2
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 1.0,
+      "required_terms": [
+        "live",
+        "flush-heavy"
+      ],
+      "covered_terms": [
+        "live"
+      ],
+      "term_coverage": 0.5,
+      "items": [
+        {
+          "source_key": "file:review/pvldb-demo-review.txt",
+          "source_type": "review",
+          "title": "PVLDB Demo review for KeenInsight",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4113,
+            "line_end": 87,
+            "page_end": 3,
+            "char_start": 1917,
+            "line_start": 46,
+            "page_start": 2,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "file:review/pvldb-demo-review.txt",
+          "source_type": "review",
+          "title": "PVLDB Demo review for KeenInsight",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7304,
+            "line_end": 149,
+            "page_end": 5,
+            "char_start": 5752,
+            "line_start": 115,
+            "page_start": 4,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "paper-system-monitoring",
+      "query": "How does the paper describe system monitoring with probes and anomaly-aware messages?",
+      "source_type": "paper",
+      "expected_source_keys": [
+        "archive:paper:2overview.tex"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "system monitoring",
+        "anomaly-aware"
+      ],
+      "covered_terms": [
+        "system monitoring",
+        "anomaly-aware"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:paper:2overview.tex",
+          "source_type": "paper",
+          "title": "2overview.tex",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2192,
+            "line_end": 19,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro0.tex",
+          "source_type": "paper",
+          "title": "1intro0.tex",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4109,
+            "line_end": 31,
+            "char_start": 1911,
+            "line_start": 14,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro.tex",
+          "source_type": "paper",
+          "title": "1intro.tex",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7929,
+            "line_end": 54,
+            "char_start": 5735,
+            "line_start": 35,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:main.tex",
+          "source_type": "paper",
+          "title": "main.tex",
+          "chunk_index": 8,
+          "locator": {
+            "char_end": 17466,
+            "line_end": 236,
+            "char_start": 15268,
+            "line_start": 227,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:main.tex",
+          "source_type": "paper",
+          "title": "main.tex",
+          "chunk_index": 7,
+          "locator": {
+            "char_end": 15548,
+            "line_end": 228,
+            "char_start": 13360,
+            "line_start": 218,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "paper-diagnosis",
+      "query": "How does the paper combine threshold checks and SQL-level diagnosis?",
+      "source_type": "paper",
+      "expected_source_keys": [
+        "archive:paper:2overview.tex"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "anomaly diagnosis",
+        "threshold"
+      ],
+      "covered_terms": [
+        "anomaly diagnosis",
+        "threshold"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:paper:2overview.tex",
+          "source_type": "paper",
+          "title": "2overview.tex",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2192,
+            "line_end": 19,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro0.tex",
+          "source_type": "paper",
+          "title": "1intro0.tex",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4109,
+            "line_end": 31,
+            "char_start": 1911,
+            "line_start": 14,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro.tex",
+          "source_type": "paper",
+          "title": "1intro.tex",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7929,
+            "line_end": 54,
+            "char_start": 5735,
+            "line_start": 35,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:sample.bib",
+          "source_type": "paper",
+          "title": "sample.bib",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2194,
+            "line_end": 85,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:main.tex",
+          "source_type": "paper",
+          "title": "main.tex",
+          "chunk_index": 10,
+          "locator": {
+            "char_end": 21289,
+            "line_end": 257,
+            "char_start": 19093,
+            "line_start": 245,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "paper-knowledge",
+      "query": "What three knowledge sources does the paper integrate?",
+      "source_type": "paper",
+      "expected_source_keys": [
+        "archive:paper:2overview.tex"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        5
+      ],
+      "hit_at_1": false,
+      "reciprocal_rank": 0.2,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "manuals-derived",
+        "code-derived",
+        "tuning-derived"
+      ],
+      "covered_terms": [
+        "code-derived"
+      ],
+      "term_coverage": 0.3333333333333333,
+      "items": [
+        {
+          "source_key": "archive:paper:main.tex",
+          "source_type": "paper",
+          "title": "main.tex",
+          "chunk_index": 16,
+          "locator": {
+            "char_end": 32768,
+            "line_end": 361,
+            "char_start": 30580,
+            "line_start": 346,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:sample.bib",
+          "source_type": "paper",
+          "title": "sample.bib",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2194,
+            "line_end": 85,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro.tex",
+          "source_type": "paper",
+          "title": "1intro.tex",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4105,
+            "line_end": 22,
+            "char_start": 1911,
+            "line_start": 13,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro.tex",
+          "source_type": "paper",
+          "title": "1intro.tex",
+          "chunk_index": 4,
+          "locator": {
+            "char_end": 8981,
+            "line_end": 60,
+            "char_start": 7649,
+            "line_start": 52,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:2overview.tex",
+          "source_type": "paper",
+          "title": "2overview.tex",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4104,
+            "line_end": 28,
+            "char_start": 1912,
+            "line_start": 16,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "paper-boundary",
+      "query": "What operator-level optimizations are mentioned for SQL-level anomalies?",
+      "source_type": "paper",
+      "expected_source_keys": [
+        "archive:paper:2overview.tex"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        3
+      ],
+      "hit_at_1": false,
+      "reciprocal_rank": 0.3333333333333333,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "query hints",
+        "rewriting",
+        "index addition"
+      ],
+      "covered_terms": [
+        "query hints",
+        "rewriting",
+        "index addition"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:paper:1intro0.tex",
+          "source_type": "paper",
+          "title": "1intro0.tex",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4109,
+            "line_end": 31,
+            "char_start": 1911,
+            "line_start": 14,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:1intro.tex",
+          "source_type": "paper",
+          "title": "1intro.tex",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7929,
+            "line_end": 54,
+            "char_start": 5735,
+            "line_start": 35,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:2overview.tex",
+          "source_type": "paper",
+          "title": "2overview.tex",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4104,
+            "line_end": 28,
+            "char_start": 1912,
+            "line_start": 16,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:main.tex",
+          "source_type": "paper",
+          "title": "main.tex",
+          "chunk_index": 10,
+          "locator": {
+            "char_end": 21289,
+            "line_end": 257,
+            "char_start": 19093,
+            "line_start": 245,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:paper:main.tex",
+          "source_type": "paper",
+          "title": "main.tex",
+          "chunk_index": 11,
+          "locator": {
+            "char_end": 23200,
+            "line_end": 313,
+            "char_start": 21009,
+            "line_start": 254,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "legacy-monitor",
+      "query": "What monitoring views and navigation did the original demo show?",
+      "source_type": "legacy-demo",
+      "expected_source_keys": [
+        "archive:legacy-demo:English/realtime-monitor.html"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "real-time monitoring",
+        "system resources overview"
+      ],
+      "covered_terms": [
+        "real-time monitoring",
+        "system resources overview"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:legacy-demo:English/realtime-monitor.html",
+          "source_type": "legacy-demo",
+          "title": "realtime-monitor.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 488,
+            "line_end": 73,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/manual.html",
+          "source_type": "legacy-demo",
+          "title": "manual.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 310,
+            "line_end": 45,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/sql-detail.html",
+          "source_type": "legacy-demo",
+          "title": "sql-detail.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1752,
+            "line_end": 79,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/tuning-knowledge.html",
+          "source_type": "legacy-demo",
+          "title": "tuning-knowledge.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 335,
+            "line_end": 45,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/dba-rules.html",
+          "source_type": "legacy-demo",
+          "title": "dba-rules.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 652,
+            "line_end": 107,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "legacy-tuning-knowledge",
+      "query": "Where did the original demo expose tuning-derived knowledge?",
+      "source_type": "legacy-demo",
+      "expected_source_keys": [
+        "archive:legacy-demo:English/tuning-knowledge.html"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "tuning-derived knowledge"
+      ],
+      "covered_terms": [
+        "tuning-derived knowledge"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:legacy-demo:English/tuning-knowledge.html",
+          "source_type": "legacy-demo",
+          "title": "tuning-knowledge.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 335,
+            "line_end": 45,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/manual.html",
+          "source_type": "legacy-demo",
+          "title": "manual.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 310,
+            "line_end": 45,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/alert-detail.html",
+          "source_type": "legacy-demo",
+          "title": "alert-detail.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2184,
+            "line_end": 107,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/code-source.html",
+          "source_type": "legacy-demo",
+          "title": "code-source.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 641,
+            "line_end": 101,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:legacy-demo:English/sql-detail.html",
+          "source_type": "legacy-demo",
+          "title": "sql-detail.html",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1752,
+            "line_end": 79,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "implementation-action-guardrail",
+      "query": "How are tuning actions typed, validated, and persisted before application?",
+      "source_type": "implementation",
+      "expected_source_keys": [
+        "project:app/tuning.py"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        3,
+        4
+      ],
+      "hit_at_1": false,
+      "reciprocal_rank": 0.3333333333333333,
+      "precision_at_k": 0.4,
+      "required_terms": [
+        "typed action allowlist",
+        "requires_user_apply"
+      ],
+      "covered_terms": [
+        "typed action allowlist",
+        "requires_user_apply"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "project:app/static/index.html",
+          "source_type": "implementation",
+          "title": "app/static/index.html",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7906,
+            "line_end": 103,
+            "char_start": 5711,
+            "line_start": 84,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/static/app.js",
+          "source_type": "implementation",
+          "title": "app/static/app.js",
+          "chunk_index": 13,
+          "locator": {
+            "char_end": 26875,
+            "line_end": 386,
+            "char_start": 24691,
+            "line_start": 322,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/tuning.py",
+          "source_type": "implementation",
+          "title": "app/tuning.py",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4116,
+            "line_end": 119,
+            "char_start": 1917,
+            "line_start": 56,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/tuning.py",
+          "source_type": "implementation",
+          "title": "app/tuning.py",
+          "chunk_index": 5,
+          "locator": {
+            "char_end": 11750,
+            "line_end": 340,
+            "char_start": 9551,
+            "line_start": 279,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/static/app.js",
+          "source_type": "implementation",
+          "title": "app/static/app.js",
+          "chunk_index": 5,
+          "locator": {
+            "char_end": 11698,
+            "line_end": 118,
+            "char_start": 9550,
+            "line_start": 109,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "implementation-index-rollback",
+      "query": "How does the implementation verify an index identity before rollback?",
+      "source_type": "implementation",
+      "expected_source_keys": [
+        "project:app/tuning.py"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "index_oid",
+        "index_definition"
+      ],
+      "covered_terms": [
+        "index_oid",
+        "index_definition"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "project:app/tuning.py",
+          "source_type": "implementation",
+          "title": "app/tuning.py",
+          "chunk_index": 9,
+          "locator": {
+            "char_end": 19418,
+            "line_end": 542,
+            "char_start": 17222,
+            "line_start": 478,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:scripts/run_experiment.py",
+          "source_type": "implementation",
+          "title": "scripts/run_experiment.py",
+          "chunk_index": 2,
+          "locator": {
+            "char_end": 6016,
+            "line_end": 196,
+            "char_start": 3820,
+            "line_start": 133,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:scripts/preflight.py",
+          "source_type": "implementation",
+          "title": "scripts/preflight.py",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4104,
+            "line_end": 127,
+            "char_start": 1907,
+            "line_start": 58,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/static/app.js",
+          "source_type": "implementation",
+          "title": "app/static/app.js",
+          "chunk_index": 11,
+          "locator": {
+            "char_end": 23054,
+            "line_end": 283,
+            "char_start": 20859,
+            "line_start": 259,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/diagnose.py",
+          "source_type": "implementation",
+          "title": "app/diagnose.py",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2185,
+            "line_end": 52,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "implementation-workload-evidence",
+      "query": "timings_ms EXPLAIN ANALYZE workload",
+      "source_type": "implementation",
+      "expected_source_keys": [
+        "project:app/workload.py"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        1,
+        2
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.4,
+      "required_terms": [
+        "timings_ms",
+        "explain",
+        "plan"
+      ],
+      "covered_terms": [
+        "timings_ms",
+        "explain",
+        "plan"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "project:app/workload.py",
+          "source_type": "implementation",
+          "title": "app/workload.py",
+          "chunk_index": 4,
+          "locator": {
+            "char_end": 9795,
+            "line_end": 310,
+            "char_start": 7618,
+            "line_start": 253,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/workload.py",
+          "source_type": "implementation",
+          "title": "app/workload.py",
+          "chunk_index": 6,
+          "locator": {
+            "char_end": 13594,
+            "line_end": 437,
+            "char_start": 11417,
+            "line_start": 373,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/static/app.js",
+          "source_type": "implementation",
+          "title": "app/static/app.js",
+          "chunk_index": 18,
+          "locator": {
+            "char_end": 36430,
+            "line_end": 553,
+            "char_start": 34231,
+            "line_start": 514,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:demo/__init__.py",
+          "source_type": "implementation",
+          "title": "demo/__init__.py",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 72,
+            "line_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/main.py",
+          "source_type": "implementation",
+          "title": "app/main.py",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7945,
+            "line_end": 274,
+            "char_start": 5748,
+            "line_start": 200,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "implementation-feedback",
+      "query": "What conditions must measured feedback satisfy before an action is effective?",
+      "source_type": "implementation",
+      "expected_source_keys": [
+        "project:app/feedback.py"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        3,
+        4
+      ],
+      "hit_at_1": false,
+      "reciprocal_rank": 0.3333333333333333,
+      "precision_at_k": 0.4,
+      "required_terms": [
+        "minimum",
+        "plan",
+        "improvement"
+      ],
+      "covered_terms": [
+        "plan",
+        "improvement"
+      ],
+      "term_coverage": 0.6666666666666666,
+      "items": [
+        {
+          "source_key": "project:app/knowledge.py",
+          "source_type": "implementation",
+          "title": "app/knowledge.py",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7931,
+            "line_end": 258,
+            "char_start": 5733,
+            "line_start": 184,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/rag.py",
+          "source_type": "implementation",
+          "title": "app/rag.py",
+          "chunk_index": 7,
+          "locator": {
+            "char_end": 15560,
+            "line_end": 565,
+            "char_start": 13379,
+            "line_start": 495,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/feedback.py",
+          "source_type": "implementation",
+          "title": "app/feedback.py",
+          "chunk_index": 2,
+          "locator": {
+            "char_end": 6025,
+            "line_end": 167,
+            "char_start": 3829,
+            "line_start": 97,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/feedback.py",
+          "source_type": "implementation",
+          "title": "app/feedback.py",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7936,
+            "line_end": 231,
+            "char_start": 5745,
+            "line_start": 161,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/static/app.js",
+          "source_type": "implementation",
+          "title": "app/static/app.js",
+          "chunk_index": 23,
+          "locator": {
+            "char_end": 45947,
+            "line_end": 661,
+            "char_start": 43780,
+            "line_start": 617,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "deployment-statements",
+      "query": "How is pg_stat_statements enabled and made queryable in the PostgreSQL deployment?",
+      "source_type": "deployment",
+      "expected_source_keys": [
+        "project:docker-compose.yml",
+        "project:db/init/00_extensions.sql"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        1,
+        2
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.4,
+      "required_terms": [
+        "pg_stat_statements",
+        "shared_preload_libraries"
+      ],
+      "covered_terms": [
+        "pg_stat_statements",
+        "shared_preload_libraries"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "project:docker-compose.yml",
+          "source_type": "deployment",
+          "title": "docker-compose.yml",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 953,
+            "line_end": 44,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:db/init/00_extensions.sql",
+          "source_type": "deployment",
+          "title": "db/init/00_extensions.sql",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 50,
+            "line_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:demo/bootstrap.sql",
+          "source_type": "deployment",
+          "title": "demo/bootstrap.sql",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 244,
+            "line_end": 4,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:pyproject.toml",
+          "source_type": "deployment",
+          "title": "pyproject.toml",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 558,
+            "line_end": 27,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:db/init/10_demo.sql",
+          "source_type": "deployment",
+          "title": "db/init/10_demo.sql",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 3018,
+            "line_end": 81,
+            "char_start": 1917,
+            "line_start": 53,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "deployment-preflight",
+      "query": "waiting_locks pg_stat_statements queryable",
+      "source_type": "implementation",
+      "expected_source_keys": [
+        "project:scripts/preflight.py"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 2,
+      "relevant_ranks": [
+        1,
+        2
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.4,
+      "required_terms": [
+        "pg_stat_statements",
+        "waiting_locks"
+      ],
+      "covered_terms": [
+        "pg_stat_statements",
+        "waiting_locks"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "project:scripts/preflight.py",
+          "source_type": "implementation",
+          "title": "scripts/preflight.py",
+          "chunk_index": 2,
+          "locator": {
+            "char_end": 6016,
+            "line_end": 168,
+            "char_start": 3824,
+            "line_start": 118,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:scripts/preflight.py",
+          "source_type": "implementation",
+          "title": "scripts/preflight.py",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4104,
+            "line_end": 127,
+            "char_start": 1907,
+            "line_start": 58,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/collector.py",
+          "source_type": "implementation",
+          "title": "app/collector.py",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4113,
+            "line_end": 153,
+            "char_start": 1918,
+            "line_start": 80,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/pg.py",
+          "source_type": "implementation",
+          "title": "app/pg.py",
+          "chunk_index": 4,
+          "locator": {
+            "char_end": 9808,
+            "line_end": 377,
+            "char_start": 7621,
+            "line_start": 316,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:app/workload.py",
+          "source_type": "implementation",
+          "title": "app/workload.py",
+          "chunk_index": 18,
+          "locator": {
+            "char_end": 36534,
+            "line_end": 1166,
+            "char_start": 34341,
+            "line_start": 1096,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "design-rag-boundary",
+      "query": "What is the performance and safety boundary of the RAG worker?",
+      "source_type": "design",
+      "expected_source_keys": [
+        "project:docs/RAG_OPERATIONS.md"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        5
+      ],
+      "hit_at_1": false,
+      "reciprocal_rank": 0.2,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "demo tables",
+        "typed server-side allowlists"
+      ],
+      "covered_terms": [
+        "typed server-side allowlists"
+      ],
+      "term_coverage": 0.5,
+      "items": [
+        {
+          "source_key": "project:docs/ICDE_REVIEW_CHECKLIST.md",
+          "source_type": "design",
+          "title": "docs/ICDE_REVIEW_CHECKLIST.md",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7942,
+            "line_end": 146,
+            "char_start": 5743,
+            "line_start": 102,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:README.md",
+          "source_type": "design",
+          "title": "README.md",
+          "chunk_index": 2,
+          "locator": {
+            "char_end": 6018,
+            "line_end": 118,
+            "char_start": 3820,
+            "line_start": 76,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:docs.md",
+          "source_type": "design",
+          "title": "docs.md",
+          "chunk_index": 3,
+          "locator": {
+            "char_end": 7935,
+            "line_end": 138,
+            "char_start": 5740,
+            "line_start": 98,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:docs/DEMO_RUNBOOK.md",
+          "source_type": "design",
+          "title": "docs/DEMO_RUNBOOK.md",
+          "chunk_index": 1,
+          "locator": {
+            "char_end": 4110,
+            "line_end": 79,
+            "char_start": 1914,
+            "line_start": 34,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "project:docs/RAG_OPERATIONS.md",
+          "source_type": "design",
+          "title": "docs/RAG_OPERATIONS.md",
+          "chunk_index": 2,
+          "locator": {
+            "char_end": 6017,
+            "line_end": 142,
+            "char_start": 3820,
+            "line_start": 92,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "evaluation-regression",
+      "query": "What protocol and repeated measurements support the final regression result?",
+      "source_type": "evaluation-data",
+      "expected_source_keys": [
+        "artifact:artifacts/final-regression-pg12.json"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "protocol",
+        "effective",
+        "rollback_completed"
+      ],
+      "covered_terms": [
+        "protocol",
+        "effective",
+        "rollback_completed"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "artifact:artifacts/final-regression-pg12.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/final-regression-pg12.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1599,
+            "line_end": 8,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/stats-case.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/stats-case.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 614,
+            "line_end": 7,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/post-change-regression-pg12.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/post-change-regression-pg12.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 199,
+            "line_end": 3,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/aa-control-results.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/aa-control-results.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1051,
+            "line_end": 9,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/pg16-validation-status.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/pg16-validation-status.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 330,
+            "line_end": 2,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "evaluation-aa",
+      "query": "A/A control same_plan_signature same_result",
+      "source_type": "evaluation-data",
+      "expected_source_keys": [
+        "artifact:artifacts/aa-control-results.json"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "same_plan_signature",
+        "same_result"
+      ],
+      "covered_terms": [
+        "same_plan_signature",
+        "same_result"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "artifact:artifacts/aa-control-results.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/aa-control-results.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1051,
+            "line_end": 9,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/preflight-pg12.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/preflight-pg12.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 507,
+            "line_end": 5,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/post-change-regression-pg12.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/post-change-regression-pg12.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 199,
+            "line_end": 3,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/pg16-validation-status.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/pg16-validation-status.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 330,
+            "line_end": 2,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "artifact:artifacts/stats-case.json",
+          "source_type": "evaluation-data",
+          "title": "artifacts/stats-case.json",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 614,
+            "line_end": 7,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "design-pdf-sql",
+      "query": "What root cause and tuning result does the SQL design screen illustrate?",
+      "source_type": "supplemental-pdf",
+      "expected_source_keys": [
+        "archive:pdf-text:SQL.pdf"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 5,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.2,
+      "required_terms": [
+        "hash join",
+        "before tuning",
+        "after tuning"
+      ],
+      "covered_terms": [
+        "hash join",
+        "before tuning",
+        "after tuning"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:pdf-text:SQL.pdf",
+          "source_type": "supplemental-pdf",
+          "title": "SQL.pdf",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2141,
+            "line_end": 67,
+            "page_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "page_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:pdf-text:system-7.pdf",
+          "source_type": "supplemental-pdf",
+          "title": "system-7.pdf",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1711,
+            "line_end": 82,
+            "page_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "page_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:pdf-text:system-6.pdf",
+          "source_type": "supplemental-pdf",
+          "title": "system-6.pdf",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1719,
+            "line_end": 82,
+            "page_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "page_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:pdf-text:system-3.pdf",
+          "source_type": "supplemental-pdf",
+          "title": "system-3.pdf",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1665,
+            "line_end": 85,
+            "page_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "page_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:pdf-text:system-4.pdf",
+          "source_type": "supplemental-pdf",
+          "title": "system-4.pdf",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1621,
+            "line_end": 82,
+            "page_end": 1,
+            "char_start": 0,
+            "line_start": 1,
+            "page_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "supplemental-inventory",
+      "query": "Where can I verify the supplied archive asset sizes and SHA-256 digests?",
+      "source_type": "supplemental",
+      "expected_source_keys": [
+        "archive:asset-inventory:KeenInsight_VLDB_Demo.zip"
+      ],
+      "expected_empty": false,
+      "passed": true,
+      "retrieved_count": 2,
+      "relevant_count": 1,
+      "relevant_ranks": [
+        1
+      ],
+      "hit_at_1": true,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 0.5,
+      "required_terms": [
+        "bytes",
+        "sha256"
+      ],
+      "covered_terms": [
+        "bytes",
+        "sha256"
+      ],
+      "term_coverage": 1.0,
+      "items": [
+        {
+          "source_key": "archive:asset-inventory:KeenInsight_VLDB_Demo.zip",
+          "source_type": "supplemental",
+          "title": "Asset inventory · KeenInsight_VLDB_Demo.zip",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 2188,
+            "line_end": 21,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        },
+        {
+          "source_key": "archive:asset-inventory:English.zip",
+          "source_type": "supplemental",
+          "title": "Asset inventory · English.zip",
+          "chunk_index": 0,
+          "locator": {
+            "char_end": 1604,
+            "line_end": 15,
+            "char_start": 0,
+            "line_start": 1,
+            "coordinate_system": "normalized_source"
+          }
+        }
+      ]
+    },
+    {
+      "id": "negative-unknown",
+      "query": "zxqv_849103_aurora qrm_7721",
+      "source_type": null,
+      "expected_source_keys": [],
+      "expected_empty": true,
+      "passed": true,
+      "retrieved_count": 0,
+      "relevant_count": 0,
+      "relevant_ranks": [],
+      "hit_at_1": false,
+      "reciprocal_rank": 1.0,
+      "precision_at_k": 1.0,
+      "required_terms": [],
+      "covered_terms": [],
+      "term_coverage": 1.0,
+      "items": []
+    }
+  ]
+}

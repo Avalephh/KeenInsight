@@ -1,0 +1,14 @@
+SOURCE_KEY: artifact:artifacts/aa-control-results.json
+SOURCE_TYPE: evaluation-data
+SOURCE_TITLE: artifacts/aa-control-results.json
+SOURCE_URI: project://artifacts/aa-control-results.json
+---
+Artifact: artifacts/aa-control-results.json
+Status: passed
+Protocol: {"timed_repetitions_per_arm":7,"warmup_repetitions_per_arm":2,"scenarios":["missing_index","hash_join_spill","aggregate_spill","sort_spill","parallel_query_underprovisioned"],"no_tuning_action_applied":true}
+Failures: []
+Scenario missing_index: same_plan_signature=True; same_result=True; median_difference_pct=5.382262923677323; p95_difference_pct=3.6914653071445347
+Scenario hash_join_spill: same_plan_signature=True; same_result=True; median_difference_pct=-1.491074658696813; p95_difference_pct=-1.0878002491219985
+Scenario aggregate_spill: same_plan_signature=True; same_result=True; median_difference_pct=15.381277798026366; p95_difference_pct=18.16983631942573
+Scenario sort_spill: same_plan_signature=True; same_result=True; median_difference_pct=-0.03954650812941425; p95_difference_pct=-0.2049554011615804
+Scenario parallel_query_underprovisioned: same_plan_signature=True; same_result=True; median_difference_pct=-2.7956080400614574; p95_difference_pct=-2.159933150656424
