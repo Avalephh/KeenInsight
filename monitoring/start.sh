@@ -157,6 +157,7 @@ start_process prometheus \
   --storage.tsdb.retention.time=24h \
   --web.listen-address=0.0.0.0:8003 \
   --web.external-url=http://123.56.83.97:8003/ \
+  --web.local-assets="$BASE_DIR/vendor/usr/share/prometheus/web/" \
   --web.enable-lifecycle
 
 start_process node_exporter \
