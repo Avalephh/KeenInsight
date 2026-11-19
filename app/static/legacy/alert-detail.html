@@ -593,6 +593,29 @@
             gap: 12px;
         }
 
+        /* Tuning Actions 可能包含很多参数，限制高度并独立滚动，避免拉长整页 */
+        .tuning-section.green-background .knob-list {
+            max-height: 320px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-right: 6px;
+            scrollbar-width: thin;
+            scrollbar-color: #c9d0da transparent;
+        }
+
+        .tuning-section.green-background .knob-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .tuning-section.green-background .knob-list::-webkit-scrollbar-thumb {
+            background: #c9d0da;
+            border-radius: 3px;
+        }
+
+        .tuning-section.green-background .knob-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
         .knob-item {
             display: flex;
             flex-direction: row;
