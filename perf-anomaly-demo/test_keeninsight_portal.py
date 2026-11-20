@@ -10,6 +10,7 @@ import threading
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from function_descriptions import _parse_json, describe_if_missing
 from function_locations import build_index, describe_function
 from keeninsight_portal import KeenInsightPortal, hot_functions_from_source
 from sysinsight_dream_bridge import StateStore, BridgeHTTPServer, BridgeHTTPHandler
@@ -96,6 +97,11 @@ class PortalTest(unittest.TestCase):
             self.assertEqual(detail["excerptStartLine"], 1)
             self.assertIn("fixture_function", detail["excerpt"])
             self.assertEqual(describe_function("missing_function", index=index, root=root), None)
+
+    def test_ai_description_parser_and_source_comment_short_circuit(self):
+        self.assertEqual(_parse_json('```json\n{"zh":"中文","en":"English"}\n```'),
+                         {"zh": "中文", "en": "English"})
+        self.assertIsNone(describe_if_missing("fixture", {"description": "source comment"}))
 
     def test_hot_functions_get_source_locations(self):
         self.portal._function_locations = {

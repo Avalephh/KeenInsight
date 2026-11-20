@@ -35,7 +35,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
-DEFAULT_MODEL = "gpt-5.6-sol"
+DEFAULT_MODEL = "gpt-6.1-sol"
 DEFAULT_POSTGRES_SOURCE = Path("/root/keeninsight-postgres/third_party/postgresql-12.22")
 DEFAULT_SYSINSIGHT_SOURCE = ROOT.parent / "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune"
 DEFAULT_VALIDATION_SQL = "SELECT count(*) FROM tpcds.store_sales"

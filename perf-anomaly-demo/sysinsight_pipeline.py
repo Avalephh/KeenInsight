@@ -56,7 +56,7 @@ from sysinsight_prometheus import (  # noqa: E402
 
 
 DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
-DEFAULT_MODEL = "GPT5.6-SOL"
+DEFAULT_MODEL = "gpt-6.1-sol"
 
 
 def api_key_from_environment() -> str:

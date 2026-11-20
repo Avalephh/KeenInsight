@@ -197,11 +197,13 @@
       showModal(name, summary+`<p class="ki-empty">Could not read source details for this function: ${esc(loadError)}</p>`+relatedExamples+relatedChains);
       return;
     }
-    const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">No source comment; showing the signature and code excerpt.</p>';
+    const model=detail.descriptionModel?` · ${esc(detail.descriptionModel)}`:'';
+    const descriptionTitle=detail.descriptionSource==='llm'?`Function description (AI generated${model})`:detail.descriptionSource==='source_comment'?'Function description (PostgreSQL source comment)':'Function description';
+    const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">No explanation is available; the source has no comment and AI generation failed.</p>';
     const signature=detail.signature?`<h3>Signature</h3><pre class="ki-code">${esc(detail.signature)}</pre>`:'';
     const numbered=String(detail.excerpt||'').split('\n').map((line,index)=>String((detail.excerptStartLine||1)+index).padStart(5,' ')+'  '+line).join('\n');
     const excerpt=numbered?`<h3>Source excerpt</h3><pre class="ki-code">${esc(numbered)}</pre>`:'';
-    showModal(name, `<div class="ki-function-detail">${summary}<h3>Function description (PostgreSQL source comment)</h3>${description}${signature}${relatedExamples}${relatedChains}${excerpt}</div>`);
+    showModal(name, `<div class="ki-function-detail">${summary}<h3>${descriptionTitle}</h3>${description}${signature}${relatedExamples}${relatedChains}${excerpt}</div>`);
   }
 
   function overview(data) {

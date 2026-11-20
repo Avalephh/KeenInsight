@@ -43,7 +43,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
-DEFAULT_MODEL = "gpt-5.6-sol"
+DEFAULT_MODEL = "gpt-6.1-sol"
 LOGGER = logging.getLogger("sysinsight-dream-bridge")
 
 sys.path.insert(0, str(ROOT))

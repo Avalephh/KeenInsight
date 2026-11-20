@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
         help="optional Python module exporting CASE_DEFINITIONS and lifecycle hooks",
     )
     parser.add_argument("--api-base", default="http://35.212.195.134:28317/v1")
-    parser.add_argument("--model", default="GPT5.6-SOL")
+    parser.add_argument("--model", default="gpt-6.1-sol")
     parser.add_argument("--n-candidates", type=int, default=1)
     parser.add_argument("--n-templates", type=int, default=1)
     parser.add_argument("--selector-n-gens", type=int, default=1)

@@ -197,11 +197,13 @@
       showModal(name, summary+`<p class="ki-empty">无法读取该函数的源码说明：${esc(loadError)}</p>`+relatedExamples+relatedChains);
       return;
     }
-    const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">源码中没有函数注释，下面显示函数签名和代码片段。</p>';
+    const model=detail.descriptionModel?` · ${esc(detail.descriptionModel)}`:'';
+    const descriptionTitle=detail.descriptionSource==='llm'?`函数说明（AI 生成${model}）`:detail.descriptionSource==='source_comment'?'函数说明（PostgreSQL 源码注释原文）':'函数说明';
+    const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">暂无函数说明；源码中没有注释，AI 说明也未能生成。</p>';
     const signature=detail.signature?`<h3>函数签名</h3><pre class="ki-code">${esc(detail.signature)}</pre>`:'';
     const numbered=String(detail.excerpt||'').split('\n').map((line,index)=>String((detail.excerptStartLine||1)+index).padStart(5,' ')+'  '+line).join('\n');
     const excerpt=numbered?`<h3>源码片段</h3><pre class="ki-code">${esc(numbered)}</pre>`:'';
-    showModal(name, `<div class="ki-function-detail">${summary}<h3>函数说明（PostgreSQL 源码注释原文）</h3>${description}${signature}${relatedExamples}${relatedChains}${excerpt}</div>`);
+    showModal(name, `<div class="ki-function-detail">${summary}<h3>${descriptionTitle}</h3>${description}${signature}${relatedExamples}${relatedChains}${excerpt}</div>`);
   }
 
   function overview(data) {

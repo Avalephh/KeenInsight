@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
-DEFAULT_MODEL = "GPT5.6-SOL"
+DEFAULT_MODEL = "gpt-6.1-sol"
 
 
 def utc_now() -> str:

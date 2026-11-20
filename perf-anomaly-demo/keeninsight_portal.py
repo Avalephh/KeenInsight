@@ -16,6 +16,7 @@ import socket
 import threading
 import time
 
+from function_descriptions import describe_if_missing
 from function_locations import describe_function, load_index as load_function_locations
 
 ROOT = Path(__file__).resolve().parent
@@ -302,7 +303,18 @@ class KeenInsightPortal:
             raise KeyError("function name required")
         details = describe_function(name, self._function_location_index())
         if not details:
-            raise KeyError("function not found in pinned PostgreSQL source")
+            details = {"name": name, "file": None, "line": None, "signature": None,
+                       "description": None, "excerpt": None, "excerptStartLine": None}
+        details["descriptionEn"] = details.get("description")
+        details["descriptionSource"] = "source_comment" if details.get("description") else None
+        if not details.get("description"):
+            generated = describe_if_missing(name, details)
+            if generated:
+                details["description"] = generated.get("zh") or generated.get("en")
+                details["descriptionEn"] = generated.get("en") or details.get("description")
+                details["descriptionSource"] = "llm"
+                details["descriptionModel"] = generated.get("model")
+                details["descriptionCached"] = bool(generated.get("cached"))
         return details
 
     @staticmethod

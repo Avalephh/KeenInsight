@@ -143,18 +143,27 @@ python3 sysinsight_dream_bridge.py \
 ```
 
 再启动常驻链路；API key 只从环境变量读取，SysInsight 和 DREAM 共用同一组变量及
-`GPT5.6-SOL` endpoint：
+`gpt-6.1-sol` endpoint：
 
 ```bash
 export SYSINSIGHT_GPT_API_KEY='<your-api-key>'
-export SYSINSIGHT_GPT_BASE_URL='http://35.212.195.134:28317/v1'
-export SYSINSIGHT_GPT_MODEL='gpt-5.6-sol'
+export SYSINSIGHT_GPT_BASE_URL='https://api.gpt.ge/v1'
+export SYSINSIGHT_GPT_MODEL='gpt-6.1-sol'
 python3 sysinsight_dream_bridge.py \
   --db keeninsight --db-schema tpcds \
   --dream-config ../dream/config/tpcds_local_config.json \
   --alert-name SysInsightDemoAnomaly \
   --state-db /tmp/sysinsight-dream-bridge.sqlite3 \
   --output /tmp/sysinsight-dream-bridge
+```
+
+`gpt-6.1-sol` 的 responses compatibility 模式不支持 `n>1`；`sysinsight_original_llm.py`
+会把一次 `n=5` 请求拆成 5 次 `n=1` 请求并合并 `choices`，调用方无需改动。
+
+六个焦点场景可以用下面的入口顺序运行，并从告警详情审计函数/差分/SHAP/调用链和函数说明是否完整：
+
+```bash
+python3 run_focus_scenarios.py --scenarios tp_payment_hot,tp_stock_level_hot,tp_stock_level_burst,tp_full_mix_surge_high,tp_wal_checkpoint,tp_order_status_hot
 ```
 
 DREAM 任务完成后，方案只有同时满足“只读、DREAM 真实复测成功、实测提升至少 10%”才会进入

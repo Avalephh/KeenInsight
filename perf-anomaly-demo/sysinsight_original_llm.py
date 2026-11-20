@@ -42,7 +42,7 @@ SOURCE_ROOT = Path(
     )
 )
 PYDEPS = Path(os.environ.get("SYSINSIGHT_PYDEPS", str(ROOT / ".pydeps")))
-DEFAULT_MODEL = "GPT5.6-SOL"
+DEFAULT_MODEL = "gpt-6.1-sol"
 DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
 
 sys.path.insert(0, str(ROOT))
@@ -621,13 +621,48 @@ def main() -> int:
                 response parsing, range filtering, and candidate selection.  This
                 is only an opt-in transport compatibility path for the supplied
                 OpenAI-compatible endpoint.
+
+                The GPT-6.1-SOL relay runs in Responses compatibility mode and
+                rejects n > 1.  The original acquisition asks for several
+                independent generations, so issue n=1 requests and merge their
+                choices into the response shape the source code already expects.
                 """
 
                 loop = asyncio.get_event_loop()
-                return await loop.run_in_executor(
-                    None,
-                    lambda: original_create(*call_args, **call_kwargs),
-                )
+                try:
+                    requested_n = int(call_kwargs.get("n") or 1)
+                except (TypeError, ValueError):
+                    requested_n = 1
+                if requested_n <= 1:
+                    kwargs = dict(call_kwargs)
+                    if "n" in kwargs:
+                        kwargs["n"] = 1
+                    return await loop.run_in_executor(
+                        None,
+                        lambda: original_create(*call_args, **kwargs),
+                    )
+                kwargs = dict(call_kwargs)
+                kwargs["n"] = 1
+                responses = []
+                for _ in range(requested_n):
+                    responses.append(await loop.run_in_executor(
+                        None,
+                        lambda kw=kwargs: original_create(*call_args, **kw),
+                    ))
+                merged = dict(responses[0])
+                merged["choices"] = [
+                    choice
+                    for response in responses
+                    for choice in (response.get("choices") or [])
+                ]
+                usage = {}
+                for response in responses:
+                    for key, value in (response.get("usage") or {}).items():
+                        if isinstance(value, (int, float)):
+                            usage[key] = usage.get(key, 0) + value
+                if usage:
+                    merged["usage"] = usage
+                return merged
 
             async def logged_acreate(*call_args: Any, **call_kwargs: Any) -> Any:
                 request_record = {

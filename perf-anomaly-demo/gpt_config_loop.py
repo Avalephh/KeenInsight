@@ -26,7 +26,7 @@ import urllib.request
 ROOT = Path(__file__).resolve().parent
 DEFAULT_OBSERVED = ROOT / "results" / "tpcc_external" / "20260910_001807" / "c10_window_spill" / "case_result.json"
 DEFAULT_API_BASE = "http://35.212.195.134:28317/v1"
-REQUESTED_MODEL = "GPT5.6-SOL"
+REQUESTED_MODEL = "gpt-6.1-sol"
 ALLOWED_PARAMETERS = {
     "work_mem",
     "maintenance_work_mem",
