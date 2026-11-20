@@ -138,15 +138,12 @@
       return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div></div>`;
     }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'No candidate parameters recorded.');
     const s=d.shapAnalysis;
-    let shap=empty(s?.reason||'No SHAP evidence retained for this alert. New completed captures run the local model; historical differential rates are not substituted.');
+    let shap=empty('暂无 SHAP 证据');
     if(s?.status==='completed'&&s.features?.length){
       const max=Math.max(...s.features.map(f=>Math.abs(f.shapValue)),1e-12);
-      const trust=s.reliability||{status:'unverified',decisionEligible:false,reasons:['Historical evidence has no explicit reliability assessment; no claim of retrospective prompt exclusion.']};
-      const trustLabel=!s.reliability?'Historical evidence · trust not assessed':trust.decisionEligible===true?'Experimental advisory':'Low confidence · excluded from LLM tuning advice';
-      const independent=s.independentValidation?`<div>Latest independent time-batch MAE: ${number(s.independentValidation.maePercentagePoints)} pp · R² ${number(s.independentValidation.r2,3)} · ${number(s.independentValidation.rows,0)} held-out measurements</div>`:'';
-      shap=`<div class="ki-shap-summary"><strong>Experimental model · foreground TPS retention</strong><div class="ki-shap-trust" role="note"><strong>${trustLabel}</strong><br>${esc((trust.reasons||[]).join(' '))}</div><div>Background ${number(s.baseValue*100)}% → prediction ${number(s.prediction*100)}%</div><div>Historical validation MAE: ${number(s.validation?.maePercentagePoints)} pp · R² ${number(s.validation?.r2,3)} · ${s.backgroundRows} measured training cases</div>${independent}<div class="ki-row-meta">${esc(s.validation?.method)}<br>${esc(s.modelVersion)} · ${esc(s.domain?.status)} · additivity residual ${Number(s.additivityResidual).toExponential(2)}</div><p class="ki-sample-note">Green increases the model prediction; red decreases it. Units: percentage points (pp), not measured TPS gains or causal parameter effects.</p></div>`+s.features.map(f=>{
+      shap=`<p class="ki-sample-note">绿色表示模型预测升高，红色表示降低。单位为百分点（pp）。</p>`+s.features.map(f=>{
         const positive=f.shapValue>=0,width=Math.abs(f.shapValue)/max*50;
-        return `<div class="shap-feature"><div class="shap-name" title="${esc((f.parameters||[]).join(', '))}">${esc(f.name)}</div><div class="shap-value" title="Inclusive sampled function rate, not CPU utilization">${f.isAggregate?'aggregate':number(f.value)}</div><div class="shap-bar ki-shap-diverging"><div class="shap-bar-fill ${positive?'low':'high'}" style="position:absolute;left:${positive?50:50-width}%;width:${width}%"></div></div><div class="shap-impact" style="color:${positive?'#008943':'#c62c20'}">${positive?'+':''}${number(f.shapValue*100,3)} pp</div></div>`;
+        return `<div class="shap-feature"><div class="shap-name" title="${esc((f.parameters||[]).join(', '))}">${esc(f.name)}</div><div class="shap-value">${f.isAggregate?'aggregate':number(f.value)}</div><div class="shap-bar ki-shap-diverging"><div class="shap-bar-fill ${positive?'low':'high'}" style="position:absolute;left:${positive?50:50-width}%;width:${width}%"></div></div><div class="shap-impact" style="color:${positive?'#008943':'#c62c20'}">${positive?'+':''}${number(f.shapValue*100,3)} pp</div></div>`;
       }).join('');
     }
     const notMeasured=interrupted?'未完成（工作流中断）':'Not measured';
