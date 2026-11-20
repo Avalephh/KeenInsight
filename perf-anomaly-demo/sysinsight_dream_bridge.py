@@ -3206,6 +3206,9 @@ class BridgeHTTPHandler(BaseHTTPRequestHandler):
             if path == "/api/v1/actions/lab/tpcc/start":
                 self._send_json(self.bridge.lab.start_tpcc(body), 202)
                 return
+            if path == "/api/v1/actions/lab/tpcc/continuous":
+                self._send_json(self.bridge.lab.start_continuous(body), 202)
+                return
             if path == "/api/v1/actions/lab/stop":
                 self._send_json(self.bridge.lab.stop(str(body.get("run_id", ""))))
                 return

@@ -56,16 +56,15 @@
     <div id="message"></div>
 
     <section>
-      <h2>SysInsight / TPCC 外部压力：基线 → 压力调优前 → 压力调优后</h2>
+      <h2>SysInsight / TPCC 连续实验：运行基线 / 压力+基线（自动调优）/ 恢复基线</h2>
       <div class="section-body">
-        <div class="notice">先运行正常基线，再以固定速率施加同一 TPCC 外部压力，并把“压力总观察秒数”平均分成调优前和调优后两段。实验默认限制正常控制约 1600 TPS、外部压力最高 4000 TPS，同时给 PostgreSQL 设置 CPU/内存/任务数护栏，避免压测拖垮整机。调优阶段通过 TemporaryPostgresConfiguration 应用安全的 session/连接级 SysInsight 候选；synchronous_commit=off 也只通过 PGOPTIONS 进入调优控制连接；会审计并跳过 shared_buffers、work_mem、maintenance_work_mem、并行 worker、max_connections、fsync、max_wal_size 等会重启集群、占满内存或改变全局持久性语义的危险项，因此不会在实验中重启 PostgreSQL。会话级参数在目标连接建立时通过 PGOPTIONS 注入，不会在每笔事务重复执行 SET；外部压力连接保持原始 SQL 和客户端数，并使用同一个 pgbench 固定速率目标。阶段结束后自动恢复临时配置，不增加撤压恢复阶段。因此对比的是有压力时目标业务 TPS 是否回升。结果表中的 TPS 是剔除启动升温窗口后的稳态中位数，提升值按同等压力口径计算；CV 用于显示波动，实时行和 Grafana 曲线仍保留每秒原始值。</div>
+        <div class="notice">“运行基线”只运行 tp_normal.sql 控制负载并持续保持，直到你切换模式或点击停止。“压力+基线”会立即把所选场景的外部压力和同一条基线控制负载一起运行；压力持续 60 秒后自动应用已校验的 SysInsight 候选，并继续以调优后的配置运行。此时再点“运行基线”，系统会先停止压力、恢复初始配置，然后重新持续运行基线。实验仍使用固定的正常/压力 TPS 目标和 CPU/内存/任务数护栏；共享内存、work_mem、max_connections、fsync、max_wal_size 等危险项只审计不应用，不会重启 PostgreSQL。</div>
         <div class="grid">
-          <div class="span-7"><label for="tpccScenario">TPCC 外部压力场景</label><select id="tpccScenario"></select></div>
-          <div class="span-3"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
+          <div class="span-6"><label for="tpccScenario">TPCC 外部压力场景</label><select id="tpccScenario"></select></div>
+          <div class="span-2"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
           <div class="span-2"><label for="pressureClients">外部客户端</label><input id="pressureClients" type="number" min="1" max="32" value="6"></div>
-          <div class="span-3 field"><label for="baselineSeconds">基线秒数</label><input id="baselineSeconds" type="number" min="5" max="300" value="60"></div>
-          <div class="span-3 field"><label for="pressureSeconds">压力总观察秒数（前后各半）</label><input id="pressureSeconds" type="number" min="10" max="300" value="180"></div>
-          <div class="span-3 toolbar" style="align-items:end"><button id="startTpcc" onclick="startTpcc()">开始基线→压力前→压力后</button><button id="stopTpcc" class="warn" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
+          <div class="span-2"><label for="autoTuneSeconds">压力后自动调优（秒）</label><input id="autoTuneSeconds" type="number" min="10" max="300" value="60"></div>
+          <div class="span-12 toolbar" style="align-items:end"><button id="startBaseline" onclick="startBaseline()">运行基线</button><button id="startPressure" class="warn" onclick="startPressure()">压力+基线</button><button id="stopTpcc" class="danger" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
         </div>
         <div id="tpccDescription" class="hint" style="margin-top:12px"></div>
         <div id="tpccPhases" class="phase-track"></div>
@@ -131,12 +130,14 @@
     }
 
     function signedMetric(value, digits = 2) {
+      if (value === undefined || value === null || value === '') return '-';
       const n = Number(value);
       if (!Number.isFinite(n)) return '-';
       return `${n >= 0 ? '+' : ''}${n.toFixed(digits)}`;
     }
 
     function percent(value, digits = 1) {
+      if (value === undefined || value === null || value === '') return '-';
       const n = Number(value);
       return Number.isFinite(n) ? `${(n * 100).toFixed(digits)}%` : '-';
     }
@@ -183,7 +184,8 @@
       $('updated').textContent = '更新于 ' + new Date().toLocaleTimeString();
     }
 
-    function phaseClass(name, run) {
+    function phaseClass(name, run, skipBaseline = false) {
+      if (skipBaseline && name === 'baseline') return 'phase';
       const rawPhase = String(run?.phase || '');
       const phase = rawPhase === 'pressure' ? 'pressure_before' : rawPhase;
       if (phase === name) return 'phase active';
@@ -201,10 +203,25 @@
     function renderTpcc(status) {
       const run = currentRun(status, 'sysinsight') || status.latest_sysinsight;
       const active = currentRun(status, 'sysinsight');
-      $('startTpcc').disabled = !!active;
+      const activeConfig = active?.config || active?.result?.config || {};
+      const continuous = !!activeConfig.continuous;
+      const continuousMode = activeConfig.continuous_mode || '';
+      const displayConfig = run?.config || run?.result?.config || activeConfig;
+      const displayMode = displayConfig.continuous_mode || '';
+      $('startBaseline').disabled = !!active && (!continuous || continuousMode === 'baseline');
+      $('startPressure').disabled = !!active && (!continuous || continuousMode === 'pressure');
       $('stopTpcc').disabled = !active;
+      const lockInputs = !!active && (!continuous || continuousMode === 'pressure');
+      ['tpccScenario','normalClients','pressureClients','autoTuneSeconds'].forEach(id => { $(id).disabled = lockInputs; });
       const phaseNames = ['baseline','pressure_before','pressure_after'];
-      $('tpccPhases').innerHTML = phaseNames.map((name, index) => `<div class="${phaseClass(name, run)}"><b>${text(`${index + 1} ${phaseLabel(name)}`)}</b><br><span class="muted">${active && run?.phase === name ? '正在采样' : (run?.result?.phases?.[name] ? '已完成' : '等待')}</span></div>`).join('');
+      const phaseText = name => {
+        if (name === 'baseline' && displayMode === 'pressure') return '本轮未运行（可先运行基线）';
+        if (active && run?.phase === name) return '正在采样';
+        const phase = run?.result?.phases?.[name];
+        if (!phase) return '等待';
+        return phase.stopped ? '已停止采样' : '已完成';
+      };
+      $('tpccPhases').innerHTML = phaseNames.map((name, index) => `<div class="${phaseClass(name, run, displayMode === 'pressure')}"><b>${text(`${index + 1} ${phaseLabel(name)}`)}</b><br><span class="muted">${phaseText(name)}</span></div>`).join('');
       const sample = active?.samples?.slice(-1)[0];
       const m = sample?.metrics || {};
       const business = m.business || m.control || {};
@@ -224,10 +241,12 @@
           ? '两段外部压力差异超过 20%，本次对比无效。'
           : (comparison.same_pressure_observed === true ? '两段外部压力在允许偏差内。' : '外部压力一致性未能确认。');
         $('tpccComparison').innerHTML = `<b>压力下调优对比</b>：目标业务 TPS ${text(metric(comparison.pressure_before_tps))} → <span class="${improved ? 'ok' : 'bad'}"><strong>${text(metric(comparison.pressure_after_tps))}</strong></span>，同等外部压力口径下调优提升 <span class="${improved ? 'ok' : 'bad'}"><strong>${text(gain)}</strong></span>${text(rawGain)}${text(external)}；${text(pressureNote)} 候选状态 ${pill(tuning.status || comparison.tuning_status || 'unknown')}。${improved ? '压力仍在，调优后目标业务 TPS 更高。' : (comparison.same_pressure_observed === false ? '请重新运行更长的压力窗口后再判断。' : '本次压力下未观察到可归因于调优的目标业务 TPS 提升。')}`;
+      } else if (active && run?.phase === 'baseline') {
+        $('tpccComparison').textContent = '当前为持续基线模式；点击“压力+基线”开始压力与自动调优。';
       } else if (run?.status === 'completed' || run?.status === 'failed' || run?.status === 'stopped') {
         $('tpccComparison').textContent = `本次实验没有形成完整的压力调优前后对比（调优候选状态：${tuning.status || 'unknown'}）。`;
       } else {
-        $('tpccComparison').textContent = '完成一次三阶段实验后，这里会显示压力下调优前后的目标业务 TPS、提升幅度，以及两段外部压力是否保持在相近水平。';
+        $('tpccComparison').textContent = '运行“压力+基线”后，这里会显示压力调优前后的目标业务 TPS；自动调优完成后持续更新。';
       }
       const rows = phaseNames.map(name => {
         const p = phaseResult(run, name), c = p.control, e = p.external;
@@ -278,20 +297,29 @@
       }
     }
 
-    async function startTpcc() {
+    async function startMode(mode) {
+      const label = mode === 'baseline' ? '运行基线' : '压力+基线';
       try {
-        const v = await post('/api/v1/actions/lab/tpcc/start', {
+        const v = await post('/api/v1/actions/lab/tpcc/continuous', {
+          mode,
           scenario_id: $('tpccScenario').value,
           normal_clients: $('normalClients').value,
           pressure_clients: $('pressureClients').value,
-          baseline_seconds: $('baselineSeconds').value,
-          pressure_seconds: $('pressureSeconds').value
+          auto_tune_seconds: $('autoTuneSeconds').value
         });
         selectedRun.sysinsight = v.run?.run_id || '';
-        message(v.status === 'already_running' ? '已有 TPCC 实验在运行，已自动接管并继续显示当前采样。' : 'TPCC 实验已排队，页面会持续显示真实采样。');
+        if (v.status === 'already_running') {
+          message(`${label}已经在运行。`);
+        } else if (mode === 'baseline') {
+          message('基线已启动，将持续运行，直到切换为压力模式或点击停止。');
+        } else {
+          message(`压力+基线已启动；约 ${$('autoTuneSeconds').value} 秒后自动调优，然后继续以调优后配置运行。`);
+        }
         await refreshAll();
-      } catch (e) { message('启动 TPCC 失败：' + e.message, true); }
+      } catch (e) { message(`${label}失败：` + e.message, true); }
     }
+    function startBaseline() { return startMode('baseline'); }
+    function startPressure() { return startMode('pressure'); }
 
     async function stopCurrent(kind) {
       try {

@@ -27,7 +27,7 @@ import sys
 import tempfile
 import threading
 import time
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from pg_temporary_config import (  # noqa: E402
     TemporaryPostgresConfiguration,
@@ -157,6 +157,10 @@ TPCC_MAX_NORMAL_TPS = _positive_env_float("SYSINSIGHT_TPCC_MAX_NORMAL_TPS", 2000
 TPCC_POSTGRES_CPU_QUOTA = os.environ.get("SYSINSIGHT_PG_CPU_QUOTA", "250%").strip() or "250%"
 TPCC_POSTGRES_MEMORY_LIMIT = os.environ.get("SYSINSIGHT_PG_MEMORY_LIMIT", "24G").strip() or "24G"
 TPCC_POSTGRES_TASKS_MAX = os.environ.get("SYSINSIGHT_PG_TASKS_MAX", "512").strip() or "512"
+# The console's baseline/pressure modes are operator-controlled, so
+# the pgbench phase duration is effectively a safety ceiling rather
+# than a planned stop time.
+TPCC_CONTINUOUS_SECONDS = 24 * 60 * 60
 
 # These API-selected values either restart the whole cluster, allocate a very
 # large shared memory segment, or weaken durability for the live demo.  A lab
@@ -852,11 +856,13 @@ class LabController:
         self.store.set_meta("last_lab_database_reset", result)
         return result
 
-    def start_tpcc(self, body: Mapping[str, Any]) -> Dict[str, Any]:
-        scenario_id = str(body.get("scenario_id") or "tp_payment_hot")
-        case = next((value for value in self.tpcc_cases if value["scenario_id"] == scenario_id), None)
-        if case is None:
-            raise KeyError("unknown TPCC scenario: {}".format(scenario_id))
+    def _tpcc_config(
+        self,
+        case: Mapping[str, Any],
+        body: Mapping[str, Any],
+        continuous_mode: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        scenario_id = str(case["scenario_id"])
         normal_clients = _bounded_int(body.get("normal_clients"), "normal_clients", 2, 1, 16)
         pressure_clients = _bounded_int(body.get("pressure_clients"), "pressure_clients", case["clients"], 1, 32)
         baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 60, 5, 300)
@@ -899,12 +905,63 @@ class LabController:
             "secondary_metric": "pressure_injection_tps",
             "actual_prometheus_alert": True,
         }
+        if continuous_mode is not None:
+            mode = str(continuous_mode).strip().lower()
+            if mode not in {"baseline", "pressure"}:
+                raise ValueError("continuous mode must be baseline or pressure")
+            auto_tune_seconds = _bounded_int(
+                body.get("auto_tune_seconds"), "auto_tune_seconds", 60, 10, 300
+            )
+            continuous_seconds = _bounded_int(
+                body.get("continuous_seconds"),
+                "continuous_seconds",
+                TPCC_CONTINUOUS_SECONDS,
+                30,
+                86400,
+            )
+            pressure = mode == "pressure"
+            config.update(
+                {
+                    "continuous": True,
+                    "continuous_mode": mode,
+                    "continuous_seconds": continuous_seconds,
+                    "auto_tune_seconds": auto_tune_seconds,
+                    "skip_baseline": pressure,
+                    "baseline_seconds": 0 if pressure else continuous_seconds,
+                    "pressure_seconds": auto_tune_seconds + continuous_seconds if pressure else 0,
+                    "pressure_before_seconds": auto_tune_seconds if pressure else 0,
+                    "pressure_after_seconds": continuous_seconds if pressure else 0,
+                    "tuning_observation": (
+                        "after {} s of pressure, apply the verified SysInsight candidate "
+                        "and keep it active until the operator restores the baseline".format(auto_tune_seconds)
+                    ),
+                }
+            )
+        return config
+
+    def start_tpcc(self, body: Mapping[str, Any]) -> Dict[str, Any]:
+        scenario_id = str(body.get("scenario_id") or "tp_payment_hot")
+        case = next((value for value in self.tpcc_cases if value["scenario_id"] == scenario_id), None)
+        if case is None:
+            raise KeyError("unknown TPCC scenario: {}".format(scenario_id))
+        config = self._tpcc_config(case, body)
+        with self._lock:
+            existing = self._active_kind("sysinsight")
+        if existing:
+            # A duplicate click or a polling race should not surface as a
+            # 409 to the operator. Keep the one real workload and let the
+            # console continue following it.
+            return {
+                "status": "already_running",
+                "message": "a sysinsight lab run is already queued or running",
+                "run": existing,
+            }
+        return self._queue_tpcc_run(case, config)
+
+    def _queue_tpcc_run(self, case: Mapping[str, Any], config: Mapping[str, Any]) -> Dict[str, Any]:
         with self._lock:
             existing = self._active_kind("sysinsight")
             if existing:
-                # A duplicate click or a polling race should not surface as a
-                # 409 to the operator. Keep the one real workload and let the
-                # console continue following it.
                 return {
                     "status": "already_running",
                     "message": "a sysinsight lab run is already queued or running",
@@ -914,10 +971,64 @@ class LabController:
             if free_bytes < 512 * 1024 * 1024:
                 raise RuntimeError("insufficient disk space for TPCC lab: {} bytes free".format(free_bytes))
             run_id = self._run_id("sysinsight")
-            self.store.create_lab_run(run_id, "sysinsight", scenario_id, case["title"], config)
+            self.store.create_lab_run(run_id, "sysinsight", str(case["scenario_id"]), str(case["title"]), config)
             stop_event = threading.Event()
             self._submit_active(run_id, stop_event, self._run_tpcc, run_id, case, config, stop_event)
             return {"status": "queued", "run": self.store.get_lab_run(run_id)}
+
+    def start_continuous(self, body: Mapping[str, Any]) -> Dict[str, Any]:
+        """Start or switch the operator-controlled baseline/pressure session.
+
+        A baseline session runs the normal control workload indefinitely.
+        A pressure session adds the selected external workload immediately,
+        applies the verified SysInsight candidate after ``auto_tune_seconds``
+        and keeps the tuned configuration running.  Switching modes stops the
+        old worker, restores its configuration, and starts the requested mode.
+        """
+
+        scenario_id = str(body.get("scenario_id") or "tp_payment_hot")
+        case = next((value for value in self.tpcc_cases if value["scenario_id"] == scenario_id), None)
+        if case is None:
+            raise KeyError("unknown TPCC scenario: {}".format(scenario_id))
+        mode = str(body.get("mode") or "baseline").strip().lower()
+        if mode not in {"baseline", "pressure"}:
+            raise ValueError("mode must be baseline or pressure")
+        active_run: Optional[Dict[str, Any]] = None
+        with self._lock:
+            active_rows = self._recover_stale_runs_locked("sysinsight")
+            if active_rows:
+                active_run = self.store.get_lab_run(str(active_rows[0]["run_id"]))
+                active_config = (active_run or {}).get("config") or {}
+                if not active_config.get("continuous"):
+                    raise RuntimeError(
+                        "a one-shot TPCC experiment is running; stop it before using the continuous console"
+                    )
+                if str(active_run.get("scenario_id")) != scenario_id:
+                    raise RuntimeError(
+                        "stop the current continuous experiment before changing scenario"
+                    )
+                if active_config.get("continuous_mode") == mode:
+                    return {"status": "already_running", "run": active_run}
+        if active_run:
+            previous_id = str(active_run["run_id"])
+            self.stop(previous_id)
+            deadline = time.monotonic() + 60.0
+            while True:
+                row = self.store.get_lab_run(previous_id)
+                with self._lock:
+                    still_active = previous_id in self._active
+                if (row is None or row.get("status") not in {"queued", "running"}) and not still_active:
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        "timed out stopping the previous continuous experiment; press Stop and retry"
+                    )
+                time.sleep(0.2)
+        config = self._tpcc_config(case, body, continuous_mode=mode)
+        queued = self._queue_tpcc_run(case, config)
+        if queued.get("status") != "already_running":
+            queued["status"] = "switch_queued" if active_run else "queued"
+        return queued
 
     def stop(self, run_id: str) -> Dict[str, Any]:
         row = self.store.get_lab_run(run_id)
@@ -1217,6 +1328,7 @@ class LabController:
         pressure_connection_config: Optional[Mapping[str, Any]] = None,
         normal_rate: Optional[float] = None,
         pressure_rate: Optional[float] = None,
+        progress: Optional[Callable[[str, float], None]] = None,
     ) -> Dict[str, Any]:
         self.store.update_lab_run(run_id, status="running", phase=phase)
         # PostgreSQL truncates application_name at 63 bytes. Keep the
@@ -1257,9 +1369,11 @@ class LabController:
                 processes.append(external)
             self._set_processes(run_id, processes)
             started = time.monotonic()
+            stopped = False
             while time.monotonic() - started < duration:
                 if stop_event.is_set():
-                    raise LabStopped("operator requested stop")
+                    stopped = True
+                    break
                 self._sample_tpcc(
                     run_id,
                     phase,
@@ -1268,11 +1382,19 @@ class LabController:
                     processes,
                     database_client=self.db,
                 )
+                if progress is not None:
+                    try:
+                        progress(phase, time.monotonic() - started)
+                    except Exception:
+                        LOGGER.exception("could not publish live TPCC progress for %s", phase)
                 time.sleep(min(1.0, max(0.05, duration - (time.monotonic() - started))))
             if stop_event.is_set():
-                raise LabStopped("operator requested stop")
-            self._wait_processes(processes)
-            failed = [
+                stopped = True
+            if stopped:
+                self._wait_processes(processes, terminate=True)
+            else:
+                self._wait_processes(processes)
+            failed = [] if stopped else [
                 "{} returned {}".format(item.get("role", "worker"), item.get("returncode"))
                 for item in processes
                 if item.get("returncode") not in (0, None)
@@ -1281,7 +1403,8 @@ class LabController:
                 raise RuntimeError("TPCC phase {} failed: {}".format(phase, "; ".join(failed)))
             result = {
                 "phase": phase,
-                "duration_seconds": duration,
+                "duration_seconds": round(time.monotonic() - started, 3) if stopped else duration,
+                "stopped": stopped,
                 "normal_target_tps": normal_rate,
                 "pressure_target_tps": pressure_rate,
                 "pressure_mode": "open_loop_fixed_rate" if pressure_rate else "closed_loop_observed_rate",
@@ -1307,6 +1430,65 @@ class LabController:
                 self._set_processes(run_id, [])
             raise
 
+    @staticmethod
+    def _phase_summaries(samples: Sequence[Mapping[str, Any]], phase: str, duration: float) -> Dict[str, Any]:
+        return {
+            "business_tps_summary": _tpcc_tps_summary(samples, phase, "business", duration),
+            "pressure_tps_summary": _tpcc_tps_summary(samples, phase, "pressure", duration),
+        }
+
+    def _attach_phase_summaries(self, run_id: str, phases: Dict[str, Any]) -> List[Dict[str, Any]]:
+        samples = self.store.list_lab_samples(run_id, 5000)
+        for name, item in phases.items():
+            if not isinstance(item, dict) or "business_tps_summary" in item:
+                continue
+            item.update(self._phase_summaries(samples, name, item.get("duration_seconds") or 0))
+        return samples
+
+    def _publish_tpcc_progress(
+        self,
+        run_id: str,
+        case: Mapping[str, Any],
+        config: Mapping[str, Any],
+        phases: Dict[str, Any],
+        tuning: Mapping[str, Any],
+        observation_model: str,
+        phase_name: str,
+        elapsed: float,
+    ) -> None:
+        samples = self.store.list_lab_samples(run_id, 5000)
+        current = phases.get(phase_name)
+        if isinstance(current, dict):
+            current["duration_seconds"] = int(round(elapsed))
+            current.update(self._phase_summaries(samples, phase_name, elapsed))
+        comparison = _tpcc_comparison(phases)
+        comparison["tuning_status"] = tuning.get("status")
+        comparison["tuning_source"] = tuning.get("source")
+        alert_observed = any(
+            bool((sample.get("metrics") or {}).get("alert_firing"))
+            for sample in samples
+            if isinstance(sample, dict)
+        )
+        self.store.update_lab_run(
+            run_id,
+            result_patch={
+                "scenario": dict(case),
+                "config": dict(config),
+                "observation_model": observation_model,
+                "phases": phases,
+                "tuning": dict(tuning),
+                "comparison": comparison,
+                "sample_count": len(samples),
+                "updated_at": utc_now(),
+                "live": True,
+                "sysinsight_state": {
+                    "alert_firing": alert_observed,
+                    "alert_observed": alert_observed,
+                    "current_incidents": [],
+                },
+            },
+        )
+
     def _run_tpcc(
         self,
         run_id: str,
@@ -1319,6 +1501,30 @@ class LabController:
         stage_dir: Optional[Path] = None
         phases: Dict[str, Any] = {}
         tuning: Dict[str, Any] = {}
+        config_applier: Optional[TemporaryPostgresConfiguration] = None
+        continuous_mode = str(config.get("continuous_mode") or "")
+        continuous = bool(config.get("continuous"))
+        observation_model = (
+            "continuous_baseline"
+            if continuous and continuous_mode == "baseline"
+            else "continuous_pressure_auto_tune"
+            if continuous
+            else "baseline_then_pressure_before_and_after_tuning"
+        )
+        progress_state = {"at": 0.0}
+
+        def progress(phase_name: str, elapsed: float) -> None:
+            now = time.monotonic()
+            if now - progress_state["at"] < 2.0:
+                return
+            progress_state["at"] = now
+            try:
+                self._publish_tpcc_progress(
+                    run_id, case, config, phases, tuning, observation_model, phase_name, elapsed
+                )
+            except Exception:
+                LOGGER.exception("could not publish live TPCC progress for %s", phase_name)
+
         normal_rate = None
         pressure_rate = None
         try:
@@ -1337,146 +1543,192 @@ class LabController:
             stage_dir.chmod(0o755)
             normal_sql = self._stage_sql(TPCC_CASE_ROOT / str(case["normal_sql"]), stage_dir)
             pressure_sql = self._stage_sql(TPCC_CASE_ROOT / str(case["sql"]), stage_dir)
-            self.store.update_lab_run(run_id, status="running", phase="baseline")
-            phases["baseline"] = self._run_phase(
-                run_id,
-                "baseline",
-                int(config["baseline_seconds"]),
-                normal_sql,
-                None,
-                int(config["normal_clients"]),
-                int(config["pressure_clients"]),
-                stop_event,
-                run_dir,
-                normal_rate=normal_rate,
-            )
-            phases["pressure_before"] = self._run_phase(
-                run_id,
-                "pressure_before",
-                int(config["pressure_before_seconds"]),
-                normal_sql,
-                pressure_sql,
-                int(config["normal_clients"]),
-                int(config["pressure_clients"]),
-                stop_event,
-                run_dir,
-                normal_rate=normal_rate,
-                pressure_rate=pressure_rate,
-            )
-            tuning = self._load_lab_tuning(str(case["scenario_id"]))
-            tuned_normal_sql = normal_sql
-            tuned_pressure_sql = pressure_sql
-            tuned_connection_args: Any = self.bridge.args
-            tuned_normal_connection_config: Mapping[str, Any] = {}
-            tuned_pressure_connection_config: Mapping[str, Any] = {}
-            if tuning.get("status") == "candidate_loaded" and tuning.get("applied_configuration"):
-                config_applier = TemporaryPostgresConfiguration(
-                    self.bridge.args,
-                    dict(tuning.get("applied_configuration") or {}),
-                    "sysinsight-lab-{}".format(self._run_marker(run_id)),
-                    allow_restart=False,
-                )
-                tuning["status"] = "applying"
-                try:
-                    with config_applier as applied:
-                        tuning["application"] = applied
-                        tuning["status"] = "applied"
-                        # TemporaryPostgresConfiguration exposes the endpoint
-                        # that was actually activated.  Its raw normalized
-                        # candidate also contains postmaster values such as
-                        # port/unix_socket_directories that are intentionally
-                        # skipped when allow_restart=False; using that raw
-                        # mapping here would send the tuned workers to an
-                        # inactive endpoint (for example port 5543).
-                        tuned_connection_args = copy.copy(self.bridge.args)
-                        endpoint = applied.get("connection_endpoint") or {}
-                        if endpoint.get("host"):
-                            tuned_connection_args.host = str(endpoint["host"])
-                        if endpoint.get("port") is not None:
-                            tuned_connection_args.port = int(endpoint["port"])
-                        # Connection-startup options are applied once when
-                        # pgbench opens a backend.  Do not prepend SET
-                        # statements to the script: pgbench would execute
-                        # those statements on every transaction and distort
-                        # the business TPS being measured.
-                        tuned_normal_connection_config = dict(
-                            applied.get("connection_configuration", {})
-                        )
-                        tuned_normal_connection_config.update(
-                            applied.get("session_configuration", {})
-                        )
-                        # Keep the external pressure recipe unchanged.  The
-                        # candidate's connection-scoped settings are harmless
-                        # bookkeeping for this lab (currently log settings),
-                        # but session planner/commit settings must not alter
-                        # the load generator's work.
-                        tuned_pressure_connection_config = dict(
-                            applied.get("connection_configuration", {})
-                        )
-                        tuned_stage_dir = stage_dir / "tuned"
-                        # Keep a separate staged path for auditability, while
-                        # passing the session candidate through PGOPTIONS at
-                        # connection startup instead of executing SET per
-                        # transaction.
-                        tuned_normal_sql = self._stage_sql(
-                            TPCC_CASE_ROOT / str(case["normal_sql"]),
-                            tuned_stage_dir,
-                            destination_name="tp_normal_tuned.sql",
-                        )
-                        old_host, old_port = self.db.host, self.db.port
-                        self.db.host = str(getattr(tuned_connection_args, "host", old_host))
-                        self.db.port = int(getattr(tuned_connection_args, "port", old_port))
-                        try:
-                            phases["pressure_after"] = self._run_phase(
-                                run_id,
-                                "pressure_after",
-                                int(config["pressure_after_seconds"]),
-                                tuned_normal_sql,
-                                tuned_pressure_sql,
-                                int(config["normal_clients"]),
-                                int(config["pressure_clients"]),
-                                stop_event,
-                                run_dir,
-                                connection_args=tuned_connection_args,
-                                connection_config=tuned_normal_connection_config,
-                                pressure_connection_args=tuned_connection_args,
-                                pressure_connection_config=tuned_pressure_connection_config,
-                                normal_rate=normal_rate,
-                                pressure_rate=pressure_rate,
-                            )
-                        finally:
-                            self.db.host, self.db.port = old_host, old_port
-                    tuning["application"] = applied
-                    tuning["status"] = applied.get("status", "applied_and_restored")
-                    tuning["reason"] = "safe SysInsight candidate applied and restored; blocked settings were not activated"
-                except BaseException as exc:
-                    tuning["application"] = getattr(config_applier, "state", {})
-                    tuning["status"] = "apply_failed"
-                    tuning["reason"] = "safe candidate application or tuned phase failed: {}".format(exc)
-                    raise
-            else:
-                phases["pressure_after"] = self._run_phase(
+            initial_phase = "pressure_before" if config.get("skip_baseline") else "baseline"
+            self.store.update_lab_run(run_id, status="running", phase=initial_phase)
+            if not config.get("skip_baseline"):
+                phases["baseline"] = {"phase": "baseline", "duration_seconds": 0, "status": "running"}
+                baseline_result = self._run_phase(
                     run_id,
-                    "pressure_after",
-                    int(config["pressure_after_seconds"]),
-                    tuned_normal_sql,
-                    tuned_pressure_sql,
+                    "baseline",
+                    int(config["baseline_seconds"]),
+                    normal_sql,
+                    None,
+                    int(config["normal_clients"]),
+                    int(config["pressure_clients"]),
+                    stop_event,
+                    run_dir,
+                    normal_rate=normal_rate,
+                    progress=progress,
+                )
+                baseline_result.update(
+                    self._phase_summaries(
+                        self.store.list_lab_samples(run_id, 5000),
+                        "baseline",
+                        baseline_result.get("duration_seconds") or 0,
+                    )
+                )
+                phases["baseline"] = baseline_result
+                if stop_event.is_set():
+                    raise LabStopped("operator requested stop")
+
+            if continuous_mode != "baseline":
+                phases["pressure_before"] = {"phase": "pressure_before", "duration_seconds": 0, "status": "running", "pressure_target_tps": pressure_rate}
+                before_result = self._run_phase(
+                    run_id,
+                    "pressure_before",
+                    int(config["pressure_before_seconds"]),
+                    normal_sql,
+                    pressure_sql,
                     int(config["normal_clients"]),
                     int(config["pressure_clients"]),
                     stop_event,
                     run_dir,
                     normal_rate=normal_rate,
                     pressure_rate=pressure_rate,
+                    progress=progress,
                 )
-            samples = self.store.list_lab_samples(run_id, 2000)
-            for phase_name, phase_result in phases.items():
-                duration = int(phase_result.get("duration_seconds") or config.get("pressure_seconds", 0))
-                phase_result["business_tps_summary"] = _tpcc_tps_summary(
-                    samples, phase_name, "business", duration
+                before_result.update(
+                    self._phase_summaries(
+                        self.store.list_lab_samples(run_id, 5000),
+                        "pressure_before",
+                        before_result.get("duration_seconds") or 0,
+                    )
                 )
-                phase_result["pressure_tps_summary"] = _tpcc_tps_summary(
-                    samples, phase_name, "pressure", duration
-                )
+                phases["pressure_before"] = before_result
+                if stop_event.is_set():
+                    raise LabStopped("operator requested stop")
+
+                tuning = self._load_lab_tuning(str(case["scenario_id"]))
+                tuned_normal_sql = normal_sql
+                tuned_pressure_sql = pressure_sql
+                tuned_connection_args: Any = self.bridge.args
+                tuned_normal_connection_config: Mapping[str, Any] = {}
+                tuned_pressure_connection_config: Mapping[str, Any] = {}
+                if tuning.get("status") == "candidate_loaded" and tuning.get("applied_configuration"):
+                    config_applier = TemporaryPostgresConfiguration(
+                        self.bridge.args,
+                        dict(tuning.get("applied_configuration") or {}),
+                        "sysinsight-lab-{}".format(self._run_marker(run_id)),
+                        allow_restart=False,
+                    )
+                    tuning["status"] = "applying"
+                    try:
+                        with config_applier as applied:
+                            tuning["application"] = applied
+                            tuning["status"] = "applied"
+                            # TemporaryPostgresConfiguration exposes the endpoint
+                            # that was actually activated.  Its raw normalized
+                            # candidate also contains postmaster values such as
+                            # port/unix_socket_directories that are intentionally
+                            # skipped when allow_restart=False; using that raw
+                            # mapping here would send the tuned workers to an
+                            # inactive endpoint (for example port 5543).
+                            tuned_connection_args = copy.copy(self.bridge.args)
+                            endpoint = applied.get("connection_endpoint") or {}
+                            if endpoint.get("host"):
+                                tuned_connection_args.host = str(endpoint["host"])
+                            if endpoint.get("port") is not None:
+                                tuned_connection_args.port = int(endpoint["port"])
+                            # Connection-startup options are applied once when
+                            # pgbench opens a backend.  Do not prepend SET
+                            # statements to the script: pgbench would execute
+                            # those statements on every transaction and distort
+                            # the business TPS being measured.
+                            tuned_normal_connection_config = dict(
+                                applied.get("connection_configuration", {})
+                            )
+                            tuned_normal_connection_config.update(
+                                applied.get("session_configuration", {})
+                            )
+                            # Keep the external pressure recipe unchanged.  The
+                            # candidate's connection-scoped settings are harmless
+                            # bookkeeping for this lab (currently log settings),
+                            # but session planner/commit settings must not alter
+                            # the load generator's work.
+                            tuned_pressure_connection_config = dict(
+                                applied.get("connection_configuration", {})
+                            )
+                            tuned_stage_dir = stage_dir / "tuned"
+                            # Keep a separate staged path for auditability, while
+                            # passing the session candidate through PGOPTIONS at
+                            # connection startup instead of executing SET per
+                            # transaction.
+                            tuned_normal_sql = self._stage_sql(
+                                TPCC_CASE_ROOT / str(case["normal_sql"]),
+                                tuned_stage_dir,
+                                destination_name="tp_normal_tuned.sql",
+                            )
+                            old_host, old_port = self.db.host, self.db.port
+                            self.db.host = str(getattr(tuned_connection_args, "host", old_host))
+                            self.db.port = int(getattr(tuned_connection_args, "port", old_port))
+                            try:
+                                phases["pressure_after"] = {"phase": "pressure_after", "duration_seconds": 0, "status": "running", "pressure_target_tps": pressure_rate}
+                                after_result = self._run_phase(
+                                    run_id,
+                                    "pressure_after",
+                                    int(config["pressure_after_seconds"]),
+                                    tuned_normal_sql,
+                                    tuned_pressure_sql,
+                                    int(config["normal_clients"]),
+                                    int(config["pressure_clients"]),
+                                    stop_event,
+                                    run_dir,
+                                    connection_args=tuned_connection_args,
+                                    connection_config=tuned_normal_connection_config,
+                                    pressure_connection_args=tuned_connection_args,
+                                    pressure_connection_config=tuned_pressure_connection_config,
+                                    normal_rate=normal_rate,
+                                    pressure_rate=pressure_rate,
+                                    progress=progress,
+                                )
+                                after_result.update(
+                                    self._phase_summaries(
+                                        self.store.list_lab_samples(run_id, 5000),
+                                        "pressure_after",
+                                        after_result.get("duration_seconds") or 0,
+                                    )
+                                )
+                                phases["pressure_after"] = after_result
+                            finally:
+                                self.db.host, self.db.port = old_host, old_port
+                            if stop_event.is_set():
+                                raise LabStopped("operator requested stop")
+                        tuning["application"] = applied
+                        tuning["status"] = applied.get("status", "applied_and_restored")
+                        tuning["reason"] = "safe SysInsight candidate applied and restored; blocked settings were not activated"
+                    except BaseException as exc:
+                        tuning["application"] = getattr(config_applier, "state", {})
+                        tuning["status"] = "apply_failed"
+                        tuning["reason"] = "safe candidate application or tuned phase failed: {}".format(exc)
+                        raise
+                else:
+                    phases["pressure_after"] = {"phase": "pressure_after", "duration_seconds": 0, "status": "running", "pressure_target_tps": pressure_rate}
+                    after_result = self._run_phase(
+                        run_id,
+                        "pressure_after",
+                        int(config["pressure_after_seconds"]),
+                        tuned_normal_sql,
+                        tuned_pressure_sql,
+                        int(config["normal_clients"]),
+                        int(config["pressure_clients"]),
+                        stop_event,
+                        run_dir,
+                        normal_rate=normal_rate,
+                        pressure_rate=pressure_rate,
+                        progress=progress,
+                    )
+                    after_result.update(
+                        self._phase_summaries(
+                            self.store.list_lab_samples(run_id, 5000),
+                            "pressure_after",
+                            after_result.get("duration_seconds") or 0,
+                        )
+                    )
+                    phases["pressure_after"] = after_result
+                    if stop_event.is_set():
+                        raise LabStopped("operator requested stop")
+
+            samples = self._attach_phase_summaries(run_id, phases)
             alert_observed = any(
                 bool((sample.get("metrics") or {}).get("alert_firing"))
                 for sample in samples
@@ -1493,7 +1745,7 @@ class LabController:
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
-                "observation_model": "baseline_then_pressure_before_and_after_tuning",
+                "observation_model": observation_model,
                 "phases": phases,
                 "tuning": tuning,
                 "comparison": comparison,
@@ -1509,10 +1761,14 @@ class LabController:
             (run_dir / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
             self.store.update_lab_run(run_id, status="completed", phase="completed", result_patch=result)
         except LabStopped as exc:
+            if config_applier is not None:
+                tuning["application"] = getattr(config_applier, "state", {})
+                tuning["status"] = str(tuning["application"].get("status") or tuning.get("status") or "")
+            self._attach_phase_summaries(run_id, phases)
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
-                "observation_model": "baseline_then_pressure_before_and_after_tuning",
+                "observation_model": observation_model,
                 "phases": phases,
                 "tuning": tuning,
                 "comparison": _tpcc_comparison(phases),
@@ -1521,10 +1777,14 @@ class LabController:
             }
             self._safe_update_run(run_id, "stopped", "stopped", str(exc), result)
         except BaseException as exc:
+            if config_applier is not None:
+                tuning["application"] = getattr(config_applier, "state", {})
+                tuning["status"] = str(tuning["application"].get("status") or tuning.get("status") or "")
+            self._attach_phase_summaries(run_id, phases)
             result = {
                 "scenario": dict(case),
                 "config": dict(config),
-                "observation_model": "baseline_then_pressure_before_and_after_tuning",
+                "observation_model": observation_model,
                 "phases": phases,
                 "tuning": tuning,
                 "comparison": _tpcc_comparison(phases),

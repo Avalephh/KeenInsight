@@ -190,6 +190,13 @@ TPCC 实验本身采用两阶段窗口：先运行基线，再保持外部压力
 启动升温窗口，以稳态中位数和 CV 展示主指标；不再追加撤压后的自然恢复阶段，因此只有压力仍
 在时目标业务 TPS 回升，才作为调优恢复证据。
 
+实验控制台也提供连续模式，由操作员按钮控制，而不是固定结束时间：
+`POST /api/v1/actions/lab/tpcc/continuous`，`{"mode":"baseline"}` 持续运行
+`tp_normal.sql` 基线；`{"mode":"pressure","scenario_id":...}` 立即叠加所选场景的外部压力，
+默认 60 秒后自动应用已校验的 SysInsight 候选，并继续以调优后配置运行。再次请求 baseline 模式
+会先停止压力、恢复初始配置，再重新持续运行基线。切换模式通过停止旧 run、等待配置恢复并启动
+新 run 完成；自动评测的 `/api/v1/actions/lab/tpcc/start` 三阶段入口保持不变。
+
 如果本机 PostgreSQL 使用 Unix socket peer 认证，DREAM worker 需要以数据库 OS 用户运行，并
 把 DREAM checkout 放在该用户可读取的位置；也可以改用 TCP/密码认证。例如本机验证可额外传入
 `--dream-run-as postgres --dream-runtime-root <postgres 可读的 DREAM 根目录>`。捕获不到活动会话
