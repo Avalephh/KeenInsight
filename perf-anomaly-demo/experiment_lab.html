@@ -61,9 +61,8 @@
         <div class="notice">“运行基线”只运行 tp_normal.sql 控制负载并持续保持，直到你切换模式或点击停止。“压力+基线”会立即把所选场景的外部压力和同一条基线控制负载一起运行；压力持续 60 秒后自动应用已校验的 SysInsight 候选，并继续以调优后的配置运行。此时再点“运行基线”，系统会先停止压力、恢复初始配置，然后重新持续运行基线。实验仍使用固定的正常/压力 TPS 目标和 CPU/内存/任务数护栏；共享内存、work_mem、max_connections、fsync、max_wal_size 等危险项只审计不应用，不会重启 PostgreSQL。</div>
         <div class="grid">
           <div class="span-6"><label for="tpccScenario">TPCC 外部压力场景</label><select id="tpccScenario"></select></div>
-          <div class="span-2"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
-          <div class="span-2"><label for="pressureClients">外部客户端</label><input id="pressureClients" type="number" min="1" max="32" value="6"></div>
-          <div class="span-2"><label for="autoTuneSeconds">压力后自动调优（秒）</label><input id="autoTuneSeconds" type="number" min="10" max="300" value="60"></div>
+          <div class="span-3"><label for="normalClients">正常控制客户端</label><input id="normalClients" type="number" min="1" max="16" value="2"></div>
+          <div class="span-3"><label for="pressureClients">外部客户端</label><input id="pressureClients" type="number" min="1" max="32" value="6"></div>
           <div class="span-12 toolbar" style="align-items:end"><button id="startBaseline" onclick="startBaseline()">运行基线</button><button id="startPressure" class="warn" onclick="startPressure()">压力+基线</button><button id="stopTpcc" class="danger" onclick="stopCurrent('sysinsight')" disabled>停止</button></div>
         </div>
         <div id="tpccDescription" class="hint" style="margin-top:12px"></div>
@@ -212,7 +211,7 @@
       $('startPressure').disabled = !!active && (!continuous || continuousMode === 'pressure');
       $('stopTpcc').disabled = !active;
       const lockInputs = !!active && (!continuous || continuousMode === 'pressure');
-      ['tpccScenario','normalClients','pressureClients','autoTuneSeconds'].forEach(id => { $(id).disabled = lockInputs; });
+      ['tpccScenario','normalClients','pressureClients'].forEach(id => { $(id).disabled = lockInputs; });
       const phaseNames = ['baseline','pressure_before','pressure_after'];
       const phaseText = name => {
         if (name === 'baseline' && displayMode === 'pressure') return '本轮未运行（可先运行基线）';
@@ -304,8 +303,7 @@
           mode,
           scenario_id: $('tpccScenario').value,
           normal_clients: $('normalClients').value,
-          pressure_clients: $('pressureClients').value,
-          auto_tune_seconds: $('autoTuneSeconds').value
+          pressure_clients: $('pressureClients').value
         });
         selectedRun.sysinsight = v.run?.run_id || '';
         if (v.status === 'already_running') {
@@ -313,7 +311,7 @@
         } else if (mode === 'baseline') {
           message('基线已启动，将持续运行，直到切换为压力模式或点击停止。');
         } else {
-          message(`压力+基线已启动；约 ${$('autoTuneSeconds').value} 秒后自动调优，然后继续以调优后配置运行。`);
+          message('压力+基线已启动；约 60 秒后自动调优，然后继续以调优后配置运行。');
         }
         await refreshAll();
       } catch (e) { message(`${label}失败：` + e.message, true); }
