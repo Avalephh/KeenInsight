@@ -146,7 +146,7 @@
     });
     const knobs=knobEntries.map(([name,value])=>{
       const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name],rationale=rationaleByParam.get(String(name));
-      const reason=rationale?.reason?`<div class="knob-reason"><span class="knob-reason-label">为什么这样调</span>${esc(rationale.reason)}</div>`:'';
+      const reason=rationale?.reason?`<div class="knob-reason"><span class="knob-reason-label">调优原因</span>${esc(rationale.reason)}</div>`:'';
       const evidence=(rationale?.evidence||[]).length?`<details class="knob-evidence"><summary>关联证据</summary><div class="ki-row-meta">${rationale.evidence.map(x=>esc(x)).join('；')}</div></details>`:'';
       return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div>${reason}${evidence}</div>`;
     }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'本次没有实际参数变化。');
