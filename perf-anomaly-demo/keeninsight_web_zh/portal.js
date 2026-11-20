@@ -163,8 +163,8 @@
     const lab=d.relatedLabRun||{},lc=lab.comparison||{};
     const hasLabTps=lc.baseline_tps!=null&&lc.pressure_before_tps!=null&&lc.pressure_after_tps!=null;
     const tps=value=>value==null?'—':Number(value).toFixed(2)+' TPS';
-    const tpsSummary=hasLabTps?`<p class="ki-sample-note">TPS 来自 SysInsight 实验台同一次运行 ${esc(lab.run_id||'')}${lab.scenario_id?' · '+esc(lab.scenario_id):''}；下方 Tuning Actions 与 SQL 回放属于告警链的独立候选/复测。</p>`:'';
-    const replayNote=hasLabTps?'下方为告警链的实时候选参数；告警链 SQL 回放复测见 Workflow evidence。':'';
+    const tpsSummary='';
+    const replayNote='';
     const footerNote=hasLabTps?'上方 TPS 来自实验台同一次运行；告警链的只读 SQL 回放复测见 Workflow evidence。流程完成不代表告警已解决。':'Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.';
     const tuningLabels=hasLabTps?{
       beforeTuning_label1:'压力调优前 TPS',beforeTuning_label2:'基线 TPS',beforeTuning_label3:'实验状态',

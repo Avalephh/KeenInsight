@@ -163,8 +163,8 @@
     const lab=d.relatedLabRun||{},lc=lab.comparison||{};
     const hasLabTps=lc.baseline_tps!=null&&lc.pressure_before_tps!=null&&lc.pressure_after_tps!=null;
     const tps=value=>value==null?'—':Number(value).toFixed(2)+' TPS';
-    const tpsSummary=hasLabTps?`<p class="ki-sample-note">TPS values come from the same SysInsight lab run ${esc(lab.run_id||'')}${lab.scenario_id?' · '+esc(lab.scenario_id):''}; the Tuning Actions and SQL replay below are the alert chain's separate candidate/measurement.</p>`:'';
-    const replayNote=hasLabTps?'The Tuning Actions below are the alert chain\'s live candidate; its SQL replay is under Workflow evidence.':'';
+    const tpsSummary='';
+    const replayNote='';
     const footerNote=hasLabTps?'The TPS values above come from the same lab run; the alert chain\'s read-only SQL replay is under Workflow evidence. Completion does not mean the alert resolved.':'Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.';
     const tuningLabels=hasLabTps?{
       beforeTuning_label1:'Pressure before TPS',beforeTuning_label2:'Baseline TPS',beforeTuning_label3:'Lab status',
