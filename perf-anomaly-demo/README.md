@@ -60,7 +60,7 @@ PostgreSQL 12.22 源码构建的 276 条文档化 GUC 关联，其中 231 条数
 自动搜索维度；仓库原有的 5 条 PG 关系在记录中保留并明确标注为 legacy，新增关系均可追溯到
 源码证据。
 
-Prometheus 演示规则位于 `../monitoring/config/prometheus/rules/sysinsight-demo.yml`：`SysInsightDemoAnomaly` 在外部压力阶段（`phase="pressure_before"`）的目标业务 TPS 低于基线最大值的 90% 并持续 30 秒时触发；在连续压力模式 120 秒的调优前窗口内，告警链的 perf/分析负载会与调优前窗口重叠，用于把“TPS 下降”作为系统调优流程的异常入口；它不改变 SysInsight 的异常提取逻辑。
+Prometheus 演示规则位于 `../monitoring/config/prometheus/rules/sysinsight-demo.yml`：`SysInsightDemoAnomaly` 在外部压力阶段（`phase="pressure_before"`）的目标业务 TPS 低于基线最大值的 90% 并持续 30 秒时触发，用于把“TPS 下降”作为系统调优流程的异常入口；它不改变 SysInsight 的异常提取逻辑。
 
 如果某次告警在函数采样之后、候选生成或验证之前被重启中断，incident 目录仍会保留 `anomaly/anomaly_counts_*.txt` 和 `anomaly/anomaly.folded`。此时运行：
 
