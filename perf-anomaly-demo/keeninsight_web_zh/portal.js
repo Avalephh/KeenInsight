@@ -117,7 +117,7 @@
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
       const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'未在固定 PostgreSQL 12.22 源码中定位（生成代码、扩展或系统符号）');
       const evidence=f.Evidence==='runtime_call_chain'?'perf 调用链':f.Evidence==='source_association'?'源码关联':'perf 差分采样';
-      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
+      return `<div class="function-item ki-clickable" data-ki-function="${esc(f.Function)}" tabindex="0" role="button" aria-label="查看函数详情 ${esc(f.Function)}"><div class="function-header"><div class="function-name">${esc(f.Function)}</div><span class="ki-function-open">详情 ›</span></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
     }).join('');
     const hotNote=d.hotFunctionsDerived?'<p class="ki-sample-note">该告警没有差分采样结果，以下函数由运行时 perf 调用链和源码关联生成。</p>':'';
     const functionsHtml=hotList.length?hotNote+hot:empty(data.rawStatus==='skipped'
@@ -171,6 +171,39 @@
     }
   }
 
+  async function showFunctionDetail(name, data) {
+    const d=data.detailAnalysis||{};
+    const hot=(d.hotFunctions||[]).find(f=>f.Function===name)||{};
+    const examples=(d.functionCodeExamples||[]).filter(s=>s.function===name);
+    const chains=(d.runtimeCallChains||[]).filter(c=>(c.matched_key_functions||[]).includes(name));
+    const evidence=hot.Evidence==='runtime_call_chain'?'perf 调用链':hot.Evidence==='source_association'?'源码关联':'perf 差分采样';
+    const location=hot.SourceFile?`${hot.SourceFile}${hot.SourceLine?':'+hot.SourceLine:''}`:'未在固定 PostgreSQL 12.22 源码中定位';
+    const summary=kv([['函数',esc(name)],['源码位置',esc(location)],['证据来源',esc(evidence)],['采样率',shown(hot['Sample Rate'])],['相对均值差',shown(hot['Diff From Mean'])]]);
+    const exampleRows=examples.map(s=>[esc(s.knob_name||s.guc_variable||'—'),esc(s.context||'—'),esc(`${s.file}:${s.line}`),esc(s.source_line||'')]);
+    const relatedExamples=exampleRows.length?panel('相关参数与源码证据',table(['参数','类型','位置','源码行'],exampleRows)):'';
+    const chainRows=chains.map(c=>[number(c.samples,0),esc((c.frames||[]).join(' → ').slice(0,800))]);
+    const relatedChains=chainRows.length?panel('相关运行时调用链',table(['样本数','调用路径'],chainRows)):'';
+    showModal(name, summary+'<p class="ki-sample-note">正在读取源码说明…</p>');
+    let detail=null,loadError='';
+    try {
+      const response=await fetch('/api/v1/keeninsight/functionDetails/'+encodeURIComponent(name),{cache:'no-store'});
+      const payload=await response.json();
+      if(!response.ok)throw new Error(payload.error||('HTTP '+response.status));
+      detail=payload;
+    } catch(error) {
+      loadError=error.message;
+    }
+    if(!detail) {
+      showModal(name, summary+`<p class="ki-empty">无法读取该函数的源码说明：${esc(loadError)}</p>`+relatedExamples+relatedChains);
+      return;
+    }
+    const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">源码中没有函数注释，下面显示函数签名和代码片段。</p>';
+    const signature=detail.signature?`<h3>函数签名</h3><pre class="ki-code">${esc(detail.signature)}</pre>`:'';
+    const numbered=String(detail.excerpt||'').split('\n').map((line,index)=>String((detail.excerptStartLine||1)+index).padStart(5,' ')+'  '+line).join('\n');
+    const excerpt=numbered?`<h3>源码片段</h3><pre class="ki-code">${esc(numbered)}</pre>`:'';
+    showModal(name, `<div class="ki-function-detail">${summary}<h3>函数说明（PostgreSQL 源码注释原文）</h3>${description}${signature}${relatedExamples}${relatedChains}${excerpt}</div>`);
+  }
+
   function overview(data) {
     const auto=data.automation||{};
     const summaries=Object.entries(data.workflowCounts||{}).map(([name,values])=>[esc(name.replaceAll('_',' ')),...['running','completed','failed','skipped'].map(state=>number(values[state]||0,0))]);
@@ -197,6 +230,11 @@
       const comparison=data.detailAnalysis?.comparison;
       if(comparison&&!(comparison.tuned_ms<comparison.baseline_ms))body.querySelectorAll('.tuning-metric-value.success').forEach(n=>n.classList.add('ki-neutral-result'));
       body.querySelectorAll('[data-ki-knowledge]').forEach(n=>n.onclick=()=>showModal('Related Knowledge Base',code(data.detailAnalysis?.functionCodeExamples||[])));
+      body.querySelectorAll('[data-ki-function]').forEach(n=>{
+        const open=()=>showFunctionDetail(n.dataset.kiFunction,data);
+        n.onclick=open;
+        n.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
+      });
       return;
     }
     let rows=[],target;

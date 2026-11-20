@@ -107,6 +107,106 @@ def build_index(root: Path) -> Dict[str, Dict[str, object]]:
     return dict(sorted(index.items()))
 
 
+def _read_lines(path: Path) -> list:
+    try:
+        return path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+
+
+def _comment_block(lines: list, end_index: int):
+    """Return (start_index, text) for the comment block ending before the function."""
+    cursor = end_index
+    while cursor >= 0 and not lines[cursor].strip():
+        cursor -= 1
+    if cursor < 0 or not lines[cursor].strip().endswith("*/"):
+        return None, None
+    end = cursor
+    while cursor >= 0 and "/*" not in lines[cursor]:
+        cursor -= 1
+    if cursor < 0:
+        return None, None
+    start = cursor
+    parts = []
+    for line in lines[start:end + 1]:
+        text = line.strip()
+        if text.startswith("/*"):
+            text = text[2:]
+        if text.endswith("*/"):
+            text = text[:-2]
+        text = text.strip()
+        if text.startswith("*"):
+            text = text[1:].strip()
+        if text:
+            parts.append(text)
+    return start, " ".join(parts).strip()[:1200] or None
+
+
+def describe_function(name: str, index: Optional[Dict[str, Dict[str, object]]] = None,
+                      root: Optional[Path] = None):
+    """Read the function signature, leading comment and a bounded source excerpt."""
+    index = index if index is not None else load_index()
+    location = index.get(str(name))
+    if not location:
+        return None
+    root = root or source_root()
+    if root is None:
+        return None
+    path = root / str(location.get("file"))
+    try:
+        path.resolve().relative_to(root.resolve())
+    except (OSError, ValueError):
+        return None
+    lines = _read_lines(path)
+    number = int(location.get("line") or 0)
+    if number < 1 or number > len(lines):
+        return None
+    definition = number - 1
+
+    signature_start = definition
+    cursor = definition - 1
+    while cursor >= 0 and definition - signature_start < 8:
+        text = lines[cursor].strip()
+        if not text:
+            break
+        if (text.startswith("/*") or text.startswith("*") or text.startswith("//")
+                or text.endswith("*/") or text.endswith(";") or text.endswith("{")
+                or text.endswith("}") or text.startswith("#")):
+            break
+        signature_start = cursor
+        cursor -= 1
+
+    signature_lines = []
+    for cursor in range(signature_start, min(len(lines), definition + 60)):
+        text = lines[cursor]
+        if "{" in text:
+            before = text.split("{", 1)[0].strip()
+            if before:
+                signature_lines.append(before)
+            break
+        signature_lines.append(text.strip())
+    signature = re.sub(r"\s+", " ", " ".join(signature_lines)).strip()[:800]
+
+    comment_start, description = _comment_block(lines, signature_start - 1)
+    if description and description.startswith(str(name)):
+        description = description[len(str(name)):].lstrip(" \t:-—")
+        description = description or None
+    excerpt_start = comment_start if comment_start is not None else signature_start
+    excerpt_end = min(len(lines), definition + 60)
+    excerpt = "\n".join(lines[excerpt_start:excerpt_end])
+    if len(excerpt) > 6000:
+        excerpt = excerpt[:6000] + "\n…"
+    return {
+        "name": str(name),
+        "file": location.get("file"),
+        "line": number,
+        "signature": signature or None,
+        "description": description,
+        "excerpt": excerpt,
+        "excerptStartLine": excerpt_start + 1,
+    }
+
+
 def load_index(root: Optional[Path] = None, rebuild: bool = False) -> Dict[str, Dict[str, object]]:
     root = root or source_root()
     if root is None:

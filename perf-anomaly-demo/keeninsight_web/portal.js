@@ -117,7 +117,7 @@
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
       const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'Not located in the pinned PostgreSQL 12.22 source tree (generated code, extension, or system symbol)');
       const evidence=f.Evidence==='runtime_call_chain'?'perf call chain':f.Evidence==='source_association'?'source association':'perf differential sampling';
-      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
+      return `<div class="function-item ki-clickable" data-ki-function="${esc(f.Function)}" tabindex="0" role="button" aria-label="View function details ${esc(f.Function)}"><div class="function-header"><div class="function-name">${esc(f.Function)}</div><span class="ki-function-open">Details ›</span></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
     }).join('');
     const hotNote=d.hotFunctionsDerived?'<p class="ki-sample-note">No differential profiling result was retained; these functions come from runtime perf call chains and source associations.</p>':'';
     const functionsHtml=hotList.length?hotNote+hot:empty(data.rawStatus==='skipped'
@@ -171,6 +171,39 @@
     }
   }
 
+  async function showFunctionDetail(name, data) {
+    const d=data.detailAnalysis||{};
+    const hot=(d.hotFunctions||[]).find(f=>f.Function===name)||{};
+    const examples=(d.functionCodeExamples||[]).filter(s=>s.function===name);
+    const chains=(d.runtimeCallChains||[]).filter(c=>(c.matched_key_functions||[]).includes(name));
+    const evidence=hot.Evidence==='runtime_call_chain'?'perf call chain':hot.Evidence==='source_association'?'source association':'perf differential sampling';
+    const location=hot.SourceFile?`${hot.SourceFile}${hot.SourceLine?':'+hot.SourceLine:''}`:'Not located in the pinned PostgreSQL 12.22 source tree';
+    const summary=kv([['Function',esc(name)],['Source location',esc(location)],['Evidence',esc(evidence)],['Sample rate',shown(hot['Sample Rate'])],['Diff from mean',shown(hot['Diff From Mean'])]]);
+    const exampleRows=examples.map(s=>[esc(s.knob_name||s.guc_variable||'—'),esc(s.context||'—'),esc(`${s.file}:${s.line}`),esc(s.source_line||'')]);
+    const relatedExamples=exampleRows.length?panel('Related parameter / source evidence',table(['Parameter','Context','Location','Source line'],exampleRows)):'';
+    const chainRows=chains.map(c=>[number(c.samples,0),esc((c.frames||[]).join(' → ').slice(0,800))]);
+    const relatedChains=chainRows.length?panel('Related runtime call chains',table(['Samples','Path'],chainRows)):'';
+    showModal(name, summary+'<p class="ki-sample-note">Reading source details…</p>');
+    let detail=null,loadError='';
+    try {
+      const response=await fetch('/api/v1/keeninsight/functionDetails/'+encodeURIComponent(name),{cache:'no-store'});
+      const payload=await response.json();
+      if(!response.ok)throw new Error(payload.error||('HTTP '+response.status));
+      detail=payload;
+    } catch(error) {
+      loadError=error.message;
+    }
+    if(!detail) {
+      showModal(name, summary+`<p class="ki-empty">Could not read source details for this function: ${esc(loadError)}</p>`+relatedExamples+relatedChains);
+      return;
+    }
+    const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">No source comment; showing the signature and code excerpt.</p>';
+    const signature=detail.signature?`<h3>Signature</h3><pre class="ki-code">${esc(detail.signature)}</pre>`:'';
+    const numbered=String(detail.excerpt||'').split('\n').map((line,index)=>String((detail.excerptStartLine||1)+index).padStart(5,' ')+'  '+line).join('\n');
+    const excerpt=numbered?`<h3>Source excerpt</h3><pre class="ki-code">${esc(numbered)}</pre>`:'';
+    showModal(name, `<div class="ki-function-detail">${summary}<h3>Function description (PostgreSQL source comment)</h3>${description}${signature}${relatedExamples}${relatedChains}${excerpt}</div>`);
+  }
+
   function overview(data) {
     const auto=data.automation||{};
     const summaries=Object.entries(data.workflowCounts||{}).map(([name,values])=>[esc(name.replaceAll('_',' ')),...['running','completed','failed','skipped'].map(state=>number(values[state]||0,0))]);
@@ -197,6 +230,11 @@
       const comparison=data.detailAnalysis?.comparison;
       if(comparison&&!(comparison.tuned_ms<comparison.baseline_ms))body.querySelectorAll('.tuning-metric-value.success').forEach(n=>n.classList.add('ki-neutral-result'));
       body.querySelectorAll('[data-ki-knowledge]').forEach(n=>n.onclick=()=>showModal('Related Knowledge Base',code(data.detailAnalysis?.functionCodeExamples||[])));
+      body.querySelectorAll('[data-ki-function]').forEach(n=>{
+        const open=()=>showFunctionDetail(n.dataset.kiFunction,data);
+        n.onclick=open;
+        n.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open();}};
+      });
       return;
     }
     let rows=[],target;

@@ -10,7 +10,7 @@ import threading
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from function_locations import build_index
+from function_locations import build_index, describe_function
 from keeninsight_portal import KeenInsightPortal, hot_functions_from_source
 from sysinsight_dream_bridge import StateStore, BridgeHTTPServer, BridgeHTTPHandler
 
@@ -80,6 +80,22 @@ class PortalTest(unittest.TestCase):
             index = build_index(root)
             self.assertEqual(index["fixture_function"],
                              {"file": "src/backend/x.c", "line": 3})
+
+    def test_function_description_extracts_comment_and_signature(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src" / "backend"
+            source.mkdir(parents=True)
+            (source / "x.c").write_text(
+                "/*\n * Compute fixture values for a tuple.\n */\n"
+                "void\nfixture_function(int value)\n{\n}\n", encoding="utf-8")
+            index = build_index(root)
+            detail = describe_function("fixture_function", index=index, root=root)
+            self.assertEqual(detail["description"], "Compute fixture values for a tuple.")
+            self.assertEqual(detail["signature"], "void fixture_function(int value)")
+            self.assertEqual(detail["excerptStartLine"], 1)
+            self.assertIn("fixture_function", detail["excerpt"])
+            self.assertEqual(describe_function("missing_function", index=index, root=root), None)
 
     def test_hot_functions_get_source_locations(self):
         self.portal._function_locations = {

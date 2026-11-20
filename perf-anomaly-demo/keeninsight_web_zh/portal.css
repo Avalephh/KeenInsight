@@ -44,3 +44,8 @@ button:disabled,select:disabled{opacity:.5;cursor:not-allowed!important}
 .ki-shap-trust{margin:10px 0;padding:10px 12px;border:1px solid #f7cfac;border-radius:5px;background:#fff7e8;color:#9b4a00;font-size:12px;line-height:1.6}
 @media(max-width:1100px){.ki-overview-stats{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:750px){.ki-overview-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.function-item.ki-clickable{cursor:pointer;transition:background .15s}
+.function-item.ki-clickable:hover{background:#eef4ff}
+.function-item.ki-clickable:focus{outline:2px solid #3370ff;outline-offset:1px}
+.ki-function-open{margin-left:auto;font-size:11px;color:#3370ff;white-space:nowrap}
+.ki-function-detail h3{font-size:14px;margin:18px 0 8px;color:#282f38}.ki-function-description{font-size:13px;line-height:1.8;color:#282f38}

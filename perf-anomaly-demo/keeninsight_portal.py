@@ -16,7 +16,7 @@ import socket
 import threading
 import time
 
-from function_locations import load_index as load_function_locations
+from function_locations import describe_function, load_index as load_function_locations
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -295,6 +295,15 @@ class KeenInsightPortal:
                 row.setdefault("SourceLine", location.get("line"))
             result.append(row)
         return result
+
+    def function_details(self, name):
+        name = str(name or "").strip()
+        if not name or len(name) > 200:
+            raise KeyError("function name required")
+        details = describe_function(name, self._function_location_index())
+        if not details:
+            raise KeyError("function not found in pinned PostgreSQL source")
+        return details
 
     @staticmethod
     def _matches(record, filters):
@@ -590,7 +599,9 @@ class KeenInsightPortal:
         allowed_filters = {"hosts": ("status", "dbType", "ip"), "alerts": ("status", "severity", "reason"),
                            "code": ("db", "category")}
         filters = {key: str(arg(key, ""))[:500] for key in allowed_filters.get(category, ()) if arg(key, "")}
-        if category == "schema":
+        if category == "functionDetails":
+            data = self.function_details(identity)
+        elif category == "schema":
             data = self.schema()
         elif category == "hosts":
             hosts = self.hosts()
