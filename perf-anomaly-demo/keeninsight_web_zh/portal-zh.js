@@ -320,6 +320,7 @@
         "Backend capture": "后端采集",
         "Measured apply / retest / restore": "实测应用 / 复测 / 恢复",
         "Workflow stages": "流程阶段",
+        "tuning_rationale": "根因解释生成",
         "Differential profiling": "差分画像",
         "perf flame graph / call chains": "perf 火焰图 / 调用链",
         "Source / parameter evidence": "源码 / 参数证据",

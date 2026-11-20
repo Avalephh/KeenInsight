@@ -52,6 +52,11 @@ button:disabled,select:disabled{opacity:.5;cursor:not-allowed!important}
 .ki-tuning-root,.ki-tuning-validation{white-space:pre-wrap;font-size:13px;line-height:1.8;color:#282f38;margin-bottom:10px}
 .ki-tuning-rationale h3{font-size:14px;margin:18px 0 8px;color:#282f38}
 .ki-tuning-skipped{display:inline-block;padding:1px 6px;border-radius:9px;background:#fff0cd;color:#8a5a00;font-size:11px;font-weight:400}
-.detail-card.scrollable.explanation-analysis{max-height:420px!important}
+.detail-card.scrollable.explanation-analysis{height:220px;max-height:220px!important}
+.tuning-result-compact{align-items:stretch}
+.tuning-result-compact .tuning-section{height:350px;display:flex;flex-direction:column;min-width:0}
+.tuning-result-compact .tuning-section-title{flex:0 0 auto}
+.tuning-result-compact .tuning-metrics{flex:1;justify-content:space-evenly;min-height:0}
+.tuning-result-compact .tuning-section.green-background .knob-list{flex:1;min-height:0;max-height:none}
 .ki-tuning-rationale .ki-table td{vertical-align:top}
 .ki-tuning-action{border-top:1px solid #e5e6eb;padding:10px 0}.ki-tuning-action-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:5px}.ki-tuning-action-reason{font-size:13px;line-height:1.8;color:#282f38;margin-bottom:4px}

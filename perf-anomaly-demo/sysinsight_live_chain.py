@@ -804,6 +804,29 @@ def main() -> int:
         result["finished_at"] = utc_now()
         _stage(stages, "result_persistence", "completed", str(result_path))
         _write_json(result_path, result)
+        # The rationale is generated after the chain result is on disk so it can
+        # read the same application/validation evidence the portal exposes.
+        # A model failure only marks this stage unavailable; it never turns a
+        # completed detect/apply/retest/restore chain into a failed incident.
+        _stage(stages, "tuning_rationale", "running")
+        try:
+            from tuning_rationale import generate as generate_tuning_rationale
+            rationale = generate_tuning_rationale(incident_dir)
+            result["tuning_rationale"] = {
+                "status": "completed",
+                "actions": len(rationale.get("actions") or []),
+                "not_applied": len(rationale.get("not_applied") or []),
+                "model": rationale.get("model"),
+                "path": str(incident_dir / "tuning_rationale.json"),
+            }
+            _stage(stages, "tuning_rationale", "completed", result["tuning_rationale"])
+        except Exception as exc:
+            result["tuning_rationale"] = {
+                "status": "failed",
+                "error": "{}: {}".format(type(exc).__name__, exc),
+            }
+            _stage(stages, "tuning_rationale", "unavailable", result["tuning_rationale"])
+        _write_json(result_path, result)
         return 0
     except Exception as exc:
         for pending in list(stages):
