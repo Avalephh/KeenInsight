@@ -48,6 +48,7 @@ LOGGER = logging.getLogger("sysinsight-dream-bridge")
 
 sys.path.insert(0, str(ROOT))
 from db_profile import profile_summary, resolve_profile  # noqa: E402
+from tpcc_transaction_cases import FOCUS_SCENARIO_IDS  # noqa: E402
 from sysinsight_prometheus import (  # noqa: E402
     PrometheusClient,
     PrometheusError,
@@ -2269,6 +2270,36 @@ class Bridge:
 
             lab = snapshot.get("lab", {}) if isinstance(snapshot.get("lab", {}), dict) else {}
             current_lab = lab.get("current", []) if isinstance(lab.get("current", []), list) else []
+            # Stable per-scenario comparison values for the six focus demos.
+            # Unlike the per-phase series above, these labels do not change
+            # when a new run starts, so a Grafana categorical chart can show
+            # one baseline/before/after group per scenario without zero-filling
+            # every other scenario.
+            seen_scenarios = set()
+            for stored_run in self.store.list_lab_runs(limit=100, kind="sysinsight", include_result=True):
+                scenario_id = str(stored_run.get("scenario_id") or "")
+                if scenario_id not in FOCUS_SCENARIO_IDS or scenario_id in seen_scenarios:
+                    continue
+                if stored_run.get("status") != "completed":
+                    continue
+                comparison = (stored_run.get("result") or {}).get("comparison") or {}
+                if not isinstance(comparison, dict):
+                    continue
+                seen_scenarios.add(scenario_id)
+                for phase_label, key in (("基线", "baseline_tps"),
+                                         ("压力调优前", "pressure_before_tps"),
+                                         ("压力调优后", "pressure_after_tps")):
+                    value = comparison.get(key)
+                    if value is None:
+                        continue
+                    emit(
+                        "sysinsight_dream_lab_tpcc_scenario_phase_tps",
+                        value,
+                        {"scenario_id": scenario_id,
+                         "title": stored_run.get("title") or scenario_id,
+                         "phase": phase_label},
+                        "Latest completed target business TPS for each focus scenario by phase.",
+                    )
             for kind in ("sysinsight",):
                 current = next((row for row in current_lab if row.get("kind") == kind), None)
                 latest = lab.get("latest_{}".format(kind))
