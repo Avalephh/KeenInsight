@@ -106,9 +106,8 @@
   function renderTuningRationale(r) {
     if(!r) return '';
     const root=r.root_cause?`<div class="ki-tuning-root">${esc(r.root_cause)}</div>`:'';
-    const actions=(r.actions||[]).map(a=>`<div class="ki-tuning-action"><div class="ki-tuning-action-head"><strong>${esc(a.parameter)}</strong><span class="ki-row-meta">${esc(a.before||'—')} → ${esc(a.after||'—')}</span>${a.applied===false?'<span class="ki-tuning-skipped">未应用</span>':''}</div><div class="ki-tuning-action-reason">${esc(a.reason||'—')}</div>${(a.evidence||[]).length?`<div class="ki-row-meta">关联证据：${a.evidence.map(x=>esc(x)).join('；')}</div>`:''}</div>`).join('');
     const validation=r.validation?`<h3>复测结果</h3><div class="ki-tuning-validation">${esc(r.validation)}</div>`:'';
-    return `<div class="ki-tuning-rationale">${root}${actions}${validation}<p class="ki-sample-note">以上说明由 ${esc(r.model||'gpt-6.1-sol')} 基于本次候选理由、参数证据和复测结果生成；关联不代表因果。</p></div>`;
+    return `<div class="ki-tuning-rationale">${root}${validation}<p class="ki-sample-note">以上说明由 ${esc(r.model||'gpt-6.1-sol')} 基于本次候选理由、参数证据和复测结果生成；各参数的具体调优原因已移到下方调优操作中，关联不代表因果。</p></div>`;
   }
 
   function alertDetail(data){
@@ -140,13 +139,16 @@
       const numeric=Number(value);
       return value!==''&&Number.isFinite(numeric)?'num:'+numeric:'str:'+value;
     };
+    const rationaleByParam=new Map(((d.tuningRationale||{}).actions||[]).map(a=>[String(a.parameter),a]));
     const knobEntries=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).filter(([name,value])=>{
       const setting=app.pre_settings?.[name];
       return !setting||normalizeKnob(setting.setting)!==normalizeKnob(value);
     });
     const knobs=knobEntries.map(([name,value])=>{
-      const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name];
-      return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div></div>`;
+      const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name],rationale=rationaleByParam.get(String(name));
+      const reason=rationale?.reason?`<div class="knob-reason"><span class="knob-reason-label">为什么这样调</span>${esc(rationale.reason)}</div>`:'';
+      const evidence=(rationale?.evidence||[]).length?`<details class="knob-evidence"><summary>关联证据</summary><div class="ki-row-meta">${rationale.evidence.map(x=>esc(x)).join('；')}</div></details>`:'';
+      return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div>${reason}${evidence}</div>`;
     }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'本次没有实际参数变化。');
     const s=d.shapAnalysis;
     let shap=empty('暂无 SHAP 证据');

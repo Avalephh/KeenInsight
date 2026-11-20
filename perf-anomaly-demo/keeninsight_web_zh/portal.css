@@ -24,7 +24,11 @@ button:disabled,select:disabled{opacity:.5;cursor:not-allowed!important}
 .detail-card.scrollable.shap-analysis:has(.ki-shap-summary){max-height:340px}
 .detail-section{min-width:0}.detail-card{overflow-wrap:anywhere}.ki-detail-statement{white-space:pre-wrap!important;max-height:100px;overflow:auto}.ki-neutral-result{color:#4e5969!important}
 .tuning-result-compact .knob-item{flex-direction:column;align-items:stretch;gap:8px}.tuning-result-compact .knob-name{font-size:12px;overflow-wrap:normal;word-break:break-word}.tuning-result-compact .knob-value{justify-content:space-between;flex-wrap:wrap;font-size:12px}.tuning-result-compact .knob-value>span{white-space:nowrap}.tuning-result-compact .tuning-metric-row{gap:8px;flex-wrap:wrap}.tuning-result-compact .tuning-metric-value{font-size:12px;max-width:100%;overflow-wrap:anywhere}
-.ki-live-table td{overflow-wrap:anywhere}.ki-live-table .sql-id,.ki-live-table .alert-id{max-width:180px;overflow-wrap:anywhere}.ki-live-table .code-block{max-width:340px;white-space:pre-wrap}.ki-live-table .rule-description{max-width:420px}
+
+.tuning-result-compact .knob-reason{font-size:12px;line-height:1.7;color:#4e5969;border-top:1px dashed #e5e6eb;margin-top:4px;padding-top:6px}
+.tuning-result-compact .knob-reason-label{display:inline-block;margin-right:6px;color:#3370ff;font-weight:600}
+.tuning-result-compact .knob-evidence{margin-top:6px;font-size:11px;color:#86909c}
+.tuning-result-compact .knob-evidence summary{cursor:pointer;color:#3370ff}.ki-live-table td{overflow-wrap:anywhere}.ki-live-table .sql-id,.ki-live-table .alert-id{max-width:180px;overflow-wrap:anywhere}.ki-live-table .code-block{max-width:340px;white-space:pre-wrap}.ki-live-table .rule-description{max-width:420px}
 .ki-live-pagination{display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px}.ki-live-pagination>div{display:flex;align-items:center;gap:6px}.ki-live-pagination .page-btn.active{opacity:1;cursor:default!important}
 #hostTableBody .host-name-main{overflow-wrap:normal;min-width:180px}#hostTableBody .host-name-sub{overflow-wrap:anywhere}#hostTableBody .status-tag,#hostTableBody .db-tag,#hostTableBody .ip-address{white-space:nowrap}#hostTableBody .action-buttons{min-width:200px}
 .table-container:has(#hostTableBody){overflow-x:auto}.data-table:has(#hostTableBody){min-width:1550px}.table-footer:has(.ki-live-pagination){min-width:0}
