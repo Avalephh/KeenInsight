@@ -71,7 +71,7 @@
       document.getElementById('ki-search').previousElementSibling.textContent='Keyword:';
       filterControl('reasonFilter','reason');
     }else if(config[1]==='code'){
-      filterControl('dbFilter','db');filterControl('categoryFilter','category',[['','All'],...['control_flow','data_flow'].map(x=>[x,x])]);
+      filterControl('dbFilter','db');filterControl('categoryFilter','category',[['','全部'],['control_flow','控制流'],['data_flow','数据流']]);
     }else if(config[1]==='hosts'){
       const selects=filterArea.querySelectorAll('select');
       selects[0].innerHTML='<option value="">All Status</option><option value="online">Online</option><option value="stale">Stale collection</option>';
@@ -270,7 +270,12 @@
         document.getElementById('snippetsContainer').innerHTML=items.length?`<table class="snippet-list"><tbody>${items.map(r=>cells([`<div class="snippet-source">${esc(r.source)}</div>`,`<div class="snippet-title">${esc(r.title)}</div><div class="snippet-text">${esc(r.content||r.description)}</div><div class="snippet-meta"><div class="snippet-tags">${[r.type,r.context,r.restart?'restart required':'no server restart'].filter(Boolean).map(x=>`<span class="snippet-tag">${esc(x)}</span>`).join('')}</div><div class="snippet-time">Default: ${r.default===''?'(empty string)':shown(r.default)} ${esc(r.unit||'')}</div></div>`,evidenceButton(r)])).join('')}</tbody></table>`:empty();
         document.querySelectorAll('#snippetsContainer tr').forEach(tr=>['snippet-source-col','snippet-content-col','snippet-action-col'].forEach((c,i)=>tr.cells[i].className=c));break;
       case 'code':
-        target='functionTableBody';rows=items.map(r=>[esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,shown(r.category),`<div class="code-block">${esc(r.functionFlow||'Runtime call chains are retained per alert, not this static reference.')}</div>`,`<div class="code-block">${esc(r.dataFlow||'Not retained')} → ${esc(r.description)}</div>`,evidenceButton(r)]);break;
+        target='functionTableBody';rows=items.map(r=>{
+          const control=r.controlFlowFunctions||[],data=r.dataFlowFunctions||[],flow=[];
+          if(control.length)flow.push('控制流：'+control.join(', '));
+          if(data.length)flow.push('数据流：'+data.join(', '));
+          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,shown(r.category),`<div class="code-block">${esc(flow.length?flow.join('；'):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
+        });break;
       case 'alertRules': {
         const metricLabels={'target_business_tps':'目标业务 TPS'};
         target='ruleTableBody';

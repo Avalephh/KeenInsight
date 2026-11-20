@@ -525,14 +525,19 @@ class KeenInsightPortal:
                                                     'range': 'numeric limits' if item.get('min') is not None else 'see parameter type/description; numeric limits not applicable'}})
             elif category == "code":
                 for association in load_json(common / "function_parameter_association.json", []) or []:
+                    control_functions = [str(value) for value in association.get("control_flow_functions") or [] if value]
+                    data_functions = [str(value) for value in association.get("data_flow_functions") or [] if value]
+                    function_flow = ", ".join(control_functions or data_functions)
                     for evidence in association.get("source_evidence", []):
                         values.append({"id": "code-" + hashlib.sha1(json.dumps(evidence,sort_keys=True).encode()).hexdigest()[:16],
                                        "name": evidence.get("function"), "db": "pg", "category": evidence.get("context"),
-                                       "description": association.get("knob_name"), "functionFlow": None,
+                                       "description": association.get("knob_name"), "functionFlow": function_flow or None,
+                                       "controlFlowFunctions": control_functions,
+                                       "dataFlowFunctions": data_functions,
                                        "dataFlow": evidence.get("variable"), "codeSnippet": evidence.get("source_line"),
                                        "file": evidence.get("file"), "line": evidence.get("line"),
                                        "detail": association.get("association_method"),
-                                       'availability': {'functionFlow': 'Static parameter/function association, not a runtime trace. Actual runtime chains are retained per alert.',
+                                       'availability': {'functionFlow': 'Source-derived control/data flow functions from the parameter association; not a runtime trace.',
                                                         'dataFlow': 'recorded' if evidence.get('variable') else 'association has no variable-level evidence'},
                                        "provenance": association.get("source_provenance"), "source": "PostgreSQL source association"})
             self._cache[category] = values

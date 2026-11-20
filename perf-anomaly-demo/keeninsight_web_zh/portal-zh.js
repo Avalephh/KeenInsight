@@ -571,6 +571,8 @@
         "Target business TPS: 10% drop for 10s": "目标业务 TPS：10 秒下降 10%",
         "Target business TPS is below 90% of the baseline maximum for 10 seconds.": "压力阶段的目标业务 TPS 低于基线最大值的 90%，并持续 10 秒。",
         "post_hoc_function_analysis": "事后函数分析",
+        "control_flow": "控制流",
+        "data_flow": "数据流",
   };
   const entries = Object.entries(map).sort((a,b)=>b[0].length-a[0].length);
   const patterns = [
