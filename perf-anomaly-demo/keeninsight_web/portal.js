@@ -133,10 +133,21 @@
       :'This alert stopped before function sampling; no function evidence is available.');
     const backfillNote=d.backfillGenerated?'<p class="ki-sample-note">Differential profiling, SHAP and function analysis were generated post hoc from retained perf data; candidate and before/after tuning records remain as originally captured.</p>':'';
     const interrupted=d.backfillGenerated||(d.stages||[]).some(s=>['running','failed'].includes(String(s.status)));
-    const knobs=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).map(([name,value])=>{
+    const normalizeKnob=v=>{
+      let value=String(v??'').trim().replace(/^['"]|['"]$/g,''),lower=value.toLowerCase();
+      if(['on','true','yes','1'].includes(lower))return'bool:true';
+      if(['off','false','no','0'].includes(lower))return'bool:false';
+      const numeric=Number(value);
+      return value!==''&&Number.isFinite(numeric)?'num:'+numeric:'str:'+value;
+    };
+    const knobEntries=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).filter(([name,value])=>{
+      const setting=app.pre_settings?.[name];
+      return !setting||normalizeKnob(setting.setting)!==normalizeKnob(value);
+    });
+    const knobs=knobEntries.map(([name,value])=>{
       const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name];
       return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div></div>`;
-    }).join('')||empty(interrupted?'This alert stopped before candidate generation; no candidate parameters are available.':'No candidate parameters recorded.');
+    }).join('')||empty(interrupted?'This alert stopped before candidate generation; no candidate parameters are available.':'No parameter changes were found.');
     const s=d.shapAnalysis;
     let shap=empty('No SHAP evidence');
     if(s?.status==='completed'&&s.features?.length){

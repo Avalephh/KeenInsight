@@ -133,10 +133,21 @@
       :'该告警在函数采样前中断，没有可用的函数证据。');
     const backfillNote=d.backfillGenerated?'<p class="ki-sample-note">该告警的差分画像、SHAP 和函数分析由保留的 perf 数据事后生成；调优候选与前后对比仍以原始流程记录为准。</p>':'';
     const interrupted=d.backfillGenerated||(d.stages||[]).some(s=>['running','failed'].includes(String(s.status)));
-    const knobs=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).map(([name,value])=>{
+    const normalizeKnob=v=>{
+      let value=String(v??'').trim().replace(/^['"]|['"]$/g,''),lower=value.toLowerCase();
+      if(['on','true','yes','1'].includes(lower))return'bool:true';
+      if(['off','false','no','0'].includes(lower))return'bool:false';
+      const numeric=Number(value);
+      return value!==''&&Number.isFinite(numeric)?'num:'+numeric:'str:'+value;
+    };
+    const knobEntries=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).filter(([name,value])=>{
+      const setting=app.pre_settings?.[name];
+      return !setting||normalizeKnob(setting.setting)!==normalizeKnob(value);
+    });
+    const knobs=knobEntries.map(([name,value])=>{
       const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name];
       return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div></div>`;
-    }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'No candidate parameters recorded.');
+    }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'本次没有实际参数变化。');
     const s=d.shapAnalysis;
     let shap=empty('暂无 SHAP 证据');
     if(s?.status==='completed'&&s.features?.length){
