@@ -321,6 +321,11 @@ def format_section(value: Any) -> str:
         "configuration_status": "配置状态", "interpretation": "解释",
         "limitations": "限制", "limits": "限制", "conclusion": "结论", "follow_up": "后续验证",
         "summary": "摘要", "scope_notes": "范围说明",
+        "tuned_improvement_ratio": "调优相对变化", "llm_hypothesis": "LLM 假设",
+        "observed_environment": "观测环境", "environment": "环境",
+        "limits_and_follow_up": "限制与后续验证", "llm_hypotheses_and_limits": "LLM 假设与限制",
+        "tuned_relative_decrease_percent": "相对降低", "next_steps": "后续步骤",
+        "not_applied_note": "未应用说明",
         "measured_evidence": "实测证据", "llm_hypotheses": "LLM 假设", "结论": "结论",
     }
     metric_labels = {"median_read_only_sql_duration_ms": "只读 SQL 耗时中位数（ms）"}
