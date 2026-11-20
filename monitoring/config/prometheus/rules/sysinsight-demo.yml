@@ -12,12 +12,12 @@ groups:
           and
           sysinsight_dream_lab_tpcc_business_tps{phase="pressure_before"}
             < 0.9 * scalar(max without (phase, status, run_id, scenario_id) (max_over_time(sysinsight_dream_lab_tpcc_business_tps{phase="baseline"}[10m])))
-        for: 120s
+        for: 30s
         labels:
           severity: warning
           source: sysinsight-demo
           metric: target_business_tps
           drop_percent: "10"
         annotations:
-          summary: "Target business TPS: 10% drop for 120s"
-          description: "Target business TPS is below 90% of the baseline maximum for 120 seconds."
+          summary: "Target business TPS: 10% drop for 30s"
+          description: "Target business TPS is below 90% of the baseline maximum for 30 seconds."
