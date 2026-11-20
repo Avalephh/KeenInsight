@@ -64,7 +64,7 @@ class Settings:
             # deterministic and offline.
             rag_llm_model=(
                 os.getenv("KI_RAG_LLM_MODEL")
-                or ("gpt-4o-mini" if os.getenv("KI_RAG_LLM_URL") else None)
+                or ("gpt-6.1-sol" if os.getenv("KI_RAG_LLM_URL") else None)
             ),
             rag_llm_token=os.getenv("KI_RAG_LLM_TOKEN") or None,
             host=os.getenv("KI_HOST", "127.0.0.1"),
