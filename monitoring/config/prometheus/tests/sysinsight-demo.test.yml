@@ -9,14 +9,20 @@ tests:
       - series: 'sysinsight_dream_lab_tpcc_business_tps{phase="baseline",status="running",run_id="run-1",scenario_id="tp_payment_hot"}'
         values: '1600+0x11'
       - series: 'sysinsight_dream_lab_tpcc_business_tps{phase="pressure_before",status="running",run_id="run-1",scenario_id="tp_payment_hot"}'
-        values: '_ _ _ _ _ _ _ _ _ _ _ _ 1600 1400+0x15'
+        values: '_ _ _ _ _ _ _ _ _ _ _ _ 1600 1400+0x65'
       - series: 'sysinsight_dream_lab_tpcc_business_tps{phase="pressure_after",status="running",run_id="run-1",scenario_id="tp_payment_hot"}'
         values: '_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 1600+0x14'
     alert_rule_test:
       - eval_time: 30s
         alertname: SysInsightDemoAnomaly
         exp_alerts: []
-      - eval_time: 1m20s
+      - eval_time: 2m0s
+        alertname: SysInsightDemoAnomaly
+        exp_alerts: []
+      - eval_time: 5m0s
+        alertname: SysInsightDemoAnomaly
+        exp_alerts: []
+      - eval_time: 5m10s
         alertname: SysInsightDemoAnomaly
         exp_alerts:
           - exp_labels:
@@ -29,5 +35,5 @@ tests:
               run_id: run-1
               scenario_id: tp_payment_hot
             exp_annotations:
-              summary: "Target business TPS: 10% drop for 10s"
-              description: "Target business TPS is below 90% of the baseline maximum for 10 seconds."
+              summary: "Target business TPS: 10% drop for 240s"
+              description: "Target business TPS is below 90% of the baseline maximum for 240 seconds."

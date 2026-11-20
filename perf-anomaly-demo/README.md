@@ -193,7 +193,7 @@ TPCC 实验本身采用两阶段窗口：先运行基线，再保持外部压力
 实验控制台也提供连续模式，由操作员按钮控制，而不是固定结束时间：
 `POST /api/v1/actions/lab/tpcc/continuous`，`{"mode":"baseline"}` 持续运行
 `tp_normal.sql` 基线；`{"mode":"pressure","scenario_id":...}` 立即叠加所选场景的外部压力，
-默认 60 秒后自动应用已校验的 SysInsight 候选，并继续以调优后配置运行。再次请求 baseline 模式
+默认 240 秒后自动应用已校验的 SysInsight 候选，并继续以调优后配置运行。再次请求 baseline 模式
 会先停止压力、恢复初始配置，再重新持续运行基线。切换模式通过停止旧 run、等待配置恢复并启动
 新 run 完成；自动评测的 `/api/v1/actions/lab/tpcc/start` 三阶段入口保持不变。
 

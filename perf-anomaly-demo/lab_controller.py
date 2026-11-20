@@ -910,7 +910,7 @@ class LabController:
             if mode not in {"baseline", "pressure"}:
                 raise ValueError("continuous mode must be baseline or pressure")
             auto_tune_seconds = _bounded_int(
-                body.get("auto_tune_seconds"), "auto_tune_seconds", 60, 10, 300
+                body.get("auto_tune_seconds"), "auto_tune_seconds", 240, 10, 300
             )
             continuous_seconds = _bounded_int(
                 body.get("continuous_seconds"),

@@ -24,15 +24,15 @@ class ContinuousTpccConfigTests(unittest.TestCase):
     def test_pressure_mode_auto_tunes_then_keeps_running(self):
         config = self.controller._tpcc_config(
             self.case,
-            {"continuous_seconds": 120, "auto_tune_seconds": 60},
+            {"continuous_seconds": 120},
             continuous_mode="pressure",
         )
         self.assertTrue(config["continuous"])
         self.assertEqual(config["continuous_mode"], "pressure")
         self.assertTrue(config["skip_baseline"])
-        self.assertEqual(config["pressure_before_seconds"], 60)
+        self.assertEqual(config["pressure_before_seconds"], 240)
         self.assertEqual(config["pressure_after_seconds"], 120)
-        self.assertEqual(config["auto_tune_seconds"], 60)
+        self.assertEqual(config["auto_tune_seconds"], 240)
         self.assertIn("keep it active", config["tuning_observation"])
 
     def test_one_shot_config_keeps_the_bounded_three_phase_shape(self):
