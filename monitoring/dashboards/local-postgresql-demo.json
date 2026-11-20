@@ -375,9 +375,9 @@
     },
     {
       "id": 17,
-      "type": "barchart",
-      "title": "六场景目标业务 TPS（基线 → 压力前 → 调优后）",
-      "description": "仅展示六个焦点场景最新一次完成实验的目标业务 TPS；每组三根柱子依次为基线、压力调优前、压力调优后。",
+      "type": "timeseries",
+      "title": "TPCC 目标业务 TPS（场景可选：基线 → 压力 → 调优后）",
+      "description": "在顶部“场景”下拉框选择一个焦点场景，仅显示该场景运行期间的目标业务 TPS 折线（不包含未运行时的 0 值）；依次覆盖基线、压力调优前和压力调优后。默认显示最近 1 小时；查看更早的运行请把右上角时间范围调到 6 小时。",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -391,123 +391,66 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_lab_tpcc_scenario_phase_tps{scenario_id=~\"tp_payment_hot|tp_stock_level_hot|tp_stock_level_burst|tp_full_mix_surge_high|tp_wal_checkpoint|tp_order_status_hot\"}",
-          "instant": true,
-          "range": false,
+          "expr": "max by (scenario_id) (sysinsight_dream_lab_tpcc_business_tps{scenario_id=\"$scenario\", phase=~\"baseline|pressure_before|pressure_after\"})",
+          "range": true,
           "format": "time_series",
-          "legendFormat": "{{title}} · {{phase}}"
+          "legendFormat": "目标业务 TPS"
         }
       ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true
-            },
-            "renameByName": {}
-          }
-        },
-        {
-          "id": "labelsToFields",
-          "options": {
-            "mode": "columns",
-            "valueLabel": "phase"
-          }
-        },
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "__name__": true,
-              "instance": true,
-              "job": true,
-              "scenario_id": true
-            },
-            "renameByName": {}
-          }
-        }
-      ],
-      "options": {
-        "xField": "title",
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "groupWidth": 0.7,
-        "barWidth": 0.9,
-        "legend": {
-          "showLegend": true,
-          "displayMode": "list",
-          "placement": "bottom",
-          "calcs": []
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
           "color": {
-            "mode": "palette-classic"
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
           },
           "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 85,
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 12,
             "gradientMode": "none",
+            "showPoints": "never",
+            "spanNulls": false,
             "axisPlacement": "auto",
-            "axisLabel": "目标业务 TPS"
+            "axisLabel": "目标业务 TPS",
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "基线"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#73BF69"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "压力调优前"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#F2495C"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "压力调优后"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#5794F2"
-                }
-              }
-            ]
-          }
-        ]
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       }
     },
     {
@@ -941,10 +884,60 @@
     "demo"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "scenario",
+        "label": "场景",
+        "type": "custom",
+        "description": "选择一个焦点 TPCC 场景，TPS 面板只显示该场景的折线。",
+        "query": "TPCC 热点仓库 Payment 外部并发 : tp_payment_hot, TPCC 热点仓库 Stock Level 外部并发 : tp_stock_level_hot, TPCC Stock Level 外部读并发 : tp_stock_level_burst, TPCC 五类交易高强度混合突发 : tp_full_mix_surge_high, TPCC New Order/Payment 写入突增造成 WAL 与 checkpoint 压力 : tp_wal_checkpoint, TPCC 热点仓库 Order Status 外部并发 : tp_order_status_hot",
+        "options": [
+          {
+            "text": "TPCC 热点仓库 Payment 外部并发",
+            "value": "tp_payment_hot",
+            "selected": true
+          },
+          {
+            "text": "TPCC 热点仓库 Stock Level 外部并发",
+            "value": "tp_stock_level_hot",
+            "selected": false
+          },
+          {
+            "text": "TPCC Stock Level 外部读并发",
+            "value": "tp_stock_level_burst",
+            "selected": false
+          },
+          {
+            "text": "TPCC 五类交易高强度混合突发",
+            "value": "tp_full_mix_surge_high",
+            "selected": false
+          },
+          {
+            "text": "TPCC New Order/Payment 写入突增造成 WAL 与 checkpoint 压力",
+            "value": "tp_wal_checkpoint",
+            "selected": false
+          },
+          {
+            "text": "TPCC 热点仓库 Order Status 外部并发",
+            "value": "tp_order_status_hot",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "TPCC 热点仓库 Payment 外部并发",
+          "value": "tp_payment_hot",
+          "selected": true
+        },
+        "includeAll": false,
+        "multi": false,
+        "refresh": 0,
+        "hide": 0,
+        "skipUrlSync": false
+      }
+    ]
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
