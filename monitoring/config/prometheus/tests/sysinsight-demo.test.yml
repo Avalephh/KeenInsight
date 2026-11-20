@@ -19,10 +19,10 @@ tests:
       - eval_time: 2m0s
         alertname: SysInsightDemoAnomaly
         exp_alerts: []
-      - eval_time: 5m0s
+      - eval_time: 3m0s
         alertname: SysInsightDemoAnomaly
         exp_alerts: []
-      - eval_time: 5m10s
+      - eval_time: 3m10s
         alertname: SysInsightDemoAnomaly
         exp_alerts:
           - exp_labels:
@@ -35,5 +35,5 @@ tests:
               run_id: run-1
               scenario_id: tp_payment_hot
             exp_annotations:
-              summary: "Target business TPS: 10% drop for 240s"
-              description: "Target business TPS is below 90% of the baseline maximum for 240 seconds."
+              summary: "Target business TPS: 10% drop for 120s"
+              description: "Target business TPS is below 90% of the baseline maximum for 120 seconds."
