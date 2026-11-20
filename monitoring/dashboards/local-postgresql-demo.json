@@ -376,8 +376,8 @@
     {
       "id": 17,
       "type": "timeseries",
-      "title": "TPCC 目标业务 TPS（场景可选：基线 → 压力 → 调优后）",
-      "description": "在顶部“场景”下拉框选择一个焦点场景，仅显示该场景运行期间的目标业务 TPS 折线（不包含未运行时的 0 值）；依次覆盖基线、压力调优前和压力调优后。默认显示最近 6 小时；在图上拖拽选中一次运行即可放大查看变化。",
+      "title": "目标业务 TPS（统一基线负载：基线 → 压力+基线 → 调优后）",
+      "description": "六个场景使用同一条 tp_normal.sql 基线控制负载，因此不再按场景筛选。绿色为纯基线 TPS，红色为压力+基线中的基线 TPS（自动调优前），蓝色为自动调优后继续施加同一压力时的基线 TPS。",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -391,10 +391,10 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (scenario_id) (sysinsight_dream_lab_tpcc_business_tps{scenario_id=\"$scenario\", phase=~\"baseline|pressure_before|pressure_after\"})",
+          "expr": "max by (phase) (sysinsight_dream_lab_tpcc_business_tps{phase=~\"baseline|pressure_before|pressure_after\"})",
           "range": true,
           "format": "time_series",
-          "legendFormat": "目标业务 TPS"
+          "legendFormat": "{{phase}}"
         }
       ],
       "fieldConfig": {
@@ -435,7 +435,65 @@
             ]
           }
         },
-        "overrides": []
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "baseline"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "基线负载 TPS"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pressure_before"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "压力+基线（调优前）"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "pressure_after"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "压力+基线（调优后）"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -884,57 +942,7 @@
     "demo"
   ],
   "templating": {
-    "list": [
-      {
-        "name": "scenario",
-        "label": "场景",
-        "type": "custom",
-        "description": "选择一个焦点 TPCC 场景，TPS 面板只显示该场景的折线。",
-        "query": "TPCC 热点仓库 Payment 外部并发 : tp_payment_hot, TPCC 热点仓库 Stock Level 外部并发 : tp_stock_level_hot, TPCC Stock Level 外部读并发 : tp_stock_level_burst, TPCC 五类交易高强度混合突发 : tp_full_mix_surge_high, TPCC New Order/Payment 写入突增造成 WAL 与 checkpoint 压力 : tp_wal_checkpoint, TPCC 热点仓库 Order Status 外部并发 : tp_order_status_hot",
-        "options": [
-          {
-            "text": "TPCC 热点仓库 Payment 外部并发",
-            "value": "tp_payment_hot",
-            "selected": true
-          },
-          {
-            "text": "TPCC 热点仓库 Stock Level 外部并发",
-            "value": "tp_stock_level_hot",
-            "selected": false
-          },
-          {
-            "text": "TPCC Stock Level 外部读并发",
-            "value": "tp_stock_level_burst",
-            "selected": false
-          },
-          {
-            "text": "TPCC 五类交易高强度混合突发",
-            "value": "tp_full_mix_surge_high",
-            "selected": false
-          },
-          {
-            "text": "TPCC New Order/Payment 写入突增造成 WAL 与 checkpoint 压力",
-            "value": "tp_wal_checkpoint",
-            "selected": false
-          },
-          {
-            "text": "TPCC 热点仓库 Order Status 外部并发",
-            "value": "tp_order_status_hot",
-            "selected": false
-          }
-        ],
-        "current": {
-          "text": "TPCC 热点仓库 Payment 外部并发",
-          "value": "tp_payment_hot",
-          "selected": true
-        },
-        "includeAll": false,
-        "multi": false,
-        "refresh": 0,
-        "hide": 0,
-        "skipUrlSync": false
-      }
-    ]
+    "list": []
   },
   "time": {
     "from": "now-6h",
