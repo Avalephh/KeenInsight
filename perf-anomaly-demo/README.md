@@ -74,6 +74,8 @@ Function Analysis 还会用 `function_locations.py` 为固定 PostgreSQL 12.22 �
 
 告警详情的“根因解释”会读取 `tuning_rationale.json`，把实际调优动作逐项列出：参数变化、为什么这样调、关联函数/源码证据和复测结果。该文件由 `tuning_rationale.py` 基于所选 LLM 候选理由、before/after 设置、源码证据和 comparison 生成；可用 `python3 tuning_rationale.py --scan` 为历史已完成告警补齐。未应用的参数会标明原因（例如需要重启）。
 
+告警详情的 Tuning Results 会优先显示关联实验台同一次运行的目标业务 TPS：基线、压力调优前、压力调优后、调优提升和调优后/基线；告警链自己的只读 SQL 回放复测仍保留在折叠的 Workflow evidence 中，两种测量不会混在一起。
+
 ## 源码调用链证据
 
 统一入口生成的 `sysinsight_input.json` 现在会保留两类真实证据：一类是异常阶段

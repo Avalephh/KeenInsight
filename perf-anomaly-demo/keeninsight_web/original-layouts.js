@@ -92,7 +92,9 @@ window.KeenInsightLayouts = {
                             Tuning Results
                         </div>
                         <div class="detail-card">
+                            ${v.tpsSummary||''}
                             <div class="tuning-result-compact">
+                                ${v.replayNote?`<div class="ki-sample-note" style="grid-column:1/-1">${v.replayNote}</div>`:''}
                                 <!-- Knobs to Tune -->
                                 <div class="tuning-section green-background">
                                     <div class="tuning-section-title">Tuning Actions</div>
@@ -106,15 +108,15 @@ window.KeenInsightLayouts = {
                                     <div class="tuning-section-title">Before Tuning</div>
                                     <div class="tuning-metrics">
                                         <div class="tuning-metric-row">
-                                            <span class="tuning-metric-name">Query time</span>
+                                            <span class="tuning-metric-name">${v.beforeTuning_label1||'Query time'}</span>
                                             <span class="tuning-metric-value highlight">${v.beforeTuning_latency}</span>
                                         </div>
                                         <div class="tuning-metric-row">
-                                            <span class="tuning-metric-name">Restored time</span>
+                                            <span class="tuning-metric-name">${v.beforeTuning_label2||'Restored time'}</span>
                                             <span class="tuning-metric-value highlight">${v.beforeTuning_restored}</span>
                                         </div>
                                         <div class="tuning-metric-row">
-                                            <span class="tuning-metric-name">State</span>
+                                            <span class="tuning-metric-name">${v.beforeTuning_label3||'State'}</span>
                                             <span class="tuning-metric-value highlight">${v.beforeTuning_state}</span>
                                         </div>
                                     </div>
@@ -125,15 +127,15 @@ window.KeenInsightLayouts = {
                                     <div class="tuning-section-title">After Tuning</div>
                                     <div class="tuning-metrics">
                                         <div class="tuning-metric-row">
-                                            <span class="tuning-metric-name">Query time</span>
+                                            <span class="tuning-metric-name">${v.afterTuning_label1||'Query time'}</span>
                                             <span class="tuning-metric-value success">${v.afterTuning_latency}</span>
                                         </div>
                                         <div class="tuning-metric-row">
-                                            <span class="tuning-metric-name">Restored time</span>
+                                            <span class="tuning-metric-name">${v.afterTuning_label2||'Restored time'}</span>
                                             <span class="tuning-metric-value success">${v.afterTuning_restored}</span>
                                         </div>
                                         <div class="tuning-metric-row">
-                                            <span class="tuning-metric-name">State</span>
+                                            <span class="tuning-metric-name">${v.afterTuning_label3||'State'}</span>
                                             <span class="tuning-metric-value success">${v.afterTuning_state}</span>
                                         </div>
                                     </div>

@@ -160,7 +160,17 @@
     const notMeasured=interrupted?'Not completed (workflow interrupted)':'Not measured';
     const noValidation=interrupted?'Tuning not executed':'No validation';
     const rationaleHtml=renderTuningRationale(d.tuningRationale);
-    return backfillNote+window.KeenInsightLayouts.alert({rules,profiling,shap,functions:functionsHtml,knobs,explanation:rationaleHtml||shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),beforeTuning_latency:c.baseline_ms==null?notMeasured:number(c.baseline_ms)+' ms',afterTuning_latency:c.tuned_ms==null?notMeasured:number(c.tuned_ms)+' ms',beforeTuning_restored:'—',afterTuning_restored:c.restored_ms==null?notMeasured:number(c.restored_ms)+' ms',beforeTuning_state:esc(c.metric||noValidation),afterTuning_state:tag(app.status||'not_applied')})+`<p class="ki-sample-note">Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
+    const lab=d.relatedLabRun||{},lc=lab.comparison||{};
+    const hasLabTps=lc.baseline_tps!=null&&lc.pressure_before_tps!=null&&lc.pressure_after_tps!=null;
+    const tps=value=>value==null?'—':Number(value).toFixed(2)+' TPS';
+    const tpsSummary=hasLabTps?`<p class="ki-sample-note">TPS values come from the same SysInsight lab run ${esc(lab.run_id||'')}${lab.scenario_id?' · '+esc(lab.scenario_id):''}; the Tuning Actions and SQL replay below are the alert chain's separate candidate/measurement.</p>`:'';
+    const replayNote=hasLabTps?'The Tuning Actions below are the alert chain\'s live candidate; its SQL replay is under Workflow evidence.':'';
+    const footerNote=hasLabTps?'The TPS values above come from the same lab run; the alert chain\'s read-only SQL replay is under Workflow evidence. Completion does not mean the alert resolved.':'Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.';
+    const tuningLabels=hasLabTps?{
+      beforeTuning_label1:'Pressure before TPS',beforeTuning_label2:'Baseline TPS',beforeTuning_label3:'Lab status',
+      afterTuning_label1:'Pressure after TPS',afterTuning_label2:'Tuning gain',afterTuning_label3:'After / baseline'
+    }:{};
+    return backfillNote+window.KeenInsightLayouts.alert({rules,profiling,shap,functions:functionsHtml,knobs,explanation:rationaleHtml||shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),...tuningLabels,tpsSummary,replayNote,beforeTuning_latency:hasLabTps?tps(lc.pressure_before_tps):(c.baseline_ms==null?notMeasured:number(c.baseline_ms)+' ms'),afterTuning_latency:hasLabTps?tps(lc.pressure_after_tps):(c.tuned_ms==null?notMeasured:number(c.tuned_ms)+' ms'),beforeTuning_restored:hasLabTps?tps(lc.baseline_tps):'—',afterTuning_restored:hasLabTps?(lc.tuning_gain_tps==null?'—':`+${number(lc.tuning_gain_tps)} TPS (${percent(lc.tuning_gain_ratio)})`):(c.restored_ms==null?notMeasured:number(c.restored_ms)+' ms'),beforeTuning_state:hasLabTps?tag(lab.status||'completed'):esc(c.metric||noValidation),afterTuning_state:hasLabTps?percent(lc.recovery_ratio):tag(app.status||'not_applied')})+`<p class="ki-sample-note">${footerNote}</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
   }
 
   async function showRunDetail(runId, incidentParam) {

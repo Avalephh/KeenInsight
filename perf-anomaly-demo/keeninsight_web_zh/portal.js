@@ -160,7 +160,17 @@
     const notMeasured=interrupted?'未完成（工作流中断）':'Not measured';
     const noValidation=interrupted?'调优未执行':'No validation';
     const rationaleHtml=renderTuningRationale(d.tuningRationale);
-    return backfillNote+window.KeenInsightLayouts.alert({rules,profiling,shap,functions:functionsHtml,knobs,explanation:rationaleHtml||shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),beforeTuning_latency:c.baseline_ms==null?notMeasured:number(c.baseline_ms)+' ms',afterTuning_latency:c.tuned_ms==null?notMeasured:number(c.tuned_ms)+' ms',beforeTuning_restored:'—',afterTuning_restored:c.restored_ms==null?notMeasured:number(c.restored_ms)+' ms',beforeTuning_state:esc(c.metric||noValidation),afterTuning_state:tag(app.status||'not_applied')})+`<p class="ki-sample-note">Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
+    const lab=d.relatedLabRun||{},lc=lab.comparison||{};
+    const hasLabTps=lc.baseline_tps!=null&&lc.pressure_before_tps!=null&&lc.pressure_after_tps!=null;
+    const tps=value=>value==null?'—':Number(value).toFixed(2)+' TPS';
+    const tpsSummary=hasLabTps?`<p class="ki-sample-note">TPS 来自 SysInsight 实验台同一次运行 ${esc(lab.run_id||'')}${lab.scenario_id?' · '+esc(lab.scenario_id):''}；下方 Tuning Actions 与 SQL 回放属于告警链的独立候选/复测。</p>`:'';
+    const replayNote=hasLabTps?'下方为告警链的实时候选参数；告警链 SQL 回放复测见 Workflow evidence。':'';
+    const footerNote=hasLabTps?'上方 TPS 来自实验台同一次运行；告警链的只读 SQL 回放复测见 Workflow evidence。流程完成不代表告警已解决。':'Measured SQL replay comparison, not a predicted TPS / CPU improvement. Workflow completion does not mean the alert resolved.';
+    const tuningLabels=hasLabTps?{
+      beforeTuning_label1:'压力调优前 TPS',beforeTuning_label2:'基线 TPS',beforeTuning_label3:'实验状态',
+      afterTuning_label1:'压力调优后 TPS',afterTuning_label2:'调优提升',afterTuning_label3:'调优后/基线'
+    }:{};
+    return backfillNote+window.KeenInsightLayouts.alert({rules,profiling,shap,functions:functionsHtml,knobs,explanation:rationaleHtml||shown(data.diagnosis?.explanation||data.message||'No root-cause explanation retained.'),...tuningLabels,tpsSummary,replayNote,beforeTuning_latency:hasLabTps?tps(lc.pressure_before_tps):(c.baseline_ms==null?notMeasured:number(c.baseline_ms)+' ms'),afterTuning_latency:hasLabTps?tps(lc.pressure_after_tps):(c.tuned_ms==null?notMeasured:number(c.tuned_ms)+' ms'),beforeTuning_restored:hasLabTps?tps(lc.baseline_tps):'—',afterTuning_restored:hasLabTps?(lc.tuning_gain_tps==null?'—':`+${number(lc.tuning_gain_tps)} TPS (${percent(lc.tuning_gain_ratio)})`):(c.restored_ms==null?notMeasured:number(c.restored_ms)+' ms'),beforeTuning_state:hasLabTps?tag(lab.status||'completed'):esc(c.metric||noValidation),afterTuning_state:hasLabTps?percent(lc.recovery_ratio):tag(app.status||'not_applied')})+`<p class="ki-sample-note">${footerNote}</p><details class="ki-evidence"><summary>Workflow evidence · runtime call chains, LLM tuning, apply, retest and restoration</summary><div class="ki-evidence-body">${alertEvidence(data)}</div></details>`;
   }
 
   async function showRunDetail(runId, incidentParam) {
@@ -274,7 +284,7 @@
           const control=r.controlFlowFunctions||[],data=r.dataFlowFunctions||[],flow=[];
           if(control.length)flow.push('控制流：'+control.join(', '));
           if(data.length)flow.push('数据流：'+data.join(', '));
-          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,shown(r.category),`<div class="code-block">${esc(flow.length?flow.join('；'):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
+          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,`<div class="code-block">${esc(flow.length?flow.join('；'):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
         });break;
       case 'alertRules': {
         const metricLabels={'target_business_tps':'目标业务 TPS'};

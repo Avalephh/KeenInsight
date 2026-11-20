@@ -471,6 +471,7 @@ class KeenInsightPortal:
                            "runtimeCallChains": source.get("runtime_call_chains") or [],
                            "functionCodeExamples": source.get("static_parameter_evidence") or [],
                            "comparison": chain.get("comparison") or {},
+                           "relatedLabRun": self.related_lab_run(row["incident_id"]),
                            "application": chain.get("temporary_application") or {},
                            "stages": stages,
                            "backfillGenerated": bool(backfill),
@@ -542,6 +543,27 @@ class KeenInsightPortal:
                                        "provenance": association.get("source_provenance"), "source": "PostgreSQL source association"})
             self._cache[category] = values
             return values
+
+    def related_lab_run(self, incident_id):
+        """Return the compact lab comparison that contains this incident."""
+        for row in self._rows("SELECT * FROM lab_runs WHERE kind='sysinsight' ORDER BY requested_at DESC LIMIT 100"):
+            result = decode(row.get("result_json"), {}) or {}
+            ids = [
+                str(item.get("incident_id"))
+                for item in ((result.get("sysinsight_state") or {}).get("current_incidents") or [])
+                if isinstance(item, dict) and item.get("incident_id")
+            ]
+            if str(incident_id) in ids:
+                return {
+                    "run_id": row.get("run_id"),
+                    "scenario_id": row.get("scenario_id"),
+                    "title": row.get("title"),
+                    "status": row.get("status"),
+                    "requested_at": row.get("requested_at"),
+                    "comparison": result.get("comparison") or {},
+                    "tuningStatus": (result.get("tuning") or {}).get("status"),
+                }
+        return None
 
     def experiment(self, row):
         result = decode(row.get('result_json'), {}) if 'result_json' in row else row.get('result') or {}
