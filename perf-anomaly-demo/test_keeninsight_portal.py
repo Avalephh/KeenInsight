@@ -10,6 +10,7 @@ import threading
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from function_locations import build_index
 from keeninsight_portal import KeenInsightPortal, hot_functions_from_source
 from sysinsight_dream_bridge import StateStore, BridgeHTTPServer, BridgeHTTPHandler
 
@@ -66,6 +67,31 @@ class PortalTest(unittest.TestCase):
         self.assertEqual(values[0]["Evidence"], "runtime_call_chain")
         self.assertEqual(values[2]["Evidence"], "source_association")
         self.assertEqual(hot_functions_from_source(None), [])
+
+    def test_function_location_index_finds_definitions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "src" / "backend"
+            source.mkdir(parents=True)
+            (source / "x.c").write_text(
+                "/* comment */\nvoid\nfixture_function(int value)\n{\n}\n", encoding="utf-8")
+            (source / "x.h").write_text(
+                "extern void fixture_function(int value);\n", encoding="utf-8")
+            index = build_index(root)
+            self.assertEqual(index["fixture_function"],
+                             {"file": "src/backend/x.c", "line": 3})
+
+    def test_hot_functions_get_source_locations(self):
+        self.portal._function_locations = {
+            "fixture_function": {"file": "src/backend/x.c", "line": 3},
+        }
+        values = self.portal._enrich_hot_functions([
+            {"Function": "fixture_function"},
+            {"Function": "missing_function"},
+        ])
+        self.assertEqual(values[0]["SourceFile"], "src/backend/x.c")
+        self.assertEqual(values[0]["SourceLine"], 3)
+        self.assertNotIn("SourceFile", values[1])
 
     def test_interrupted_alert_uses_backfilled_function_analysis(self):
         incident_dir = Path(self.tmp.name) / "backfill-incident"

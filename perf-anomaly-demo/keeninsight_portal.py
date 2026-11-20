@@ -16,6 +16,8 @@ import socket
 import threading
 import time
 
+from function_locations import load_index as load_function_locations
+
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 VERSION = "keeninsight.ui.v1"
@@ -174,6 +176,8 @@ class KeenInsightPortal:
         self._cache = {}
         self._cache_lock = threading.Lock()
         self._host_metrics_cache = None
+        self._function_locations = None
+        self._function_locations_lock = threading.Lock()
         self._backfill()
 
     def _backfill(self):
@@ -263,6 +267,34 @@ class KeenInsightPortal:
                 record["error"] = str(exc)
             self._host_metrics_cache = (time.monotonic(), record)
             return record
+
+    def _function_location_index(self):
+        with self._function_locations_lock:
+            if self._function_locations is None:
+                try:
+                    self._function_locations = load_function_locations()
+                except Exception:
+                    self._function_locations = {}
+            return self._function_locations
+
+    def _enrich_hot_functions(self, values):
+        """Attach pinned-source file/line to profiler function names."""
+        if not values:
+            return values
+        locations = self._function_location_index()
+        result = []
+        for item in values:
+            if not isinstance(item, dict):
+                result.append(item)
+                continue
+            row = dict(item)
+            name = row.get("Function")
+            location = locations.get(name) if isinstance(name, str) else None
+            if isinstance(location, dict):
+                row.setdefault("SourceFile", location.get("file"))
+                row.setdefault("SourceLine", location.get("line"))
+            result.append(row)
+        return result
 
     @staticmethod
     def _matches(record, filters):
@@ -359,6 +391,7 @@ class KeenInsightPortal:
         hot_function_count = compare.get('key_function_count')
         if not hot_function_count and derived_hot_functions:
             hot_function_count = len(hot_functions)
+        hot_functions = self._enrich_hot_functions(hot_functions)
         record['rootCause'] = [f.get('Function') for f in hot_functions[:5] if f.get('Function')]
         api = chain.get('api') or {}
         record['diagnosis'] = {**(result.get('analysis') or {}),

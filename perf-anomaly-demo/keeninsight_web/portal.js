@@ -115,8 +115,9 @@
     const hotList=d.hotFunctions||[];
     const hot=hotList.map(f=>{
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
+      const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'Not located in the pinned PostgreSQL 12.22 source tree (generated code, extension, or system symbol)');
       const evidence=f.Evidence==='runtime_call_chain'?'perf call chain':f.Evidence==='source_association'?'source association':'perf differential sampling';
-      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${source?esc(source.file)+':'+source.line:'Source location not retained for this function'}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
+      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
     }).join('');
     const hotNote=d.hotFunctionsDerived?'<p class="ki-sample-note">No differential profiling result was retained; these functions come from runtime perf call chains and source associations.</p>':'';
     const functionsHtml=hotList.length?hotNote+hot:empty(data.rawStatus==='skipped'

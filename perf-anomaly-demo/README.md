@@ -70,6 +70,8 @@ python3 backfill_incident_analysis.py <incident-dir>
 
 会基于这些原始 perf 数据事后生成差分画像、函数分析、运行时调用链、源码关联和 SHAP，并写入 `backfill_function_analysis.json`；门户会自动读取它。该工具不会伪造 LLM 候选、应用结果或调优前后对比。
 
+Function Analysis 还会用 `function_locations.py` 为固定 PostgreSQL 12.22 源码树建立函数定义索引（缓存到 `results/function_locations.json`），为 perf 函数补全源码 `file:line`。生成代码、扩展聚合符号和内核符号无法在 PostgreSQL 源码中定位时，页面会明确说明。
+
 ## 源码调用链证据
 
 统一入口生成的 `sysinsight_input.json` 现在会保留两类真实证据：一类是异常阶段

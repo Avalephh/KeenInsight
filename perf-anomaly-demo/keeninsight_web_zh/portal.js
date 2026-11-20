@@ -115,8 +115,9 @@
     const hotList=d.hotFunctions||[];
     const hot=hotList.map(f=>{
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
+      const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'未在固定 PostgreSQL 12.22 源码中定位（生成代码、扩展或系统符号）');
       const evidence=f.Evidence==='runtime_call_chain'?'perf 调用链':f.Evidence==='source_association'?'源码关联':'perf 差分采样';
-      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${source?esc(source.file)+':'+source.line:'未保留该函数的源码位置'}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
+      return `<div class="function-item"><div class="function-header"><div class="function-name">${esc(f.Function)}</div></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
     }).join('');
     const hotNote=d.hotFunctionsDerived?'<p class="ki-sample-note">该告警没有差分采样结果，以下函数由运行时 perf 调用链和源码关联生成。</p>':'';
     const functionsHtml=hotList.length?hotNote+hot:empty(data.rawStatus==='skipped'
