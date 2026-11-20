@@ -372,6 +372,7 @@ class KeenInsightPortal:
         inputs = evidence.get("input") or {}
         incident_path = Path(row.get("directory") or ROOT)
         backfill = load_json(incident_path / "backfill_function_analysis.json", {}) or {}
+        tuning_rationale = load_json(incident_path / "tuning_rationale.json", {}) or None
         prometheus_capture = (evidence.get("prometheusCapture")
                               or load_json(incident_path / "prometheus_capture.json", {}) or {})
         metric_queries = prometheus_capture.get("queries") or {}
@@ -473,6 +474,7 @@ class KeenInsightPortal:
                            "application": chain.get("temporary_application") or {},
                            "stages": stages,
                            "backfillGenerated": bool(backfill),
+                           "tuningRationale": tuning_rationale,
                            "backendSnapshot": evidence.get('backendSnapshot') or {},
                            "perfCapture": chain.get('perf') or evidence.get('perfCapture') or {},
                            "llm": api,

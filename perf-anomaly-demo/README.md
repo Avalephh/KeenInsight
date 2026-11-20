@@ -72,6 +72,8 @@ python3 backfill_incident_analysis.py <incident-dir>
 
 Function Analysis 还会用 `function_locations.py` 为固定 PostgreSQL 12.22 源码树建立函数定义索引（缓存到 `results/function_locations.json`），为 perf 函数补全源码 `file:line`。生成代码、扩展聚合符号和内核符号无法在 PostgreSQL 源码中定位时，页面会明确说明。点击任一函数可查看源码注释、函数签名、相关参数/源码证据、运行时调用链和代码片段。
 
+告警详情的“根因解释”会读取 `tuning_rationale.json`，把实际调优动作逐项列出：参数变化、为什么这样调、关联函数/源码证据和复测结果。该文件由 `tuning_rationale.py` 基于所选 LLM 候选理由、before/after 设置、源码证据和 comparison 生成；可用 `python3 tuning_rationale.py --scan` 为历史已完成告警补齐。未应用的参数会标明原因（例如需要重启）。
+
 ## 源码调用链证据
 
 统一入口生成的 `sysinsight_input.json` 现在会保留两类真实证据：一类是异常阶段
