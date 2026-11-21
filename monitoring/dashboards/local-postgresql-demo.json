@@ -377,7 +377,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "目标业务 TPS（统一基线负载：基线 → 压力+基线 → 调优后）",
-      "description": "六个场景使用同一条 tp_normal.sql 基线控制负载，因此不再按场景筛选。绿色为纯基线 TPS，红色为压力+基线中的基线 TPS（自动调优前），蓝色为自动调优后继续施加同一压力时的基线 TPS。",
+      "description": "六个场景使用同一条 tp_normal.sql 基线控制负载，因此不再按场景筛选。绿色为纯基线 TPS，红色为压力+基线中的基线 TPS（自动调优前），蓝色为自动调优后继续施加同一压力时的基线 TPS；曲线使用 10 秒滑动平均，减少瞬时抖动。",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -391,7 +391,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (phase) (sysinsight_dream_lab_tpcc_business_tps{phase=~\"baseline|pressure_before|pressure_after\"})",
+          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{phase=~\"baseline|pressure_before|pressure_after\"}[10s]))",
           "range": true,
           "format": "time_series",
           "legendFormat": "{{phase}}"
