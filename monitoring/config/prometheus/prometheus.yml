@@ -25,6 +25,11 @@ scrape_configs:
   # Prometheus target. Grafana can therefore show exactly what the background
   # system-tuning loop observed and applied.
   - job_name: sysinsight_dream_bridge
+    # The lab TPS gauge changes every second.  A 5s scrape gives the
+    # Grafana 10s moving average two samples instead of one, while the
+    # other exporters stay at the global 15s interval.
+    scrape_interval: 5s
+    scrape_timeout: 4s
     static_configs:
       - targets:
           - 127.0.0.1:8001
