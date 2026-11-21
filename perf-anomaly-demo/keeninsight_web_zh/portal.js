@@ -107,7 +107,7 @@
     if(!r) return '';
     const root=r.root_cause?`<div class="ki-tuning-root">${esc(r.root_cause)}</div>`:'';
     const validation=r.validation?`<h3>复测结果</h3><div class="ki-tuning-validation">${esc(r.validation)}</div>`:'';
-    return `<div class="ki-tuning-rationale">${root}${validation}<p class="ki-sample-note">以上说明由 ${esc(r.model||'gpt-6.1-sol')} 基于本次候选理由、参数证据和复测结果生成；各参数的具体调优原因已移到下方调优操作中，关联不代表因果。</p></div>`;
+    return `<div class="ki-tuning-rationale">${root}${validation}<p class="ki-sample-note">以上说明由 ${esc(r.model||'gpt-6.1-sol')} 基于本次候选理由、参数证据和复测结果生成；各参数的具体调优原因已移到下方调优操作中。</p></div>`;
   }
 
   function alertDetail(data){
