@@ -545,7 +545,40 @@ class KeenInsightPortal:
             return values
 
     def related_lab_run(self, incident_id):
-        """Return the compact lab comparison that contains this incident."""
+        """Return the compact lab comparison that contains this incident.
+
+        A continuous pressure run can finish without retaining the incident
+        in ``sysinsight_state.current_incidents`` (for example when the run is
+        stopped from the console).  The Prometheus lab TPS series already
+        carries the originating ``run_id``, so use that first and keep the
+        old result scan as a fallback.
+        """
+        run_id = ""
+        incident_rows = self._rows(
+            "SELECT alert_json FROM incidents WHERE incident_id=?",
+            (incident_id,),
+        )
+        if incident_rows:
+            alert = decode(incident_rows[0].get("alert_json"), {}) or {}
+            labels = alert.get("labels") or {}
+            run_id = str(labels.get("run_id") or "")
+        if run_id:
+            lab_rows = self._rows(
+                "SELECT * FROM lab_runs WHERE run_id=? AND kind='sysinsight'",
+                (run_id,),
+            )
+            if lab_rows:
+                row = lab_rows[0]
+                result = decode(row.get("result_json"), {}) or {}
+                return {
+                    "run_id": row.get("run_id"),
+                    "scenario_id": row.get("scenario_id"),
+                    "title": row.get("title"),
+                    "status": row.get("status"),
+                    "requested_at": row.get("requested_at"),
+                    "comparison": result.get("comparison") or {},
+                    "tuningStatus": (result.get("tuning") or {}).get("status"),
+                }
         for row in self._rows("SELECT * FROM lab_runs WHERE kind='sysinsight' ORDER BY requested_at DESC LIMIT 100"):
             result = decode(row.get("result_json"), {}) or {}
             ids = [

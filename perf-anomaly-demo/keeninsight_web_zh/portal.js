@@ -163,7 +163,7 @@
     const noValidation=interrupted?'调优未执行':'No validation';
     const rationaleHtml=renderTuningRationale(d.tuningRationale);
     const lab=d.relatedLabRun||{},lc=lab.comparison||{};
-    const hasLabTps=lc.baseline_tps!=null&&lc.pressure_before_tps!=null&&lc.pressure_after_tps!=null;
+    const hasLabTps=lc.pressure_before_tps!=null&&lc.pressure_after_tps!=null;
     const tps=value=>value==null?'—':Number(value).toFixed(2)+' TPS';
     const tpsSummary='';
     const replayNote='';
