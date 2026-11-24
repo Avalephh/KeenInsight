@@ -256,10 +256,30 @@
       panel('Data categories',table(['Category','Page','Stored data'],data.schema.categories.map(r=>[esc(r.name),`<a href="${esc(r.page)}">${esc(r.page)}</a>`,esc(r.description)])));
   }
 
+  function detailScrollKey(el){
+    if(el.classList.contains('knob-list'))return 'tuning-actions';
+    if(el.classList.contains('shap-analysis'))return 'shap';
+    if(el.classList.contains('explanation-analysis'))return 'explanation';
+    if(el.querySelector('.differential-profiling-container'))return 'differential';
+    if(el.querySelector('.function-list'))return 'functions';
+    return '';
+  }
+  function captureDetailScroll(){
+    const root=document.getElementById('detailContent');if(!root)return[];
+    return [...root.querySelectorAll('.knob-list, .detail-card.scrollable')].map(el=>({key:detailScrollKey(el),top:el.scrollTop,left:el.scrollLeft})).filter(x=>x.key&&((x.top||0)>0||(x.left||0)>0));
+  }
+  function restoreDetailScroll(state){
+    const root=document.getElementById('detailContent');if(!root||!state.length)return;
+    const scrollers=[...root.querySelectorAll('.knob-list, .detail-card.scrollable')];
+    state.forEach(x=>{const el=scrollers.find(node=>detailScrollKey(node)===x.key);if(el){el.scrollTop=x.top;el.scrollLeft=x.left;}});
+  }
+
   function render(data) {
     const body=document.getElementById('ki-body'),items=data.items||[];
     if(detail){
+      const detailScroll=captureDetailScroll();
       document.getElementById('detailContent').innerHTML=alertDetail(data);
+      restoreDetailScroll(detailScroll);
       const title=document.getElementById('pageTitle');title.textContent='Alert Details · '+data.id.slice(0,36);title.title=data.id;
       const comparison=data.detailAnalysis?.comparison;
       if(comparison&&!(comparison.tuned_ms<comparison.baseline_ms))body.querySelectorAll('.tuning-metric-value.success').forEach(n=>n.classList.add('ki-neutral-result'));
@@ -365,6 +385,6 @@
     const a=document.createElement('a');a.href=url;a.download=`keeninsight-${config[1]}-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   };
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
-  setInterval(()=>{if(!document.hidden&&!document.activeElement?.matches('input,select')&&!document.querySelector('details[open]')&&!modal.classList.contains('show'))refresh();},10000);
+  setInterval(()=>{if(!document.hidden&&!document.activeElement?.matches('input,select,.knob-list')&&!document.querySelector('.knob-list:hover')&&!document.querySelector('details[open]')&&!modal.classList.contains('show'))refresh();},10000);
   refresh();
 })();
