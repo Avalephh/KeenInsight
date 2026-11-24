@@ -4,7 +4,8 @@
 The selected LLM acquisition candidate already contains the reasoning used to
 choose its parameters.  This tool turns that reasoning plus the actual
 before/after settings, source evidence and replay comparison into a concise
-Chinese explanation, and stores it next to the incident for the portal.
+Chinese explanation plus an English translation, and stores both next to the incident for
+the two portals.
 """
 from __future__ import annotations
 
@@ -318,6 +319,113 @@ def request_explanation(bundle: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return parsed
 
 
+def _write_payload(target: Path, payload: Dict[str, Any]) -> None:
+    temporary = target.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(str(temporary), str(target))
+
+
+def request_translation(value: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Translate the operator-facing rationale into English."""
+    settings = api_settings()
+    if settings is None:
+        return None
+    base, key, model = settings
+    source = {
+        "root_cause": str(value.get("root_cause") or ""),
+        "validation": str(value.get("validation") or ""),
+        "actions": [
+            {"parameter": item.get("parameter"), "reason": item.get("reason")}
+            for item in value.get("actions") or [] if isinstance(item, dict)
+        ],
+        "not_applied": [
+            {"parameter": item.get("parameter"), "reason": item.get("reason")}
+            for item in value.get("not_applied") or [] if isinstance(item, dict)
+        ],
+    }
+    prompt = (
+        "Translate the following PostgreSQL incident explanation into concise, natural English "
+        "for an observability UI. Keep parameter names, numbers, units, SQL identifiers and function "
+        "names unchanged. Do not add or remove claims. Return JSON only with keys root_cause, "
+        "validation, actions (array of {parameter, reason}) and not_applied (array of "
+        "{parameter, reason}).\n\nDATA:\n"
+        + json.dumps(source, ensure_ascii=False, indent=2)
+    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": "Return valid JSON only. Translate faithfully; do not add facts."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.1,
+        "max_tokens": 2200,
+    }
+    req = urllib.request.Request(
+        base + "/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": "Bearer " + key,
+                 "Content-Type": "application/json",
+                 "Accept": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=120) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return None
+    choices = body.get("choices") or []
+    if not choices or not isinstance(choices[0], dict):
+        return None
+    return parse_json((choices[0].get("message") or {}).get("content") or "")
+
+
+def merge_translation(value: Dict[str, Any], translated: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    if not translated:
+        return value
+    result = dict(value)
+    root = str(translated.get("root_cause") or "").strip()
+    validation = str(translated.get("validation") or "").strip()
+    if root:
+        result["root_cause_en"] = root
+    if validation:
+        result["validation_en"] = validation
+    action_map = {
+        str(item.get("parameter")): item
+        for item in translated.get("actions") or [] if isinstance(item, dict)
+    }
+    actions = []
+    for action in value.get("actions") or []:
+        item = action_map.get(str(action.get("parameter"))) or {}
+        reason = str(item.get("reason") or "").strip()
+        actions.append(dict(action, reason_en=reason) if reason else action)
+    result["actions"] = actions
+    skipped_map = {
+        str(item.get("parameter")): item
+        for item in translated.get("not_applied") or [] if isinstance(item, dict)
+    }
+    skipped = []
+    for action in value.get("not_applied") or []:
+        item = skipped_map.get(str(action.get("parameter"))) or {}
+        reason = str(item.get("reason") or "").strip()
+        skipped.append(dict(action, reason_en=reason) if reason else action)
+    result["not_applied"] = skipped
+    return result
+
+
+def ensure_english(target: Path, existing: Dict[str, Any]) -> Dict[str, Any]:
+    """Add English fields to an existing Chinese-only rationale."""
+    if existing.get("root_cause_en"):
+        return existing
+    translated = request_translation(existing)
+    if not translated:
+        return existing
+    merged = merge_translation(existing, translated)
+    model = (api_settings() or (None, None, MODEL))[2]
+    merged["translation"] = {"model": model, "translatedAt": now()}
+    _write_payload(target, merged)
+    return merged
+
+
 def format_section(value: Any) -> str:
     labels = {
         "metric": "验证指标", "baseline_ms": "基线耗时", "tuned_ms": "调优后耗时",
@@ -434,12 +542,18 @@ def generate(incident_dir: Path, force: bool = False) -> Dict[str, Any]:
     if target.is_file() and not force:
         existing = load_json(target, {}) or {}
         if existing.get("schemaVersion") == SCHEMA:
-            return existing
+            return ensure_english(target, existing)
     bundle = build_inputs(incident_dir)
     if not bundle.get("changed"):
         raise ValueError("no changed tuning parameters found in {}".format(incident_dir))
     model = (api_settings() or (None, None, MODEL))[2]
     merged = merge_explanation(bundle, request_explanation(bundle), model)
+    translated = request_translation(merged)
+    merged = merge_translation(merged, translated)
+    translation_metadata = (
+        {"model": model, "translatedAt": now()}
+        if translated else {"status": "unavailable"}
+    )
     payload = {
         "schemaVersion": SCHEMA,
         "generatedAt": now(),
@@ -447,15 +561,14 @@ def generate(incident_dir: Path, force: bool = False) -> Dict[str, Any]:
         "incidentDirectory": str(incident_dir),
         "model": model,
         **merged,
+        "translation": translation_metadata,
         "provenance": {
             "selectedLLMReasoning": bundle.get("selected_reasoning"),
             "candidateModel": bundle.get("model"),
             "comparison": bundle.get("comparison"),
         },
     }
-    temporary = target.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    os.replace(str(temporary), str(target))
+    _write_payload(target, payload)
     return payload
 
 

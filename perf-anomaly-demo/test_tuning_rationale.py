@@ -53,3 +53,33 @@ class TuningRationaleTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RationaleTranslationTests(unittest.TestCase):
+    def test_merge_translation_keeps_chinese_and_adds_english(self):
+        from tuning_rationale import merge_translation
+        value = {
+            "root_cause": "结论：中文根因",
+            "validation": "复测通过",
+            "actions": [{"parameter": "work_mem", "reason": "中文原因", "evidence": ["x"]}],
+            "not_applied": [{"parameter": "max_connections", "reason": "需要重启"}],
+        }
+        translated = {
+            "root_cause": "Conclusion: English root cause",
+            "validation": "Replay passed",
+            "actions": [{"parameter": "work_mem", "reason": "English reason"}],
+            "not_applied": [{"parameter": "max_connections", "reason": "Requires restart"}],
+        }
+        merged = merge_translation(value, translated)
+        self.assertEqual(merged["root_cause"], "结论：中文根因")
+        self.assertEqual(merged["root_cause_en"], "Conclusion: English root cause")
+        self.assertEqual(merged["validation_en"], "Replay passed")
+        self.assertEqual(merged["actions"][0]["reason"], "中文原因")
+        self.assertEqual(merged["actions"][0]["reason_en"], "English reason")
+        self.assertEqual(merged["not_applied"][0]["reason_en"], "Requires restart")
+        self.assertEqual(merged["actions"][0]["evidence"], ["x"])
+
+    def test_merge_translation_without_result_is_a_noop(self):
+        from tuning_rationale import merge_translation
+        value = {"root_cause": "中文", "actions": [], "not_applied": []}
+        self.assertEqual(merge_translation(value, None), value)
