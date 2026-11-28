@@ -56,7 +56,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_bridge_up",
+          "expr": "sysinsight_dream_bridge_up{job=\"sysinsight_dream_bridge\"}",
           "instant": true,
           "format": "time_series",
           "legendFormat": "bridge"
@@ -114,7 +114,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_bridge_alert_firing",
+          "expr": "sysinsight_dream_bridge_alert_firing{job=\"sysinsight_dream_bridge\"}",
           "instant": true,
           "format": "time_series",
           "legendFormat": "alert"
@@ -172,7 +172,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_bridge_api_configured",
+          "expr": "sysinsight_dream_bridge_api_configured{job=\"sysinsight_dream_bridge\"}",
           "instant": true,
           "format": "time_series",
           "legendFormat": "configured"
@@ -230,7 +230,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_bridge_last_collection_error",
+          "expr": "sysinsight_dream_bridge_last_collection_error{job=\"sysinsight_dream_bridge\"}",
           "instant": true,
           "format": "time_series",
           "legendFormat": "error"
@@ -288,13 +288,13 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_bridge_alert_firing",
+          "expr": "sysinsight_dream_bridge_alert_firing{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "SysInsight alert",
           "range": true
         },
         {
           "refId": "B",
-          "expr": "sysinsight_dream_bridge_last_collection_error",
+          "expr": "sysinsight_dream_bridge_last_collection_error{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "collection error",
           "range": true
         }
@@ -341,7 +341,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sysinsight_dream_bridge_incident_info",
+          "expr": "sysinsight_dream_bridge_incident_info{job=\"sysinsight_dream_bridge\"}",
           "instant": true,
           "format": "table",
           "legendFormat": "{{incident_id}} {{status}}"

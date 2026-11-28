@@ -73,7 +73,10 @@ class MySQLDatabaseClient:
         connection = self._connect(database)
         try:
             with connection.cursor() as cursor:
-                cursor.execute(sql, params)
+                if params:
+                    cursor.execute(sql, params)
+                else:
+                    cursor.execute(sql)
                 return list(cursor.fetchall())
         finally:
             connection.close()

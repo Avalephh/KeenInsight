@@ -104,9 +104,46 @@ class PrometheusClient:
         return None
 
 
-def default_queries(database: str) -> Dict[str, str]:
+def mysql_queries(database: str) -> Dict[str, str]:
+    """Return the MySQL exporter queries used by the MySQL demo stack."""
+
+    schema = _promql_label(database)
+    return {
+        "active_sessions": 'mysql_global_status_threads_running{job="mysql"}',
+        "idle_in_transaction_sessions": (
+            'clamp_min(mysql_global_status_threads_connected{job="mysql"}'
+            ' - mysql_global_status_threads_running{job="mysql"}, 0)'
+        ),
+        "transactions_committed": 'mysql_global_status_commands_total{job="mysql",command="commit"}',
+        "transactions_rolled_back": 'mysql_global_status_commands_total{job="mysql",command="rollback"}',
+        "tuples_returned": 'mysql_global_status_innodb_row_ops_total{job="mysql",operation="read"}',
+        "tuples_fetched": 'mysql_global_status_innodb_row_ops_total{job="mysql",operation="read"}',
+        "blocks_read": 'mysql_global_status_innodb_buffer_pool_reads{job="mysql"}',
+        "blocks_hit": 'mysql_global_status_innodb_buffer_pool_read_requests{job="mysql"}',
+        "temporary_files": 'mysql_global_status_created_tmp_files{job="mysql"}',
+        # MySQL exposes temp-table counts, not temp bytes; retain the closest
+        # real counter and label its source rather than inventing bytes.
+        "temporary_bytes": 'mysql_global_status_created_tmp_disk_tables{job="mysql"}',
+        "locks": 'mysql_global_status_innodb_row_lock_current_waits{job="mysql"}',
+        "database_size_bytes": (
+            'sum(mysql_info_schema_table_size{{job="mysql",component="data_length",schema="{}"}})'
+            ' + sum(mysql_info_schema_table_size{{job="mysql",component="index_length",schema="{}"}})'
+        ).format(schema, schema),
+        "cpu_percent": '100 * (1 - avg(rate(node_cpu_seconds_total{mode="idle"}[1m])))',
+        "memory_used_percent": (
+            '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)'
+        ),
+        "disk_read_bytes_per_second": "sum(rate(node_disk_read_bytes_total[1m]))",
+        "disk_write_bytes_per_second": "sum(rate(node_disk_written_bytes_total[1m]))",
+        "load1": "node_load1",
+    }
+
+
+def default_queries(database: str, dbms: str = "postgresql") -> Dict[str, str]:
     """Return queries matching the metrics provisioned in this checkout."""
 
+    if str(dbms).lower() in {"mysql", "mariadb"}:
+        return mysql_queries(database)
     db = _promql_label(database)
     selector = 'job="postgres",datname="{}"'.format(db)
     return {
@@ -174,6 +211,7 @@ def collect_window(
     step: float = 15.0,
     alert_name: str = "",
     queries: Optional[Mapping[str, str]] = None,
+    dbms: str = "postgresql",
 ) -> Dict[str, Any]:
     """Collect a complete, auditable Prometheus observation window.
 
@@ -181,7 +219,7 @@ def collect_window(
     exporter metric cannot be confused with a zero measurement.
     """
 
-    expressions = dict(queries or default_queries(database))
+    expressions = dict(queries or default_queries(database, dbms))
     result: Dict[str, Any] = {
         "source": {"type": "prometheus", "url": client.base_url},
         "database": database,
@@ -391,8 +429,9 @@ def build_sysinsight_input(
             },
         },
     ]
+    dbms = str(profile.get("name", "postgresql/12")).split("/", 1)[0]
     return {
-        "schema": "sysinsight.postgresql.input.v1",
+        "schema": "sysinsight.{}.input.v1".format(dbms),
         "generated_at": utc_now(),
         "source_case_result": str(case_path) if case_path else None,
         "database": {

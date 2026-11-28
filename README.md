@@ -24,7 +24,8 @@ SysInsight 使用的原始开源源码不是本项目重写的实现。复现所
 
 - Linux；Python 3.8+；
 - PostgreSQL 12.x，数据库 `keeninsight` 中存在 `keeninsight_tpcc` schema；
-- `psql`、`pgbench`、`perf`、`curl`、`perl`；
+- 可选 MySQL 8.0.x，数据库 `keeninsight_tpcc`（MySQL 演示使用单独的数据库和 bridge）；
+- `psql`、`pgbench`、`perf`、`curl`、`perl`、`pymysql`；
 - Prometheus、node_exporter、postgres_exporter 和 Grafana OSS。当前主机已有的发行包路径可通过 `monitoring/env.example` 中的变量指定；这些大文件不进 Git；
 - 调用真实 SysInsight API 时，需要原始 WorkloadTune 源码快照和 Python 依赖。
 
@@ -68,6 +69,35 @@ Grafana：<http://127.0.0.1:8002/>；Prometheus：<http://127.0.0.1:8003/>。Gra
 一页实验控制台：<http://127.0.0.1:8001/lab>；Grafana 实验看板：<http://127.0.0.1:8002/d/sysinsight-experiment-lab?orgId=1&refresh=5s>。控制台可重置实验参数、触发 TPCC 基线→压力→恢复，并查看压力下调优前后的目标业务 TPS 对比。
 
 中文演示入口：产品门户 <http://127.0.0.1:8004/keeninsight/>，中文实验台 <http://127.0.0.1:8005/lab>，中文管理台 <http://127.0.0.1:8005/ui>。中文版与英文版共用同一份 bridge 数据和 Grafana/Prometheus。
+
+## MySQL 版本
+
+PostgreSQL 演示保持原样，另有一套功能对齐的 MySQL 8.0 演示栈，两套数据、Prometheus job、告警规则和 Grafana 看板互相隔离：
+
+| 入口 | PostgreSQL | MySQL |
+| --- | --- | --- |
+| 英文产品门户 | <http://127.0.0.1:8001/keeninsight/> | <http://127.0.0.1:8101/keeninsight/> |
+| 英文实验台 / 管理台 | <http://127.0.0.1:8001/lab>、`/ui` | <http://127.0.0.1:8101/lab>、`/ui` |
+| 中文产品门户 | <http://127.0.0.1:8004/keeninsight/> | <http://127.0.0.1:8104/keeninsight/> |
+| 中文实验台 / 管理台 | <http://127.0.0.1:8005/lab>、`/ui` | <http://127.0.0.1:8105/lab>、`/ui` |
+| 本机监控大屏 | `local-postgresql-demo` / `-en` | `local-mysql-demo` / `-en` |
+| 系统调优联动 | `sysinsight-dream-automation` | `sysinsight-mysql-dream-automation` |
+| 实验看板 | `sysinsight-experiment-lab` | `sysinsight-mysql-experiment-lab` |
+| Prometheus job | `sysinsight_dream_bridge`、`postgres` | `sysinsight_mysql_bridge`、`mysql` |
+| 告警规则 | `SysInsightDemoAnomaly` | `SysInsightMySQLDemoAnomaly` |
+
+MySQL Grafana 直达：<http://127.0.0.1:8002/d/local-mysql-demo>（中文）、
+<http://127.0.0.1:8002/d/local-mysql-demo-en>（英文）、
+<http://127.0.0.1:8002/d/sysinsight-mysql-dream-automation>、
+<http://127.0.0.1:8002/d/sysinsight-mysql-experiment-lab>。
+
+MySQL 侧使用本机 `mysql.service`、数据库 `keeninsight_tpcc`，由 `keeninsight-mysql-demo.service` 启动 bridge（8101/8104/8105）；`keeninsight-mysql-exporter.service` 在 127.0.0.1:9104 暴露 MySQL 指标。连接账号和密码只放在 `/etc/keeninsight/mysql.env`（`SYSINSIGHT_MYSQL_PASSWORD`）和 `/etc/keeninsight/mysql-exporter.env`，不写入 Git 或结果文件。首次部署 MySQL 数据库、导入 TPCC 数据的步骤见 `monitoring/DEPLOYMENT.md`。
+
+MySQL 实验台复用与 PG 相同的六个 TPCC 焦点场景（Payment、Stock Level 热点/突发、五类交易混合、redo/checkpoint、Order Status），但交易由 MySQL 原生 SQL 和后台 worker 实现；每个事务都 rollback，不改变导入数据。实验仍按“基线 → 压力下自动调优前 → 临时应用候选 → 调优后 → 恢复原配置”记录同一套 `comparison` 字段，因此门户、告警详情、中文/英文页面和 Grafana 实验看板的读取逻辑完全一致。
+
+MySQL 真实告警链包含：Prometheus 告警 → 对 mysqld 的 `perf record` → 原始 SysInsight MySQL 函数匹配 → MySQL `performance_schema`/源码证据 → LLM 候选生成 → 动态变量白名单校验 → `SET GLOBAL`/session 临时应用 → read-only replay 复测 → 恢复 → 根因解释和中英文调优原因。动态变量在恢复阶段逐项还原；buffer pool 扩缩容会等待 MySQL 异步 resize 完成并记录状态。
+
+MySQL 的函数分析源码位置和源码证据来自 MySQL 8.0 源码树（默认 `/root/mysql-src/src`，可用 `MYSQL_SOURCE_ROOT` 覆盖）。如果源码树不在，函数分析仍可使用，但源码位置和静态参数证据会显示为未定位。MySQL SHAP 模型用真实采集的、与 perf 窗口对齐的控制 TPS 保留率样本训练，模型和训练凭证在 `perf-anomaly-demo/models/sysinsight_mysql_tps/`；当前训练覆盖六个焦点场景、样本量有限，因此页面保留实际归因但标记为低置信度，不把 SHAP 当作因果证明或 LLM 调优依据。
 
 ## 运行真实 API 的 TPCC 验证
 

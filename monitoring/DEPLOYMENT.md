@@ -33,6 +33,57 @@ journalctl -u keeninsight-demo.service -n 100 --no-pager
 systemctl disable --now keeninsight-demo.service
 ```
 
+## MySQL 演示栈
+
+MySQL 演示与 PG 演示共用 Prometheus、Grafana 和系统主机指标，但使用独立的 bridge、
+状态库、数据库、告警规则和 Grafana 看板。MySQL 侧需要 MySQL Community Server 8.0.x、
+`pymysql`、`perf`、`perl` 和 MySQL 8.0 源码树（用于函数位置/源码证据）。
+
+已安装的服务：
+
+```bash
+systemctl is-enabled keeninsight-mysql-demo.service keeninsight-mysql-exporter.service
+systemctl status keeninsight-mysql-demo.service
+systemctl status keeninsight-mysql-exporter.service
+journalctl -u keeninsight-mysql-demo.service -n 100 --no-pager
+```
+
+`keeninsight-mysql-demo.service` 运行在 8101（英文）、8104（中文门户）、8105（中文实验台/管理台），
+状态库为 `monitoring/data/mysql_demo_service.sqlite3`。它依赖 `mysql.service`，但不会停止或重启
+MySQL；所有候选参数通过 `SET GLOBAL`/session 临时应用并在实验结束或异常时恢复。buffer pool
+扩缩容会等待 MySQL 异步 resize 完成。
+
+私有配置：
+
+```bash
+/etc/keeninsight/mysql.env              # SYSINSIGHT_MYSQL_PASSWORD
+/etc/keeninsight/mysql-exporter.env     # DATA_SOURCE_NAME（0600/0640，含密码）
+```
+
+数据库账号至少需要 `PROCESS`、`REPLICATION CLIENT`、`SYSTEM_VARIABLES_ADMIN`、
+`SESSION_VARIABLES_ADMIN` 和 `SELECT performance_schema`；exporter 使用单独的最小权限账号。
+数据库为 `keeninsight_tpcc`，表结构/数据从已验证的 TPCC 数据集导入；导入时需把 PG 导出的
+带时区时间戳规范成 MySQL `DATETIME`。MySQL 8.0 源码默认放在 `/root/mysql-src/src`，或用
+`MYSQL_SOURCE_ROOT` 指向已有源码树；函数源码索引可用以下命令重建：
+
+```bash
+python3 perf-anomaly-demo/function_locations.py --dbms mysql \
+  --source-root /root/mysql-src/src --rebuild
+```
+
+MySQL SHAP 模型使用与 perf 窗口对齐的真实控制 TPS 保留率样本训练，训练数据在
+`perf-anomaly-demo/results/mysql_shap_windows/`，模型在
+`perf-anomaly-demo/models/sysinsight_mysql_tps/`。重新采集和训练：
+
+```bash
+python3 perf-anomaly-demo/collect_mysql_shap_windows.py --rounds 3
+python3 perf-anomaly-demo/sysinsight_shap.py train-mysql
+```
+
+当前只有六个焦点场景作为训练分组，验证覆盖不足，因此 SHAP 页面会显示实际归因但标记低置信度；
+低置信度归因不会进入 LLM 的调优依据。MySQL 源码/函数索引缓存是本地生成资产，
+不属于运行数据库数据，可由上面的命令重建。
+
 ## 新机器：需要先具备什么
 
 目前支持与本机相同的 **Linux x86_64 + systemd + PostgreSQL 12** 演示环境。

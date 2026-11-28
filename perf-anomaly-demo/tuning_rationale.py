@@ -93,6 +93,8 @@ def parse_json(text: str) -> Optional[Dict[str, Any]]:
 
 def display_value(name: str, value: Any, pre: Dict[str, Any]) -> str:
     setting = pre.get(name) if isinstance(pre, dict) else None
+    if not isinstance(setting, dict):
+        setting = {"setting": setting, "unit": ""} if setting is not None else None
     unit = (setting or {}).get("unit") or ""
     if value is None:
         return "—"
@@ -200,7 +202,8 @@ def build_inputs(incident_dir: Path):
     actual_changed = []
     for parameter in changed:
         after = requested.get(parameter)
-        before = (pre.get(parameter) or {}).get("setting")
+        before_entry = pre.get(parameter)
+        before = before_entry.get("setting") if isinstance(before_entry, dict) else before_entry
         if same_value(before, after):
             continue
         actual_changed.append(parameter)

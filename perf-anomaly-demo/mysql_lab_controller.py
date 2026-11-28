@@ -154,8 +154,8 @@ class MySQLLabController:
     def _config(self, case: Mapping[str, Any], body: Mapping[str, Any], continuous_mode: Optional[str] = None) -> Dict[str, Any]:
         normal_clients = _bounded_int(body.get("normal_clients"), "normal_clients", 2, 1, 16)
         pressure_clients = _bounded_int(body.get("pressure_clients"), "pressure_clients", case["clients"], 1, 32)
-        baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 30, 5, 300)
-        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 120, 10, 300)
+        baseline_seconds = _bounded_int(body.get("baseline_seconds"), "baseline_seconds", 60, 5, 300)
+        pressure_seconds = _bounded_int(body.get("pressure_seconds"), "pressure_seconds", 180, 10, 300)
         before = max(5, pressure_seconds // 2)
         after = pressure_seconds - before
         normal_target = round(500.0 * normal_clients / 2.0, 1)
@@ -166,9 +166,12 @@ class MySQLLabController:
             "pressure_before_seconds": before, "pressure_after_seconds": after,
             "normal_target_tps": normal_target, "pressure_target_tps": pressure_target,
             "pressure_mode": "open_loop_fixed_rate",
+            "pressure_hold_until_completion": True,
+            "tuning_observation": "same external pressure is replayed before and after SysInsight tuning",
             "primary_metric": "normal_business_tps",
             "primary_metric_source": "MySQL normal TPCC control workload",
             "secondary_metric": "pressure_injection_tps",
+            "actual_prometheus_alert": True,
             "dbms": "mysql",
         }
         if continuous_mode:
@@ -185,6 +188,11 @@ class MySQLLabController:
                 "pressure_before_seconds": auto if pressure else 0,
                 "pressure_after_seconds": seconds if pressure else 0,
                 "pressure_seconds": auto + seconds if pressure else 0,
+                "tuning_observation": (
+                    "after {} s of pressure, apply the verified SysInsight candidate "
+                    "and keep it active until the operator restores the baseline".format(auto)
+                    if pressure else "keep the normal MySQL TPCC baseline running until switched to pressure"
+                ),
             })
         return config
 
@@ -266,6 +274,9 @@ class MySQLLabController:
     def _run_phase(self, run_id: str, phase: str, duration: float, scenario: str,
                    normal: int, normal_rate: float, pressure: int = 0, pressure_rate: float = 0,
                    stop_event: Optional[threading.Event] = None, session_settings: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+        # Publish the phase before the workload starts so Prometheus can
+        # label (and alert on) the pressure samples while the phase is live.
+        self.store.update_lab_run(run_id, status="running", phase=phase)
         workload = self._new_workload()
         self._workload = workload
         specs = [WorkloadSpec("control", "normal", normal, normal_rate, session_settings or {})]

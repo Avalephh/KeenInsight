@@ -1,0 +1,6745 @@
+{
+  "schemaVersion": "keeninsight.shap.v1",
+  "modelVersion": "mysql80-foreground-tps-1728c053149da947",
+  "modelType": "RandomForestRegressor",
+  "dbms": "mysql",
+  "createdAt": "2026-11-28T13:19:46.253362+00:00",
+  "target": "foreground pressure TPS / foreground normal baseline TPS",
+  "outputUnit": "TPS retention ratio",
+  "featureUnit": "original inclusive perf sample-rate units, not CPU utilization percent",
+  "featureNames": [
+    "Adaptive_flush::get_pct_for_dirty",
+    "Adaptive_flush::get_pct_for_lsn",
+    "Adaptive_flush::set_average",
+    "Adaptive_flush::set_flush_target_by_lsn",
+    "Adaptive_flush::set_flush_target_by_page",
+    "AddCost",
+    "Aggregator_distinct::setup",
+    "Alter_stage::inc",
+    "Alter_stage::reestimate",
+    "Arch_Page_Sys::post_recovery_init",
+    "Arch_Page_Sys::set_tracking_buf_pool",
+    "Arch_Page_Sys::track_initial_pages",
+    "Arch_Page_Sys::track_page",
+    "AutoDebugTrace::",
+    "BTR_TABLE_STATS_FROM_SAMPLE",
+    "BUF_DUMP_CREATE",
+    "BUF_DUMP_PAGE",
+    "BUF_DUMP_SPACE",
+    "BUF_READ_AHEAD_RANDOM_THRESHOLD",
+    "Batch_segment",
+    "Binlog_ifile::open_file",
+    "Buf_fetch",
+    "Checkable_rwlock::unlock",
+    "Checkable_rwlock::wrlock",
+    "Clone_Snapshot::get_state_info",
+    "Clone_Snapshot::init_disk_estimate",
+    "Clone_Snapshot::set_state_info",
+    "Clone_Sys::get_gtid_persistor",
+    "Clone_persist_gtid::wait_flush",
+    "Connection_handler_manager::check_and_incr_conn_count",
+    "Connection_handler_manager::valid_connection_count",
+    "CreateIteratorFromAccessPath",
+    "DDTableBuffer",
+    "Delegate::is_empty",
+    "Double_write",
+    "Double_write::create_batch_segments",
+    "Double_write::create_reduced",
+    "Double_write::create_reduced_batch_segments",
+    "Double_write::create_single_segments",
+    "Double_write::create_v2",
+    "Double_write::init_file",
+    "Double_write::instance",
+    "Double_write::load",
+    "Double_write::reset_file",
+    "Double_write::shutdown",
+    "DynamicRangeIterator::DynamicRangeIterator",
+    "ER_THD",
+    "Event_worker_thread::run",
+    "Events::lock_schema_events",
+    "Events::show_create_event",
+    "Fil_shard::acquire",
+    "Flush_observer::Flush_observer",
+    "Flush_observer::flush",
+    "Flush_observer::is_complete",
+    "Global_read_lock::lock_global_read_lock",
+    "Global_read_lock::make_global_read_lock_block_commit",
+    "Gtid_mode::get",
+    "Gtid_set::clear_set_and_sid_map",
+    "HashJoinIterator::BuildHashTable",
+    "HashJoinIterator::ReadNextHashJoinChunk",
+    "HazardPointer::get",
+    "HazardPointer::set",
+    "IB_thread",
+    "IB_thread::",
+    "IB_thread::IB_thread",
+    "IB_thread::operator",
+    "IB_thread::start",
+    "IB_thread::wait",
+    "IORequest::IORequest",
+    "Innodb_redo_log::execute",
+    "Instruction:",
+    "Item_func_group_concat::setup",
+    "Item_sum::ram_limitation",
+    "LogEvent::",
+    "LogEvent::LogEvent",
+    "LogEvent::errcode",
+    "LogEvent::function",
+    "LogEvent::lookup",
+    "LogEvent::prio",
+    "LogEvent::source_file",
+    "LogEvent::source_line",
+    "LogEvent::subsys",
+    "Log_data_block_header::set_lsn",
+    "Log_file::contains",
+    "Log_files_capacity::Log_files_capacity",
+    "Log_files_capacity::cancel_resize",
+    "Log_files_capacity::current_physical_capacity",
+    "Log_files_capacity::hard_logical_capacity_for_physical",
+    "Log_files_capacity::initialize",
+    "Log_files_capacity::is_target_reached_for_resizing_down",
+    "Log_files_capacity::next_file_earlier_margin",
+    "Log_files_capacity::soft_logical_capacity_for_hard",
+    "Log_files_capacity::update",
+    "Log_files_capacity::update_exposed",
+    "Log_files_capacity::update_target",
+    "Log_files_context::",
+    "Log_files_dict::Const_iterator::operator",
+    "Log_files_dict::begin",
+    "Log_files_dict::end",
+    "Log_files_write_impl::compute_how_much_to_write",
+    "Log_files_write_impl::compute_next_write_ahead_end",
+    "Log_files_write_impl::copy_to_write_ahead_buffer",
+    "Log_files_write_impl::update_current_write_ahead",
+    "Log_files_write_impl::write_blocks",
+    "Log_resource::dummy_function_to_ensure_we_are_linked_into_the_server",
+    "MDL_context_backup_manager::init",
+    "MDL_lock::get_incompatible_waiting_types_bitmap_idx",
+    "MDL_lock_guard::lock",
+    "MDL_request::init_by_key_with_source",
+    "MYSQL_BIN_LOG::Binlog_ofile::open_existing",
+    "MYSQL_BIN_LOG::close",
+    "MYSQL_BIN_LOG::find_first_log",
+    "MYSQL_BIN_LOG::generate_name",
+    "MYSQL_BIN_LOG::get_log_fname",
+    "MYSQL_BIN_LOG::get_log_lock",
+    "MYSQL_BIN_LOG::open_binlog",
+    "MYSQL_BIN_LOG::open_index_file",
+    "MYSQL_BIN_LOG::set_max_size",
+    "MY_LOCALE_ERRMSGS::is_loaded",
+    "Master_info::clear_gtid_monitoring_info",
+    "MetadataRecover::empty",
+    "MetadataRecover::store",
+    "Multisource_info::begin",
+    "Multisource_info::end",
+    "Multisource_info::unlock",
+    "Multisource_info::wrlock",
+    "Ndb_dd_client::mdl_lock_logfile_group",
+    "Ndb_dd_client::mdl_lock_logfile_group_exclusive",
+    "Ndb_dd_client::mdl_lock_schema",
+    "Ndb_dd_client::mdl_lock_schema_exclusive",
+    "Ndb_dd_client::mdl_lock_table",
+    "Ndb_dd_client::mdl_lock_tablespace",
+    "Ndb_dd_client::mdl_lock_tablespace_exclusive",
+    "Ndb_dd_client::mdl_locks_acquire_exclusive",
+    "Ndb_schema_event_handler::Lock_wait_timeout_guard::",
+    "Ndb_schema_event_handler::Lock_wait_timeout_guard::Lock_wait_timeout_guard",
+    "Open_table_context::Open_table_context",
+    "Open_table_context::get_timeout",
+    "Open_table_context::recover_from_failed_open",
+    "Optimize_table_order::Optimize_table_order",
+    "Optimize_table_order::best_access_path",
+    "Optimize_table_order::best_extension_by_limited_search",
+    "Optimize_table_order::calculate_scan_cost",
+    "Optimize_table_order::check_interleaving_with_nj",
+    "Optimize_table_order::greedy_search",
+    "Optimize_table_order::lateral_derived_cost",
+    "Optimize_table_order::recalculate_lateral_deps_incrementally",
+    "Optimize_table_order::semijoin_dupsweedout_access_paths",
+    "PCT_IO",
+    "PasswdValue::IsVoid",
+    "Per_thread_connection_handler::block_until_new_connection",
+    "Per_thread_connection_handler::get_max_threads",
+    "PolicyMutex",
+    "Query_logger::reopen_log_file",
+    "Query_logger::set_handlers",
+    "Query_logger::set_log_file",
+    "Query_result_create::send_eof",
+    "Range_optimizer_error_handler::handle_condition",
+    "Recovered_xa_transactions::init",
+    "Recovered_xa_transactions::instance",
+    "Recovered_xa_transactions::recover_prepared_xa_transactions",
+    "Reduced_double_write",
+    "Reduced_double_write::allocate",
+    "Relay_log_info::check_if_info_was_cleared",
+    "Relay_log_info::clear_info",
+    "Relay_log_info::count_relay_log_space",
+    "Relay_log_info::flush_info",
+    "Relay_log_info::is_group_relay_log_name_invalid",
+    "Relay_log_info::purge_relay_logs",
+    "Relay_log_info::reset_group_relay_log_pos",
+    "Relay_log_info::rli_init_info",
+    "Relaylog_ifile::open_file",
+    "Rotate_innodb_master_key::execute",
+    "Rpl_acf_configuration_handler::init",
+    "Rpl_encryption::initialize",
+    "Rpl_info_handler::end_info",
+    "Rpl_info_handler::init_info",
+    "Rsegs::at",
+    "Rsegs::s_lock",
+    "Rsegs::s_unlock",
+    "Rsegs::size",
+    "SHUTTING_DOWN",
+    "Scope_guard",
+    "Server_state_delegate::after_dd_upgrade_from_57",
+    "Server_state_delegate::before_recovery",
+    "Session_tracker::server_boot_verify",
+    "Sql_cmd_alter_table_truncate_partition::execute",
+    "Sql_cmd_alter_tablespace_rename::execute",
+    "Sql_cmd_analyze_table::handle_histogram_command",
+    "Sql_cmd_common_server::check_and_open_table",
+    "Sql_cmd_create_srs::execute",
+    "Sql_cmd_ddl_trigger_common::open_and_lock_subj_table",
+    "Sql_cmd_delete::delete_from_single_table",
+    "Sql_cmd_discard_import_tablespace::mysql_discard_or_import_tablespace",
+    "Sql_cmd_drop_srs::execute",
+    "Sql_cmd_handler_read::execute",
+    "Sql_cmd_import_table::execute",
+    "Sql_cmd_install_component::execute",
+    "Sql_cmd_lock_instance::execute",
+    "Sql_cmd_secondary_load_unload::mysql_secondary_load_or_unload",
+    "Sql_cmd_show_schema_base::set_metadata_lock",
+    "Sql_cmd_truncate_table::lock_table",
+    "Sql_cmd_uninstall_component::execute",
+    "Sql_cmd_update::update_single_table",
+    "Sql_cmd_xa_commit::process_attached_xa_commit",
+    "Sql_cmd_xa_prepare::trans_xa_prepare",
+    "Sql_cmd_xa_rollback::process_attached_xa_rollback",
+    "Srs_fetcher::lock",
+    "SysTablespace::can_auto_extend_last_file",
+    "SysTablespace::open_or_create",
+    "THD::init",
+    "Table_cache::free_unused_tables_if_necessary",
+    "Table_cache::remove_table",
+    "Table_map_restorer::",
+    "Table_ref::lock_descriptor",
+    "Tablespace::get_sum_of_sizes",
+    "Tablespace::set_flags",
+    "Tablespace::set_name",
+    "Tablespace::set_path",
+    "Tablespace::set_space_id",
+    "Temp_table_handle::open",
+    "Transaction_boundary_parser::reset",
+    "Udf_load_service::init",
+    "Wait_stats",
+    "Wait_stats::operator",
+    "acl_tables_setup_for_write_and_acquire_mdl",
+    "acquire_backup_lock_in_lock_tables_mode",
+    "acquire_mandatory_metadata_locks",
+    "acquire_mdl_for_table",
+    "acquire_mdl_for_trigger",
+    "adjust_check_constraint_names_for_old_table_version",
+    "adjust_foreign_key_names_for_old_table_version",
+    "adjust_max_connections",
+    "adjust_open_files_limit",
+    "adjust_table_cache_size",
+    "adjust_table_def_size",
+    "alloc_record_buffers",
+    "arch_init",
+    "basename_index",
+    "basename_prefix_eval",
+    "basename_prefix_find",
+    "binlog_cache_mngr::init",
+    "bool",
+    "bootstrap::run_bootstrap_thread",
+    "btr_cur_get_page",
+    "btr_cur_open_at_rnd_pos",
+    "btr_drop_next_batch",
+    "btr_estimate_number_of_different_key_vals",
+    "btr_page_get_next",
+    "btr_page_get_prev",
+    "btr_record_not_null_field_in_rec",
+    "btr_search_disable",
+    "btr_search_drop_page_hash_when_freed",
+    "btr_search_enable",
+    "btr_search_sys_create",
+    "btr_search_sys_resize",
+    "buf::Block_hint::buffer_fix_block_if_still_valid",
+    "buf_LRU_add_block",
+    "buf_LRU_block_free_non_file_page",
+    "buf_LRU_buf_pool_running_out",
+    "buf_LRU_check_size_of_non_data_objects",
+    "buf_LRU_count_space_references",
+    "buf_LRU_drop_page_hash_for_tablespace",
+    "buf_LRU_flush_or_remove_pages",
+    "buf_LRU_free_from_unzip_LRU_list",
+    "buf_LRU_free_page",
+    "buf_LRU_get_free_block",
+    "buf_LRU_get_free_only",
+    "buf_LRU_insert_zip_clean",
+    "buf_LRU_old_ratio_update",
+    "buf_LRU_old_ratio_update_instance",
+    "buf_LRU_print",
+    "buf_LRU_print_instance",
+    "buf_LRU_remove_pages",
+    "buf_LRU_scan_and_free_block",
+    "buf_LRU_stat_inc_io",
+    "buf_LRU_stat_update",
+    "buf_LRU_validate",
+    "buf_LRU_validate_instance",
+    "buf_are_flush_lists_empty_validate",
+    "buf_block_alloc",
+    "buf_block_get_state",
+    "buf_block_init_low",
+    "buf_block_set_file_page",
+    "buf_block_t::ahi_t::validate",
+    "buf_block_try_discard_uncompressed",
+    "buf_buddy_alloc",
+    "buf_buddy_free",
+    "buf_buddy_mem_invalid",
+    "buf_buddy_relocate",
+    "buf_buddy_stat_t::take_snapshot",
+    "buf_chunk_init",
+    "buf_dump",
+    "buf_dump_status",
+    "buf_flush_LRU_list",
+    "buf_flush_LRU_list_batch",
+    "buf_flush_check_neighbor",
+    "buf_flush_do_batch",
+    "buf_flush_free_flush_rbt",
+    "buf_flush_get_dirty_pages_count",
+    "buf_flush_init_flush_rbt",
+    "buf_flush_lists",
+    "buf_flush_page_and_try_neighbors",
+    "buf_flush_page_cleaner_close",
+    "buf_flush_page_cleaner_disabled_debug_update",
+    "buf_flush_page_cleaner_init",
+    "buf_flush_page_coordinator_thread",
+    "buf_flush_ready_for_flush",
+    "buf_flush_ready_for_replace",
+    "buf_flush_sync_all_buf_pools",
+    "buf_flush_try_neighbors",
+    "buf_flush_validate_low",
+    "buf_flush_wait_LRU_batch_end",
+    "buf_flush_wait_batch_end",
+    "buf_free_from_unzip_LRU_list_batch",
+    "buf_get_latched_pages_number",
+    "buf_get_latched_pages_number_instance",
+    "buf_get_n_pending_read_ios",
+    "buf_get_total_list_len",
+    "buf_get_total_list_size_in_bytes",
+    "buf_get_total_stat",
+    "buf_get_withdraw_depth",
+    "buf_load",
+    "buf_load_abort",
+    "buf_load_status",
+    "buf_load_throttle_if_needed",
+    "buf_must_be_all_freed",
+    "buf_must_be_all_freed_instance",
+    "buf_page_alloc_descriptor",
+    "buf_page_belongs_to_unzip_LRU",
+    "buf_page_can_relocate",
+    "buf_page_create",
+    "buf_page_free_descriptor",
+    "buf_page_get_mutex",
+    "buf_page_get_state",
+    "buf_page_get_zip",
+    "buf_page_hash_get_low",
+    "buf_page_hash_get_s_locked",
+    "buf_page_hash_lock_x_confirm",
+    "buf_page_in_file",
+    "buf_page_init",
+    "buf_page_init_for_read",
+    "buf_page_init_low",
+    "buf_page_is_accessed",
+    "buf_page_peek",
+    "buf_page_peek_if_young",
+    "buf_page_reset_file_page_was_freed",
+    "buf_page_set_file_page_was_freed",
+    "buf_page_set_io_fix",
+    "buf_page_t::get_oldest_lsn",
+    "buf_page_t::get_space",
+    "buf_page_t::init_io_fix",
+    "buf_page_t::is_io_fix_write",
+    "buf_page_t::reset_flush_observer",
+    "buf_page_t::reset_page_id",
+    "buf_page_t::someone_has_io_responsibility",
+    "buf_page_t::was_io_fix_read",
+    "buf_page_t::was_stale",
+    "buf_page_try_get",
+    "buf_pool_adjust_chunk_unit",
+    "buf_pool_clear_hash_index",
+    "buf_pool_free",
+    "buf_pool_free_all",
+    "buf_pool_free_instance",
+    "buf_pool_from_array",
+    "buf_pool_from_block",
+    "buf_pool_from_bpage",
+    "buf_pool_get",
+    "buf_pool_get_curr_size",
+    "buf_pool_get_dirty_pages_count",
+    "buf_pool_get_n_pages",
+    "buf_pool_get_oldest_modification_approx",
+    "buf_pool_index",
+    "buf_pool_init",
+    "buf_pool_invalidate",
+    "buf_pool_invalidate_instance",
+    "buf_pool_pending_io_reads_count",
+    "buf_pool_pending_io_writes_count",
+    "buf_pool_register_chunk",
+    "buf_pool_resize",
+    "buf_pool_resize_chunk_make_null",
+    "buf_pool_resize_hash",
+    "buf_pool_set_sizes",
+    "buf_pool_size_align",
+    "buf_pool_t::deallocate_chunk",
+    "buf_pool_t::madvise_dont_dump",
+    "buf_pool_t::madvise_dump",
+    "buf_pool_update_madvise",
+    "buf_pool_validate_instance",
+    "buf_pool_wait_for_no_pending_io",
+    "buf_pool_watch_is_sentinel",
+    "buf_pool_watch_occurred",
+    "buf_pool_watch_remove",
+    "buf_pool_watch_set",
+    "buf_pool_watch_unset",
+    "buf_pool_withdraw_blocks",
+    "buf_print",
+    "buf_print_instance",
+    "buf_print_io",
+    "buf_print_io_instance",
+    "buf_read_ahead_linear",
+    "buf_read_ahead_random",
+    "buf_read_ibuf_merge_pages",
+    "buf_read_page_background",
+    "buf_read_page_low",
+    "buf_read_recv_pages",
+    "buf_refresh_io_stats",
+    "buf_refresh_io_stats_all",
+    "buf_resize_status",
+    "buf_resize_status_progress_reset",
+    "buf_resize_status_progress_update",
+    "buf_resize_thread",
+    "buf_stat_per_index_t",
+    "buf_stats_aggregate_pool_info",
+    "buf_stats_get_pool_info",
+    "buf_unzip_LRU_add_block",
+    "buf_validate",
+    "calculate_materialization_costs",
+    "can_switch_from_ref_to_range",
+    "check_binlog_cache_size",
+    "check_quick_select",
+    "clone_check_recovery_crashpoint",
+    "clone_files_recovery",
+    "cmp_rec_rec_with_match",
+    "collect_and_lock_fk_tables_for_complex_alter_table",
+    "collect_and_lock_fk_tables_for_rename_table",
+    "connection_events_loop_aborted",
+    "counter_indexer_t",
+    "create_table_from_items",
+    "dblwr::File::",
+    "dblwr::File::File",
+    "dblwr::enable_reduced",
+    "dblwr::force_flush",
+    "dblwr::force_flush_all",
+    "dblwr::is_enabled",
+    "dblwr::is_reduced",
+    "dblwr::open",
+    "dblwr::recv::load",
+    "dblwr::reduced_open",
+    "dblwr::v1::create",
+    "dblwr::v1::init",
+    "dblwr_file_open",
+    "dd::acquire_exclusive_schema_mdl",
+    "dd::acquire_exclusive_table_mdl",
+    "dd::acquire_exclusive_tablespace_mdl",
+    "dd::acquire_shared_table_mdl",
+    "dd::acquire_shared_tablespace_mdl",
+    "dd::cache::Cache_element",
+    "dd::cache::Shared_dictionary_cache::init",
+    "dd::cache::Shared_multi_map",
+    "dd::create_native_table",
+    "dd::drop_native_table",
+    "dd::info_schema::Table_statistics::read_stat_from_SE",
+    "dd::info_schema::Tablespace_statistics::read_stat_from_SE",
+    "dd::info_schema::remove_I_S_view_metadata",
+    "dd::init",
+    "dd::mdl_lock_schema",
+    "dd::ndbinfo::init_schema_and_tables",
+    "dd::performance_schema::init_pfs_tables",
+    "dd::reset_tables_and_tablespaces",
+    "dd::sdi_utils::mdl_lock",
+    "dd::upgrade::",
+    "dd::upgrade::I_S_upgrade_required",
+    "dd::upgrade::no_server_upgrade_required",
+    "dd::upgrade::plugin_initialize_delayed_after_upgrade",
+    "dd::upgrade_57::Upgrade_MDL_guard::acquire_lock_tablespace",
+    "dd::upgrade_57::in_progress",
+    "dd_tablespace_get_mdl",
+    "ddl::Unique_os_file_descriptor::get",
+    "ddl::Unique_os_file_descriptor::is_open",
+    "delegates_init",
+    "delete_optimizer_cost_module",
+    "dict_boot",
+    "dict_create",
+    "dict_index_get_lock",
+    "dict_index_get_n_unique_in_tree",
+    "dict_index_has_desc",
+    "dict_index_is_online_ddl",
+    "dict_index_is_spatial",
+    "dict_index_is_unique",
+    "dict_index_t",
+    "dict_index_t::is_clustered",
+    "dict_init",
+    "dict_persist_init",
+    "dict_resize",
+    "dirname_length",
+    "do_command",
+    "do_create_native_table_for_pfs",
+    "do_drop_native_table_for_pfs",
+    "fclose",
+    "fdatasync",
+    "feof",
+    "fflush",
+    "fil_check_missing_tablespaces",
+    "fil_encryption_rotate",
+    "fil_ibd_open",
+    "fil_open_system_tablespace_files",
+    "fil_page_get_next",
+    "fil_page_get_prev",
+    "fil_space_acquire_silent",
+    "fil_space_release",
+    "fix_host_cache_size",
+    "fix_low_prio_updates",
+    "fix_max_binlog_size",
+    "fix_max_relay_log_size",
+    "fix_net_read_timeout",
+    "fix_net_write_timeout",
+    "fix_table_cache_size",
+    "flush_error_log_messages",
+    "flush_tables_with_read_lock",
+    "fprintf",
+    "fputs",
+    "free_all_read_locks",
+    "fsp_flags_init",
+    "fsp_flags_set_sdi",
+    "fsp_header_get_tablespace_size",
+    "fsp_init",
+    "fsp_is_system_temporary",
+    "fsync",
+    "ft_init_stopwords",
+    "ftruncate64",
+    "get_key_scans_params",
+    "get_max_connections",
+    "get_next_redo_rseg_from_trx_sys",
+    "get_next_redo_rseg_from_undo_spaces",
+    "get_next_temp_rseg",
+    "get_partial_join_cost",
+    "get_quick_record_count",
+    "get_server_state",
+    "get_srv_flush_log_at_timeout",
+    "get_srv_replication_delay",
+    "getuid",
+    "gtid_server_init",
+    "ha_commit_trans",
+    "ha_init",
+    "ha_init_errors",
+    "ha_innobase::get_memory_buffer_size",
+    "ha_is_storage_engine_disabled",
+    "ha_myisam::preload_keys",
+    "ha_myisam::start_bulk_insert",
+    "ha_post_recover",
+    "handle_options",
+    "handle_reload_request",
+    "handlerton",
+    "hash_assert_can_modify",
+    "hash_calc_cell_id",
+    "hash_get_nth_cell",
+    "hash_lock_x_all",
+    "hash_unlock_x_all",
+    "heap_create",
+    "heap_prepare_hp_create_info",
+    "histograms::drop_histograms",
+    "histograms::lock_for_write",
+    "histograms::rename_histograms",
+    "hp_get_new_block",
+    "i_s_cmpmem_fill_low",
+    "i_s_innodb_buf_page_lru_fill_table",
+    "i_s_innodb_buffer_page_fill_table",
+    "i_s_innodb_buffer_stats_fill_table",
+    "i_s_innodb_fill_buffer_lru",
+    "i_s_innodb_fill_buffer_pool",
+    "i_s_innodb_stats_fill",
+    "ib::error::",
+    "ib::error::error",
+    "ib::fatal::fatal",
+    "ib::info::",
+    "ib::info::info",
+    "ib::logger",
+    "ib::warn::",
+    "ib::warn::warn",
+    "ib_counter_t",
+    "ibt::open_or_create",
+    "ibuf_bitmap_page",
+    "ibuf_get_merge_page_nos_func",
+    "ibuf_init_at_db_start",
+    "ibuf_insert",
+    "ibuf_max_size_update",
+    "ibuf_merge",
+    "ibuf_merge_in_background",
+    "ibuf_mtr_commit",
+    "ibuf_mtr_start",
+    "ibuf_page",
+    "ibuf_should_try",
+    "init_common_variables",
+    "init_icu_data_directory",
+    "init_max_user_conn",
+    "init_optimizer_cost_module",
+    "init_replica_thread",
+    "init_server_auto_options",
+    "init_server_components",
+    "init_sql_command_flags",
+    "initialize_storage_engine",
+    "inline_mysql_cond_signal",
+    "inline_mysql_cond_wait",
+    "inline_mysql_end_stage",
+    "inline_mysql_mutex_lock",
+    "inline_mysql_mutex_unlock",
+    "inline_mysql_set_stage",
+    "inline_mysql_stage_set_work_completed",
+    "inline_mysql_stage_set_work_estimated",
+    "innobase_commit_concurrency_init_default",
+    "innobase_disable_core_dump",
+    "innobase_flush_logs",
+    "innobase_get_open_files_limit",
+    "innobase_init_files",
+    "innobase_set_open_files_limit",
+    "innobase_should_madvise_buf_pool",
+    "innobase_srv_conc_enter_innodb",
+    "innodb_buffer_pool_evict_uncompressed",
+    "innodb_buffer_pool_size_init",
+    "innodb_buffer_pool_size_validate",
+    "innodb_change_buffer_max_size_update",
+    "innodb_init_params",
+    "innodb_io_capacity_max_update",
+    "innodb_io_capacity_update",
+    "innodb_log_checksums_func_update",
+    "innodb_max_dirty_pages_pct_update",
+    "innodb_redo_log_capacity_init",
+    "innodb_redo_log_capacity_update",
+    "innodb_rollback_segments_update",
+    "innodb_set_buf_pool_size",
+    "innodb_thread_concurrency_update",
+    "innodb_undo_tablespaces_deprecate",
+    "intern_close_table",
+    "is_buffer_pool_size_ok",
+    "is_help_or_validate_option",
+    "llstr",
+    "lob::btr_rec_get_externally_stored_len",
+    "lock_check_constraint_names",
+    "lock_check_constraint_names_for_rename",
+    "lock_db_routines",
+    "lock_object_name",
+    "lock_routine_name",
+    "lock_schema_name",
+    "lock_sys_create",
+    "lock_sys_resize",
+    "lock_tables_open_and_lock_tables",
+    "lock_trx_print_wait_and_mvcc_state",
+    "lock_trx_release_locks",
+    "log_allocate_buffer",
+    "log_allocate_write_ahead_buffer",
+    "log_block_get_first_rec_group",
+    "log_block_store_checksum",
+    "log_buffer_flush_order_lag",
+    "log_buffer_flush_to_disk",
+    "log_buffer_resize_low",
+    "log_buffer_s_lock_wait",
+    "log_buffer_x_lock_enter",
+    "log_calc_buf_size",
+    "log_concurrency_margin",
+    "log_control_writer_threads",
+    "log_crash_safe_validate",
+    "log_create_unused_file",
+    "log_data_block_header_serialize",
+    "log_data_blocks_write",
+    "log_files::is_consumption_needed",
+    "log_files::might_create_unused_file",
+    "log_files::might_recycle_file",
+    "log_files::physical_capacity_allows_to_create",
+    "log_files::physical_capacity_allows_to_recycle",
+    "log_files_create_next_as_unused_if_needed",
+    "log_files_next_file_size",
+    "log_files_next_unused_id",
+    "log_files_oldest_needed_lsn",
+    "log_files_process_consumed_file",
+    "log_files_recycle_file",
+    "log_files_remove_consumed_file",
+    "log_flush_low",
+    "log_flusher",
+    "log_free_check",
+    "log_get_lsn",
+    "log_max_spins_when_waiting_in_user_thread",
+    "log_message",
+    "log_pause_writer_threads",
+    "log_pending_flushes",
+    "log_persist_crash_safe",
+    "log_request_sync_flush",
+    "log_resume_writer_threads",
+    "log_self_write_up_to",
+    "log_start",
+    "log_start_background_threads",
+    "log_stop_background_threads",
+    "log_sync_flush_lsn",
+    "log_sys_init",
+    "log_translate_lsn_to_sn",
+    "log_update_concurrency_margin",
+    "log_wait_for_flush",
+    "log_wait_for_write",
+    "log_write_to_file_requests_are_frequent",
+    "log_write_up_to",
+    "log_writer_is_active",
+    "login_connection",
+    "make_join_query_block",
+    "meb::redo_log_archive_produce",
+    "mem_heap_free",
+    "mi_log",
+    "mlockall",
+    "modify_thread_cache_size",
+    "monitor_inc_value",
+    "monitor_inc_value_cumulative",
+    "monitor_set",
+    "mpmc_bq",
+    "mtr_commit_mlog_test",
+    "mtr_t::",
+    "mtr_t::Logging::init",
+    "mtr_t::Logging::is_disabled",
+    "mtr_t::Logging::is_enabled",
+    "mtr_t::commit",
+    "mtr_t::start",
+    "my_free",
+    "my_malloc",
+    "my_strdup",
+    "my_timer_initialize",
+    "mysql_admin_table",
+    "mysql_alter_db",
+    "mysql_alter_table",
+    "mysql_clone_connect",
+    "mysql_clone_get_command",
+    "mysql_clone_get_response",
+    "mysql_create_like_table",
+    "mysql_create_table",
+    "mysql_drop_view",
+    "mysql_inplace_alter_table",
+    "mysql_install_plugin",
+    "mysql_lock_tables",
+    "mysql_rename_tables",
+    "mysql_rm_db",
+    "mysql_rm_table",
+    "mysql_table_grant",
+    "mysql_uninstall_plugin",
+    "mysqld_main",
+    "network_init",
+    "next_free_record_pos",
+    "notify_about_advanced_write_lsn",
+    "open_and_process_routine",
+    "open_table",
+    "open_table_get_mdl_lock",
+    "open_tables",
+    "open_views_and_update_metadata",
+    "operator",
+    "os_aio_simulated_put_read_threads_to_sleep",
+    "os_aio_simulated_wake_handler_threads",
+    "os_aio_start_threads",
+    "os_event_reset",
+    "os_event_set",
+    "os_event_wait",
+    "os_event_wait_time_low",
+    "os_file_fsync_posix",
+    "os_file_get_size",
+    "os_is_o_direct_supported",
+    "page_get_infimum_rec",
+    "page_id_t",
+    "page_id_t::hash",
+    "page_id_t::operator",
+    "page_id_t::page_id_t",
+    "page_id_t::page_no",
+    "page_id_t::space",
+    "page_is_spatial_non_leaf",
+    "page_rec_get_next",
+    "page_rec_is_supremum",
+    "page_size_t::copy_from",
+    "page_size_t::is_compressed",
+    "page_size_t::page_size_t",
+    "page_size_t::physical",
+    "page_zip_des_init",
+    "page_zip_get_size",
+    "page_zip_set_size",
+    "pars_init",
+    "pc_flush_slot",
+    "pc_request",
+    "pc_wait_finished",
+    "perror",
+    "pfs_os_file_close_func",
+    "pfs_os_file_create_func",
+    "pfs_os_file_read_no_error_handling_int_fd_func",
+    "pfs_os_file_write_int_fd_func",
+    "plugin_is_ready",
+    "plugin_register_builtin_and_init_core_se",
+    "plugin_register_dynamic_and_init_all",
+    "plugin_register_early_plugins",
+    "posix_fadvise64",
+    "pre_init_event_thread",
+    "prepare_check_constraints_for_alter",
+    "prepare_check_constraints_for_create",
+    "prepare_check_constraints_for_create_like_table",
+    "prepare_for_repair",
+    "prepare_thread_and_validate",
+    "process_key_caches",
+    "prune_partitions",
+    "push_warning_printf",
+    "randominit",
+    "rbt_create",
+    "rbt_free",
+    "read_histograms",
+    "rec_get_offsets",
+    "recreate_redo_files",
+    "recv_apply_hashed_log_recs",
+    "recv_recovery_begin",
+    "recv_recovery_from_checkpoint_finish",
+    "recv_recovery_from_checkpoint_start",
+    "recv_recovery_is_on",
+    "recv_sys_add_to_parsing_buf",
+    "recv_sys_create",
+    "recv_sys_free",
+    "recv_sys_init",
+    "recv_sys_resize_buf",
+    "recv_verify_log_is_clean_pre_8_0_30",
+    "remove_secondary_engine",
+    "rename",
+    "resourcegroups::Resource_group_mgr::acquire_shared_mdl_for_resource_group",
+    "resourcegroups::Resource_group_mgr::disable_resource_group",
+    "resourcegroups::Resource_group_mgr::instance",
+    "resourcegroups::Resource_group_mgr::post_init",
+    "resourcegroups::Resource_group_mgr::set_unsupport_reason",
+    "resourcegroups::Sql_cmd_alter_resource_group::execute",
+    "resourcegroups::Sql_cmd_create_resource_group::execute",
+    "resourcegroups::Sql_cmd_drop_resource_group::execute",
+    "rewind",
+    "rm_table_do_discovery_and_lock_fk_tables",
+    "row_log_apply_op",
+    "row_log_apply_ops",
+    "row_log_block_allocate",
+    "row_log_block_free",
+    "row_log_estimate_work",
+    "row_log_online_op",
+    "row_log_progress_inc_per_block",
+    "row_log_table_apply_op",
+    "row_log_table_apply_ops",
+    "row_log_table_close_func",
+    "row_log_table_delete",
+    "row_log_table_low",
+    "row_log_table_low_redundant",
+    "row_log_table_open",
+    "row_log_tmpfile",
+    "rpl_make_log_name",
+    "rw_lock_debug_mutex_enter",
+    "rw_lock_debug_mutex_exit",
+    "rw_lock_free",
+    "rw_lock_own",
+    "rw_lock_s_lock_spin",
+    "rw_lock_s_unlock",
+    "rw_lock_sx_lock_func",
+    "rw_lock_x_lock",
+    "rw_lock_x_lock_func",
+    "rw_lock_x_lock_gen",
+    "rw_lock_x_lock_wait_func",
+    "rw_lock_x_unlock",
+    "set_externally_disabled_storage_engine_names",
+    "set_my_errno",
+    "set_table_encryption_type",
+    "set_user",
+    "setreuid",
+    "setup_error_log",
+    "setup_error_log_components",
+    "setup_fpu",
+    "setup_range_optimizer_param",
+    "sqrt",
+    "srv_conc_enter_innodb",
+    "srv_conc_enter_innodb_with_atomics",
+    "srv_conc_force_enter_innodb",
+    "srv_create_sdi_indexes",
+    "srv_do_purge",
+    "srv_enter_innodb_with_tickets",
+    "srv_export_innodb_status",
+    "srv_free",
+    "srv_get_activity_count",
+    "srv_init",
+    "srv_init_abort_low",
+    "srv_mon_get_rseg_size",
+    "srv_mon_process_existing_counter",
+    "srv_open_tmp_tablespace",
+    "srv_purge_coordinator_thread",
+    "srv_start",
+    "srv_start_state_set",
+    "srv_undo_tablespace_create",
+    "srv_undo_tablespaces_init",
+    "srv_undo_tablespaces_mark_construction_done",
+    "srv_undo_tablespaces_upgrade",
+    "srv_wake_purge_thread_if_not_active",
+    "std::_Rb_tree_iterator",
+    "std::__atomic_base",
+    "std::__cxx11::basic_ostringstream",
+    "std::__cxx11::basic_regex",
+    "std::__cxx11::basic_string",
+    "std::__cxx11::list",
+    "std::__cxx11::to_string",
+    "std::allocator",
+    "std::atomic",
+    "std::basic_ostream",
+    "std::chrono::_V2::steady_clock::now",
+    "std::chrono::_V2::system_clock::now",
+    "std::chrono::duration",
+    "std::chrono::time_point",
+    "std::common_type",
+    "std::function",
+    "std::map",
+    "std::mutex::mutex",
+    "std::numeric_limits",
+    "std::operator",
+    "std::ostream::operator",
+    "std::pair",
+    "std::priority_queue",
+    "std::reference_wrapper",
+    "std::thread",
+    "std::thread::",
+    "std::thread::join",
+    "std::thread::thread",
+    "std::underlying_type",
+    "std::unique_ptr",
+    "std::vector",
+    "strcat",
+    "strcmp",
+    "strcpy",
+    "strerror",
+    "strlen",
+    "strmake",
+    "sync_arr_wake_threads_if_sema_free",
+    "sync_array_close",
+    "sync_array_detect_deadlock",
+    "sync_array_free",
+    "sync_array_get",
+    "sync_array_get_and_reserve_cell",
+    "sync_array_get_nth_cell",
+    "sync_array_init",
+    "sync_array_print",
+    "sync_array_print_info",
+    "sync_array_print_long_waits",
+    "sync_array_print_long_waits_low",
+    "sync_array_reserve_cell",
+    "sync_array_t",
+    "sync_array_wake_threads_if_sema_free_low",
+    "sysconf",
+    "temptable::Handler::create",
+    "temptable::Handler::get_memory_buffer_size",
+    "temptable::MemoryMonitor::MMAP::consumption",
+    "temptable::MemoryMonitor::MMAP::decrease",
+    "temptable::MemoryMonitor::MMAP::increase",
+    "temptable::MemoryMonitor::MMAP::threshold",
+    "temptable::MemoryMonitor::RAM::decrease",
+    "temptable::MemoryMonitor::RAM::increase",
+    "temptable::MemoryMonitor::RAM::threshold",
+    "temptable::Prefer_RAM_over_MMAP_policy::block_source",
+    "test_if_skip_sort_order",
+    "thd_get_tmp_table_size",
+    "thd_is_replication_slave_thread",
+    "thd_requested_durability",
+    "time",
+    "trace_tmp_table",
+    "trx_commit_in_memory",
+    "trx_flush_log_if_needed",
+    "trx_flush_log_if_needed_low",
+    "trx_is_interrupted",
+    "trx_purge",
+    "trx_purge_add_update_undo_to_history",
+    "trx_purge_dml_delay",
+    "trx_purge_state",
+    "trx_purge_sys_initialize",
+    "trx_purge_sys_mem_create",
+    "trx_rseg_add_rollback_segments",
+    "trx_rseg_adjust_rollback_segments",
+    "trx_sys_create",
+    "trx_sys_create_sys_pages",
+    "trx_sys_hdr_page",
+    "trx_sys_init_at_db_start",
+    "trx_sys_mutex_enter",
+    "trx_sys_mutex_exit",
+    "trx_write_trx_id",
+    "try_acquire_high_prio_shared_mdl_lock",
+    "udf_init_globals",
+    "undo::Tablespace::get_active",
+    "undo::Tablespace::is_active_no_latch",
+    "undo::Tablespace::is_empty",
+    "undo::Tablespace::rsegs",
+    "undo::Tablespace::set_active",
+    "undo::Tablespaces::at",
+    "undo::Tablespaces::s_lock",
+    "undo::Tablespaces::s_unlock",
+    "unireg_abort",
+    "unlikely",
+    "unlink",
+    "unsigned",
+    "ut::Count::Count",
+    "ut::aligned_array_pointer",
+    "ut::free",
+    "ut::make_psi_memory_key",
+    "ut::malloc_withkey",
+    "ut::random_from_interval_fast",
+    "ut::realloc_withkey",
+    "ut::zalloc_withkey",
+    "ut_2_power_up",
+    "ut_dbg_assertion_failed",
+    "ut_delay",
+    "ut_list_base",
+    "ut_sprintf_timestamp",
+    "ut_uint64_align_down",
+    "ut_uint64_align_up",
+    "void",
+    "wait_while_table_is_used",
+    "wake_up_waiters",
+    "xa::Transaction_cache::initialize"
+  ],
+  "functionParameters": {
+    "Adaptive_flush::get_pct_for_dirty": [
+      "innodb_max_dirty_pages_pct_lwm"
+    ],
+    "Adaptive_flush::get_pct_for_lsn": [
+      "innodb_adaptive_flushing",
+      "innodb_io_capacity"
+    ],
+    "Adaptive_flush::set_average": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Adaptive_flush::set_flush_target_by_lsn": [
+      "innodb_buffer_pool_instances",
+      "innodb_io_capacity"
+    ],
+    "Adaptive_flush::set_flush_target_by_page": [
+      "innodb_buffer_pool_instances",
+      "innodb_io_capacity"
+    ],
+    "AddCost": [
+      "max_heap_table_size"
+    ],
+    "Aggregator_distinct::setup": [
+      "max_heap_table_size"
+    ],
+    "Alter_stage::inc": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "Alter_stage::reestimate": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "Arch_Page_Sys::post_recovery_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "Arch_Page_Sys::set_tracking_buf_pool": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Arch_Page_Sys::track_initial_pages": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Arch_Page_Sys::track_page": [
+      "innodb_buffer_pool_instances"
+    ],
+    "AutoDebugTrace::": [
+      "host_cache_size",
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "max_connections",
+      "max_heap_table_size",
+      "max_relay_log_size",
+      "max_write_lock_count",
+      "optimizer_search_depth",
+      "table_open_cache"
+    ],
+    "BTR_TABLE_STATS_FROM_SAMPLE": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "BUF_DUMP_CREATE": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "BUF_DUMP_PAGE": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "BUF_DUMP_SPACE": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "BUF_READ_AHEAD_RANDOM_THRESHOLD": [
+      "innodb_random_read_ahead"
+    ],
+    "Batch_segment": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Binlog_ifile::open_file": [
+      "rpl_read_size"
+    ],
+    "Buf_fetch": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Checkable_rwlock::unlock": [
+      "max_relay_log_size"
+    ],
+    "Checkable_rwlock::wrlock": [
+      "max_relay_log_size"
+    ],
+    "Clone_Snapshot::get_state_info": [
+      "innodb_log_file_size"
+    ],
+    "Clone_Snapshot::init_disk_estimate": [
+      "innodb_log_file_size"
+    ],
+    "Clone_Snapshot::set_state_info": [
+      "innodb_log_file_size"
+    ],
+    "Clone_Sys::get_gtid_persistor": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "Clone_persist_gtid::wait_flush": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "Connection_handler_manager::check_and_incr_conn_count": [
+      "max_connections"
+    ],
+    "Connection_handler_manager::valid_connection_count": [
+      "max_connections"
+    ],
+    "CreateIteratorFromAccessPath": [
+      "join_buffer_size"
+    ],
+    "DDTableBuffer": [
+      "innodb_buffer_pool_size"
+    ],
+    "Delegate::is_empty": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Double_write": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::create_batch_segments": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::create_reduced": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::create_reduced_batch_segments": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::create_single_segments": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::create_v2": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::init_file": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::load": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::reset_file": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Double_write::shutdown": [
+      "innodb_buffer_pool_instances"
+    ],
+    "DynamicRangeIterator::DynamicRangeIterator": [
+      "range_alloc_block_size"
+    ],
+    "ER_THD": [
+      "binlog_cache_size"
+    ],
+    "Event_worker_thread::run": [
+      "lock_wait_timeout"
+    ],
+    "Events::lock_schema_events": [
+      "lock_wait_timeout"
+    ],
+    "Events::show_create_event": [
+      "lock_wait_timeout"
+    ],
+    "Fil_shard::acquire": [
+      "innodb_spin_wait_delay"
+    ],
+    "Flush_observer::Flush_observer": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Flush_observer::flush": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Flush_observer::is_complete": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Global_read_lock::lock_global_read_lock": [
+      "lock_wait_timeout"
+    ],
+    "Global_read_lock::make_global_read_lock_block_commit": [
+      "lock_wait_timeout"
+    ],
+    "Gtid_mode::get": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Gtid_set::clear_set_and_sid_map": [
+      "max_relay_log_size"
+    ],
+    "HashJoinIterator::BuildHashTable": [
+      "join_buffer_size"
+    ],
+    "HashJoinIterator::ReadNextHashJoinChunk": [
+      "join_buffer_size"
+    ],
+    "HazardPointer::get": [
+      "innodb_buffer_pool_instances"
+    ],
+    "HazardPointer::set": [
+      "innodb_buffer_pool_instances"
+    ],
+    "IB_thread": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "IB_thread::": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "IB_thread::IB_thread": [
+      "innodb_buffer_pool_instances"
+    ],
+    "IB_thread::operator": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "IB_thread::start": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "IB_thread::wait": [
+      "innodb_buffer_pool_instances"
+    ],
+    "IORequest::IORequest": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "Innodb_redo_log::execute": [
+      "lock_wait_timeout"
+    ],
+    "Instruction:": [
+      "join_buffer_size",
+      "lock_wait_timeout"
+    ],
+    "Item_func_group_concat::setup": [
+      "max_heap_table_size"
+    ],
+    "Item_sum::ram_limitation": [
+      "max_heap_table_size",
+      "tmp_table_size"
+    ],
+    "LogEvent::": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::LogEvent": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::errcode": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::function": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::lookup": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::prio": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::source_file": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::source_line": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "LogEvent::subsys": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "Log_data_block_header::set_lsn": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "Log_file::contains": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::Log_files_capacity": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::cancel_resize": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::current_physical_capacity": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::hard_logical_capacity_for_physical": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::initialize": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::is_target_reached_for_resizing_down": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::next_file_earlier_margin": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::soft_logical_capacity_for_hard": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::update": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::update_exposed": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_capacity::update_target": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_context::": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_dict::Const_iterator::operator": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_dict::begin": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_dict::end": [
+      "innodb_log_file_size"
+    ],
+    "Log_files_write_impl::compute_how_much_to_write": [
+      "innodb_log_write_ahead_size"
+    ],
+    "Log_files_write_impl::compute_next_write_ahead_end": [
+      "innodb_log_write_ahead_size"
+    ],
+    "Log_files_write_impl::copy_to_write_ahead_buffer": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "Log_files_write_impl::update_current_write_ahead": [
+      "innodb_log_write_ahead_size"
+    ],
+    "Log_files_write_impl::write_blocks": [
+      "innodb_log_write_ahead_size"
+    ],
+    "Log_resource::dummy_function_to_ensure_we_are_linked_into_the_server": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "MDL_context_backup_manager::init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "MDL_lock::get_incompatible_waiting_types_bitmap_idx": [
+      "max_write_lock_count"
+    ],
+    "MDL_lock_guard::lock": [
+      "lock_wait_timeout"
+    ],
+    "MDL_request::init_by_key_with_source": [
+      "low_priority_updates"
+    ],
+    "MYSQL_BIN_LOG::Binlog_ofile::open_existing": [
+      "rpl_read_size"
+    ],
+    "MYSQL_BIN_LOG::close": [
+      "max_relay_log_size"
+    ],
+    "MYSQL_BIN_LOG::find_first_log": [
+      "max_relay_log_size"
+    ],
+    "MYSQL_BIN_LOG::generate_name": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "MYSQL_BIN_LOG::get_log_fname": [
+      "max_relay_log_size"
+    ],
+    "MYSQL_BIN_LOG::get_log_lock": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "MYSQL_BIN_LOG::open_binlog": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "MYSQL_BIN_LOG::open_index_file": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "MYSQL_BIN_LOG::set_max_size": [
+      "max_relay_log_size"
+    ],
+    "MY_LOCALE_ERRMSGS::is_loaded": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Master_info::clear_gtid_monitoring_info": [
+      "max_relay_log_size"
+    ],
+    "MetadataRecover::empty": [
+      "innodb_buffer_pool_size"
+    ],
+    "MetadataRecover::store": [
+      "innodb_buffer_pool_size"
+    ],
+    "Multisource_info::begin": [
+      "max_relay_log_size"
+    ],
+    "Multisource_info::end": [
+      "max_relay_log_size"
+    ],
+    "Multisource_info::unlock": [
+      "max_relay_log_size"
+    ],
+    "Multisource_info::wrlock": [
+      "max_relay_log_size"
+    ],
+    "Ndb_dd_client::mdl_lock_logfile_group": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_lock_logfile_group_exclusive": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_lock_schema": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_lock_schema_exclusive": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_lock_table": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_lock_tablespace": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_lock_tablespace_exclusive": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_dd_client::mdl_locks_acquire_exclusive": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_schema_event_handler::Lock_wait_timeout_guard::": [
+      "lock_wait_timeout"
+    ],
+    "Ndb_schema_event_handler::Lock_wait_timeout_guard::Lock_wait_timeout_guard": [
+      "lock_wait_timeout"
+    ],
+    "Open_table_context::Open_table_context": [
+      "lock_wait_timeout"
+    ],
+    "Open_table_context::get_timeout": [
+      "lock_wait_timeout"
+    ],
+    "Open_table_context::recover_from_failed_open": [
+      "lock_wait_timeout"
+    ],
+    "Optimize_table_order::Optimize_table_order": [
+      "optimizer_search_depth"
+    ],
+    "Optimize_table_order::best_access_path": [
+      "join_buffer_size"
+    ],
+    "Optimize_table_order::best_extension_by_limited_search": [
+      "optimizer_search_depth"
+    ],
+    "Optimize_table_order::calculate_scan_cost": [
+      "join_buffer_size"
+    ],
+    "Optimize_table_order::check_interleaving_with_nj": [
+      "optimizer_search_depth"
+    ],
+    "Optimize_table_order::greedy_search": [
+      "optimizer_search_depth"
+    ],
+    "Optimize_table_order::lateral_derived_cost": [
+      "max_heap_table_size"
+    ],
+    "Optimize_table_order::recalculate_lateral_deps_incrementally": [
+      "optimizer_search_depth"
+    ],
+    "Optimize_table_order::semijoin_dupsweedout_access_paths": [
+      "max_heap_table_size"
+    ],
+    "PCT_IO": [
+      "innodb_buffer_pool_instances",
+      "innodb_io_capacity"
+    ],
+    "PasswdValue::IsVoid": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Per_thread_connection_handler::block_until_new_connection": [
+      "max_connections"
+    ],
+    "Per_thread_connection_handler::get_max_threads": [
+      "max_connections"
+    ],
+    "PolicyMutex": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_lru_scan_depth",
+      "innodb_rollback_segments",
+      "innodb_sort_buffer_size",
+      "innodb_sync_array_size",
+      "sort_buffer_size"
+    ],
+    "Query_logger::reopen_log_file": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Query_logger::set_handlers": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Query_logger::set_log_file": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Query_result_create::send_eof": [
+      "lock_wait_timeout"
+    ],
+    "Range_optimizer_error_handler::handle_condition": [
+      "range_optimizer_max_mem_size"
+    ],
+    "Recovered_xa_transactions::init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Recovered_xa_transactions::instance": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Recovered_xa_transactions::recover_prepared_xa_transactions": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Reduced_double_write": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Reduced_double_write::allocate": [
+      "innodb_buffer_pool_instances"
+    ],
+    "Relay_log_info::check_if_info_was_cleared": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::clear_info": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::count_relay_log_space": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::flush_info": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::is_group_relay_log_name_invalid": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::purge_relay_logs": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::reset_group_relay_log_pos": [
+      "max_relay_log_size"
+    ],
+    "Relay_log_info::rli_init_info": [
+      "max_relay_log_size"
+    ],
+    "Relaylog_ifile::open_file": [
+      "rpl_read_size"
+    ],
+    "Rotate_innodb_master_key::execute": [
+      "lock_wait_timeout"
+    ],
+    "Rpl_acf_configuration_handler::init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Rpl_encryption::initialize": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Rpl_info_handler::end_info": [
+      "max_relay_log_size"
+    ],
+    "Rpl_info_handler::init_info": [
+      "max_relay_log_size"
+    ],
+    "Rsegs::at": [
+      "innodb_rollback_segments"
+    ],
+    "Rsegs::s_lock": [
+      "innodb_rollback_segments"
+    ],
+    "Rsegs::s_unlock": [
+      "innodb_rollback_segments"
+    ],
+    "Rsegs::size": [
+      "innodb_rollback_segments"
+    ],
+    "SHUTTING_DOWN": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "Scope_guard": [
+      "host_cache_size",
+      "innodb_buffer_pool_instances",
+      "max_connections"
+    ],
+    "Server_state_delegate::after_dd_upgrade_from_57": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Server_state_delegate::before_recovery": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Session_tracker::server_boot_verify": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Sql_cmd_alter_table_truncate_partition::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_alter_tablespace_rename::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_analyze_table::handle_histogram_command": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_common_server::check_and_open_table": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_create_srs::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_ddl_trigger_common::open_and_lock_subj_table": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_delete::delete_from_single_table": [
+      "range_alloc_block_size"
+    ],
+    "Sql_cmd_discard_import_tablespace::mysql_discard_or_import_tablespace": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_drop_srs::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_handler_read::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_import_table::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_install_component::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_lock_instance::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_secondary_load_unload::mysql_secondary_load_or_unload": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_show_schema_base::set_metadata_lock": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_truncate_table::lock_table": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_uninstall_component::execute": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_update::update_single_table": [
+      "range_alloc_block_size"
+    ],
+    "Sql_cmd_xa_commit::process_attached_xa_commit": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_xa_prepare::trans_xa_prepare": [
+      "lock_wait_timeout"
+    ],
+    "Sql_cmd_xa_rollback::process_attached_xa_rollback": [
+      "lock_wait_timeout"
+    ],
+    "Srs_fetcher::lock": [
+      "lock_wait_timeout"
+    ],
+    "SysTablespace::can_auto_extend_last_file": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "SysTablespace::open_or_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "THD::init": [
+      "low_priority_updates"
+    ],
+    "Table_cache::free_unused_tables_if_necessary": [
+      "table_open_cache"
+    ],
+    "Table_cache::remove_table": [
+      "table_open_cache"
+    ],
+    "Table_map_restorer::": [
+      "optimizer_search_depth"
+    ],
+    "Table_ref::lock_descriptor": [
+      "low_priority_updates"
+    ],
+    "Tablespace::get_sum_of_sizes": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "Tablespace::set_flags": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "Tablespace::set_name": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "Tablespace::set_path": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "Tablespace::set_space_id": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "Temp_table_handle::open": [
+      "lock_wait_timeout"
+    ],
+    "Transaction_boundary_parser::reset": [
+      "max_relay_log_size"
+    ],
+    "Udf_load_service::init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "Wait_stats": [
+      "innodb_flush_log_at_trx_commit",
+      "innodb_log_spin_cpu_abs_lwm"
+    ],
+    "Wait_stats::operator": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "acl_tables_setup_for_write_and_acquire_mdl": [
+      "lock_wait_timeout"
+    ],
+    "acquire_backup_lock_in_lock_tables_mode": [
+      "lock_wait_timeout"
+    ],
+    "acquire_mandatory_metadata_locks": [
+      "lock_wait_timeout"
+    ],
+    "acquire_mdl_for_table": [
+      "lock_wait_timeout"
+    ],
+    "acquire_mdl_for_trigger": [
+      "lock_wait_timeout"
+    ],
+    "adjust_check_constraint_names_for_old_table_version": [
+      "lock_wait_timeout"
+    ],
+    "adjust_foreign_key_names_for_old_table_version": [
+      "lock_wait_timeout"
+    ],
+    "adjust_max_connections": [
+      "max_connections"
+    ],
+    "adjust_open_files_limit": [
+      "max_connections",
+      "table_open_cache"
+    ],
+    "adjust_table_cache_size": [
+      "max_connections",
+      "table_open_cache"
+    ],
+    "adjust_table_def_size": [
+      "table_open_cache"
+    ],
+    "alloc_record_buffers": [
+      "max_heap_table_size",
+      "tmp_table_size"
+    ],
+    "arch_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "basename_index": [
+      "binlog_cache_size",
+      "host_cache_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "basename_prefix_eval": [
+      "binlog_cache_size",
+      "max_relay_log_size"
+    ],
+    "basename_prefix_find": [
+      "binlog_cache_size",
+      "max_relay_log_size"
+    ],
+    "binlog_cache_mngr::init": [
+      "binlog_cache_size"
+    ],
+    "bool": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold",
+      "innodb_rollback_segments",
+      "innodb_thread_concurrency",
+      "lock_wait_timeout"
+    ],
+    "bootstrap::run_bootstrap_thread": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "btr_cur_get_page": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "btr_cur_open_at_rnd_pos": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "btr_drop_next_batch": [
+      "innodb_buffer_pool_instances"
+    ],
+    "btr_estimate_number_of_different_key_vals": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "btr_page_get_next": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "btr_page_get_prev": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "btr_record_not_null_field_in_rec": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "btr_search_disable": [
+      "innodb_buffer_pool_instances"
+    ],
+    "btr_search_drop_page_hash_when_freed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "btr_search_enable": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "btr_search_sys_create": [
+      "innodb_buffer_pool_instances"
+    ],
+    "btr_search_sys_resize": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf::Block_hint::buffer_fix_block_if_still_valid": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_add_block": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_block_free_non_file_page": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_buf_pool_running_out": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_check_size_of_non_data_objects": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_LRU_count_space_references": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_drop_page_hash_for_tablespace": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_flush_or_remove_pages": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_free_from_unzip_LRU_list": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_LRU_free_page": [
+      "innodb_buffer_pool_instances",
+      "innodb_lru_scan_depth"
+    ],
+    "buf_LRU_get_free_block": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_LRU_get_free_only": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_LRU_insert_zip_clean": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_old_ratio_update": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_old_ratio_update_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_print": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_print_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_remove_pages": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_scan_and_free_block": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_LRU_stat_inc_io": [
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "buf_LRU_stat_update": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_validate": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_LRU_validate_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_are_flush_lists_empty_validate": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_block_alloc": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_block_get_state": [
+      "innodb_buffer_pool_instances",
+      "innodb_lru_scan_depth"
+    ],
+    "buf_block_init_low": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_block_set_file_page": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_block_t::ahi_t::validate": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_block_try_discard_uncompressed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_buddy_alloc": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_buddy_free": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_buddy_mem_invalid": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_buddy_relocate": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_buddy_stat_t::take_snapshot": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_chunk_init": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_dump": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_dump_status": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_LRU_list": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_flush_LRU_list_batch": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_flush_check_neighbor": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_neighbors"
+    ],
+    "buf_flush_do_batch": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_free_flush_rbt": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_get_dirty_pages_count": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_init_flush_rbt": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_lists": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_page_and_try_neighbors": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_flush_page_cleaner_close": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_page_cleaner_disabled_debug_update": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_page_cleaner_init": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_flush_page_coordinator_thread": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_sync",
+      "innodb_io_capacity"
+    ],
+    "buf_flush_ready_for_flush": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_flush_ready_for_replace": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_flush_sync_all_buf_pools": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_flush_try_neighbors": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_neighbors"
+    ],
+    "buf_flush_validate_low": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_wait_LRU_batch_end": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_flush_wait_batch_end": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_free_from_unzip_LRU_list_batch": [
+      "innodb_lru_scan_depth"
+    ],
+    "buf_get_latched_pages_number": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_get_latched_pages_number_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_get_n_pending_read_ios": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_get_total_list_len": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_get_total_list_size_in_bytes": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_get_total_stat": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_get_withdraw_depth": [
+      "innodb_buffer_pool_instances",
+      "innodb_lru_scan_depth"
+    ],
+    "buf_load": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_load_abort": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_load_status": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_load_throttle_if_needed": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity"
+    ],
+    "buf_must_be_all_freed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_must_be_all_freed_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_alloc_descriptor": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_belongs_to_unzip_LRU": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_can_relocate": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_create": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_free_descriptor": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_get_mutex": [
+      "innodb_buffer_pool_instances",
+      "innodb_lru_scan_depth"
+    ],
+    "buf_page_get_state": [
+      "innodb_buffer_pool_instances",
+      "innodb_read_ahead_threshold"
+    ],
+    "buf_page_get_zip": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_hash_get_low": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_hash_get_s_locked": [
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "buf_page_hash_lock_x_confirm": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_in_file": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_init": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_init_for_read": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_init_low": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_is_accessed": [
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "buf_page_peek": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_peek_if_young": [
+      "innodb_random_read_ahead"
+    ],
+    "buf_page_reset_file_page_was_freed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_set_file_page_was_freed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_set_io_fix": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::get_oldest_lsn": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::get_space": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::init_io_fix": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::is_io_fix_write": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::reset_flush_observer": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_page_t::reset_page_id": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::someone_has_io_responsibility": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_page_t::was_io_fix_read": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_t::was_stale": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_page_try_get": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_adjust_chunk_unit": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_clear_hash_index": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_free": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_free_all": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_free_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_from_array": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_from_block": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_from_bpage": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_get": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_get_curr_size": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_get_dirty_pages_count": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_get_n_pages": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_get_oldest_modification_approx": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_index": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_init": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_invalidate": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_invalidate_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_pending_io_reads_count": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_pending_io_writes_count": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_register_chunk": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_resize": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_change_buffer_max_size"
+    ],
+    "buf_pool_resize_chunk_make_null": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_resize_hash": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_set_sizes": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_size_align": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "buf_pool_t::deallocate_chunk": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_t::madvise_dont_dump": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_t::madvise_dump": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_update_madvise": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_validate_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_wait_for_no_pending_io": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_pool_watch_is_sentinel": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_watch_occurred": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_watch_remove": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_watch_set": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_watch_unset": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_pool_withdraw_blocks": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_print": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_print_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_print_io": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_print_io_instance": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_read_ahead_linear": [
+      "innodb_buffer_pool_instances",
+      "innodb_read_ahead_threshold"
+    ],
+    "buf_read_ahead_random": [
+      "innodb_buffer_pool_instances",
+      "innodb_random_read_ahead"
+    ],
+    "buf_read_ibuf_merge_pages": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_read_page_background": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_read_page_low": [
+      "innodb_buffer_pool_instances",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "buf_read_recv_pages": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_refresh_io_stats": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_refresh_io_stats_all": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_resize_status": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_resize_status_progress_reset": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_resize_status_progress_update": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "buf_resize_thread": [
+      "innodb_buffer_pool_size"
+    ],
+    "buf_stat_per_index_t": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_stats_aggregate_pool_info": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_stats_get_pool_info": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_unzip_LRU_add_block": [
+      "innodb_buffer_pool_instances"
+    ],
+    "buf_validate": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "calculate_materialization_costs": [
+      "max_heap_table_size"
+    ],
+    "can_switch_from_ref_to_range": [
+      "range_alloc_block_size"
+    ],
+    "check_binlog_cache_size": [
+      "binlog_cache_size"
+    ],
+    "check_quick_select": [
+      "read_rnd_buffer_size"
+    ],
+    "clone_check_recovery_crashpoint": [
+      "innodb_buffer_pool_size"
+    ],
+    "clone_files_recovery": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "cmp_rec_rec_with_match": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "collect_and_lock_fk_tables_for_complex_alter_table": [
+      "lock_wait_timeout"
+    ],
+    "collect_and_lock_fk_tables_for_rename_table": [
+      "lock_wait_timeout"
+    ],
+    "connection_events_loop_aborted": [
+      "max_connections"
+    ],
+    "counter_indexer_t": [
+      "innodb_sync_array_size"
+    ],
+    "create_table_from_items": [
+      "lock_wait_timeout"
+    ],
+    "dblwr::File::": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::File::File": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::enable_reduced": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::force_flush": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::force_flush_all": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::is_enabled": [
+      "innodb_buffer_pool_size"
+    ],
+    "dblwr::is_reduced": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::open": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "dblwr::recv::load": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::reduced_open": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dblwr::v1::create": [
+      "innodb_buffer_pool_size"
+    ],
+    "dblwr::v1::init": [
+      "innodb_buffer_pool_size"
+    ],
+    "dblwr_file_open": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dd::acquire_exclusive_schema_mdl": [
+      "lock_wait_timeout"
+    ],
+    "dd::acquire_exclusive_table_mdl": [
+      "lock_wait_timeout"
+    ],
+    "dd::acquire_exclusive_tablespace_mdl": [
+      "lock_wait_timeout"
+    ],
+    "dd::acquire_shared_table_mdl": [
+      "lock_wait_timeout"
+    ],
+    "dd::acquire_shared_tablespace_mdl": [
+      "lock_wait_timeout"
+    ],
+    "dd::cache::Cache_element": [
+      "max_connections"
+    ],
+    "dd::cache::Shared_dictionary_cache::init": [
+      "max_connections"
+    ],
+    "dd::cache::Shared_multi_map": [
+      "lock_wait_timeout",
+      "max_connections"
+    ],
+    "dd::create_native_table": [
+      "lock_wait_timeout"
+    ],
+    "dd::drop_native_table": [
+      "lock_wait_timeout"
+    ],
+    "dd::info_schema::Table_statistics::read_stat_from_SE": [
+      "lock_wait_timeout"
+    ],
+    "dd::info_schema::Tablespace_statistics::read_stat_from_SE": [
+      "lock_wait_timeout"
+    ],
+    "dd::info_schema::remove_I_S_view_metadata": [
+      "lock_wait_timeout"
+    ],
+    "dd::init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::mdl_lock_schema": [
+      "lock_wait_timeout"
+    ],
+    "dd::ndbinfo::init_schema_and_tables": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::performance_schema::init_pfs_tables": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::reset_tables_and_tablespaces": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::sdi_utils::mdl_lock": [
+      "lock_wait_timeout"
+    ],
+    "dd::upgrade::": [
+      "lock_wait_timeout"
+    ],
+    "dd::upgrade::I_S_upgrade_required": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::upgrade::no_server_upgrade_required": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::upgrade::plugin_initialize_delayed_after_upgrade": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd::upgrade_57::Upgrade_MDL_guard::acquire_lock_tablespace": [
+      "lock_wait_timeout"
+    ],
+    "dd::upgrade_57::in_progress": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dd_tablespace_get_mdl": [
+      "lock_wait_timeout"
+    ],
+    "ddl::Unique_os_file_descriptor::get": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "ddl::Unique_os_file_descriptor::is_open": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "delegates_init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "delete_optimizer_cost_module": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "dict_boot": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_index_get_lock": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "dict_index_get_n_unique_in_tree": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "dict_index_has_desc": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_index_is_online_ddl": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "dict_index_is_spatial": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_index_is_unique": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_index_t": [
+      "innodb_buffer_pool_instances"
+    ],
+    "dict_index_t::is_clustered": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_persist_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "dict_resize": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "dirname_length": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "do_command": [
+      "net_read_timeout"
+    ],
+    "do_create_native_table_for_pfs": [
+      "lock_wait_timeout"
+    ],
+    "do_drop_native_table_for_pfs": [
+      "lock_wait_timeout"
+    ],
+    "fclose": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "fdatasync": [
+      "innodb_use_fdatasync"
+    ],
+    "feof": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "fflush": [
+      "innodb_buffer_pool_size"
+    ],
+    "fil_check_missing_tablespaces": [
+      "innodb_buffer_pool_size"
+    ],
+    "fil_encryption_rotate": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "fil_ibd_open": [
+      "innodb_buffer_pool_size"
+    ],
+    "fil_open_system_tablespace_files": [
+      "innodb_buffer_pool_size"
+    ],
+    "fil_page_get_next": [
+      "innodb_read_ahead_threshold"
+    ],
+    "fil_page_get_prev": [
+      "innodb_read_ahead_threshold"
+    ],
+    "fil_space_acquire_silent": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "fil_space_release": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "fix_host_cache_size": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "fix_low_prio_updates": [
+      "low_priority_updates"
+    ],
+    "fix_max_binlog_size": [
+      "max_relay_log_size"
+    ],
+    "fix_max_relay_log_size": [
+      "max_relay_log_size"
+    ],
+    "fix_net_read_timeout": [
+      "net_read_timeout"
+    ],
+    "fix_net_write_timeout": [
+      "net_write_timeout"
+    ],
+    "fix_table_cache_size": [
+      "table_open_cache"
+    ],
+    "flush_error_log_messages": [
+      "innodb_buffer_pool_size"
+    ],
+    "flush_tables_with_read_lock": [
+      "lock_wait_timeout"
+    ],
+    "fprintf": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "fputs": [
+      "innodb_buffer_pool_instances"
+    ],
+    "free_all_read_locks": [
+      "max_write_lock_count"
+    ],
+    "fsp_flags_init": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "fsp_flags_set_sdi": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "fsp_header_get_tablespace_size": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "fsp_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "fsp_is_system_temporary": [
+      "innodb_buffer_pool_instances",
+      "innodb_rollback_segments"
+    ],
+    "fsync": [
+      "innodb_use_fdatasync"
+    ],
+    "ft_init_stopwords": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "ftruncate64": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "get_key_scans_params": [
+      "read_rnd_buffer_size"
+    ],
+    "get_max_connections": [
+      "max_connections"
+    ],
+    "get_next_redo_rseg_from_trx_sys": [
+      "innodb_rollback_segments"
+    ],
+    "get_next_redo_rseg_from_undo_spaces": [
+      "innodb_rollback_segments"
+    ],
+    "get_next_temp_rseg": [
+      "innodb_rollback_segments"
+    ],
+    "get_partial_join_cost": [
+      "join_buffer_size"
+    ],
+    "get_quick_record_count": [
+      "range_alloc_block_size"
+    ],
+    "get_server_state": [
+      "max_relay_log_size"
+    ],
+    "get_srv_flush_log_at_timeout": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "get_srv_replication_delay": [
+      "innodb_thread_concurrency"
+    ],
+    "getuid": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "gtid_server_init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "ha_commit_trans": [
+      "lock_wait_timeout"
+    ],
+    "ha_init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "ha_init_errors": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "ha_innobase::get_memory_buffer_size": [
+      "innodb_buffer_pool_size"
+    ],
+    "ha_is_storage_engine_disabled": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "ha_myisam::preload_keys": [
+      "preload_buffer_size"
+    ],
+    "ha_myisam::start_bulk_insert": [
+      "bulk_insert_buffer_size"
+    ],
+    "ha_post_recover": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "handle_options": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "handle_reload_request": [
+      "lock_wait_timeout"
+    ],
+    "handlerton": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "hash_assert_can_modify": [
+      "innodb_buffer_pool_instances"
+    ],
+    "hash_calc_cell_id": [
+      "innodb_buffer_pool_instances"
+    ],
+    "hash_get_nth_cell": [
+      "innodb_buffer_pool_instances"
+    ],
+    "hash_lock_x_all": [
+      "innodb_buffer_pool_instances"
+    ],
+    "hash_unlock_x_all": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "heap_create": [
+      "max_heap_table_size"
+    ],
+    "heap_prepare_hp_create_info": [
+      "max_heap_table_size"
+    ],
+    "histograms::drop_histograms": [
+      "lock_wait_timeout"
+    ],
+    "histograms::lock_for_write": [
+      "lock_wait_timeout"
+    ],
+    "histograms::rename_histograms": [
+      "lock_wait_timeout"
+    ],
+    "hp_get_new_block": [
+      "max_heap_table_size"
+    ],
+    "i_s_cmpmem_fill_low": [
+      "innodb_buffer_pool_instances"
+    ],
+    "i_s_innodb_buf_page_lru_fill_table": [
+      "innodb_buffer_pool_instances"
+    ],
+    "i_s_innodb_buffer_page_fill_table": [
+      "innodb_buffer_pool_instances"
+    ],
+    "i_s_innodb_buffer_stats_fill_table": [
+      "innodb_buffer_pool_instances"
+    ],
+    "i_s_innodb_fill_buffer_lru": [
+      "innodb_buffer_pool_instances"
+    ],
+    "i_s_innodb_fill_buffer_pool": [
+      "innodb_buffer_pool_instances"
+    ],
+    "i_s_innodb_stats_fill": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ib::error::": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_rollback_segments",
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "ib::error::error": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_rollback_segments",
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "ib::fatal::fatal": [
+      "innodb_use_fdatasync"
+    ],
+    "ib::info::": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_rollback_segments",
+      "table_open_cache"
+    ],
+    "ib::info::info": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_rollback_segments",
+      "table_open_cache"
+    ],
+    "ib::logger": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold",
+      "innodb_rollback_segments",
+      "innodb_sort_buffer_size",
+      "innodb_use_fdatasync",
+      "sort_buffer_size",
+      "table_open_cache"
+    ],
+    "ib::warn::": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold",
+      "innodb_rollback_segments",
+      "innodb_use_fdatasync",
+      "table_open_cache"
+    ],
+    "ib::warn::warn": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold",
+      "innodb_rollback_segments",
+      "innodb_use_fdatasync",
+      "table_open_cache"
+    ],
+    "ib_counter_t": [
+      "innodb_buffer_pool_size",
+      "innodb_random_read_ahead"
+    ],
+    "ibt::open_or_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "ibuf_bitmap_page": [
+      "innodb_buffer_pool_instances",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "ibuf_get_merge_page_nos_func": [
+      "innodb_buffer_pool_size"
+    ],
+    "ibuf_init_at_db_start": [
+      "innodb_buffer_pool_size"
+    ],
+    "ibuf_insert": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ibuf_max_size_update": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "ibuf_merge": [
+      "innodb_io_capacity"
+    ],
+    "ibuf_merge_in_background": [
+      "innodb_io_capacity"
+    ],
+    "ibuf_mtr_commit": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ibuf_mtr_start": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ibuf_page": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ibuf_should_try": [
+      "innodb_buffer_pool_size"
+    ],
+    "init_common_variables": [
+      "max_connections"
+    ],
+    "init_icu_data_directory": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "init_max_user_conn": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "init_optimizer_cost_module": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "init_replica_thread": [
+      "lock_wait_timeout"
+    ],
+    "init_server_auto_options": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "init_server_components": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "init_sql_command_flags": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "initialize_storage_engine": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "inline_mysql_cond_signal": [
+      "max_connections",
+      "max_write_lock_count"
+    ],
+    "inline_mysql_cond_wait": [
+      "max_connections"
+    ],
+    "inline_mysql_end_stage": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "inline_mysql_mutex_lock": [
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "inline_mysql_mutex_unlock": [
+      "host_cache_size",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "inline_mysql_set_stage": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "inline_mysql_stage_set_work_completed": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "inline_mysql_stage_set_work_estimated": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "innobase_commit_concurrency_init_default": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "innobase_disable_core_dump": [
+      "innodb_buffer_pool_instances"
+    ],
+    "innobase_flush_logs": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "innobase_get_open_files_limit": [
+      "table_open_cache"
+    ],
+    "innobase_init_files": [
+      "innodb_change_buffer_max_size"
+    ],
+    "innobase_set_open_files_limit": [
+      "table_open_cache"
+    ],
+    "innobase_should_madvise_buf_pool": [
+      "innodb_buffer_pool_instances"
+    ],
+    "innobase_srv_conc_enter_innodb": [
+      "innodb_thread_concurrency"
+    ],
+    "innodb_buffer_pool_evict_uncompressed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "innodb_buffer_pool_size_init": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "innodb_buffer_pool_size_validate": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "innodb_change_buffer_max_size_update": [
+      "innodb_change_buffer_max_size"
+    ],
+    "innodb_init_params": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "innodb_io_capacity_max_update": [
+      "innodb_io_capacity"
+    ],
+    "innodb_io_capacity_update": [
+      "innodb_io_capacity"
+    ],
+    "innodb_log_checksums_func_update": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm"
+    ],
+    "innodb_max_dirty_pages_pct_update": [
+      "innodb_max_dirty_pages_pct_lwm"
+    ],
+    "innodb_redo_log_capacity_init": [
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "innodb_redo_log_capacity_update": [
+      "innodb_log_file_size"
+    ],
+    "innodb_rollback_segments_update": [
+      "innodb_rollback_segments"
+    ],
+    "innodb_set_buf_pool_size": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "innodb_thread_concurrency_update": [
+      "innodb_thread_concurrency"
+    ],
+    "innodb_undo_tablespaces_deprecate": [
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "intern_close_table": [
+      "table_open_cache"
+    ],
+    "is_buffer_pool_size_ok": [
+      "innodb_buffer_pool_size"
+    ],
+    "is_help_or_validate_option": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "llstr": [
+      "max_relay_log_size"
+    ],
+    "lob::btr_rec_get_externally_stored_len": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "lock_check_constraint_names": [
+      "lock_wait_timeout"
+    ],
+    "lock_check_constraint_names_for_rename": [
+      "lock_wait_timeout"
+    ],
+    "lock_db_routines": [
+      "lock_wait_timeout"
+    ],
+    "lock_object_name": [
+      "lock_wait_timeout"
+    ],
+    "lock_routine_name": [
+      "lock_wait_timeout"
+    ],
+    "lock_schema_name": [
+      "lock_wait_timeout"
+    ],
+    "lock_sys_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "lock_sys_resize": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "lock_tables_open_and_lock_tables": [
+      "lock_wait_timeout"
+    ],
+    "lock_trx_print_wait_and_mvcc_state": [
+      "innodb_buffer_pool_instances"
+    ],
+    "lock_trx_release_locks": [
+      "innodb_spin_wait_delay"
+    ],
+    "log_allocate_buffer": [
+      "innodb_log_buffer_size"
+    ],
+    "log_allocate_write_ahead_buffer": [
+      "innodb_log_write_ahead_size"
+    ],
+    "log_block_get_first_rec_group": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "log_block_store_checksum": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "log_buffer_flush_order_lag": [
+      "innodb_buffer_pool_instances"
+    ],
+    "log_buffer_flush_to_disk": [
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "log_buffer_resize_low": [
+      "innodb_log_buffer_size"
+    ],
+    "log_buffer_s_lock_wait": [
+      "innodb_spin_wait_delay"
+    ],
+    "log_buffer_x_lock_enter": [
+      "innodb_spin_wait_delay"
+    ],
+    "log_calc_buf_size": [
+      "innodb_log_buffer_size"
+    ],
+    "log_concurrency_margin": [
+      "innodb_log_file_size",
+      "innodb_thread_concurrency"
+    ],
+    "log_control_writer_threads": [
+      "innodb_log_writer_threads"
+    ],
+    "log_crash_safe_validate": [
+      "innodb_buffer_pool_instances"
+    ],
+    "log_create_unused_file": [
+      "innodb_log_file_size"
+    ],
+    "log_data_block_header_serialize": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "log_data_blocks_write": [
+      "innodb_log_write_ahead_size"
+    ],
+    "log_files::is_consumption_needed": [
+      "innodb_log_file_size"
+    ],
+    "log_files::might_create_unused_file": [
+      "innodb_log_file_size"
+    ],
+    "log_files::might_recycle_file": [
+      "innodb_log_file_size"
+    ],
+    "log_files::physical_capacity_allows_to_create": [
+      "innodb_log_file_size"
+    ],
+    "log_files::physical_capacity_allows_to_recycle": [
+      "innodb_log_file_size"
+    ],
+    "log_files_create_next_as_unused_if_needed": [
+      "innodb_log_file_size"
+    ],
+    "log_files_next_file_size": [
+      "innodb_log_file_size"
+    ],
+    "log_files_next_unused_id": [
+      "innodb_log_file_size"
+    ],
+    "log_files_oldest_needed_lsn": [
+      "innodb_log_file_size"
+    ],
+    "log_files_process_consumed_file": [
+      "innodb_log_file_size"
+    ],
+    "log_files_recycle_file": [
+      "innodb_log_file_size"
+    ],
+    "log_files_remove_consumed_file": [
+      "innodb_log_file_size"
+    ],
+    "log_flush_low": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "log_flusher": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "log_free_check": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "log_get_lsn": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "log_max_spins_when_waiting_in_user_thread": [
+      "innodb_log_spin_cpu_abs_lwm",
+      "innodb_log_spin_cpu_pct_hwm"
+    ],
+    "log_message": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm"
+    ],
+    "log_pause_writer_threads": [
+      "innodb_log_writer_threads"
+    ],
+    "log_pending_flushes": [
+      "innodb_buffer_pool_size"
+    ],
+    "log_persist_crash_safe": [
+      "innodb_buffer_pool_instances"
+    ],
+    "log_request_sync_flush": [
+      "innodb_flush_sync"
+    ],
+    "log_resume_writer_threads": [
+      "innodb_log_writer_threads"
+    ],
+    "log_self_write_up_to": [
+      "innodb_flush_log_at_trx_commit",
+      "innodb_spin_wait_delay"
+    ],
+    "log_start": [
+      "innodb_buffer_pool_size"
+    ],
+    "log_start_background_threads": [
+      "innodb_buffer_pool_size"
+    ],
+    "log_stop_background_threads": [
+      "innodb_buffer_pool_size"
+    ],
+    "log_sync_flush_lsn": [
+      "innodb_flush_sync"
+    ],
+    "log_sys_init": [
+      "innodb_buffer_pool_size",
+      "innodb_log_file_size",
+      "innodb_thread_concurrency"
+    ],
+    "log_translate_lsn_to_sn": [
+      "innodb_log_buffer_size"
+    ],
+    "log_update_concurrency_margin": [
+      "innodb_thread_concurrency"
+    ],
+    "log_wait_for_flush": [
+      "innodb_flush_log_at_trx_commit",
+      "innodb_log_wait_for_flush_spin_hwm"
+    ],
+    "log_wait_for_write": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "log_write_to_file_requests_are_frequent": [
+      "innodb_log_spin_cpu_abs_lwm"
+    ],
+    "log_write_up_to": [
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "log_writer_is_active": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "login_connection": [
+      "connect_timeout",
+      "net_read_timeout",
+      "net_write_timeout"
+    ],
+    "make_join_query_block": [
+      "range_alloc_block_size"
+    ],
+    "meb::redo_log_archive_produce": [
+      "innodb_log_write_ahead_size"
+    ],
+    "mem_heap_free": [
+      "innodb_sort_buffer_size",
+      "innodb_stats_transient_sample_pages",
+      "sort_buffer_size"
+    ],
+    "mi_log": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "mlockall": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "modify_thread_cache_size": [
+      "max_connections"
+    ],
+    "monitor_inc_value": [
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "monitor_inc_value_cumulative": [
+      "innodb_lru_scan_depth"
+    ],
+    "monitor_set": [
+      "innodb_buffer_pool_instances",
+      "innodb_io_capacity",
+      "innodb_purge_batch_size"
+    ],
+    "mpmc_bq": [
+      "innodb_buffer_pool_instances"
+    ],
+    "mtr_commit_mlog_test": [
+      "innodb_buffer_pool_size"
+    ],
+    "mtr_t::": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments",
+      "innodb_stats_transient_sample_pages"
+    ],
+    "mtr_t::Logging::init": [
+      "innodb_buffer_pool_size"
+    ],
+    "mtr_t::Logging::is_disabled": [
+      "innodb_buffer_pool_instances"
+    ],
+    "mtr_t::Logging::is_enabled": [
+      "innodb_flush_sync"
+    ],
+    "mtr_t::commit": [
+      "innodb_buffer_pool_size",
+      "innodb_stats_transient_sample_pages"
+    ],
+    "mtr_t::start": [
+      "innodb_buffer_pool_size",
+      "innodb_stats_transient_sample_pages"
+    ],
+    "my_free": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "my_malloc": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "my_strdup": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "my_timer_initialize": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "mysql_admin_table": [
+      "lock_wait_timeout"
+    ],
+    "mysql_alter_db": [
+      "lock_wait_timeout"
+    ],
+    "mysql_alter_table": [
+      "lock_wait_timeout"
+    ],
+    "mysql_clone_connect": [
+      "connect_timeout",
+      "net_read_timeout",
+      "net_write_timeout"
+    ],
+    "mysql_clone_get_command": [
+      "net_read_timeout",
+      "net_write_timeout"
+    ],
+    "mysql_clone_get_response": [
+      "net_read_timeout"
+    ],
+    "mysql_create_like_table": [
+      "lock_wait_timeout"
+    ],
+    "mysql_create_table": [
+      "lock_wait_timeout"
+    ],
+    "mysql_drop_view": [
+      "lock_wait_timeout"
+    ],
+    "mysql_inplace_alter_table": [
+      "lock_wait_timeout"
+    ],
+    "mysql_install_plugin": [
+      "lock_wait_timeout"
+    ],
+    "mysql_lock_tables": [
+      "lock_wait_timeout"
+    ],
+    "mysql_rename_tables": [
+      "lock_wait_timeout"
+    ],
+    "mysql_rm_db": [
+      "lock_wait_timeout"
+    ],
+    "mysql_rm_table": [
+      "lock_wait_timeout"
+    ],
+    "mysql_table_grant": [
+      "lock_wait_timeout"
+    ],
+    "mysql_uninstall_plugin": [
+      "lock_wait_timeout"
+    ],
+    "mysqld_main": [
+      "max_connections",
+      "table_open_cache"
+    ],
+    "network_init": [
+      "max_connections"
+    ],
+    "next_free_record_pos": [
+      "max_heap_table_size"
+    ],
+    "notify_about_advanced_write_lsn": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "open_and_process_routine": [
+      "lock_wait_timeout"
+    ],
+    "open_table": [
+      "lock_wait_timeout"
+    ],
+    "open_table_get_mdl_lock": [
+      "lock_wait_timeout",
+      "low_priority_updates"
+    ],
+    "open_tables": [
+      "lock_wait_timeout"
+    ],
+    "open_views_and_update_metadata": [
+      "lock_wait_timeout"
+    ],
+    "operator": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "os_aio_simulated_put_read_threads_to_sleep": [
+      "innodb_read_ahead_threshold"
+    ],
+    "os_aio_simulated_wake_handler_threads": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "os_aio_start_threads": [
+      "innodb_buffer_pool_size"
+    ],
+    "os_event_reset": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_sync"
+    ],
+    "os_event_set": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_flush_sync",
+      "innodb_rollback_segments"
+    ],
+    "os_event_wait": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "os_event_wait_time_low": [
+      "innodb_flush_log_at_trx_commit",
+      "innodb_flush_sync"
+    ],
+    "os_file_fsync_posix": [
+      "innodb_use_fdatasync"
+    ],
+    "os_file_get_size": [
+      "innodb_buffer_pool_instances"
+    ],
+    "os_is_o_direct_supported": [
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "page_get_infimum_rec": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "page_id_t": [
+      "innodb_buffer_pool_instances"
+    ],
+    "page_id_t::hash": [
+      "innodb_buffer_pool_instances"
+    ],
+    "page_id_t::operator": [
+      "innodb_buffer_pool_instances"
+    ],
+    "page_id_t::page_id_t": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_neighbors",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "page_id_t::page_no": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_neighbors",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "page_id_t::space": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_neighbors",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "page_is_spatial_non_leaf": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "page_rec_get_next": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "page_rec_is_supremum": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "page_size_t::copy_from": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "page_size_t::is_compressed": [
+      "innodb_buffer_pool_instances"
+    ],
+    "page_size_t::page_size_t": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "table_open_cache"
+    ],
+    "page_size_t::physical": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "page_zip_des_init": [
+      "innodb_buffer_pool_instances"
+    ],
+    "page_zip_get_size": [
+      "innodb_buffer_pool_instances"
+    ],
+    "page_zip_set_size": [
+      "innodb_buffer_pool_instances"
+    ],
+    "pars_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "pc_flush_slot": [
+      "innodb_buffer_pool_instances"
+    ],
+    "pc_request": [
+      "innodb_buffer_pool_instances"
+    ],
+    "pc_wait_finished": [
+      "innodb_buffer_pool_instances"
+    ],
+    "perror": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "pfs_os_file_close_func": [
+      "innodb_buffer_pool_instances"
+    ],
+    "pfs_os_file_create_func": [
+      "innodb_buffer_pool_instances"
+    ],
+    "pfs_os_file_read_no_error_handling_int_fd_func": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "pfs_os_file_write_int_fd_func": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "plugin_is_ready": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "plugin_register_builtin_and_init_core_se": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "plugin_register_dynamic_and_init_all": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "plugin_register_early_plugins": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "posix_fadvise64": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "pre_init_event_thread": [
+      "lock_wait_timeout"
+    ],
+    "prepare_check_constraints_for_alter": [
+      "lock_wait_timeout"
+    ],
+    "prepare_check_constraints_for_create": [
+      "lock_wait_timeout"
+    ],
+    "prepare_check_constraints_for_create_like_table": [
+      "lock_wait_timeout"
+    ],
+    "prepare_for_repair": [
+      "lock_wait_timeout"
+    ],
+    "prepare_thread_and_validate": [
+      "lock_wait_timeout"
+    ],
+    "process_key_caches": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "prune_partitions": [
+      "range_alloc_block_size",
+      "range_optimizer_max_mem_size"
+    ],
+    "push_warning_printf": [
+      "binlog_cache_size"
+    ],
+    "randominit": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "rbt_create": [
+      "innodb_buffer_pool_instances"
+    ],
+    "rbt_free": [
+      "innodb_buffer_pool_instances"
+    ],
+    "read_histograms": [
+      "lock_wait_timeout"
+    ],
+    "rec_get_offsets": [
+      "innodb_stats_transient_sample_pages"
+    ],
+    "recreate_redo_files": [
+      "innodb_buffer_pool_size"
+    ],
+    "recv_apply_hashed_log_recs": [
+      "innodb_buffer_pool_size"
+    ],
+    "recv_recovery_begin": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "recv_recovery_from_checkpoint_finish": [
+      "innodb_buffer_pool_size"
+    ],
+    "recv_recovery_from_checkpoint_start": [
+      "innodb_buffer_pool_size"
+    ],
+    "recv_recovery_is_on": [
+      "innodb_buffer_pool_instances"
+    ],
+    "recv_sys_add_to_parsing_buf": [
+      "innodb_log_buffer_size"
+    ],
+    "recv_sys_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "recv_sys_free": [
+      "innodb_buffer_pool_size"
+    ],
+    "recv_sys_init": [
+      "innodb_buffer_pool_size",
+      "innodb_log_buffer_size"
+    ],
+    "recv_sys_resize_buf": [
+      "innodb_log_buffer_size"
+    ],
+    "recv_verify_log_is_clean_pre_8_0_30": [
+      "innodb_buffer_pool_size"
+    ],
+    "remove_secondary_engine": [
+      "lock_wait_timeout"
+    ],
+    "rename": [
+      "innodb_buffer_pool_instances"
+    ],
+    "resourcegroups::Resource_group_mgr::acquire_shared_mdl_for_resource_group": [
+      "lock_wait_timeout"
+    ],
+    "resourcegroups::Resource_group_mgr::disable_resource_group": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "resourcegroups::Resource_group_mgr::instance": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "resourcegroups::Resource_group_mgr::post_init": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "resourcegroups::Resource_group_mgr::set_unsupport_reason": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "resourcegroups::Sql_cmd_alter_resource_group::execute": [
+      "lock_wait_timeout"
+    ],
+    "resourcegroups::Sql_cmd_create_resource_group::execute": [
+      "lock_wait_timeout"
+    ],
+    "resourcegroups::Sql_cmd_drop_resource_group::execute": [
+      "lock_wait_timeout"
+    ],
+    "rewind": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "rm_table_do_discovery_and_lock_fk_tables": [
+      "lock_wait_timeout"
+    ],
+    "row_log_apply_op": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_apply_ops": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_block_allocate": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_block_free": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_estimate_work": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_online_op": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_progress_inc_per_block": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_apply_op": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_apply_ops": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_close_func": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_delete": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_low": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_low_redundant": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_table_open": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "row_log_tmpfile": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "rpl_make_log_name": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "rw_lock_debug_mutex_enter": [
+      "innodb_sync_array_size"
+    ],
+    "rw_lock_debug_mutex_exit": [
+      "innodb_sync_array_size"
+    ],
+    "rw_lock_free": [
+      "innodb_buffer_pool_instances"
+    ],
+    "rw_lock_own": [
+      "innodb_buffer_pool_instances",
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "rw_lock_s_lock_spin": [
+      "innodb_spin_wait_delay"
+    ],
+    "rw_lock_s_unlock": [
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "rw_lock_sx_lock_func": [
+      "innodb_spin_wait_delay"
+    ],
+    "rw_lock_x_lock": [
+      "innodb_buffer_pool_instances",
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "rw_lock_x_lock_func": [
+      "innodb_spin_wait_delay"
+    ],
+    "rw_lock_x_lock_gen": [
+      "innodb_buffer_pool_instances"
+    ],
+    "rw_lock_x_lock_wait_func": [
+      "innodb_spin_wait_delay"
+    ],
+    "rw_lock_x_unlock": [
+      "innodb_buffer_pool_instances",
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "set_externally_disabled_storage_engine_names": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "set_my_errno": [
+      "max_heap_table_size"
+    ],
+    "set_table_encryption_type": [
+      "lock_wait_timeout"
+    ],
+    "set_user": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "setreuid": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "setup_error_log": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "setup_error_log_components": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "setup_fpu": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "setup_range_optimizer_param": [
+      "range_optimizer_max_mem_size"
+    ],
+    "sqrt": [
+      "innodb_adaptive_flushing",
+      "innodb_io_capacity"
+    ],
+    "srv_conc_enter_innodb": [
+      "innodb_thread_concurrency"
+    ],
+    "srv_conc_enter_innodb_with_atomics": [
+      "innodb_adaptive_max_sleep_delay",
+      "innodb_thread_concurrency",
+      "innodb_thread_sleep_delay"
+    ],
+    "srv_conc_force_enter_innodb": [
+      "innodb_thread_concurrency"
+    ],
+    "srv_create_sdi_indexes": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_do_purge": [
+      "innodb_purge_batch_size",
+      "innodb_purge_rseg_truncate_frequency"
+    ],
+    "srv_enter_innodb_with_tickets": [
+      "innodb_thread_concurrency"
+    ],
+    "srv_export_innodb_status": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_free": [
+      "innodb_buffer_pool_instances"
+    ],
+    "srv_get_activity_count": [
+      "innodb_io_capacity"
+    ],
+    "srv_init": [
+      "innodb_buffer_pool_instances"
+    ],
+    "srv_init_abort_low": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "srv_mon_get_rseg_size": [
+      "innodb_rollback_segments"
+    ],
+    "srv_mon_process_existing_counter": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_open_tmp_tablespace": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_purge_coordinator_thread": [
+      "innodb_purge_batch_size"
+    ],
+    "srv_start": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments",
+      "table_open_cache"
+    ],
+    "srv_start_state_set": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_undo_tablespace_create": [
+      "innodb_rollback_segments"
+    ],
+    "srv_undo_tablespaces_init": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_undo_tablespaces_mark_construction_done": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "srv_undo_tablespaces_upgrade": [
+      "innodb_buffer_pool_size"
+    ],
+    "srv_wake_purge_thread_if_not_active": [
+      "innodb_purge_batch_size"
+    ],
+    "std::_Rb_tree_iterator": [
+      "max_relay_log_size"
+    ],
+    "std::__atomic_base": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_log_buffer_size",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold",
+      "innodb_rollback_segments"
+    ],
+    "std::__cxx11::basic_ostringstream": [
+      "innodb_buffer_pool_size"
+    ],
+    "std::__cxx11::basic_regex": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::__cxx11::basic_string": [
+      "host_cache_size",
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "max_connections",
+      "max_relay_log_size",
+      "table_open_cache"
+    ],
+    "std::__cxx11::list": [
+      "max_connections"
+    ],
+    "std::__cxx11::to_string": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "max_relay_log_size"
+    ],
+    "std::allocator": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "std::atomic": [
+      "host_cache_size",
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_log_file_size",
+      "max_connections"
+    ],
+    "std::basic_ostream": [
+      "innodb_buffer_pool_size"
+    ],
+    "std::chrono::_V2::steady_clock::now": [
+      "innodb_buffer_pool_instances",
+      "innodb_io_capacity",
+      "innodb_thread_concurrency"
+    ],
+    "std::chrono::_V2::system_clock::now": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "std::chrono::duration": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_flush_sync",
+      "innodb_io_capacity",
+      "innodb_log_spin_cpu_abs_lwm",
+      "innodb_thread_concurrency",
+      "innodb_use_fdatasync"
+    ],
+    "std::chrono::time_point": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_io_capacity",
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "std::common_type": [
+      "innodb_buffer_pool_instances",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_thread_concurrency"
+    ],
+    "std::function": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "std::map": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::mutex::mutex": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::numeric_limits": [
+      "tmp_table_size"
+    ],
+    "std::operator": [
+      "innodb_adaptive_max_sleep_delay",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_purge_batch_size",
+      "innodb_thread_concurrency",
+      "max_relay_log_size"
+    ],
+    "std::ostream::operator": [
+      "innodb_buffer_pool_size"
+    ],
+    "std::pair": [
+      "lock_wait_timeout"
+    ],
+    "std::priority_queue": [
+      "innodb_buffer_pool_size"
+    ],
+    "std::reference_wrapper": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::thread": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::thread::": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::thread::join": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::thread::thread": [
+      "innodb_buffer_pool_instances"
+    ],
+    "std::underlying_type": [
+      "innodb_buffer_pool_size"
+    ],
+    "std::unique_ptr": [
+      "innodb_buffer_pool_instances",
+      "innodb_io_capacity"
+    ],
+    "std::vector": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments",
+      "max_connections"
+    ],
+    "strcat": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "strcmp": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "strcpy": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "strerror": [
+      "host_cache_size",
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "max_connections"
+    ],
+    "strlen": [
+      "host_cache_size",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_max_dirty_pages_pct_lwm",
+      "max_connections",
+      "table_open_cache"
+    ],
+    "strmake": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "sync_arr_wake_threads_if_sema_free": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_close": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_detect_deadlock": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_free": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_get": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_get_and_reserve_cell": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_get_nth_cell": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_init": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_print": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_print_info": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_print_long_waits": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_print_long_waits_low": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_reserve_cell": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_t": [
+      "innodb_sync_array_size"
+    ],
+    "sync_array_wake_threads_if_sema_free_low": [
+      "innodb_sync_array_size"
+    ],
+    "sysconf": [
+      "innodb_buffer_pool_instances"
+    ],
+    "temptable::Handler::create": [
+      "tmp_table_size"
+    ],
+    "temptable::Handler::get_memory_buffer_size": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::MMAP::consumption": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::MMAP::decrease": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::MMAP::increase": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::MMAP::threshold": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::RAM::decrease": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::RAM::increase": [
+      "temptable_max_ram"
+    ],
+    "temptable::MemoryMonitor::RAM::threshold": [
+      "temptable_max_ram"
+    ],
+    "temptable::Prefer_RAM_over_MMAP_policy::block_source": [
+      "temptable_max_ram"
+    ],
+    "test_if_skip_sort_order": [
+      "range_alloc_block_size"
+    ],
+    "thd_get_tmp_table_size": [
+      "tmp_table_size"
+    ],
+    "thd_is_replication_slave_thread": [
+      "innodb_thread_concurrency"
+    ],
+    "thd_requested_durability": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "time": [
+      "max_connections"
+    ],
+    "trace_tmp_table": [
+      "max_heap_table_size",
+      "tmp_table_size"
+    ],
+    "trx_commit_in_memory": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "trx_flush_log_if_needed": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "trx_flush_log_if_needed_low": [
+      "innodb_flush_log_at_trx_commit"
+    ],
+    "trx_is_interrupted": [
+      "innodb_thread_concurrency"
+    ],
+    "trx_purge": [
+      "innodb_purge_batch_size"
+    ],
+    "trx_purge_add_update_undo_to_history": [
+      "innodb_purge_batch_size"
+    ],
+    "trx_purge_dml_delay": [
+      "innodb_purge_batch_size"
+    ],
+    "trx_purge_state": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "trx_purge_sys_initialize": [
+      "innodb_buffer_pool_size"
+    ],
+    "trx_purge_sys_mem_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "trx_rseg_add_rollback_segments": [
+      "innodb_rollback_segments"
+    ],
+    "trx_rseg_adjust_rollback_segments": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "trx_sys_create": [
+      "innodb_buffer_pool_size"
+    ],
+    "trx_sys_create_sys_pages": [
+      "innodb_buffer_pool_size"
+    ],
+    "trx_sys_hdr_page": [
+      "innodb_random_read_ahead",
+      "innodb_read_ahead_threshold"
+    ],
+    "trx_sys_init_at_db_start": [
+      "innodb_buffer_pool_size"
+    ],
+    "trx_sys_mutex_enter": [
+      "innodb_buffer_pool_instances"
+    ],
+    "trx_sys_mutex_exit": [
+      "innodb_buffer_pool_instances"
+    ],
+    "trx_write_trx_id": [
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "try_acquire_high_prio_shared_mdl_lock": [
+      "lock_wait_timeout"
+    ],
+    "udf_init_globals": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "undo::Tablespace::get_active": [
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespace::is_active_no_latch": [
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespace::is_empty": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespace::rsegs": [
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespace::set_active": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespaces::at": [
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespaces::s_lock": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "undo::Tablespaces::s_unlock": [
+      "innodb_buffer_pool_size",
+      "innodb_rollback_segments"
+    ],
+    "unireg_abort": [
+      "host_cache_size",
+      "max_connections"
+    ],
+    "unlikely": [
+      "innodb_adaptive_flushing",
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_lru_scan_depth",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_rollback_segments",
+      "innodb_sort_buffer_size",
+      "innodb_sync_array_size",
+      "innodb_thread_concurrency",
+      "innodb_use_fdatasync",
+      "sort_buffer_size",
+      "table_open_cache"
+    ],
+    "unlink": [
+      "innodb_buffer_pool_instances"
+    ],
+    "unsigned": [
+      "host_cache_size",
+      "innodb_buffer_pool_instances",
+      "innodb_flush_neighbors",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_lru_scan_depth",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_read_ahead_threshold",
+      "max_connections",
+      "tmp_table_size"
+    ],
+    "ut::Count::Count": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_sync_array_size"
+    ],
+    "ut::aligned_array_pointer": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "ut::free": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_sort_buffer_size",
+      "sort_buffer_size"
+    ],
+    "ut::make_psi_memory_key": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_sync_array_size"
+    ],
+    "ut::malloc_withkey": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "ut::random_from_interval_fast": [
+      "innodb_spin_wait_delay"
+    ],
+    "ut::realloc_withkey": [
+      "innodb_log_buffer_size"
+    ],
+    "ut::zalloc_withkey": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ut_2_power_up": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ut_dbg_assertion_failed": [
+      "innodb_adaptive_flushing",
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_file_size",
+      "innodb_log_write_ahead_size",
+      "innodb_lru_scan_depth",
+      "innodb_max_dirty_pages_pct_lwm",
+      "innodb_read_ahead_threshold",
+      "innodb_rollback_segments",
+      "innodb_sort_buffer_size",
+      "innodb_sync_array_size",
+      "innodb_thread_concurrency",
+      "innodb_use_fdatasync",
+      "sort_buffer_size",
+      "table_open_cache"
+    ],
+    "ut_delay": [
+      "innodb_spin_wait_delay"
+    ],
+    "ut_list_base": [
+      "innodb_buffer_pool_instances"
+    ],
+    "ut_sprintf_timestamp": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size"
+    ],
+    "ut_uint64_align_down": [
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size"
+    ],
+    "ut_uint64_align_up": [
+      "innodb_log_file_size"
+    ],
+    "void": [
+      "innodb_buffer_pool_instances",
+      "innodb_buffer_pool_size",
+      "innodb_flush_log_at_trx_commit",
+      "innodb_io_capacity",
+      "innodb_log_buffer_size",
+      "innodb_log_write_ahead_size",
+      "innodb_lru_scan_depth",
+      "innodb_rollback_segments",
+      "innodb_spin_wait_delay",
+      "innodb_sync_array_size",
+      "innodb_thread_concurrency",
+      "innodb_use_fdatasync",
+      "max_connections"
+    ],
+    "wait_while_table_is_used": [
+      "lock_wait_timeout"
+    ],
+    "wake_up_waiters": [
+      "max_write_lock_count"
+    ],
+    "xa::Transaction_cache::initialize": [
+      "host_cache_size",
+      "max_connections"
+    ]
+  },
+  "featureMin": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    67.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    5.3,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.59,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.99,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.99,
+    0.0,
+    0.0,
+    1.31,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.23,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.17,
+    0.81,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.93,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    66.7,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    1.77,
+    0.0,
+    0.0,
+    2.2,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.38,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.8,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.04,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.24,
+    0.05,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.17,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.78,
+    0.0,
+    1.22,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.07,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.73,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.35,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.15,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.63,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "featureMax": [
+    0.0,
+    0.0,
+    0.0,
+    0.12,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.53,
+    0.0,
+    0.04,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    0.0,
+    0.0,
+    0.01,
+    0.01,
+    0.03,
+    0.0,
+    0.01,
+    0.0,
+    0.1,
+    0.01,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.09,
+    0.0,
+    0.0,
+    0.08,
+    0.61,
+    1.0,
+    0.27,
+    0.02,
+    0.84,
+    0.0,
+    0.0,
+    0.08,
+    0.0,
+    0.0,
+    85.19,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.14,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    19.22,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.06,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    0.19,
+    0.0,
+    0.09,
+    0.06,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.92,
+    4.61,
+    0.18,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.28,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.06,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    4.25,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    4.25,
+    0.0,
+    0.0,
+    2.57,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.28,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    7.57,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.27,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.04,
+    0.05,
+    0.0,
+    3.7,
+    8.84,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.08,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    6.32,
+    0.0,
+    0.0,
+    0.11,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.29,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    85.1,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.1,
+    0.04,
+    0.06,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.4,
+    4.54,
+    0.0,
+    0.0,
+    6.64,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.13,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.36,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.01,
+    0.03,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    2.27,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.37,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.23,
+    0.45,
+    0.06,
+    0.09,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.81,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    1.81,
+    0.0,
+    2.83,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.07,
+    0.05,
+    0.0,
+    0.03,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.52,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    4.89,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    0.0,
+    0.0,
+    0.05,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.1,
+    0.0,
+    0.08,
+    0.0,
+    0.27,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.17,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.99,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.06,
+    0.07,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.2,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.02,
+    0.0,
+    0.11,
+    0.0,
+    0.0,
+    0.0,
+    0.22,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.03,
+    0.22,
+    0.02,
+    0.04,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.09,
+    0.4,
+    0.17,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    11.42,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "targetMin": 0.12338054287394608,
+  "targetMax": 0.7647359996619757,
+  "validation": {
+    "method": "GroupKFold, five folds grouped by focus scenario; no same-scenario train/test overlap",
+    "folds": [
+      {
+        "trainingGroups": [
+          "tp_order_status_hot",
+          "tp_payment_hot",
+          "tp_stock_level_burst",
+          "tp_stock_level_hot"
+        ],
+        "heldOutGroups": [
+          "tp_full_mix_surge_high",
+          "tp_wal_checkpoint"
+        ]
+      },
+      {
+        "trainingGroups": [
+          "tp_full_mix_surge_high",
+          "tp_order_status_hot",
+          "tp_payment_hot",
+          "tp_stock_level_burst",
+          "tp_wal_checkpoint"
+        ],
+        "heldOutGroups": [
+          "tp_stock_level_hot"
+        ]
+      },
+      {
+        "trainingGroups": [
+          "tp_full_mix_surge_high",
+          "tp_order_status_hot",
+          "tp_payment_hot",
+          "tp_stock_level_hot",
+          "tp_wal_checkpoint"
+        ],
+        "heldOutGroups": [
+          "tp_stock_level_burst"
+        ]
+      },
+      {
+        "trainingGroups": [
+          "tp_full_mix_surge_high",
+          "tp_order_status_hot",
+          "tp_stock_level_burst",
+          "tp_stock_level_hot",
+          "tp_wal_checkpoint"
+        ],
+        "heldOutGroups": [
+          "tp_payment_hot"
+        ]
+      },
+      {
+        "trainingGroups": [
+          "tp_full_mix_surge_high",
+          "tp_payment_hot",
+          "tp_stock_level_burst",
+          "tp_stock_level_hot",
+          "tp_wal_checkpoint"
+        ],
+        "heldOutGroups": [
+          "tp_order_status_hot"
+        ]
+      }
+    ],
+    "maeRetentionRatio": 0.22143597480077015,
+    "maePercentagePoints": 22.143597480077016,
+    "r2": -0.6325802324070862,
+    "rows": 18,
+    "scenarioGroups": 6
+  },
+  "modelSha256": "1728c053149da94716b736066a34f87274eab969c9102e97d749b1110817e633",
+  "datasetSha256": "3876fcda78cc8bf175b83a8583b663e7818903c07c53832a9bf9b8ebda654b08",
+  "versions": {
+    "sklearn": "1.2.2",
+    "shap": "0.42.1",
+    "numpy": "1.24.4",
+    "joblib": "1.4.2"
+  },
+  "scope": "Experimental MySQL 8.0.36 local TPC-C-shaped workload under the six demo pressure scenarios.",
+  "limitations": [
+    "Limited local benchmark data; held-out validation is not an online guarantee.",
+    "Only the six demo scenarios form the training groups, so validation coverage is below the trusted-advisory threshold.",
+    "Tree-path-dependent TreeSHAP explains this fitted model using training path counts, not causation or the LLM.",
+    "Not calibrated for other MySQL builds or workloads outside the demo scenario set.",
+    "Missing symbols in a complete counts file are zero sampled hits, not zero execution cost."
+  ]
+}

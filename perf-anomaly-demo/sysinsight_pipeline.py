@@ -188,6 +188,7 @@ def _load_prometheus_capture(args: argparse.Namespace, case_result: Mapping[str,
         end,
         args.prometheus_step,
         args.alert_name,
+        dbms=args.dbms,
     )
 
 

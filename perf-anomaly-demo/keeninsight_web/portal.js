@@ -124,7 +124,7 @@
     const hotList=d.hotFunctions||[];
     const hot=hotList.map(f=>{
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
-      const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'Not located in the pinned PostgreSQL 12.22 source tree (generated code, extension, or system symbol)');
+      const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'Not located in the pinned database source tree (generated code, extension, or system symbol)');
       const evidence=f.Evidence==='runtime_call_chain'?'perf call chain':f.Evidence==='source_association'?'source association':'perf differential sampling';
       return `<div class="function-item ki-clickable" data-ki-function="${esc(f.Function)}" tabindex="0" role="button" aria-label="View function details ${esc(f.Function)}"><div class="function-header"><div class="function-name">${esc(f.Function)}</div><span class="ki-function-open">Details ›</span></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
     }).join('');
@@ -141,23 +141,26 @@
       const numeric=Number(value);
       return value!==''&&Number.isFinite(numeric)?'num:'+numeric:'str:'+value;
     };
+    const settingValue=v=>v&&typeof v==='object'?v.setting:v;
+    const settingUnit=v=>v&&typeof v==='object'?(v.unit||''):'';
     const rationaleByParam=new Map(((d.tuningRationale||{}).actions||[]).map(a=>[String(a.parameter),a]));
     const knobEntries=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).filter(([name,value])=>{
       const setting=app.pre_settings?.[name];
-      return !setting||normalizeKnob(setting.setting)!==normalizeKnob(value);
+      return !setting||normalizeKnob(settingValue(setting))!==normalizeKnob(value);
     });
     const knobs=knobEntries.map(([name,value])=>{
       const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name],rationale=rationaleByParam.get(String(name));
       const reasonText=rationale?.reason_en||rationale?.reason;
       const reason=reasonText?`<div class="knob-reason"><span class="knob-reason-label">Why this change</span>${esc(reasonText)}</div>`:'';
       const evidence=(rationale?.evidence||[]).length?`<details class="knob-evidence"><summary>Related evidence</summary><div class="ki-row-meta">${rationale.evidence.map(x=>esc(x)).join('; ')}</div></details>`:'';
-      return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div>${reason}${evidence}</div>`;
+      return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(settingValue(setting))}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(settingUnit(setting))}</span></div>${reason}${evidence}</div>`;
     }).join('')||empty(interrupted?'This alert stopped before candidate generation; no candidate parameters are available.':'No parameter changes were found.');
     const s=d.shapAnalysis;
     let shap=empty('No SHAP evidence');
     if(s?.status==='completed'&&s.features?.length){
       const max=Math.max(...s.features.map(f=>Math.abs(f.shapValue)),1e-12);
-      shap=`<p class="ki-sample-note">Green increases the model prediction; red decreases it. Units: percentage points (pp).</p>`+s.features.map(f=>{
+      const lowConfidence=s.reliability?.status==='low_confidence'?'<p class="ki-sample-note">Low-confidence model: this training set has limited scenario/row coverage; attributions are shown for inspection and are excluded from LLM tuning decisions.</p>':'';
+      shap=`${lowConfidence}<p class="ki-sample-note">Green increases the model prediction; red decreases it. Units: percentage points (pp).</p>`+s.features.map(f=>{
         const positive=f.shapValue>=0,width=Math.abs(f.shapValue)/max*50;
         return `<div class="shap-feature"><div class="shap-name" title="${esc((f.parameters||[]).join(', '))}">${esc(f.name)}</div><div class="shap-value">${f.isAggregate?'aggregate':number(f.value)}</div><div class="shap-bar ki-shap-diverging"><div class="shap-bar-fill ${positive?'low':'high'}" style="position:absolute;left:${positive?50:50-width}%;width:${width}%"></div></div><div class="shap-impact" style="color:${positive?'#008943':'#c62c20'}">${positive?'+':''}${number(f.shapValue*100,3)} pp</div></div>`;
       }).join('');
@@ -208,7 +211,7 @@
     const examples=(d.functionCodeExamples||[]).filter(s=>s.function===name);
     const chains=(d.runtimeCallChains||[]).filter(c=>(c.matched_key_functions||[]).includes(name));
     const evidence=hot.Evidence==='runtime_call_chain'?'perf call chain':hot.Evidence==='source_association'?'source association':'perf differential sampling';
-    const location=hot.SourceFile?`${hot.SourceFile}${hot.SourceLine?':'+hot.SourceLine:''}`:'Not located in the pinned PostgreSQL 12.22 source tree';
+    const location=hot.SourceFile?`${hot.SourceFile}${hot.SourceLine?':'+hot.SourceLine:''}`:'Not located in the pinned database source tree';
     const summary=kv([['Function',esc(name)],['Source location',esc(location)],['Evidence',esc(evidence)],['Sample rate',shown(hot['Sample Rate'])],['Diff from mean',shown(hot['Diff From Mean'])]]);
     const exampleRows=examples.map(s=>[esc(s.knob_name||s.guc_variable||'—'),esc(s.context||'—'),esc(`${s.file}:${s.line}`),esc(s.source_line||'')]);
     const relatedExamples=exampleRows.length?panel('Related parameter / source evidence',table(['Parameter','Context','Location','Source line'],exampleRows)):'';
@@ -229,7 +232,7 @@
       return;
     }
     const model=detail.descriptionModel?` · ${esc(detail.descriptionModel)}`:'';
-    const descriptionTitle=detail.descriptionSource==='llm'?`Function description (AI generated${model})`:detail.descriptionSource==='source_comment'?'Function description (PostgreSQL source comment)':'Function description';
+    const descriptionTitle=detail.descriptionSource==='llm'?`Function description (AI generated${model})`:detail.descriptionSource==='source_comment'?'Function description (database source comment)':'Function description';
     const descriptionText=detail.descriptionEn||detail.description;
     const description=descriptionText?`<p class="ki-function-description">${esc(descriptionText)}</p>`:'<p class="ki-sample-note">No explanation is available; the source has no comment and AI generation failed.</p>';
     const signature=detail.signature?`<h3>Signature</h3><pre class="ki-code">${esc(detail.signature)}</pre>`:'';
@@ -309,7 +312,7 @@
           const control=r.controlFlowFunctions||[],data=r.dataFlowFunctions||[],flow=[];
           if(control.length)flow.push('Control flow: '+control.join(', '));
           if(data.length)flow.push('Data flow: '+data.join(', '));
-          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,shown(r.category),`<div class="code-block">${esc(flow.length?flow.join('; '):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
+          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge ${r.db==='mysql'?'mysql':'pg'}">${r.db==='mysql'?'MySQL':'PostgreSQL'}</span>`,shown(r.category),`<div class="code-block">${esc(flow.length?flow.join('; '):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
         });break;
       case 'alertRules': {
         const metricLabels={'target_business_tps':'Target business TPS'};

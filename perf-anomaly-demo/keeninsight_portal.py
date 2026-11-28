@@ -17,7 +17,7 @@ import threading
 import time
 
 from function_descriptions import describe_if_missing
-from function_locations import describe_function, load_index as load_function_locations
+from function_locations import describe_function, load_index as load_function_locations, source_root as function_source_root
 
 ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
@@ -32,7 +32,7 @@ CATEGORIES = {
     "alerts": ("alert-list.html", "Alert trigger, raw state, diagnosis, apply/retest/restore evidence"),
     "profiles": ("alert-detail.html", "Differential profiling, SHAP, hot functions, runtime call chains"),
     "alertRules": ("alert-rules.html", "Actual loaded Prometheus alert expression and state"),
-    "code": ("code-source.html", "Versioned PostgreSQL function/parameter/source-line associations"),
+    "code": ("code-source.html", "Versioned database function/parameter/source-line associations"),
     "manual": ("manual.html", "Parameter descriptions, unit, context, defaults and limits"),
 }
 
@@ -178,6 +178,7 @@ class KeenInsightPortal:
         self._cache_lock = threading.Lock()
         self._host_metrics_cache = None
         self._function_locations = None
+        self._function_locations_root = None
         self._function_locations_lock = threading.Lock()
         self._backfill()
 
@@ -274,8 +275,11 @@ class KeenInsightPortal:
     def _function_location_index(self):
         with self._function_locations_lock:
             if self._function_locations is None:
+                dbms = str(getattr(self.bridge.args, "dbms", "postgresql"))
                 try:
-                    self._function_locations = load_function_locations()
+                    self._function_locations_root = function_source_root(dbms=dbms)
+                    self._function_locations = load_function_locations(
+                        self._function_locations_root, dbms=dbms)
                 except Exception:
                     self._function_locations = {}
             return self._function_locations
@@ -303,7 +307,8 @@ class KeenInsightPortal:
         name = str(name or "").strip()
         if not name or len(name) > 200:
             raise KeyError("function name required")
-        details = describe_function(name, self._function_location_index())
+        index = self._function_location_index()
+        details = describe_function(name, index, root=self._function_locations_root)
         if not details:
             details = {"name": name, "file": None, "line": None, "signature": None,
                        "description": None, "excerpt": None, "excerptStartLine": None}
@@ -513,6 +518,10 @@ class KeenInsightPortal:
         with self._cache_lock:
             if category in self._cache:
                 return self._cache[category]
+            if str(getattr(self.bridge.args, "dbms", "postgresql")).lower() in {"mysql", "mariadb"}:
+                values = self._mysql_references(category)
+                self._cache[category] = values
+                return values
             values = []
             common = ROOT / "db_profiles/postgresql/common"
             if category == "manual":
@@ -545,6 +554,131 @@ class KeenInsightPortal:
                                        "provenance": association.get("source_provenance"), "source": "PostgreSQL source association"})
             self._cache[category] = values
             return values
+
+    def _mysql_references(self, category):
+        """MySQL parameter manual and source association for the shared portal."""
+
+        try:
+            from db_profile import resolve_profile, profile_summary
+            profile = profile_summary(resolve_profile(
+                getattr(self.bridge.args, "dbms", "mysql"),
+                getattr(self.bridge.args, "pg_version", "8.0.36"),
+            ))
+        except Exception:
+            profile = {}
+        files = profile.get("files", {}) if isinstance(profile, dict) else {}
+        constraints_payload = load_json(Path(files.get("constraints", "")), {}) or {}
+        constraints = constraints_payload.get("MySQL_Parameters", {}) if isinstance(constraints_payload, dict) else {}
+        defaults_payload = load_json(Path(files.get("defaults", "")), {}) or {}
+        if isinstance(defaults_payload, list):
+            defaults = defaults_payload[0] if defaults_payload and isinstance(defaults_payload[0], dict) else {}
+        elif isinstance(defaults_payload, dict):
+            defaults = defaults_payload
+        else:
+            defaults = {}
+        manual_rows = load_json(Path(files.get("manual", "")), []) or []
+        manual = {
+            str(row.get("parameter")): row
+            for row in manual_rows
+            if isinstance(row, dict) and row.get("parameter")
+        }
+        if category == "manual":
+            values = []
+            for name, spec in constraints.items():
+                kind = str(spec[0]) if isinstance(spec, list) and spec else "unknown"
+                bounds = spec[2] if isinstance(spec, list) and len(spec) > 2 else None
+                row = manual.get(name, {})
+                minimum = maximum = None
+                if kind == "int" and isinstance(bounds, list) and len(bounds) >= 2:
+                    minimum, maximum = bounds[0], bounds[1]
+                values.append({
+                    "id": name,
+                    "source": "MySQL 8.0 original SysInsight parameter association and configuration constraints",
+                    "content": ("MySQL 8.0 parameter {}; original target range {} - {}; suggested values: {}."
+                                .format(name, minimum if minimum is not None else "n/a",
+                                        maximum if maximum is not None else "n/a",
+                                        ", ".join(str(v) for v in row.get("suggested_values", [])[:6]) or "n/a")),
+                    "title": name,
+                    "description": "MySQL 8.0 target parameter",
+                    "type": kind,
+                    "default": defaults.get(name),
+                    "unit": "unitless / bytes / milliseconds as defined by MySQL",
+                    "context": "MySQL global or session variable",
+                    "min": minimum,
+                    "max": maximum,
+                    "restart": False,
+                    "availability": {
+                        "unit": "MySQL native unit",
+                        "range": "numeric limits" if minimum is not None else "see MySQL enum/parameter definition",
+                    },
+                })
+            return values
+        if category != "code":
+            return []
+        association_path = Path(str(files.get("association", "")))
+        associations = load_json(association_path, []) or []
+        try:
+            source_root = function_source_root(dbms="mysql")
+            locations = load_function_locations(source_root, dbms="mysql")
+        except Exception:
+            source_root, locations = None, {}
+        values = []
+        source_lines = {}
+
+        def definition_line(location):
+            if not source_root or not isinstance(location, dict):
+                return None
+            relative = str(location.get("file") or "")
+            try:
+                number = int(location.get("line") or 0)
+            except (TypeError, ValueError):
+                return None
+            if not relative or number < 1:
+                return None
+            if relative not in source_lines:
+                try:
+                    source_lines[relative] = (source_root / relative).read_text(
+                        encoding="utf-8", errors="replace").splitlines()
+                except OSError:
+                    source_lines[relative] = []
+            lines = source_lines[relative]
+            if number <= len(lines):
+                return lines[number - 1].strip()
+            return None
+
+        for association in associations:
+            if not isinstance(association, dict):
+                continue
+            knob = str(association.get("knob_name") or "")
+            control = [str(value) for value in association.get("control_flow_functions") or [] if value]
+            data = [str(value) for value in association.get("data_flow_functions") or [] if value]
+            function_flow = ", ".join(data or control)
+            for context, functions in (("data_flow", data[:16]), ("control_flow", control[:16])):
+                for function in functions:
+                    location = locations.get(function, {}) if isinstance(locations, dict) else {}
+                    identity = json.dumps([knob, context, function], sort_keys=True)
+                    values.append({
+                        "id": "mysql-code-" + hashlib.sha1(identity.encode()).hexdigest()[:16],
+                        "name": function,
+                        "db": "mysql",
+                        "category": context,
+                        "description": knob,
+                        "functionFlow": function_flow or None,
+                        "controlFlowFunctions": control,
+                        "dataFlowFunctions": data,
+                        "dataFlow": None,
+                        "codeSnippet": definition_line(location),
+                        "file": location.get("file"),
+                        "line": location.get("line"),
+                        "detail": "Original MySQL parameter/function association with the matched MySQL 8.0 source definition.",
+                        "availability": {
+                            "functionFlow": "Original MySQL control/data flow function list; not a runtime trace.",
+                            "dataFlow": "Source location is available when the function definition was indexed.",
+                        },
+                        "provenance": {"association": str(association_path), "source_root": str(source_root or "")},
+                        "source": "MySQL source association",
+                    })
+        return values
 
     def related_lab_run(self, incident_id):
         """Return the compact lab comparison that contains this incident.
@@ -632,7 +766,7 @@ class KeenInsightPortal:
                 'collectionError': self.bridge.last_collection_error},
             'capabilities': [
                 {'name': 'Alert → perf → source → LLM → apply/retest/restore', 'state': 'enabled' if getattr(args,'sysinsight_full_chain',False) else 'disabled', 'detail': 'Open an alert to inspect measured evidence and restoration, not just workflow status.'},
-                {'name': 'SHAP attribution', 'state': 'experimental' if (ROOT/'models/sysinsight_pg12_tps/manifest.json').is_file() else 'unavailable', 'detail': 'Tree-path-dependent TreeSHAP of a local PG12 foreground-TPS-retention model, trained on measured cases. Prediction explanation, not causality or LLM reasoning. Per-alert version, validation and range warnings retained.'},
+                {'name': 'SHAP attribution', 'state': 'experimental' if (ROOT / ('models/sysinsight_mysql_tps' if str(getattr(args, 'dbms', '')).lower() in {'mysql', 'mariadb'} else 'models/sysinsight_pg12_tps') / 'manifest.json').is_file() else 'unavailable', 'detail': 'Tree-path-dependent TreeSHAP of a local {} foreground-TPS-retention model, trained on measured cases. Prediction explanation, not causality or LLM reasoning. Per-alert version, validation and range warnings retained.'.format('MySQL 8.0' if str(getattr(args, 'dbms', '')).lower() in {'mysql', 'mariadb'} else 'PG12')},
                 {'name': 'Host / database / TPS monitoring', 'state': 'external', 'detail': 'Available in the existing Grafana dashboards; not duplicated here.'},
             ], 'schema': self.schema(), 'links': {'lab': '/lab', 'automation': '/ui'}}
 
@@ -640,8 +774,11 @@ class KeenInsightPortal:
         try:
             payload = self.bridge.prometheus._get("/api/v1/rules", {"type": "alert"})
             values = []
+            selected_alert = str(getattr(self.bridge.args, "alert_name", "") or "")
             for group in payload.get("data", {}).get("groups", []):
                 for rule in group.get("rules", []):
+                    if selected_alert and rule.get("name") != selected_alert:
+                        continue
                     labels = rule.get("labels", {}) or {}
                     try:
                         drop_percent = float(labels.get("drop_percent"))

@@ -1,0 +1,1078 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "① 打开系统调优实验台",
+      "url": "http://123.56.83.97:8001/lab",
+      "type": "link",
+      "targetBlank": true
+    },
+    {
+      "title": "② 打开产品门户 / 调优历史",
+      "url": "http://123.56.83.97:8001/keeninsight/template.html",
+      "type": "link",
+      "targetBlank": true
+    },
+    {
+      "title": "③ 打开联动管理",
+      "url": "http://123.56.83.97:8001/ui",
+      "type": "link",
+      "targetBlank": true
+    },
+    {
+      "title": "④ 主机 / PostgreSQL 监控",
+      "url": "http://123.56.83.97:8002/d/local-postgresql-demo/582e36f",
+      "type": "link",
+      "targetBlank": true
+    },
+    {
+      "title": "⑤ 告警联动状态",
+      "url": "http://123.56.83.97:8002/d/sysinsight-dream-automation/84c3106",
+      "type": "link",
+      "targetBlank": true
+    }
+  ],
+  "panels": [
+    {
+      "type": "row",
+      "title": "① 实验状态",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 1
+      },
+      "id": 101,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_sysinsight_run_info{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "{{phase}} / {{status}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "当前阶段",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 4,
+        "y": 1
+      },
+      "id": 102,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_business_tps_steady{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "{{phase}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "目标业务 TPS（稳态）",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 9,
+        "y": 1
+      },
+      "id": 103,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "{{phase}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "压力注入 TPS",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 14,
+        "y": 1
+      },
+      "id": 104,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_alert_firing{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "当前 {{phase}}",
+          "refId": "A",
+          "instant": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_alert_observed{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "本次曾触发 {{phase}}",
+          "refId": "B",
+          "instant": true
+        }
+      ],
+      "title": "告警",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 19,
+        "y": 1
+      },
+      "id": 105,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_tuning_improved{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "提升 {{scenario_id}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "调优是否提升",
+      "type": "stat"
+    },
+    {
+      "type": "row",
+      "title": "② 实时曲线",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 110,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 16,
+        "x": 0,
+        "y": 6
+      },
+      "id": 111,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "目标业务 TPS {{phase}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "压力注入 TPS {{phase}}",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "title": "三阶段 TPS 曲线",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "id": 112,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_connections{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "实验连接 {{phase}}",
+          "refId": "A",
+          "range": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_active_sessions{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "活动连接 {{phase}}",
+          "refId": "B",
+          "range": true
+        }
+      ],
+      "title": "实验连接",
+      "type": "timeseries"
+    },
+    {
+      "type": "row",
+      "title": "③ 压力下调优前后对比",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 120,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1000
+              },
+              {
+                "color": "green",
+                "value": 1500
+              }
+            ]
+          },
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 0,
+        "y": 17
+      },
+      "id": 121,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "valueMode": "color",
+        "namePlacement": "left",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_baseline_business_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "无压力基线",
+          "refId": "A",
+          "instant": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_pressure_before_business_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "压力调优前",
+          "refId": "B",
+          "instant": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_pressure_after_business_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "压力调优后",
+          "refId": "C",
+          "instant": true
+        }
+      ],
+      "title": "目标业务 TPS 对比",
+      "type": "bargauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 7,
+        "x": 10,
+        "y": 17
+      },
+      "id": 122,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_tuning_gain_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "{{scenario_id}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "调优提升 TPS",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 7,
+        "x": 17,
+        "y": 17
+      },
+      "id": 123,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_tuning_gain_ratio{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "{{scenario_id}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "调优提升比例",
+      "type": "stat"
+    },
+    {
+      "type": "row",
+      "title": "④ 压力一致性与恢复",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "id": 130,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 8,
+        "x": 0,
+        "y": 25
+      },
+      "id": 131,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_external_pressure_before_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "压力前",
+          "refId": "A",
+          "instant": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_external_pressure_after_tps{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "压力后",
+          "refId": "B",
+          "instant": true
+        }
+      ],
+      "title": "外部压力前 / 后 TPS",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 8,
+        "y": 25
+      },
+      "id": 132,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_external_pressure_delta_ratio{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "偏差",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "压力偏差",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 5,
+        "x": 13,
+        "y": 25
+      },
+      "id": 133,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_comparison_valid{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "valid",
+          "refId": "A",
+          "instant": true
+        },
+        {
+          "expr": "sysinsight_dream_lab_tpcc_same_pressure_observed{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "same pressure",
+          "refId": "B",
+          "instant": true
+        }
+      ],
+      "title": "对比是否有效",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "gray",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 18,
+        "y": 25
+      },
+      "id": 134,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "targets": [
+        {
+          "expr": "sysinsight_dream_lab_tpcc_recovery_ratio{job=\"sysinsight_mysql_bridge\"}",
+          "legendFormat": "恢复",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "title": "恢复比例",
+      "type": "stat"
+    },
+    {
+      "type": "row",
+      "title": "⑤ 演示说明",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 140,
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "text",
+      "title": "演示顺序",
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 141,
+      "options": {
+        "mode": "markdown",
+        "content": "### 演示顺序\n1. 打开 [系统调优实验台](http://123.56.83.97:8001/lab)，选择 TPCC 场景，运行“基线 → 压力调优前 → 压力调优后”。\n2. 本看板每 5 秒刷新：先看阶段与目标业务 TPS 曲线，再看压力下调优前后对比和提升。\n3. 打开 [产品门户](http://123.56.83.97:8001/keeninsight/template.html) 查看调优历史；每行“详情”会展开配置、三阶段 TPS、候选来源、应用/恢复和告警证据。\n4. 打开 [联动管理](http://123.56.83.97:8001/ui) 查看告警时间线；告警详情包含 perf 调用链、函数差分、SHAP、参数候选和复测/恢复证据。\n\n**提示：** 演示建议用默认 60 秒基线 + 180 秒压力（前后各 90 秒）；短于 15 秒的阶段可能只被 Prometheus 抓到 0–1 个点。",
+        "showTitle": false
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 39,
+  "tags": [
+    "mysql",
+    "mysql-demo",
+    "prometheus",
+    "sysinsight",
+    "system-tuning",
+    "tpcc"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "KeenInsight MySQL 系统调优演示",
+  "uid": "sysinsight-mysql-experiment-lab",
+  "version": 1
+}

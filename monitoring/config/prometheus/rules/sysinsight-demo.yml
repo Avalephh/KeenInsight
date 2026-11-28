@@ -8,10 +8,15 @@ groups:
         # run retained by Prometheus; phase matching keeps the rule silent
         # during the baseline itself and after tuning.
         expr: |
-          sysinsight_dream_lab_tpcc_business_tps{phase="pressure_before"} > 0
+          sysinsight_dream_lab_tpcc_business_tps{job="sysinsight_dream_bridge",phase="pressure_before"} > 0
           and
-          sysinsight_dream_lab_tpcc_business_tps{phase="pressure_before"}
-            < 0.9 * scalar(max without (phase, status, run_id, scenario_id) (max_over_time(sysinsight_dream_lab_tpcc_business_tps{phase="baseline"}[10m])))
+          sysinsight_dream_lab_tpcc_business_tps{job="sysinsight_dream_bridge",phase="pressure_before"}
+            < 0.9 * scalar(max without (phase, status, run_id, scenario_id) (max_over_time(sysinsight_dream_lab_tpcc_business_tps{job="sysinsight_dream_bridge",phase="baseline"}[10m])))
+          and
+          # Ignore stale series from a previous lab run. Prometheus keeps the
+          # last value for the lookback window, but only a fresh scrape can
+          # represent pressure that is actually active now.
+          (time() - timestamp(sysinsight_dream_lab_tpcc_business_tps{job="sysinsight_dream_bridge",phase="pressure_before"}) < 20)
         for: 30s
         labels:
           severity: warning

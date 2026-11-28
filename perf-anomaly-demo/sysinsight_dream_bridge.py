@@ -139,7 +139,7 @@ def _hint_table_pattern(sql: str) -> str:
 
 
 def _read_api_key() -> str:
-    for name in ("SYSINSIGHT_GPT_API_KEY", "SYSINSIGHT_API_KEY", "OPENAI_API_KEY"):
+    for name in ("SYSINSIGHT_GPT_API_KEY", "SYSINSIGHT_API_KEY", "OPENAI_API_KEY", "KI_RAG_LLM_TOKEN"):
         value = os.environ.get(name, "")
         if value:
             return value
@@ -2513,6 +2513,7 @@ class Bridge:
                 end,
                 self.args.prometheus_step,
                 self.args.alert_name,
+                dbms=self.args.dbms,
             )
         except Exception as exc:
             return {
@@ -2596,9 +2597,10 @@ class Bridge:
                 pids.append(pid)
         pids_path = incident_dir / "active_pids.json"
         _write_json(pids_path, pids)
+        chain_script = "mysql_live_chain.py" if str(getattr(self.args, "dbms", "postgresql")).lower() in {"mysql", "mariadb"} else "sysinsight_live_chain.py"
         command = [
             sys.executable,
-            str(ROOT / "sysinsight_live_chain.py"),
+            str(ROOT / chain_script),
             "--case-result",
             str(case_path),
             "--prometheus-capture",
@@ -2655,6 +2657,13 @@ class Bridge:
         if self.args.sysinsight_validation_sql:
             command.extend(["--validation-sql", self.args.sysinsight_validation_sql])
         env = os.environ.copy()
+        if not any(env.get(name) for name in ("SYSINSIGHT_GPT_API_KEY", "SYSINSIGHT_API_KEY", "OPENAI_API_KEY")):
+            # The systemd environment exposes the shared KeenInsight token,
+            # while the original SysInsight LLM wrapper only reads its own
+            # variable names. Bridge them without writing the key to disk.
+            api_key = _read_api_key()
+            if api_key:
+                env["SYSINSIGHT_GPT_API_KEY"] = api_key
         if not env.get("SYSINSIGHT_SOURCE_ROOT"):
             source_root = ROOT.parent / "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune"
             if (source_root / "DBTuner" / "utils" / "analyzeException.py").is_file():

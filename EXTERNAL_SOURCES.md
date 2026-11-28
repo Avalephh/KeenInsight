@@ -48,6 +48,24 @@ python3 perf-anomaly-demo/db_profiles/build_profile_artifacts.py
 
 构建器会根据源码和官方资料机械生成关联、约束、默认值与 provenance，不会把生成机器的绝对路径写入新的 provenance。
 
+## MySQL 8.0.42 source tree
+
+`mysql-source.lock` 锁定 MySQL Community Server 8.0.42 官方 source tarball、下载地址和
+SHA-256。MySQL 演示用这棵树做函数源码位置、源码证据和源码注释读取；没有源码树时演示仍可
+运行，但这些字段会显示为未定位。
+
+```bash
+./scripts/fetch_mysql_source.sh
+```
+
+默认目录是 `third_party/mysql-8.0.42/`，也可用 `MYSQL_SOURCE_ROOT` 指定。源码索引缓存
+`perf-anomaly-demo/results/function_locations_mysql.json` 可以用以下命令重建：
+
+```bash
+python3 perf-anomaly-demo/function_locations.py --dbms mysql \
+  --source-root "$MYSQL_SOURCE_ROOT" --rebuild
+```
+
 ## 开源监控组件
 
 `monitoring/versions.lock` 锁定 Prometheus、node_exporter、postgres_exporter 和 Grafana OSS 的版本、官方下载地址及 SHA-256。干净检出后执行：

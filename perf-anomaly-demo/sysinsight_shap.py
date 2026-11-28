@@ -24,6 +24,8 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_MODEL = ROOT / "models" / "sysinsight_pg12_tps"
+MYSQL_MODEL = ROOT / "models" / "sysinsight_mysql_tps"
+DEFAULT_MYSQL_SOURCE = ROOT / "results" / "mysql_shap_windows"
 SCHEMA = "keeninsight.shap.v1"
 
 
@@ -34,22 +36,77 @@ def sha(path):
 def read_rates(path):
     """Read measured inclusive rates. Missing symbols mean zero sampled hits."""
     values = {}
-    with Path(path).open(encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            name = row.get("Function")
-            raw = row.get("Sampling Rate (%)")
-            if not name or raw is None:
+    for delimiter in ("\t", ","):
+        values = {}
+        with Path(path).open(encoding="utf-8") as handle:
+            reader = csv.DictReader(handle, delimiter=delimiter)
+            fields = reader.fieldnames or []
+            rate_field = next((field for field in ("Sampling Rate (%)", "Average Sampling Rate (%)")
+                               if field in fields), "")
+            if not rate_field:
                 continue
-            value = float(str(raw).rstrip("%"))
-            if not math.isfinite(value) or value < 0:
-                raise ValueError("invalid sampled function rate")
-            values[name] = value
-    if len(values) < 10 or not any(key in values for key in ("PostgresMain", "postgres", "standard_ExecutorRun")):
-        raise ValueError("not a complete PostgreSQL function-count profile")
+            for row in reader:
+                name = row.get("Function")
+                raw = row.get(rate_field)
+                if not name or raw is None:
+                    continue
+                value = float(str(raw).rstrip("%"))
+                if not math.isfinite(value) or value < 0:
+                    raise ValueError("invalid sampled function rate")
+                values[name] = value
+            if values:
+                break
+    if len(values) < 10:
+        raise ValueError("not a complete function-count profile")
+    postgres_marker = any(key in values for key in ("PostgresMain", "postgres", "standard_ExecutorRun"))
+    mysql_marker = any(key in values for key in ("mysqld_main", "dispatch_command", "do_command", "handle_connection"))
+    if not postgres_marker and not mysql_marker:
+        raise ValueError("not a complete PostgreSQL or MySQL function-count profile")
     return values
 
 
-def associations():
+def _sysinsight_source_root():
+    configured = os.environ.get("SYSINSIGHT_SOURCE_ROOT", "")
+    if configured:
+        return Path(configured)
+    for candidate in (
+        ROOT.parent / "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune",
+        Path("/root/repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune"),
+    ):
+        if candidate.is_dir():
+            return candidate
+    return ROOT.parent / "repositories/Avalephh-KeenInsight/branch-sources/WorkloadTune"
+
+
+def mysql_associations():
+    """Map MySQL perf symbols to knobs using the original association library."""
+
+    path = _sysinsight_source_root() / "DBTuner" / "utils" / "paramater_association_library.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    mapping = {}
+    for item in data:
+        knob = item.get("knob_name")
+        if not knob:
+            continue
+        for key in ("data_flow_functions", "control_flow_functions"):
+            for function in item.get(key, []) or []:
+                name = str(function)
+                # Association entries sometimes carry aggregate sentinels such
+                # as _db_keyword_ that do not denote real perf symbols.
+                if name and not name.startswith("_"):
+                    mapping.setdefault(name, set()).add(knob)
+    return mapping
+
+
+def associations(dbms="postgresql", model_dir=None):
+    if str(dbms).lower() in {"mysql", "mariadb"}:
+        manifest_path = Path(model_dir or MYSQL_MODEL) / "manifest.json"
+        if manifest_path.is_file():
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            parameters = manifest.get("functionParameters")
+            if isinstance(parameters, dict):
+                return {name: set(values or []) for name, values in parameters.items()}
+        return mysql_associations()
     data = json.loads((ROOT / 'db_profiles/postgresql/common/function_parameter_association.json').read_text())
     mapping = {}
     for item in data:
@@ -156,6 +213,141 @@ def train(source, destination):
     return {'modelVersion':version,'validation':metrics,'featureCount':len(names),'destination':str(destination)}
 
 
+def training_rows_mysql(source):
+    """Load real MySQL baseline/pressure windows with their pressure profiles."""
+
+    records, excluded, fingerprints = [], [], set()
+    schema = "keeninsight.mysql-shap-window.v1"
+    for path in sorted(Path(source).glob("**/measurement.json")):
+        try:
+            row = json.loads(path.read_text(encoding="utf-8"))
+            if row.get("schemaVersion") != schema or row.get("status") != "completed":
+                raise ValueError("not a completed MySQL SHAP measurement")
+            baseline = float(row["baselineTps"])
+            pressure = float(row["pressureTps"])
+            target = float(row["target"])
+            if baseline <= 0 or pressure < 0 or not math.isfinite(baseline + pressure):
+                raise ValueError("invalid measured TPS pair")
+            if abs(target - pressure / baseline) > 1e-4:
+                raise ValueError("target does not match the measured TPS pair")
+            capture = row.get("capture") or {}
+            if (capture.get("perf") or {}).get("status") != "completed":
+                raise ValueError("profile has no completed perf provenance")
+            counts = Path(str(row["countsPath"]))
+            rates = read_rates(counts)
+            signature = sha(counts)
+            if signature in fingerprints:
+                raise ValueError("duplicate profile, not an independent sample")
+            fingerprints.add(signature)
+            records.append({
+                "group": str(row["scenarioId"]),
+                "target": target,
+                "rates": rates,
+                "sourceCase": str(path.resolve()),
+                "caseSha256": sha(path),
+                "profile": str(counts.resolve()),
+                "profileSha256": signature,
+                "baselineControlTps": baseline,
+                "pressureControlTps": pressure,
+                "foregroundWorker": "mysql-control",
+                "captureStartedAt": (capture.get("perf") or {}).get("requested_at"),
+                "captureStoppedAt": (capture.get("perf") or {}).get("finished_at"),
+            })
+        except (KeyError, TypeError, ValueError, OSError) as exc:
+            excluded.append({"sourceCase": str(path), "reason": str(exc)})
+    groups = {record["group"] for record in records}
+    if len(records) < 15 or len(groups) < 6:
+        raise ValueError(
+            "Need >=15 genuine MySQL measured profiles across >=6 focus scenarios; do not synthesize missing training data"
+        )
+    return records, excluded
+
+
+def train_mysql(source, destination):
+    import joblib
+    import numpy as np
+    import shap
+    import sklearn
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.model_selection import GroupKFold
+    from sklearn.metrics import mean_absolute_error, r2_score
+
+    records, excluded = training_rows_mysql(source)
+    mapping = mysql_associations()
+    names = sorted(mapping)
+    matrix = np.array([[record["rates"].get(name, 0.0) for name in names] for record in records], dtype=float)
+    target = np.array([record["target"] for record in records])
+    groups = np.array([record["group"] for record in records])
+    make_model = lambda: RandomForestRegressor(n_estimators=96, max_depth=5, min_samples_leaf=2,
+                                               max_features=.5, n_jobs=1, random_state=20261128)
+    predictions = np.zeros(len(records))
+    folds = []
+    for train_idx, test_idx in GroupKFold(n_splits=5).split(matrix, target, groups):
+        model = make_model().fit(matrix[train_idx], target[train_idx])
+        predictions[test_idx] = model.predict(matrix[test_idx])
+        folds.append({"trainingGroups": sorted(set(groups[train_idx])),
+                      "heldOutGroups": sorted(set(groups[test_idx]))})
+    model = make_model().fit(matrix, target)
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    archive_model_assets(destination)
+    joblib.dump(model, destination / "forest.joblib", compress=3)
+    dataset = {
+        "schemaVersion": SCHEMA,
+        "featureNames": names,
+        "records": [{**{key: value for key, value in record.items() if key != "rates"},
+                     "values": matrix[index].tolist(),
+                     "heldOutPrediction": float(predictions[index])}
+                    for index, record in enumerate(records)],
+        "excluded": excluded,
+    }
+    (destination / "training_provenance.json").write_text(json.dumps(dataset, ensure_ascii=False, indent=2))
+    metrics = {
+        "method": "GroupKFold, five folds grouped by focus scenario; no same-scenario train/test overlap",
+        "folds": folds,
+        "maeRetentionRatio": float(mean_absolute_error(target, predictions)),
+        "maePercentagePoints": float(mean_absolute_error(target, predictions) * 100),
+        "r2": float(r2_score(target, predictions)),
+        "rows": len(records),
+        "scenarioGroups": len(set(groups)),
+    }
+    version = "mysql80-foreground-tps-" + sha(destination / "forest.joblib")[:16]
+    function_parameters = {name: sorted(mapping.get(name, [])) for name in names}
+    manifest = {
+        "schemaVersion": SCHEMA,
+        "modelVersion": version,
+        "modelType": "RandomForestRegressor",
+        "dbms": "mysql",
+        "createdAt": dt.datetime.now(dt.timezone.utc).isoformat(),
+        "target": "foreground pressure TPS / foreground normal baseline TPS",
+        "outputUnit": "TPS retention ratio",
+        "featureUnit": "original inclusive perf sample-rate units, not CPU utilization percent",
+        "featureNames": names,
+        "functionParameters": function_parameters,
+        "featureMin": matrix.min(axis=0).tolist(),
+        "featureMax": matrix.max(axis=0).tolist(),
+        "targetMin": float(target.min()),
+        "targetMax": float(target.max()),
+        "validation": metrics,
+        "modelSha256": sha(destination / "forest.joblib"),
+        "datasetSha256": sha(destination / "training_provenance.json"),
+        "versions": {"sklearn": sklearn.__version__, "shap": shap.__version__,
+                     "numpy": np.__version__, "joblib": joblib.__version__},
+        "scope": "Experimental MySQL 8.0.36 local TPC-C-shaped workload under the six demo pressure scenarios.",
+        "limitations": [
+            "Limited local benchmark data; held-out validation is not an online guarantee.",
+            "Only the six demo scenarios form the training groups, so validation coverage is below the trusted-advisory threshold.",
+            "Tree-path-dependent TreeSHAP explains this fitted model using training path counts, not causation or the LLM.",
+            "Not calibrated for other MySQL builds or workloads outside the demo scenario set.",
+            "Missing symbols in a complete counts file are zero sampled hits, not zero execution cost.",
+        ],
+    }
+    (destination / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2))
+    archive_model_assets(destination)
+    return {"modelVersion": version, "validation": metrics, "featureCount": len(names),
+            "destination": str(destination)}
+
+
 def archive_model_assets(directory):
     """Retain immutable model/data pairs so historical SHAP hashes stay auditable."""
     directory=Path(directory)
@@ -240,7 +432,7 @@ def explain(counts_path, model_dir=DEFAULT_MODEL, context=None):
     residual = prediction - base - float(values.sum())
     if not math.isfinite(prediction + base + residual) or abs(residual)>1e-5:
         raise ValueError('SHAP additivity validation failed')
-    mapping = associations()
+    mapping = associations(manifest.get('dbms', 'postgresql'), directory)
     features = sorted([{'name':name,'value':float(matrix[0,i]),'shapValue':float(values[i]),
         'contributionPercentagePoints':float(values[i]*100),'impact':'increases_prediction' if values[i]>=0 else 'decreases_prediction',
         'parameters':sorted(mapping.get(name,[]))} for i,name in enumerate(names)], key=lambda r:abs(r['shapValue']),reverse=True)
@@ -294,14 +486,24 @@ def compact_evidence(result):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=['train','explain'])
-    parser.add_argument('--source',default=str(ROOT/'results/tpcc_api_validation'))
+    parser.add_argument('action',choices=['train','train-mysql','explain'])
+    parser.add_argument('--source')
     parser.add_argument('--counts')
-    parser.add_argument('--model-dir',default=str(DEFAULT_MODEL))
+    parser.add_argument('--model-dir')
     parser.add_argument('--output')
     parser.add_argument('--context-json',default='{}')
     args=parser.parse_args()
-    result=train(args.source,args.model_dir) if args.action=='train' else explain(args.counts,args.model_dir,json.loads(args.context_json))
+    if args.action=='train':
+        args.source=args.source or str(ROOT/'results/tpcc_api_validation')
+        args.model_dir=args.model_dir or str(DEFAULT_MODEL)
+        result=train(args.source,args.model_dir)
+    elif args.action=='train-mysql':
+        args.source=args.source or str(DEFAULT_MYSQL_SOURCE)
+        args.model_dir=args.model_dir or str(MYSQL_MODEL)
+        result=train_mysql(args.source,args.model_dir)
+    else:
+        args.model_dir=args.model_dir or str(DEFAULT_MODEL)
+        result=explain(args.counts,args.model_dir,json.loads(args.context_json))
     if args.output:
         Path(args.output).write_text(json.dumps(result,ensure_ascii=False,indent=2))
     else:

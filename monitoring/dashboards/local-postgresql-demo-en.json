@@ -391,7 +391,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{phase=~\"baseline|pressure_before|pressure_after\"}[10s]))",
+          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_dream_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}[10s]))",
           "range": true,
           "format": "time_series",
           "legendFormat": "{{phase}}"

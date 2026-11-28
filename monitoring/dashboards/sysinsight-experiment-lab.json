@@ -115,7 +115,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_sysinsight_run_info",
+          "expr": "sysinsight_dream_lab_sysinsight_run_info{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "{{phase}} / {{status}}",
           "refId": "A",
           "instant": true
@@ -175,7 +175,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_business_tps_steady",
+          "expr": "sysinsight_dream_lab_tpcc_business_tps_steady{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "{{phase}}",
           "refId": "A",
           "instant": true
@@ -235,7 +235,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_external_tps",
+          "expr": "sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "{{phase}}",
           "refId": "A",
           "instant": true
@@ -295,13 +295,13 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_alert_firing",
+          "expr": "sysinsight_dream_lab_tpcc_alert_firing{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "当前 {{phase}}",
           "refId": "A",
           "instant": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_alert_observed",
+          "expr": "sysinsight_dream_lab_tpcc_alert_observed{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "本次曾触发 {{phase}}",
           "refId": "B",
           "instant": true
@@ -361,7 +361,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_tuning_improved",
+          "expr": "sysinsight_dream_lab_tpcc_tuning_improved{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "提升 {{scenario_id}}",
           "refId": "A",
           "instant": true
@@ -451,13 +451,13 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_business_tps",
+          "expr": "sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "目标业务 TPS {{phase}}",
           "refId": "A",
           "range": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_external_tps",
+          "expr": "sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "压力注入 TPS {{phase}}",
           "refId": "B",
           "range": true
@@ -534,13 +534,13 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_connections",
+          "expr": "sysinsight_dream_lab_tpcc_connections{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "实验连接 {{phase}}",
           "refId": "A",
           "range": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_active_sessions",
+          "expr": "sysinsight_dream_lab_tpcc_active_sessions{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "活动连接 {{phase}}",
           "refId": "B",
           "range": true
@@ -617,19 +617,19 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_baseline_business_tps",
+          "expr": "sysinsight_dream_lab_tpcc_baseline_business_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "无压力基线",
           "refId": "A",
           "instant": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_pressure_before_business_tps",
+          "expr": "sysinsight_dream_lab_tpcc_pressure_before_business_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "压力调优前",
           "refId": "B",
           "instant": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_pressure_after_business_tps",
+          "expr": "sysinsight_dream_lab_tpcc_pressure_after_business_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "压力调优后",
           "refId": "C",
           "instant": true
@@ -689,7 +689,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_tuning_gain_tps",
+          "expr": "sysinsight_dream_lab_tpcc_tuning_gain_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "{{scenario_id}}",
           "refId": "A",
           "instant": true
@@ -749,7 +749,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_tuning_gain_ratio",
+          "expr": "sysinsight_dream_lab_tpcc_tuning_gain_ratio{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "{{scenario_id}}",
           "refId": "A",
           "instant": true
@@ -822,13 +822,13 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_external_pressure_before_tps",
+          "expr": "sysinsight_dream_lab_tpcc_external_pressure_before_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "压力前",
           "refId": "A",
           "instant": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_external_pressure_after_tps",
+          "expr": "sysinsight_dream_lab_tpcc_external_pressure_after_tps{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "压力后",
           "refId": "B",
           "instant": true
@@ -888,7 +888,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_external_pressure_delta_ratio",
+          "expr": "sysinsight_dream_lab_tpcc_external_pressure_delta_ratio{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "偏差",
           "refId": "A",
           "instant": true
@@ -948,13 +948,13 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_comparison_valid",
+          "expr": "sysinsight_dream_lab_tpcc_comparison_valid{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "valid",
           "refId": "A",
           "instant": true
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_same_pressure_observed",
+          "expr": "sysinsight_dream_lab_tpcc_same_pressure_observed{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "same pressure",
           "refId": "B",
           "instant": true
@@ -1014,7 +1014,7 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_recovery_ratio",
+          "expr": "sysinsight_dream_lab_tpcc_recovery_ratio{job=\"sysinsight_dream_bridge\"}",
           "legendFormat": "恢复",
           "refId": "A",
           "instant": true

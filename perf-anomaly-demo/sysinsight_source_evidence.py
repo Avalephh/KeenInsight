@@ -127,9 +127,34 @@ def _function_spans(masked_text: str) -> List[Tuple[int, int, str]]:
     ]
 
 
-def resolve_source_root() -> Optional[Path]:
+def _profile_dbms(profile: Optional[Mapping[str, Any]]) -> str:
+    if isinstance(profile, Mapping):
+        name = str(profile.get("name") or "").lower()
+        if name.startswith(("mysql", "mariadb")):
+            return "mysql"
+        dbms = str(profile.get("dbms") or "").lower()
+        if dbms in {"mysql", "mariadb"}:
+            return "mysql"
+    if str(os.environ.get("SYSINSIGHT_DBMS", "")).lower() in {"mysql", "mariadb"}:
+        return "mysql"
+    return "postgresql"
+
+
+def resolve_source_root(dbms: str = "postgresql") -> Optional[Path]:
     """Find the checked-out source tree without requiring it in Git."""
 
+    if str(dbms).lower() in {"mysql", "mariadb"}:
+        configured = os.environ.get("MYSQL_SOURCE_ROOT", "").strip()
+        candidates = [Path(configured)] if configured else []
+        candidates.extend([
+            Path("/root/mysql-src/src"),
+            PROJECT_ROOT / "mysql-src" / "src",
+            PROJECT_ROOT / "third_party" / "mysql-8.0.42",
+        ])
+        for candidate in candidates:
+            if candidate and (candidate / "sql").is_dir() and (candidate / "storage").is_dir():
+                return candidate.resolve()
+        return None
     configured = os.environ.get("POSTGRES_SOURCE_ROOT", "").strip()
     candidates = [Path(configured)] if configured else []
     candidates.extend(
@@ -380,6 +405,80 @@ def _static_parameter_evidence(
     return result
 
 
+def _mysql_static_parameter_evidence(
+    association_path: Path,
+    source_root: Optional[Path],
+    knob_names: Sequence[str],
+    key_functions: Set[str],
+) -> List[Dict[str, Any]]:
+    """Attach real MySQL function definitions to the original associations."""
+
+    if source_root is None or not association_path.is_file():
+        return []
+    try:
+        payload = json.loads(association_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    try:
+        from function_locations import load_index
+        locations = load_index(source_root, dbms="mysql")
+    except Exception:
+        locations = {}
+    if not locations:
+        return []
+    by_knob = {
+        str(item.get("knob_name")): item
+        for item in payload
+        if isinstance(item, Mapping) and item.get("knob_name")
+    }
+    result: List[Dict[str, Any]] = []
+    for knob_name in knob_names:
+        item = by_knob.get(knob_name)
+        if not item:
+            continue
+        rows = []
+        for context, key in (("data_flow", "data_flow_functions"),
+                             ("control_flow", "control_flow_functions")):
+            for function in item.get(key, []) or []:
+                name = str(function)
+                location = locations.get(name)
+                if location:
+                    rows.append((context, name, location))
+        rows.sort(key=lambda row: (
+            0 if row[1] in key_functions else 1,
+            0 if row[0] == "data_flow" else 1,
+            str(row[2].get("file", "")),
+            int(row[2].get("line", 0) or 0),
+        ))
+        selected = []
+        seen = set()
+        for context, name, location in rows:
+            identity = (str(location.get("file", "")), int(location.get("line", 0) or 0), name)
+            if identity in seen:
+                continue
+            seen.add(identity)
+            selected.append((context, name, location))
+            if len(selected) >= MAX_EVIDENCE_PER_KNOB:
+                break
+        for context, name, location in selected:
+            result.append({
+                "knob_name": knob_name,
+                "guc_variable": None,
+                "function": name,
+                "context": context,
+                "file": location.get("file"),
+                "line": location.get("line"),
+                "source_line": None,
+                "source_sha256": None,
+                "evidence_type": "association_function_definition",
+                "source_excerpt": _function_excerpt(
+                    source_root, str(location.get("file")), location.get("line")),
+            })
+    return result
+
+
 def source_code_for_matched_knobs(
     data: Any,
     profile: Optional[Mapping[str, Any]] = None,
@@ -396,7 +495,8 @@ def source_code_for_matched_knobs(
 
     if not isinstance(data, list):
         return []
-    source_root = resolve_source_root()
+    dbms = _profile_dbms(profile)
+    source_root = resolve_source_root(dbms)
     association_path = _association_path(profile)
     if source_root is None or not association_path.is_file():
         return [
@@ -413,6 +513,13 @@ def source_code_for_matched_knobs(
         for item in payload
         if isinstance(item, Mapping) and item.get("knob_name")
     }
+    mysql_locations = {}
+    if dbms == "mysql":
+        try:
+            from function_locations import load_index
+            mysql_locations = load_index(source_root, dbms="mysql")
+        except Exception:
+            mysql_locations = {}
     result: List[Dict[str, Any]] = []
     for item in data:
         if not isinstance(item, Mapping):
@@ -425,6 +532,11 @@ def source_code_for_matched_knobs(
             for row in rows:
                 if isinstance(row, Mapping) and row.get("function"):
                     rows_by_function.setdefault(str(row["function"]), row)
+        if dbms == "mysql":
+            for function in association.get("data_flow_functions") or []:
+                location = mysql_locations.get(str(function))
+                if location:
+                    rows_by_function.setdefault(str(function), dict(location, function=str(function)))
         functions = item.get("data_flow_functions", [])
         if not isinstance(functions, list):
             functions = []
@@ -453,7 +565,8 @@ def build_source_evidence(
     key_functions = set(ordered_key_functions)
     knob_names = _matched_knobs(source_detection)
     association_path = _association_path(profile)
-    source_root = resolve_source_root()
+    dbms = _profile_dbms(profile)
+    source_root = resolve_source_root(dbms)
     # The original exception comparator can return hundreds of functions.  A
     # folded stack containing any of them would otherwise be dominated by
     # generic PostgresMain/kernel paths.  Keep the highest-ranked anomaly
@@ -467,11 +580,10 @@ def build_source_evidence(
         runtime_targets.update(str(value) for value in row.get("data_flow_functions", [])[:4])
         runtime_targets.update(str(value) for value in row.get("control_flow_functions", [])[:4])
     runtime = _runtime_call_chains(case_result, case_path, runtime_targets)
-    static = _static_parameter_evidence(
-        association_path,
-        source_root,
-        knob_names,
-        key_functions,
+    static = (
+        _mysql_static_parameter_evidence(association_path, source_root, knob_names, key_functions)
+        if dbms == "mysql"
+        else _static_parameter_evidence(association_path, source_root, knob_names, key_functions)
     )
     provenance: Dict[str, Any] = {}
     provenance_path = association_path.with_name("function_parameter_association.provenance.json")
@@ -492,7 +604,7 @@ def build_source_evidence(
         if not source_detection:
             reason = "source detection is not present in case_result"
         elif not source_root:
-            reason = "pinned PostgreSQL source tree is not available"
+            reason = "pinned {} source tree is not available".format("MySQL" if dbms == "mysql" else "PostgreSQL")
         elif not association_path.is_file():
             reason = "source association library is not available"
         else:
@@ -500,9 +612,11 @@ def build_source_evidence(
     return {
         "status": status,
         "reason": reason,
+        "dbms": dbms,
         "semantics": {
             "runtime_call_chain": "perf folded-stack samples; frame order is preserved",
-            "static_source_relation": "GUC binding plus direct source identifier use",
+            "static_source_relation": ("MySQL variable association plus source function definition"
+                                       if dbms == "mysql" else "GUC binding plus direct source identifier use"),
             "not_claimed": "complete static call graph or performance direction",
         },
         "provenance": provenance,
@@ -518,7 +632,7 @@ def render_source_evidence(evidence: Mapping[str, Any], max_chars: int = MAX_REN
     """Render evidence into the original SysInsight prompt language."""
 
     runtime_lines = [
-        "10. Runtime sampled call-chain and PostgreSQL source evidence:",
+        "10. Runtime sampled call-chain and database source evidence:",
         "    The call chains below are real perf folded-stack samples. They preserve the observed frame order, but they are not a complete static call graph.",
     ]
     chains = evidence.get("runtime_call_chains", [])
@@ -533,8 +647,8 @@ def render_source_evidence(evidence: Mapping[str, Any], max_chars: int = MAX_REN
         runtime_lines.append("    - No runtime folded-stack chain was available for this case.")
 
     static_lines = [
-        "11. PostgreSQL source evidence:",
-        "    The source records below are extracted from the pinned PostgreSQL tree and retain file, line, context and SHA-256 evidence.",
+        "11. Database source evidence:",
+        "    The source records below are extracted from the pinned database tree and retain file, line, context and SHA-256 evidence.",
     ]
     records = evidence.get("static_parameter_evidence", [])
     if isinstance(records, list) and records:

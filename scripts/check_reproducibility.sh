@@ -26,11 +26,24 @@ required_files=(
   EXTERNAL_SOURCES.md
   external-sources.lock
   postgresql-source.lock
+  mysql-source.lock
   requirements-sysinsight.txt
   monitoring/config/prometheus/prometheus.yml
   monitoring/config/grafana/grafana.ini
   monitoring/dashboards/local-postgresql-demo.json
+  monitoring/dashboards/local-mysql-demo.json
+  monitoring/dashboards/local-mysql-demo-en.json
+  monitoring/dashboards/sysinsight-mysql-dream-automation.json
+  monitoring/dashboards/sysinsight-mysql-experiment-lab.json
   perf-anomaly-demo/db_profile.py
+  perf-anomaly-demo/mysql_database.py
+  perf-anomaly-demo/mysql_workload.py
+  perf-anomaly-demo/mysql_lab_controller.py
+  perf-anomaly-demo/mysql_live_chain.py
+  perf-anomaly-demo/mysql_temporary_config.py
+  perf-anomaly-demo/collect_mysql_shap_windows.py
+  scripts/fetch_mysql_source.sh
+  scripts/mysql-demo.sh
   perf-anomaly-demo/sysinsight_detection.py
   perf-anomaly-demo/sysinsight_original_llm.py
   perf-anomaly-demo/sysinsight_prometheus.py
@@ -65,7 +78,8 @@ root = Path(os.environ["PROJECT_ROOT"])
 sys.path.insert(0, str(root / "perf-anomaly-demo"))
 from db_profile import resolve_profile  # noqa: E402
 
-for dbms, version in [("postgresql", "12"), ("postgresql", "13"), ("postgresql", "14")]:
+for dbms, version in [("postgresql", "12"), ("postgresql", "13"), ("postgresql", "14"),
+                      ("mysql", "8.0.36")]:
     profile = resolve_profile(dbms, version)
     for key in profile.raw.get("files", {}):
         profile.path(key)
@@ -76,6 +90,10 @@ for relative_path in [
     "monitoring/config/grafana/provisioning/dashboards/dashboards.yml",
     "monitoring/config/grafana/provisioning/datasources/prometheus.yml",
     "monitoring/dashboards/local-postgresql-demo.json",
+    "monitoring/dashboards/local-mysql-demo.json",
+    "monitoring/dashboards/local-mysql-demo-en.json",
+    "monitoring/dashboards/sysinsight-mysql-dream-automation.json",
+    "monitoring/dashboards/sysinsight-mysql-experiment-lab.json",
 ]:
     path = root / relative_path
     if path.suffix == ".json":

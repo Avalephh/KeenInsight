@@ -122,7 +122,7 @@
     const hotList=d.hotFunctions||[];
     const hot=hotList.map(f=>{
       const source=(d.functionCodeExamples||[]).find(s=>s.function===f.Function);
-      const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'未在固定 PostgreSQL 12.22 源码中定位（生成代码、扩展或系统符号）');
+      const location=f.SourceFile?`${f.SourceFile}${f.SourceLine?':'+f.SourceLine:''}`:(source?`${source.file}:${source.line}`:'未在固定数据库源码中定位（生成代码、扩展或系统符号）');
       const evidence=f.Evidence==='runtime_call_chain'?'perf 调用链':f.Evidence==='source_association'?'源码关联':'perf 差分采样';
       return `<div class="function-item ki-clickable" data-ki-function="${esc(f.Function)}" tabindex="0" role="button" aria-label="查看函数详情 ${esc(f.Function)}"><div class="function-header"><div class="function-name">${esc(f.Function)}</div><span class="ki-function-open">详情 ›</span></div><div class="function-info-row"><div class="function-meta">${esc(location)}</div><div class="function-sources"><span class="source-tag">${evidence}</span></div></div></div>`;
     }).join('');
@@ -139,22 +139,25 @@
       const numeric=Number(value);
       return value!==''&&Number.isFinite(numeric)?'num:'+numeric:'str:'+value;
     };
+    const settingValue=v=>v&&typeof v==='object'?v.setting:v;
+    const settingUnit=v=>v&&typeof v==='object'?(v.unit||''):'';
     const rationaleByParam=new Map(((d.tuningRationale||{}).actions||[]).map(a=>[String(a.parameter),a]));
     const knobEntries=Object.entries(app.requested_configuration||d.knobs?.selected_candidate?.configuration||{}).filter(([name,value])=>{
       const setting=app.pre_settings?.[name];
-      return !setting||normalizeKnob(setting.setting)!==normalizeKnob(value);
+      return !setting||normalizeKnob(settingValue(setting))!==normalizeKnob(value);
     });
     const knobs=knobEntries.map(([name,value])=>{
       const setting=app.pre_settings?.[name],skipped=app.skipped_configuration?.[name],rationale=rationaleByParam.get(String(name));
       const reason=rationale?.reason?`<div class="knob-reason"><span class="knob-reason-label">调优原因</span>${esc(rationale.reason)}</div>`:'';
       const evidence=(rationale?.evidence||[]).length?`<details class="knob-evidence"><summary>关联证据</summary><div class="ki-row-meta">${rationale.evidence.map(x=>esc(x)).join('；')}</div></details>`:'';
-      return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(setting?.setting)}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(setting?.unit||'')}</span></div>${reason}${evidence}</div>`;
+      return `<div class="knob-item"><div class="knob-name">${esc(name)}<div class="ki-row-meta">${esc(skipped?'Not applied: '+skipped.reason:app.status||'Candidate only')}</div></div><div class="knob-value"><span class="knob-current">${shown(settingValue(setting))}</span><span class="knob-arrow">→</span><span class="knob-recommended">${shown(value)} ${esc(settingUnit(setting))}</span></div>${reason}${evidence}</div>`;
     }).join('')||empty(interrupted?'该告警在调优候选生成前中断，未产生可用的候选参数。':'本次没有实际参数变化。');
     const s=d.shapAnalysis;
     let shap=empty('暂无 SHAP 证据');
     if(s?.status==='completed'&&s.features?.length){
       const max=Math.max(...s.features.map(f=>Math.abs(f.shapValue)),1e-12);
-      shap=`<p class="ki-sample-note">绿色表示模型预测升高，红色表示降低。单位为百分点（pp）。</p>`+s.features.map(f=>{
+      const lowConfidence=s.reliability?.status==='low_confidence'?'<p class="ki-sample-note">低置信度模型：当前训练集场景/样本覆盖有限；归因仅用于查看，不作为 LLM 调优依据。</p>':'';
+      shap=`${lowConfidence}<p class="ki-sample-note">绿色表示模型预测升高，红色表示降低。单位为百分点（pp）。</p>`+s.features.map(f=>{
         const positive=f.shapValue>=0,width=Math.abs(f.shapValue)/max*50;
         return `<div class="shap-feature"><div class="shap-name" title="${esc((f.parameters||[]).join(', '))}">${esc(f.name)}</div><div class="shap-value">${f.isAggregate?'aggregate':number(f.value)}</div><div class="shap-bar ki-shap-diverging"><div class="shap-bar-fill ${positive?'low':'high'}" style="position:absolute;left:${positive?50:50-width}%;width:${width}%"></div></div><div class="shap-impact" style="color:${positive?'#008943':'#c62c20'}">${positive?'+':''}${number(f.shapValue*100,3)} pp</div></div>`;
       }).join('');
@@ -205,7 +208,7 @@
     const examples=(d.functionCodeExamples||[]).filter(s=>s.function===name);
     const chains=(d.runtimeCallChains||[]).filter(c=>(c.matched_key_functions||[]).includes(name));
     const evidence=hot.Evidence==='runtime_call_chain'?'perf 调用链':hot.Evidence==='source_association'?'源码关联':'perf 差分采样';
-    const location=hot.SourceFile?`${hot.SourceFile}${hot.SourceLine?':'+hot.SourceLine:''}`:'未在固定 PostgreSQL 12.22 源码中定位';
+    const location=hot.SourceFile?`${hot.SourceFile}${hot.SourceLine?':'+hot.SourceLine:''}`:'未在固定数据库源码中定位';
     const summary=kv([['函数',esc(name)],['源码位置',esc(location)],['证据来源',esc(evidence)],['采样率',shown(hot['Sample Rate'])],['相对均值差',shown(hot['Diff From Mean'])]]);
     const exampleRows=examples.map(s=>[esc(s.knob_name||s.guc_variable||'—'),esc(s.context||'—'),esc(`${s.file}:${s.line}`),esc(s.source_line||'')]);
     const relatedExamples=exampleRows.length?panel('相关参数与源码证据',table(['参数','类型','位置','源码行'],exampleRows)):'';
@@ -226,7 +229,7 @@
       return;
     }
     const model=detail.descriptionModel?` · ${esc(detail.descriptionModel)}`:'';
-    const descriptionTitle=detail.descriptionSource==='llm'?`函数说明（AI 生成${model}）`:detail.descriptionSource==='source_comment'?'函数说明（PostgreSQL 源码注释原文）':'函数说明';
+    const descriptionTitle=detail.descriptionSource==='llm'?`函数说明（AI 生成${model}）`:detail.descriptionSource==='source_comment'?'函数说明（数据库源码注释原文）':'函数说明';
     const description=detail.description?`<p class="ki-function-description">${esc(detail.description)}</p>`:'<p class="ki-sample-note">暂无函数说明；源码中没有注释，AI 说明也未能生成。</p>';
     const signature=detail.signature?`<h3>函数签名</h3><pre class="ki-code">${esc(detail.signature)}</pre>`:'';
     const numbered=String(detail.excerpt||'').split('\n').map((line,index)=>String((detail.excerptStartLine||1)+index).padStart(5,' ')+'  '+line).join('\n');
@@ -305,7 +308,7 @@
           const control=r.controlFlowFunctions||[],data=r.dataFlowFunctions||[],flow=[];
           if(control.length)flow.push('控制流：'+control.join(', '));
           if(data.length)flow.push('数据流：'+data.join(', '));
-          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge pg">PostgreSQL</span>`,`<div class="code-block">${esc(flow.length?flow.join('；'):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
+          return [esc(r.id),`<strong>${esc(r.name)}</strong><div class="ki-row-meta">${esc(r.file)}:${r.line}</div>`,`<span class="db-badge ${r.db==='mysql'?'mysql':'pg'}">${r.db==='mysql'?'MySQL':'PostgreSQL'}</span>`,`<div class="code-block">${esc(flow.length?flow.join('；'):(r.functionFlow||'—'))}</div>`,`<div class="code-block">${esc(r.dataFlow||'—')} → ${esc(r.description||'—')}</div>${r.codeSnippet?`<div class="ki-row-meta">${esc(r.codeSnippet)}</div>`:''}`,evidenceButton(r)];
         });break;
       case 'alertRules': {
         const metricLabels={'target_business_tps':'目标业务 TPS'};

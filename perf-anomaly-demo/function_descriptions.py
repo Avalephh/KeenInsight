@@ -33,13 +33,16 @@ def _now() -> str:
 def _api_settings():
     base = (os.environ.get("SYSINSIGHT_GPT_BASE_URL")
             or os.environ.get("SYSINSIGHT_API_BASE")
-            or os.environ.get("OPENAI_BASE_URL") or "").strip()
+            or os.environ.get("OPENAI_BASE_URL")
+            or os.environ.get("KI_RAG_LLM_URL") or "").strip()
     key = (os.environ.get("SYSINSIGHT_GPT_API_KEY")
            or os.environ.get("SYSINSIGHT_API_KEY")
-           or os.environ.get("OPENAI_API_KEY") or "").strip()
+           or os.environ.get("OPENAI_API_KEY")
+           or os.environ.get("KI_RAG_LLM_TOKEN") or "").strip()
     model = (os.environ.get("SYSINSIGHT_GPT_MODEL")
              or os.environ.get("SYSINSIGHT_API_MODEL")
-             or os.environ.get("OPENAI_MODEL") or MODEL).strip()
+             or os.environ.get("OPENAI_MODEL")
+             or os.environ.get("KI_RAG_LLM_MODEL") or MODEL).strip()
     if not base or not key:
         return None
     base = base.rstrip("/")
