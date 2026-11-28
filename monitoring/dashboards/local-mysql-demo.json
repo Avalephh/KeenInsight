@@ -831,7 +831,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "目标业务 TPS（统一基线负载：基线 → 压力+基线 → 调优后）",
-      "description": "六个场景使用同一套 MySQL 正常 TPCC 控制负载。绿色为纯基线 TPS，红色为压力+基线中的控制 TPS（自动调优前），蓝色为自动调优后继续施加同一压力时的控制 TPS；曲线使用 30 秒滑动平均，减少瞬时抖动。",
+      "description": "MySQL 阶段 TPS：2 秒采样，仅显示当前 3 秒内有新样本的阶段，避免阶段颜色互相覆盖。",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -845,11 +845,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}[30s]))",
+          "expr": "max by (phase) (sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"} and (time() - timestamp(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}) < 3))",
           "range": true,
           "format": "time_series",
           "legendFormat": "{{phase}}",
-          "interval": "5s"
+          "interval": "2s"
         }
       ],
       "fieldConfig": {
@@ -861,7 +861,7 @@
           },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 2,
             "fillOpacity": 12,
             "gradientMode": "none",
@@ -965,10 +965,10 @@
           "sort": "none"
         }
       },
-      "maxDataPoints": 720
+      "maxDataPoints": 900
     }
   ],
-  "refresh": "5s",
+  "refresh": "2s",
   "schemaVersion": 39,
   "tags": [
     "prometheus",

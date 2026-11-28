@@ -451,23 +451,23 @@
       },
       "targets": [
         {
-          "expr": "avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\"}[15s])",
+          "expr": "sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\"} and (time() - timestamp(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\"}) < 3)",
           "legendFormat": "目标业务 TPS {{phase}}",
           "refId": "A",
           "range": true,
-          "interval": "5s"
+          "interval": "2s"
         },
         {
-          "expr": "avg_over_time(sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"}[15s])",
+          "expr": "sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"} and (time() - timestamp(sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"}) < 3)",
           "legendFormat": "压力注入 TPS {{phase}}",
           "refId": "B",
           "range": true,
-          "interval": "5s"
+          "interval": "2s"
         }
       ],
       "title": "三阶段 TPS 曲线",
       "type": "timeseries",
-      "maxDataPoints": 720
+      "maxDataPoints": 900
     },
     {
       "datasource": {
@@ -1056,7 +1056,7 @@
       }
     }
   ],
-  "refresh": "5s",
+  "refresh": "2s",
   "schemaVersion": 39,
   "tags": [
     "mysql",

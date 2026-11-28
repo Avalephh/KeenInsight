@@ -831,7 +831,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "Target Business TPS (shared baseline: baseline → pressure + baseline → after tuning)",
-      "description": "The six scenarios share the same normal control workload. Green is the pure baseline TPS, red is the control TPS under pressure before auto-tuning, and blue is the control TPS under the same pressure after auto-tuning; each series uses a 30-second moving average.",
+      "description": "MySQL phase TPS: 2-second samples; only a phase with a sample from the last 3 seconds is drawn, so phase colors do not cover each other.",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -845,11 +845,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}[30s]))",
+          "expr": "max by (phase) (sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"} and (time() - timestamp(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}) < 3))",
           "range": true,
           "format": "time_series",
           "legendFormat": "{{phase}}",
-          "interval": "5s"
+          "interval": "2s"
         }
       ],
       "fieldConfig": {
@@ -861,7 +861,7 @@
           },
           "custom": {
             "drawStyle": "line",
-            "lineInterpolation": "linear",
+            "lineInterpolation": "smooth",
             "lineWidth": 2,
             "fillOpacity": 12,
             "gradientMode": "none",
@@ -965,10 +965,10 @@
           "sort": "none"
         }
       },
-      "maxDataPoints": 720
+      "maxDataPoints": 900
     }
   ],
-  "refresh": "5s",
+  "refresh": "2s",
   "schemaVersion": 39,
   "tags": [
     "prometheus",
