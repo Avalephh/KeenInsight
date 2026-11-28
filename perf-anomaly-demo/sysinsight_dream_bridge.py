@@ -2044,7 +2044,11 @@ class Bridge:
     def __init__(self, args: argparse.Namespace) -> None:
         self.args = args
         self.store = StateStore(Path(args.state_db))
-        self.db = DatabaseClient(args.db, args.db_user, args.host, args.port, args.run_as, args.db_timeout)
+        if str(getattr(args, "dbms", "postgresql")).lower() in {"mysql", "mariadb"}:
+            from mysql_database import MySQLDatabaseClient
+            self.db = MySQLDatabaseClient(args.db, args.db_user, args.host, args.port, args.run_as, args.db_timeout)
+        else:
+            self.db = DatabaseClient(args.db, args.db_user, args.host, args.port, args.run_as, args.db_timeout)
         self.prometheus = PrometheusClient(args.prometheus_url, timeout=args.prometheus_timeout)
         self.output_root = Path(args.output).resolve()
         self.output_root.mkdir(parents=True, exist_ok=True)
@@ -2074,7 +2078,11 @@ class Bridge:
         interrupted = self.store.recover_incidents()
         if interrupted:
             LOGGER.warning("closed %d alert workflow(s) interrupted by bridge restart", len(interrupted))
-        self.lab = LabController(self)
+        if str(getattr(args, "dbms", "postgresql")).lower() in {"mysql", "mariadb"}:
+            from mysql_lab_controller import MySQLLabController
+            self.lab = MySQLLabController(self)
+        else:
+            self.lab = LabController(self)
         self.portal = KeenInsightPortal(self)
         self.http_server: Optional[ThreadingHTTPServer] = None
         self.http_thread: Optional[threading.Thread] = None

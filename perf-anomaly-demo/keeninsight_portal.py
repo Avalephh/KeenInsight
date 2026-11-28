@@ -227,8 +227,10 @@ class KeenInsightPortal:
                 age = (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(collected)).total_seconds()
             except ValueError:
                 pass
-        return [{"id": "local-postgresql", "name": socket.gethostname(), "ip": "127.0.0.1",
-                 "dbType": "PostgreSQL", "database": self.bridge.args.db, "cluster": "local",
+        dbms = str(getattr(self.bridge.args, "dbms", "postgresql")).lower()
+        mysql = dbms in {"mysql", "mariadb"}
+        return [{"id": "local-mysql" if mysql else "local-postgresql", "name": socket.gethostname(), "ip": "127.0.0.1",
+                 "dbType": "MySQL" if mysql else "PostgreSQL", "database": self.bridge.args.db, "cluster": "local",
                  "status": "online" if age is not None and age < 60 else "stale",
                  "updatedAt": collected, "collectionAgeSeconds": age,
                  "collectionError": self.bridge.last_collection_error,
