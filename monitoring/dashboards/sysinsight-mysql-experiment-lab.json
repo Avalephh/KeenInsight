@@ -451,20 +451,23 @@
       },
       "targets": [
         {
-          "expr": "sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\"}",
+          "expr": "avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\"}[15s])",
           "legendFormat": "目标业务 TPS {{phase}}",
           "refId": "A",
-          "range": true
+          "range": true,
+          "interval": "5s"
         },
         {
-          "expr": "sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"}",
+          "expr": "avg_over_time(sysinsight_dream_lab_tpcc_external_tps{job=\"sysinsight_mysql_bridge\"}[15s])",
           "legendFormat": "压力注入 TPS {{phase}}",
           "refId": "B",
-          "range": true
+          "range": true,
+          "interval": "5s"
         }
       ],
       "title": "三阶段 TPS 曲线",
-      "type": "timeseries"
+      "type": "timeseries",
+      "maxDataPoints": 720
     },
     {
       "datasource": {

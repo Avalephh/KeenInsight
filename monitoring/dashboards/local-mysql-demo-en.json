@@ -831,7 +831,7 @@
       "id": 17,
       "type": "timeseries",
       "title": "Target Business TPS (shared baseline: baseline → pressure + baseline → after tuning)",
-      "description": "The six scenarios share the same normal control workload. Green is the pure baseline TPS, red is the control TPS under pressure before auto-tuning, and blue is the control TPS under the same pressure after auto-tuning; each series uses a 10-second moving average.",
+      "description": "The six scenarios share the same normal control workload. Green is the pure baseline TPS, red is the control TPS under pressure before auto-tuning, and blue is the control TPS under the same pressure after auto-tuning; each series uses a 30-second moving average.",
       "gridPos": {
         "h": 10,
         "w": 24,
@@ -845,10 +845,11 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}[10s]))",
+          "expr": "max by (phase) (avg_over_time(sysinsight_dream_lab_tpcc_business_tps{job=\"sysinsight_mysql_bridge\",phase=~\"baseline|pressure_before|pressure_after\"}[30s]))",
           "range": true,
           "format": "time_series",
-          "legendFormat": "{{phase}}"
+          "legendFormat": "{{phase}}",
+          "interval": "5s"
         }
       ],
       "fieldConfig": {
@@ -963,10 +964,11 @@
           "mode": "single",
           "sort": "none"
         }
-      }
+      },
+      "maxDataPoints": 720
     }
   ],
-  "refresh": "15s",
+  "refresh": "5s",
   "schemaVersion": 39,
   "tags": [
     "prometheus",
@@ -981,7 +983,7 @@
     "list": []
   },
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
