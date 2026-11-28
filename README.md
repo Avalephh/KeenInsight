@@ -76,10 +76,10 @@ PostgreSQL 演示保持原样，另有一套功能对齐的 MySQL 8.0 演示栈�
 
 | 入口 | PostgreSQL | MySQL |
 | --- | --- | --- |
-| 英文产品门户 | <http://127.0.0.1:8001/keeninsight/> | <http://127.0.0.1:8101/keeninsight/> |
-| 英文实验台 / 管理台 | <http://127.0.0.1:8001/lab>、`/ui` | <http://127.0.0.1:8101/lab>、`/ui` |
-| 中文产品门户 | <http://127.0.0.1:8004/keeninsight/> | <http://127.0.0.1:8104/keeninsight/> |
-| 中文实验台 / 管理台 | <http://127.0.0.1:8005/lab>、`/ui` | <http://127.0.0.1:8105/lab>、`/ui` |
+| 英文产品门户 | <http://127.0.0.1:8001/keeninsight/> | <http://127.0.0.1:8006/keeninsight/> |
+| 英文实验台 / 管理台 | <http://127.0.0.1:8001/lab>、`/ui` | <http://127.0.0.1:8006/lab>、`/ui` |
+| 中文产品门户 | <http://127.0.0.1:8004/keeninsight/> | <http://127.0.0.1:8007/keeninsight/> |
+| 中文实验台 / 管理台 | <http://127.0.0.1:8005/lab>、`/ui` | <http://127.0.0.1:8008/lab>、`/ui` |
 | 本机监控大屏 | `local-postgresql-demo` / `-en` | `local-mysql-demo` / `-en` |
 | 系统调优联动 | `sysinsight-dream-automation` | `sysinsight-mysql-dream-automation` |
 | 实验看板 | `sysinsight-experiment-lab` | `sysinsight-mysql-experiment-lab` |
@@ -91,7 +91,7 @@ MySQL Grafana 直达：<http://127.0.0.1:8002/d/local-mysql-demo>（中文）、
 <http://127.0.0.1:8002/d/sysinsight-mysql-dream-automation>、
 <http://127.0.0.1:8002/d/sysinsight-mysql-experiment-lab>。
 
-MySQL 侧使用本机 `mysql.service`、数据库 `keeninsight_tpcc`，由 `keeninsight-mysql-demo.service` 启动 bridge（8101/8104/8105）；`keeninsight-mysql-exporter.service` 在 127.0.0.1:9104 暴露 MySQL 指标。连接账号和密码只放在 `/etc/keeninsight/mysql.env`（`SYSINSIGHT_MYSQL_PASSWORD`）和 `/etc/keeninsight/mysql-exporter.env`，不写入 Git 或结果文件。首次部署 MySQL 数据库、导入 TPCC 数据的步骤见 `monitoring/DEPLOYMENT.md`。
+MySQL 侧使用本机 `mysql.service`、数据库 `keeninsight_tpcc`，由 `keeninsight-mysql-demo.service` 启动 bridge（8006/8007/8008）；`keeninsight-mysql-exporter.service` 在 127.0.0.1:9104 暴露 MySQL 指标。连接账号和密码只放在 `/etc/keeninsight/mysql.env`（`SYSINSIGHT_MYSQL_PASSWORD`）和 `/etc/keeninsight/mysql-exporter.env`，不写入 Git 或结果文件。首次部署 MySQL 数据库、导入 TPCC 数据的步骤见 `monitoring/DEPLOYMENT.md`。
 
 MySQL 实验台复用与 PG 相同的六个 TPCC 焦点场景（Payment、Stock Level 热点/突发、五类交易混合、redo/checkpoint、Order Status），但交易由 MySQL 原生 SQL 和后台 worker 实现；每个事务都 rollback，不改变导入数据。实验仍按“基线 → 压力下自动调优前 → 临时应用候选 → 调优后 → 恢复原配置”记录同一套 `comparison` 字段，因此门户、告警详情、中文/英文页面和 Grafana 实验看板的读取逻辑完全一致。
 

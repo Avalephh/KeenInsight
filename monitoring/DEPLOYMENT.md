@@ -48,7 +48,7 @@ systemctl status keeninsight-mysql-exporter.service
 journalctl -u keeninsight-mysql-demo.service -n 100 --no-pager
 ```
 
-`keeninsight-mysql-demo.service` 运行在 8101（英文）、8104（中文门户）、8105（中文实验台/管理台），
+`keeninsight-mysql-demo.service` 运行在 8006（英文）、8007（中文门户）、8008（中文实验台/管理台），
 状态库为 `monitoring/data/mysql_demo_service.sqlite3`。它依赖 `mysql.service`，但不会停止或重启
 MySQL；所有候选参数通过 `SET GLOBAL`/session 临时应用并在实验结束或异常时恢复。buffer pool
 扩缩容会等待 MySQL 异步 resize 完成。

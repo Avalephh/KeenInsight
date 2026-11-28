@@ -10,7 +10,7 @@ exec /usr/bin/python3 /root/new/perf-anomaly-demo/sysinsight_dream_bridge.py \
   --alert-name SysInsightMySQLDemoAnomaly \
   --state-db /root/new/monitoring/data/mysql_demo_service.sqlite3 \
   --output /root/new/monitoring/data/mysql_demo_service \
-  --http-listen 0.0.0.0 --http-port 8101 --http-port-zh 8104 --http-port-zh-lab 8105 \
+  --http-listen 0.0.0.0 --http-port 8006 --http-port-zh 8007 --http-port-zh-lab 8008 \
   --public-host 123.56.83.97 --poll-interval 5 --stats-limit 300 --active-limit 100 \
   --slow-limit 10 --slow-mean-ms 10000 --slow-max-ms 10000 \
   --sample-retention-days 1 --sample-max-rows 500000 \
